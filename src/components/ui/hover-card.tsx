@@ -1,27 +1,21 @@
-import * as React from "react";
-import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
+import * as React from "react"
+import { cn } from "@/lib/utils"
 
-import { cn } from "@/lib/utils";
+const HoverCard = ({ children }: { children: React.ReactNode }) => {
+  const [open, setOpen] = React.useState(false)
+  return <HoverCardContext.Provider value={{ open, setOpen }}>{children}</HoverCardContext.Provider>
+}
+const HoverCardContext = React.createContext<{ open: boolean; setOpen: (v: boolean) => void }>({ open: false, setOpen: () => {} })
 
-const HoverCard = HoverCardPrimitive.Root;
+const HoverCardTrigger = ({ asChild, children, ...props }: React.HTMLAttributes<HTMLDivElement> & { asChild?: boolean }) => {
+  const { setOpen } = React.useContext(HoverCardContext)
+  return <div onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)} {...props}>{children}</div>
+}
 
-const HoverCardTrigger = HoverCardPrimitive.Trigger;
+const HoverCardContent = ({ className, align, sideOffset, ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { align?: string; sideOffset?: number; ref?: React.Ref<HTMLDivElement> }) => {
+  const { open } = React.useContext(HoverCardContext)
+  if (!open) return null
+  return <div ref={ref} className={cn("z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md", className)} {...props} />
+}
 
-const HoverCardContent = React.forwardRef<
-  React.ElementRef<typeof HoverCardPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof HoverCardPrimitive.Content>
->(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
-  <HoverCardPrimitive.Content
-    ref={ref}
-    align={align}
-    sideOffset={sideOffset}
-    className={cn(
-      "z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-      className,
-    )}
-    {...props}
-  />
-));
-HoverCardContent.displayName = HoverCardPrimitive.Content.displayName;
-
-export { HoverCard, HoverCardTrigger, HoverCardContent };
+export { HoverCard, HoverCardTrigger, HoverCardContent }

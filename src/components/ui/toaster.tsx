@@ -1,24 +1,25 @@
-import { useToast } from "@/hooks/use-toast";
-import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast"
 
 export function Toaster() {
-  const { toasts } = useToast();
+  const { toasts } = useToast()
+
+  if (toasts.length === 0) return null
 
   return (
-    <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
-        return (
-          <Toast key={id} {...props}>
-            <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && <ToastDescription>{description}</ToastDescription>}
-            </div>
-            {action}
-            <ToastClose />
-          </Toast>
-        );
-      })}
-      <ToastViewport />
-    </ToastProvider>
-  );
+    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-[420px]">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={`rounded-lg border p-4 shadow-lg transition-all ${
+            toast.variant === "destructive"
+              ? "border-destructive bg-destructive text-destructive-foreground"
+              : "border bg-background text-foreground"
+          }`}
+        >
+          {toast.title && <p className="text-sm font-semibold">{toast.title}</p>}
+          {toast.description && <p className="text-sm opacity-90 mt-1">{toast.description}</p>}
+        </div>
+      ))}
+    </div>
+  )
 }

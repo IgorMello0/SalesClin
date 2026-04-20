@@ -1,28 +1,40 @@
-import * as React from "react";
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import * as React from "react"
+import { cn } from "@/lib/utils"
 
-import { cn } from "@/lib/utils";
+const TooltipProvider = ({ children }: { children: React.ReactNode; delayDuration?: number }) => <>{children}</>
 
-const TooltipProvider = TooltipPrimitive.Provider;
+const Tooltip = ({ children }: { children: React.ReactNode }) => {
+  const [open, setOpen] = React.useState(false)
+  return <TooltipContext.Provider value={{ open, setOpen }}>{children}</TooltipContext.Provider>
+}
 
-const Tooltip = TooltipPrimitive.Root;
+const TooltipContext = React.createContext<{ open: boolean; setOpen: (v: boolean) => void }>({ open: false, setOpen: () => {} })
 
-const TooltipTrigger = TooltipPrimitive.Trigger;
+const TooltipTrigger = ({ asChild, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) => {
+  const { setOpen } = React.useContext(TooltipContext)
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<any>, {
+      onMouseEnter: () => setOpen(true),
+      onMouseLeave: () => setOpen(false),
+    })
+  }
+  return <button type="button" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)} {...props}>{children}</button>
+}
 
-const TooltipContent = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
-  <TooltipPrimitive.Content
-    ref={ref}
-    sideOffset={sideOffset}
-    className={cn(
-      "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-      className,
-    )}
-    {...props}
-  />
-));
-TooltipContent.displayName = TooltipPrimitive.Content.displayName;
+const TooltipContent = ({ className, sideOffset = 4, ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { sideOffset?: number; ref?: React.Ref<HTMLDivElement> }) => {
+  const { open } = React.useContext(TooltipContext)
+  if (!open) return null
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+TooltipContent.displayName = "TooltipContent"
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
