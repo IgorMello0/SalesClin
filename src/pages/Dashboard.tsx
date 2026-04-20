@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { dashboardApi } from '@/lib/api';
 
 const Dashboard = () => {
   const [filter, setFilter] = useState<'today' | '7days' | 'custom'>('custom');
@@ -14,42 +15,16 @@ const Dashboard = () => {
     conversao: 0
   });
 
-  const getTargetData = useCallback((currentFilter: string) => {
-    if (currentFilter === 'today') {
-      return {
-        leads: 42,
-        agendamentos: 28,
-        comparada: 12,
-        oportunidades: 8,
-        faturamento: 12500,
-        ticketOrcado: 1200,
-        ticketFechado: 1100,
-        conversao: 19.5
-      };
+  const fetchTargetData = useCallback(async (currentFilter: string) => {
+    try {
+      const response = await dashboardApi.getMetrics(currentFilter);
+      if (response.success && response.data) {
+        return response.data;
+      }
+    } catch (e) {
+      console.error(e);
     }
-    if (currentFilter === '7days') {
-      return {
-        leads: 312,
-        agendamentos: 185,
-        comparada: 94,
-        oportunidades: 62,
-        faturamento: 84200,
-        ticketOrcado: 2800,
-        ticketFechado: 2400,
-        conversao: 22.8
-      };
-    }
-    // Default / Custom (January 2024 as in original code)
-    return {
-      leads: 1248,
-      agendamentos: 856,
-      comparada: 612,
-      oportunidades: 425,
-      faturamento: 342500,
-      ticketOrcado: 4850,
-      ticketFechado: 3920,
-      conversao: 28.4
-    };
+    return { leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, faturamento: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0 };
   }, []);
 
   const animationRef = useCallback((targets: any) => {
@@ -83,40 +58,37 @@ const Dashboard = () => {
     requestAnimationFrame(frame);
   }, [counters]);
 
-  // Use a ref to store the targets to avoid the useCallback loop
-  const targetsRef = useState(getTargetData('custom'))[0];
-
   useEffect(() => {
-    const targets = getTargetData('custom');
-    // Só anima no primeiro load
-    const duration = 1000;
-    const startTime = performance.now();
-    const frame = (time: number) => {
-      const elapsed = time - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setCounters({
-        leads: Math.floor(ease * targets.leads),
-        agendamentos: Math.floor(ease * targets.agendamentos),
-        comparada: Math.floor(ease * targets.comparada),
-        oportunidades: Math.floor(ease * targets.oportunidades),
-        faturamento: Math.floor(ease * targets.faturamento),
-        ticketOrcado: Math.floor(ease * targets.ticketOrcado),
-        ticketFechado: Math.floor(ease * targets.ticketFechado),
-        conversao: Number((ease * targets.conversao).toFixed(1))
-      });
-      if (progress < 1) requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
-  }, []);
+    let mounted = true;
+    fetchTargetData('custom').then(targets => {
+      if (!mounted) return;
+      const duration = 1000;
+      const startTime = performance.now();
+      const frame = (time: number) => {
+        const elapsed = time - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+        setCounters({
+          leads: Math.floor(ease * targets.leads),
+          agendamentos: Math.floor(ease * targets.agendamentos),
+          comparada: Math.floor(ease * targets.comparada),
+          oportunidades: Math.floor(ease * targets.oportunidades),
+          faturamento: Math.floor(ease * targets.faturamento),
+          ticketOrcado: Math.floor(ease * targets.ticketOrcado),
+          ticketFechado: Math.floor(ease * targets.ticketFechado),
+          conversao: Number((ease * targets.conversao).toFixed(1))
+        });
+        if (progress < 1) requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+    return () => { mounted = false; };
+  }, [fetchTargetData]);
 
-  const handleFilterChange = (newFilter: 'today' | '7days' | 'custom') => {
+  const handleFilterChange = async (newFilter: 'today' | '7days' | 'custom') => {
     if (newFilter === filter) return;
     setFilter(newFilter);
-    const targets = getTargetData(newFilter);
-    
-    // Cancela qualquer animação anterior e seta os valores finais imediatamente antes de começar a nova
-    // No caso de mock, apenas setamos os novos valores sem o jitter
+    const targets = await fetchTargetData(newFilter);
     setCounters(targets);
   };
 

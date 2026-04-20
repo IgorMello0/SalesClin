@@ -57,6 +57,18 @@ const modules = [
     description: 'Módulo de testes odontológicos',
     icon: 'TestTube',
   },
+  {
+    code: 'funnel',
+    name: 'Funil de Vendas',
+    description: 'Gestão de funil de vendas e conversão',
+    icon: 'Filter',
+  },
+  {
+    code: 'metas',
+    name: 'Metas',
+    description: 'Engenharia reversa e simulador de metas',
+    icon: 'TrendingUp',
+  },
 ]
 
 async function main() {

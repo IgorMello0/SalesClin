@@ -88,7 +88,7 @@ export default {
         fadeInUp: {
           from: {
             opacity: "0",
-            transform: "translateY(20px)",
+            transform: "translateY(6px)",
           },
           to: {
             opacity: "1",
@@ -102,7 +102,7 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in-up": "fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "fade-in-up": "fadeInUp 0.22s ease-out forwards",
       },
     },
   },

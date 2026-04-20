@@ -6,7 +6,7 @@ import {
   SidebarHeader,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
@@ -90,7 +90,7 @@ export function AppSidebar() {
             <img 
               alt="SalesClin Logo" 
               className="w-full h-auto object-contain max-w-[160px] animate-in fade-in zoom-in duration-300" 
-              src="https://lh3.googleusercontent.com/aida/ADBb0ujZdVFv8pr5CEgYo9fv70hrrcUgLI7mMa2bF4IAkmcx6ZlbMd4tetC5PuMB0LZ9wHidNTCLDmYQ9IXhB0Iuu55oRIn-I6jXv1hpM1gWZo8sbu-8e46QuFSVixoBdSk0f_S6Aw8AvV1V0WidLR18IhOSq4Om05XKCCUnunoqDvIM0a2jBRPFVQayWcHo5orNcB0vYCJ1SKnh4-caKl_8u0Hlxk8PB2kqw-91avmi2d0Uah0noUyMP9rNhUsB_KcJIizRLQaDAuCc" 
+              src="/logo-salesclin.png" 
             />
           )}
         </div>
@@ -99,9 +99,9 @@ export function AppSidebar() {
       <SidebarContent className={cn("transition-all duration-300", isCollapsed ? "px-2" : "px-4")}>
         <nav className="flex-1 space-y-2">
           {filteredMenuItems.map((item) => (
-            <a
+            <Link
               key={item.title}
-              href={item.url}
+              to={item.url}
               title={isCollapsed ? item.title : ""}
               className={cn(
                 "flex items-center gap-3 py-3 text-sm font-semibold tracking-wide font-headline transition-all rounded-xl overflow-hidden group/item",
@@ -116,52 +116,40 @@ export function AppSidebar() {
                 isCollapsed ? "text-2xl" : "group-hover/item:scale-110"
               )}>{item.icon}</span>
               {!isCollapsed && <span className="truncate animate-in slide-in-from-left-2 duration-300">{item.title}</span>}
-            </a>
+            </Link>
           ))}
         </nav>
       </SidebarContent>
       
       <SidebarFooter className={cn("pb-8 mt-auto transition-all duration-300", isCollapsed ? "px-2" : "px-4")}>
-        <div className="space-y-6">
-          <button 
-            onClick={() => navigate('/appointments')}
-            title={isCollapsed ? "Nova Conversão" : ""}
-            className={cn(
-              "text-white flex items-center justify-center font-headline font-bold shadow-xl transition-all group/btn shrink-0",
-              isCollapsed 
-                ? "w-14 h-14 rounded-2xl mx-auto bg-sky-500 shadow-sky-500/20" 
-                : "w-full py-4 px-4 rounded-2xl gap-2 text-xs bg-sky-500 hover:bg-sky-600 shadow-sky-500/10"
-            )}
-          >
-            <span className="material-symbols-outlined text-xl group-hover/btn:scale-125 transition-transform">add</span>
-            {!isCollapsed && <span className="animate-in fade-in duration-300 font-black">Nova Conversão</span>}
-          </button>
+        <div className="space-y-2">
+
           
-          <div className={cn("pt-6 border-t space-y-2 border-white/10 overflow-hidden", isCollapsed ? "flex flex-col items-center" : "")}>
-            <a 
-              href="/profile"
+          <div className={cn("pt-3 border-t space-y-0.5 border-white/10 overflow-hidden", isCollapsed ? "flex flex-col items-center" : "")}>
+            <Link 
+              to="/profile"
               title={isCollapsed ? "Meu Perfil" : ""}
               className={cn(
-                "flex items-center gap-3 py-3 text-sm font-medium transition-all rounded-xl",
+                "flex items-center gap-3 py-1.5 text-sm font-medium transition-all rounded-xl",
                 isCollapsed ? "justify-center w-14" : "px-4",
                 location.pathname === '/profile' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
               )}
             >
               <span className="material-symbols-outlined text-xl shrink-0">account_circle</span>
               {!isCollapsed && <span className="animate-in fade-in duration-300">Meu Perfil</span>}
-            </a>
-            <a 
-              href="/settings"
+            </Link>
+            <Link 
+              to="/settings"
               title={isCollapsed ? "Configurações" : ""}
               className={cn(
-                "flex items-center gap-3 py-3 text-sm font-medium transition-all rounded-xl",
+                "flex items-center gap-3 py-1.5 text-sm font-medium transition-all rounded-xl",
                 isCollapsed ? "justify-center w-14" : "px-4",
                 location.pathname === '/settings' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
               )}
             >
               <span className="material-symbols-outlined text-xl shrink-0">settings</span>
               {!isCollapsed && <span className="animate-in fade-in duration-300">Configurações</span>}
-            </a>
+            </Link>
             <button 
               onClick={handleLogout}
               title={isCollapsed ? "Sair" : ""}

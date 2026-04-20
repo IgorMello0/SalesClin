@@ -95,6 +95,12 @@ export const clientsApi = {
   delete: async (id: number) => apiRequest<{ id: number }>(`/clientes/${id}`, { method: 'DELETE' }),
 }
 
+// Dashboard
+export const dashboardApi = {
+  getMetrics: async (filter: string = 'custom') => 
+    apiRequest<any>(`/dashboard/metrics?filter=${filter}`),
+}
+
 // Profissionais
 export const professionalsApi = {
   login: async (email: string, password: string) => 

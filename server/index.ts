@@ -18,6 +18,7 @@ import { router as mensagensRouter } from './routes/mensagens'
 import { router as uploadRouter } from './routes/upload'
 import { router as modulesRouter } from './routes/modules'
 import { router as permissionsRouter } from './routes/permissions'
+import { router as dashboardRouter } from './routes/dashboard'
 import { createErrorResponse } from './utils/response'
 import path from 'path'
 
@@ -48,6 +49,7 @@ app.use('/api/mensagens', mensagensRouter)
 app.use('/api/upload', uploadRouter)
 app.use('/api/modules', modulesRouter)
 app.use('/api/permissions', permissionsRouter)
+app.use('/api/dashboard', dashboardRouter)
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
