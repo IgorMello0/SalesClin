@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dashboardApi } from '@/lib/api';
+import { Card } from '@/components/ui/card';
 
 const Dashboard = () => {
   const [filter, setFilter] = useState<'today' | '7days' | 'custom'>('custom');
@@ -102,7 +103,7 @@ const Dashboard = () => {
           <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Dashboard de Vendas</h2>
           <p className="text-on-surface-variant text-sm mt-1">Bem-vindo ao centro de comando SalesClin.</p>
         </div>
-        <div className="flex items-center gap-3 glass-card p-1.5 rounded-xl border-slate-200/50">
+        <Card className="flex items-center gap-3 p-1.5">
           <button 
             onClick={() => handleFilterChange('today')}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-slate-50'}`}
@@ -122,13 +123,13 @@ const Dashboard = () => {
             <span className="material-symbols-outlined text-sm">calendar_today</span>
             {filter === 'today' ? '16 Abr, 2024' : filter === '7days' ? '10 Abr - 16 Abr, 2024' : '01 Jan - 31 Jan, 2024'}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Primary Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
         {/* Card 1: Total de Leads (70%) */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">groups</span>
@@ -148,10 +149,10 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '70%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Card 2: Avaliação Agendada (35%) */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">event_available</span>
@@ -171,10 +172,10 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '35%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Card 3: Avaliação Comparada (62%) */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">how_to_reg</span>
@@ -194,10 +195,10 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '62%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Card 4: Oportunidades Geradas (42%) */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">rocket_launch</span>
@@ -217,13 +218,13 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '42%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Secondary Stats Grid (New Metrics) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
         {/* Card 5: Faturamento Total */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
@@ -243,10 +244,10 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '41%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Card 6: Ticket (Orçado) */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">calculate</span>
@@ -266,10 +267,10 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '100%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Card 7: Ticket (Fechado) */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">handshake</span>
@@ -289,10 +290,10 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '100%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Card 8: Taxa de Conversão */}
-        <div className="glass-card p-6 rounded-2xl hover-card">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">percent</span>
@@ -312,7 +313,7 @@ const Dashboard = () => {
               <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '100%' }}></div>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
 
@@ -339,7 +340,7 @@ const Dashboard = () => {
               { label: 'Pix / Débito', value: 94200, target: 80000, percent: 117 },
               { label: 'Dinheiro', value: 9000, target: 20000, percent: 3 },
             ].map((item) => (
-              <div key={item.label} className="glass-card p-6 rounded-2xl hover-card">
+              <Card key={item.label} className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="w-2 h-2 rounded-full bg-secondary"></span>
                   <span className="text-primary text-[10px] font-bold uppercase tracking-tight">{item.label}</span>
@@ -354,7 +355,7 @@ const Dashboard = () => {
                     <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: `${item.percent}%` }}></div>
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
@@ -362,7 +363,7 @@ const Dashboard = () => {
 
       {/* Two Column Section: Funnel and Origin */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 relative z-10">
-        <div className="glass-card p-8 rounded-2xl space-y-8 hover-card">
+        <Card className="p-8 space-y-8">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold text-primary font-headline">Funil de Leads SalesClin</h3>
             <button className="text-on-surface-variant hover:text-primary transition-colors btn-hover">
@@ -392,10 +393,10 @@ const Dashboard = () => {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
         {/* Origin Section */}
-        <div className="glass-card p-8 rounded-2xl space-y-8 hover-card">
+        <Card className="p-8 space-y-8">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold text-primary font-headline">Leads por Origem</h3>
             <div className="flex gap-2">
@@ -421,7 +422,7 @@ const Dashboard = () => {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -137,7 +138,7 @@ const Payments = () => {
           {/* Summary Stats Grid */}
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
             {stats.map((s) => (
-              <div key={s.label} className="glass-card rounded-2xl p-4 border border-white/60 hover-card">
+              <Card key={s.label} className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center shadow-lg ${s.glow}`}>
                     <span className="material-symbols-outlined text-white text-base">{s.icon}</span>
@@ -147,12 +148,12 @@ const Payments = () => {
                   {s.value}
                 </p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 uppercase font-bold tracking-wider">{s.label}</p>
-              </div>
+              </Card>
             ))}
           </div>
 
           {/* Main Content Area */}
-          <div className="glass-card rounded-3xl border border-white/60 overflow-hidden">
+          <Card className="overflow-hidden">
             <div className="p-6 border-b border-slate-100/60 bg-white/40">
               <div className="flex flex-col gap-4">
                 <div>
@@ -311,7 +312,7 @@ const Payments = () => {
                 </Accordion>
               )}
             </div>
-          </div>
+          </Card>
         </TabsContent>
 
         {/* ── Tab: Relatórios ── */}
@@ -322,7 +323,7 @@ const Payments = () => {
               { label: 'Ticket Médio', value: `R$ ${clients.length > 0 ? (confirmedRevenue / clients.length).toFixed(2) : "0.00"}`, icon: 'query_stats', subtitle: 'Por cliente ativo', color: 'bg-indigo-500' },
               { label: 'Inadimplência', value: `${allPayments.length > 0 ? ((allPayments.filter((p) => p.status === "overdue").length / allPayments.length) * 100).toFixed(1) : "0.0"}%`, icon: 'warning', subtitle: 'Dívidas em atraso', color: 'bg-red-500', destructive: true },
             ].map(card => (
-              <div key={card.label} className="glass-card rounded-3xl p-6 border border-white/60 hover-card">
+              <Card key={card.label} className="p-6">
                 <div className="flex items-center gap-4 mb-4">
                   <div className={`w-12 h-12 rounded-2xl ${card.color} flex items-center justify-center shadow-lg shadow-black/5`}>
                     <span className="material-symbols-outlined text-white text-xl">{card.icon}</span>
@@ -333,12 +334,12 @@ const Payments = () => {
                   </div>
                 </div>
                 <p className={`text-4xl font-black font-headline ${card.destructive ? 'text-red-500' : 'text-primary'}`}>{card.value}</p>
-              </div>
+              </Card>
             ))}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-             <div className="glass-card rounded-3xl p-6 border border-white/60">
+             <Card className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-lg font-black text-primary font-headline">Serviços Mais Lucrativos</h3>
@@ -349,9 +350,9 @@ const Payments = () => {
                 <div className="space-y-6 text-center py-10">
                    <p className="text-sm text-muted-foreground italic">Nenhum dado de vendas disponível para o ranking.</p>
                 </div>
-             </div>
+             </Card>
 
-             <div className="glass-card rounded-3xl p-6 border border-white/60">
+             <Card className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-lg font-black text-primary font-headline">Saúde Financeira</h3>
@@ -375,7 +376,7 @@ const Payments = () => {
                       <Progress value={12} className="h-2 bg-slate-100" />
                    </div>
                 </div>
-             </div>
+             </Card>
           </div>
         </TabsContent>
       </Tabs>

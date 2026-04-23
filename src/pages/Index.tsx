@@ -244,7 +244,7 @@ const Index = () => {
       <div className="relative z-10">
         {/* Navbar */}
         <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'py-3' : 'py-6'}`}>
-          <div className="max-w-7xl mx-auto px-4">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
             <div className={`glass-card rounded-2xl px-6 py-3 flex items-center justify-between border-slate-200/50 shadow-sm`}>
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 bg-[var(--primary)] rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
@@ -296,7 +296,7 @@ const Index = () => {
 
         {/* Hero Section */}
         <section className="relative pt-44 pb-24 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 text-center">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 text-center">
             <div className="inline-flex items-center gap-2 bg-white/80 px-4 py-2 rounded-full border border-slate-200 shadow-sm mb-8">
               <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse" />
               <span className="text-xs font-headline font-bold text-slate-700 uppercase tracking-widest">Metodologia para Alto Ticket</span>
@@ -335,10 +335,10 @@ const Index = () => {
         </section>
 
         {/* Problem Section */}
-        <section id="sistema" className="py-32 bg-[var(--primary)] relative overflow-hidden rounded-[4rem] mx-4">
+        <section id="sistema" className="py-32 bg-[var(--primary)] relative overflow-hidden rounded-[4rem] mx-6 md:mx-12 lg:mx-16">
           <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/grid-me.png')]" />
           
-          <div className="max-w-7xl mx-auto px-4 relative">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 relative">
             <div className="max-w-4xl mb-20">
               <span className="text-[var(--secondary)] font-headline font-bold text-sm uppercase tracking-[0.2em] mb-6 block">O problema real</span>
               <h2 className="text-white font-headline text-4xl md:text-6xl font-bold mb-8 leading-tight tracking-tight">O gargalo não está na captação. Está no processo comercial.</h2>
@@ -366,7 +366,7 @@ const Index = () => {
 
         {/* Features Section - CURVED 3D CAROUSEL */}
         <section id="funcionalidades" className="py-32 overflow-hidden relative">
-          <div className="max-w-7xl mx-auto px-4 relative z-10">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 relative z-10">
             <div className="text-center mb-24">
               <span className="text-[var(--accent)] font-headline font-bold text-sm uppercase tracking-[0.2em] mb-6 block">O que você controla</span>
               <h2 className="text-[var(--primary)] font-headline text-4xl md:text-6xl font-bold mb-8 tracking-tight max-w-5xl mx-auto leading-tight">Gestão comercial completa, estruturada para o ciclo de vendas de clínicas.</h2>
@@ -451,11 +451,11 @@ const Index = () => {
         </section>
 
         {/* IA Section */}
-        <section id="ia" className="py-32 bg-slate-900 relative overflow-hidden rounded-[4rem] mx-4 mb-20">
+        <section id="ia" className="py-32 bg-slate-900 relative overflow-hidden rounded-[4rem] mx-6 md:mx-12 lg:mx-16 mb-20">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-30" />
           <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[150px] -mr-48 -mb-48" />
           
-          <div className="max-w-7xl mx-auto px-4 relative">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 relative">
             <div className="max-w-3xl mb-24">
               <span className="text-[var(--accent)] font-headline font-bold text-sm uppercase tracking-[0.2em] mb-6 block">Inteligência Artificial Integrada</span>
               <h2 className="text-white font-headline text-4xl md:text-6xl font-bold mb-8 leading-tight tracking-tight">A IA trabalha enquanto sua equipe descansa.</h2>
@@ -485,7 +485,7 @@ const Index = () => {
 
         {/* Differential Section */}
         <section id="diferencial" className="py-32">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col lg:flex-row items-center gap-20">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 flex flex-col lg:flex-row items-center gap-20">
             <div className="flex-1">
                <span className="text-[var(--secondary)] font-headline font-bold text-sm uppercase tracking-[0.2em] mb-6 block">Diferencial</span>
               <h2 className="text-[var(--primary)] font-headline text-4xl md:text-6xl font-bold mb-8 leading-[1.1] tracking-tight">Um CRM vazio não resolve problema de processo.</h2>
@@ -538,7 +538,7 @@ const Index = () => {
         </section>
 
         {/* CTA Final */}
-        <section className="py-32 px-4">
+        <section className="py-32 px-6 md:px-12 lg:px-16">
           <div className="max-w-6xl mx-auto bg-[var(--primary)] rounded-[5rem] p-12 md:p-24 text-center relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--secondary)]/10 rounded-full blur-[120px]" />
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-[var(--accent)]/15 rounded-full blur-[120px]" />
@@ -556,7 +556,7 @@ const Index = () => {
 
         {/* Footer */}
         <footer className="py-20 border-t border-slate-200">
-          <div className="max-w-7xl mx-auto px-4">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
             <div className="flex flex-col md:flex-row items-center justify-between gap-12 mb-12">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-[var(--primary)] rounded-xl flex items-center justify-center">

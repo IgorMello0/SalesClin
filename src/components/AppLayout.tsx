@@ -31,8 +31,8 @@ const AppLayout = () => {
           <Outlet />
         </div>
       ) : (
-        <main className="w-full flex-1 p-4 md:p-10">
-          <div className="animate-fade-in-up">
+        <main className="w-full flex-1 px-6 md:px-16 lg:px-24 py-6 md:py-10">
+          <div className="max-w-[1400px] mx-auto animate-fade-in-up">
             <Outlet />
           </div>
         </main>

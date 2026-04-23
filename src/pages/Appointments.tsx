@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, parseISO } from 'date-fns';
@@ -134,7 +135,7 @@ const Appointments = () => {
       {/* ── Stats Row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((s) => (
-          <div key={s.label} className="glass-card rounded-2xl p-4 border border-white/60 hover-card">
+          <Card key={s.label} className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center shadow-lg ${s.glow}`}>
                 <span className="material-symbols-outlined text-white text-base">{s.icon}</span>
@@ -142,7 +143,7 @@ const Appointments = () => {
             </div>
             <p className="text-3xl font-black text-primary font-headline leading-none">{s.value}</p>
             <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-          </div>
+          </Card>
         ))}
       </div>
 
@@ -150,7 +151,7 @@ const Appointments = () => {
 
         {/* ── Mini Calendar Sidebar ── */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="glass-card rounded-2xl p-4 border border-white/60 hover-card">
+          <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-primary text-lg">calendar_view_month</span>
               <h3 className="text-sm font-bold text-primary">Calendário</h3>
@@ -180,10 +181,10 @@ const Appointments = () => {
                 day_outside: "text-muted-foreground opacity-40",
               }}
             />
-          </div>
+          </Card>
 
           {/* Today's Quick Stats */}
-          <div className="glass-card rounded-2xl p-4 border border-white/60">
+          <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-secondary text-lg">bar_chart</span>
               <h3 className="text-sm font-bold text-primary">Hoje</h3>
@@ -203,12 +204,12 @@ const Appointments = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* ── Main Calendar View ── */}
         <div className="lg:col-span-3">
-          <div className="glass-card rounded-2xl border border-white/60 overflow-hidden">
+          <Card className="overflow-hidden">
 
             {/* Controls Header */}
             <div className="p-4 border-b border-slate-100 flex flex-col gap-3">
@@ -404,7 +405,7 @@ const Appointments = () => {
                 </div>
               )}
             </div>
-          </div>
+          </Card>
         </div>
       </div>
 

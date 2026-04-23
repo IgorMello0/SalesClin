@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -379,13 +380,13 @@ const SalesFunnel = () => {
                 isOver && "bg-slate-100/80 border-secondary/30 scale-[1.01]"
               )}>
                 {stageLeads.map((lead) => (
-                  <div 
+                  <Card 
                     key={lead.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
                     onClick={() => setSelectedLead(lead)}
                     className={cn(
-                      "glass-card p-4 rounded-xl hover-card cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
+                      "p-4 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
                       draggedLeadId === lead.id && "opacity-40 grayscale-[0.5]"
                     )}
                   >
@@ -451,7 +452,7 @@ const SalesFunnel = () => {
                         </button>
                       )}
                     </div>
-                  </div>
+                  </Card>
                 ))}
 
                 {stageLeads.length === 0 && (
@@ -467,7 +468,7 @@ const SalesFunnel = () => {
 
       {/* Add Lead Dialog */}
       <Dialog open={isAddingLead} onOpenChange={setIsAddingLead}>
-        <DialogContent className="sm:max-w-[425px] rounded-3xl border-slate-100 glass-card">
+        <DialogContent className="sm:max-w-[425px] rounded-3xl border-slate-100 bg-white">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-primary font-headline">Cadastrar Novo Lead</DialogTitle>
             <p className="text-slate-500 text-sm">Adicione as informações básicas do novo lead para o pipeline.</p>
@@ -516,7 +517,7 @@ const SalesFunnel = () => {
 
       {/* Lead Details Modal */}
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 glass-card p-0 flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 flex flex-col">
           {selectedLead && (
             <>
               {/* Header Profile Section */}
@@ -689,7 +690,7 @@ const SalesFunnel = () => {
 
       {/* Create Proposal Dialog */}
       <Dialog open={isCreatingProposal} onOpenChange={setIsCreatingProposal}>
-        <DialogContent className="sm:max-w-[700px] rounded-3xl border-slate-100 glass-card p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[700px] rounded-3xl border-slate-100 bg-white p-0 overflow-hidden">
           <div className="p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100">
             <h3 className="text-2xl font-extrabold text-primary font-headline tracking-tight">Criação de Proposta Comercial</h3>
             <p className="text-slate-500 text-sm mt-1">Defina os termos do tratamento e valores para o paciente.</p>
