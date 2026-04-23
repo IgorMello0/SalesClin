@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -96,130 +97,125 @@ const Payments = () => {
   };
 
   const stats = [
-    { label: 'Receita Confirmada', value: `R$ ${confirmedRevenue.toFixed(2)}`, icon: 'payments', color: 'from-emerald-500 to-green-600', glow: 'shadow-emerald-500/20' },
-    { label: 'Pendentes', value: `R$ ${pendingAmount.toFixed(2)}`, icon: 'schedule', color: 'from-amber-500 to-orange-500', glow: 'shadow-orange-500/20' },
-    { label: 'Em Atraso', value: `R$ ${overdueAmount.toFixed(2)}`, icon: 'warning', color: 'from-red-500 to-rose-600', glow: 'shadow-red-500/20', destructive: true },
-    { label: 'Contratos Ativos', value: activeContracts.toString(), icon: 'description', color: 'from-sky-500 to-blue-600', glow: 'shadow-sky-500/20' },
-    { label: 'Próximos 7 Dias', value: upcomingPayments.toString(), icon: 'event', color: 'from-violet-500 to-purple-600', glow: 'shadow-violet-500/20' },
+    { label: 'Receita Confirmada', value: `R$ ${confirmedRevenue.toFixed(2)}`, icon: 'payments' },
+    { label: 'Pendentes',          value: `R$ ${pendingAmount.toFixed(2)}`,   icon: 'schedule' },
+    { label: 'Em Atraso',          value: `R$ ${overdueAmount.toFixed(2)}`,   icon: 'warning',     destructive: true },
+    { label: 'Contratos Ativos',   value: activeContracts.toString(),          icon: 'description' },
+    { label: 'Próximos 7 Dias',    value: upcomingPayments.toString(),         icon: 'event' },
   ];
 
   return (
-    <div className="w-full space-y-6 p-4 sm:p-6 md:p-8">
+    <div className="w-full space-y-8 p-4 sm:p-6 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-              <span className="material-symbols-outlined text-white text-xl">account_balance_wallet</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-primary font-headline">
-              Gestão Financeira
-            </h1>
-          </div>
-          <p className="text-sm text-muted-foreground ml-[52px]">
-            Controle de pacotes, planos e pagamentos de clientes
-          </p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="flex items-center gap-3 w-full">
+          <h1 className="text-3xl font-bold tracking-tight text-primary font-headline whitespace-nowrap">Financeiro</h1>
+          <div className="flex-1 h-px bg-slate-200/50"></div>
+          <p className="text-slate-500 text-sm hidden md:block">Controle de pacotes, planos e pagamentos</p>
         </div>
       </div>
 
-      {/* ── Tabs List ── */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="bg-slate-100/50 p-1 rounded-2xl border border-slate-200/40 w-full sm:w-fit">
-          <TabsTrigger value="overview" className="rounded-xl px-8 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
+      {/* ── Tabs ── */}
+      <Tabs defaultValue="overview" className="space-y-8">
+        <TabsList className="bg-slate-100/50 p-1 rounded-2xl border border-slate-200/40 w-full sm:w-fit backdrop-blur-sm">
+          <TabsTrigger value="overview" className="rounded-xl px-8 font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">
             Visão Geral
           </TabsTrigger>
-          <TabsTrigger value="reports" className="rounded-xl px-8 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger value="reports" className="rounded-xl px-8 font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">
             Relatórios
           </TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Visão Geral ── */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* Summary Stats Grid */}
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+        <TabsContent value="overview" className="space-y-8">
+          {/* Stats Grid — Dashboard Mirror Pattern */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             {stats.map((s) => (
-              <Card key={s.label} className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center shadow-lg ${s.glow}`}>
-                    <span className="material-symbols-outlined text-white text-base">{s.icon}</span>
+              <Card key={s.label} className="p-6 bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm rounded-2xl hover-card transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-50 text-accent rounded-lg">
+                    <span className="material-symbols-outlined text-xl">{s.icon}</span>
                   </div>
+                  {s.destructive && (
+                    <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded">Atenção</span>
+                  )}
                 </div>
-                <p className={`text-xl sm:text-2xl font-black font-headline leading-none ${s.destructive ? 'text-red-500' : 'text-primary'}`}>
-                  {s.value}
-                </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 uppercase font-bold tracking-wider">{s.label}</p>
+                <div className="space-y-1">
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{s.label}</p>
+                  <h3 className={`text-2xl font-extrabold font-headline ${
+                    s.destructive ? 'text-red-500' : 'text-primary'
+                  }`}>{s.value}</h3>
+                </div>
               </Card>
             ))}
           </div>
 
           {/* Main Content Area */}
-          <Card className="overflow-hidden">
-            <div className="p-6 border-b border-slate-100/60 bg-white/40">
-              <div className="flex flex-col gap-4">
-                <div>
-                  <h2 className="text-xl font-black text-primary font-headline">Gerenciar Pagamentos</h2>
-                  <p className="text-sm text-muted-foreground">Clientes agrupados por pacotes e planos ativos</p>
+          <Card className="bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm rounded-2xl overflow-hidden">
+            <div className="p-8 border-b border-slate-100/60 bg-white/40">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex items-center gap-3 flex-1">
+                  <h3 className="text-lg font-bold text-primary font-headline whitespace-nowrap">Gerenciar Pagamentos</h3>
+                  <div className="flex-1 h-px bg-slate-200/50"></div>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">search</span>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative w-full sm:w-[300px]">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
                     <Input
-                      placeholder="Buscar por cliente, serviço ou tipo de pacote..."
+                      placeholder="Buscar cliente ou serviço..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 rounded-xl bg-slate-50/50 border-slate-200 focus:bg-white text-sm"
+                      className="pl-10 rounded-xl bg-slate-50 border-slate-200 focus:bg-white text-sm"
                     />
                   </div>
-                  <div className="flex gap-2">
-                    <Select value={filter} onValueChange={setFilter}>
-                      <SelectTrigger className="w-full sm:w-[200px] rounded-xl border-slate-200 font-bold text-slate-600">
-                        <span className="material-symbols-outlined text-lg mr-2">filter_alt</span>
-                        <SelectValue placeholder="Filtrar" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-slate-200">
-                        <SelectItem value="all">Todos os Status</SelectItem>
-                        <SelectItem value="overdue">Em Atraso</SelectItem>
-                        <SelectItem value="active">Pacotes Ativos</SelectItem>
-                        <SelectItem value="monthly">Mensalidades</SelectItem>
-                        <SelectItem value="package">Pacotes de Sessões</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Select value={filter} onValueChange={setFilter}>
+                    <SelectTrigger className="w-full sm:w-[180px] rounded-xl border-slate-200 font-bold text-slate-600 bg-slate-50">
+                      <span className="material-symbols-outlined text-lg mr-2">filter_alt</span>
+                      <SelectValue placeholder="Filtrar" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-slate-200">
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="overdue">Em Atraso</SelectItem>
+                      <SelectItem value="active">Pacotes Ativos</SelectItem>
+                      <SelectItem value="monthly">Mensalidades</SelectItem>
+                      <SelectItem value="package">Pacotes de Sessões</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
 
             <div className="p-6">
               {filteredClients.length === 0 ? (
-                <div className="text-center py-20 bg-slate-50/30 rounded-3xl border border-dashed border-slate-200">
+                <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
                   <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-sm mx-auto mb-4 border border-slate-100">
-                    <span className="material-symbols-outlined text-slate-400 text-3xl">group_off</span>
+                    <span className="material-symbols-outlined text-slate-300 text-3xl">account_balance_wallet</span>
                   </div>
-                  <p className="font-bold text-slate-600">Nenhum registro encontrado</p>
-                  <p className="text-sm text-muted-foreground">Tente ajustar seus filtros de busca</p>
+                  <p className="font-bold text-slate-400">Nenhum registro encontrado</p>
                 </div>
               ) : (
                 <Accordion type="single" collapsible className="space-y-3">
                   {filteredClients.map((client) => (
-                    <AccordionItem key={client.id} value={client.id} className="border border-slate-100 rounded-2xl overflow-hidden hover:border-primary/20 transition-all bg-white shadow-sm">
-                      <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-slate-50/50 transition-all group">
+                    <AccordionItem key={client.id} value={client.id} className="border border-slate-100 rounded-2xl overflow-hidden hover:border-primary/20 transition-all bg-white shadow-sm mb-4">
+                      <AccordionTrigger className="px-6 py-5 hover:no-underline hover:bg-slate-50 transition-all group">
                         <div className="flex items-center justify-between w-full pr-4">
                           <div className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-3">
-                              <span className="font-black text-primary font-headline tracking-wide">{client.clientName}</span>
+                              <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                              <span className="font-bold text-primary font-headline tracking-tight">{client.clientName}</span>
                               {getStatusBadge(client.status)}
                             </div>
-                            <div className="text-xs font-medium text-muted-foreground">
+                            <div className="text-xs font-medium text-slate-400">
                               {client.service} • {client.packageType}
                             </div>
                           </div>
                           
                           <div className="flex items-center gap-12 text-sm">
                             <div className="text-right hidden sm:block">
-                              <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none mb-2">Progresso</p>
+                              <p className="text-[10px] uppercase font-bold text-slate-400 leading-none mb-2">Progresso</p>
                               <div className="flex items-center gap-2">
-                                <span className="font-black text-primary">{client.progress.completed}/{client.progress.total}</span>
+                                <span className="font-bold text-primary font-headline">{client.progress.completed}/{client.progress.total}</span>
                                 <Progress
                                   value={(client.progress.completed / client.progress.total) * 100}
                                   className="w-16 h-1.5"
@@ -227,8 +223,8 @@ const Payments = () => {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none mb-1">Próx. Vencimento</p>
-                              <p className="font-black text-sky-600">{client.nextPayment.date}</p>
+                              <p className="text-[10px] uppercase font-bold text-slate-400 leading-none mb-1">Próx. Vencimento</p>
+                              <p className="font-bold text-secondary">{client.nextPayment.date}</p>
                             </div>
                           </div>
                         </div>
@@ -290,20 +286,14 @@ const Payments = () => {
 
                           {/* Action Buttons */}
                           <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                            <button
-                              onClick={() => handleAddManualPayment(client.id)}
-                              className="flex-1 py-3 px-4 rounded-xl bg-primary text-white text-xs font-bold btn-hover shadow-lg shadow-primary/10 flex items-center justify-center gap-2"
-                            >
+                            <Button variant="secondary" className="flex-1 shadow-lg shadow-secondary/20" onClick={() => handleAddManualPayment(client.id)}>
                               <span className="material-symbols-outlined text-lg">add_card</span>
                               Lançar Pagamento Manual
-                            </button>
-                            <button
-                              onClick={() => handleViewContract(client.id)}
-                              className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold btn-hover flex items-center justify-center gap-2 bg-white"
-                            >
+                            </Button>
+                            <Button variant="outline" className="flex-1" onClick={() => handleViewContract(client.id)}>
                               <span className="material-symbols-outlined text-lg">visibility</span>
                               Ver Detalhes do Plano
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       </AccordionContent>
@@ -316,64 +306,73 @@ const Payments = () => {
         </TabsContent>
 
         {/* ── Tab: Relatórios ── */}
-        <TabsContent value="reports" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <TabsContent value="reports" className="space-y-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { label: 'Receita Total', value: `R$ ${confirmedRevenue.toFixed(2)}`, icon: 'trending_up', subtitle: 'Confirmado no período', color: 'bg-emerald-500' },
-              { label: 'Ticket Médio', value: `R$ ${clients.length > 0 ? (confirmedRevenue / clients.length).toFixed(2) : "0.00"}`, icon: 'query_stats', subtitle: 'Por cliente ativo', color: 'bg-indigo-500' },
-              { label: 'Inadimplência', value: `${allPayments.length > 0 ? ((allPayments.filter((p) => p.status === "overdue").length / allPayments.length) * 100).toFixed(1) : "0.0"}%`, icon: 'warning', subtitle: 'Dívidas em atraso', color: 'bg-red-500', destructive: true },
+              { label: 'Receita Total', value: `R$ ${confirmedRevenue.toFixed(2)}`, icon: 'trending_up', subtitle: 'Confirmado no período' },
+              { label: 'Ticket Médio', value: `R$ ${clients.length > 0 ? (confirmedRevenue / clients.length).toFixed(2) : "0.00"}`, icon: 'query_stats', subtitle: 'Por cliente ativo' },
+              { label: 'Inadimplência', value: `${allPayments.length > 0 ? ((allPayments.filter((p) => p.status === "overdue").length / allPayments.length) * 100).toFixed(1) : "0.0"}%`, icon: 'warning', subtitle: 'Dívidas em atraso', destructive: true },
             ].map(card => (
-              <Card key={card.label} className="p-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className={`w-12 h-12 rounded-2xl ${card.color} flex items-center justify-center shadow-lg shadow-black/5`}>
-                    <span className="material-symbols-outlined text-white text-xl">{card.icon}</span>
+              <Card key={card.label} className="p-6 bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm rounded-2xl hover-card transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-50 text-accent rounded-lg">
+                    <span className="material-symbols-outlined text-xl">{card.icon}</span>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">{card.label}</h3>
-                    <p className="text-xs text-muted-foreground">{card.subtitle}</p>
-                  </div>
+                  {card.destructive && (
+                    <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded">Alerta</span>
+                  )}
                 </div>
-                <p className={`text-4xl font-black font-headline ${card.destructive ? 'text-red-500' : 'text-primary'}`}>{card.value}</p>
+                <div className="space-y-1">
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{card.label}</p>
+                  <p className="text-[10px] text-slate-500 font-medium mb-2">{card.subtitle}</p>
+                  <h3 className={`text-2xl font-extrabold font-headline ${card.destructive ? 'text-red-500' : 'text-primary'}`}>{card.value}</h3>
+                </div>
               </Card>
             ))}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-             <Card className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-black text-primary font-headline">Serviços Mais Lucrativos</h3>
-                    <p className="text-xs text-muted-foreground italic">Baseado em contratos ativos</p>
-                  </div>
+          <div className="grid gap-8 lg:grid-cols-2">
+             <Card className="p-8 bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm rounded-2xl hover-card">
+                <div className="flex items-center gap-3 mb-8">
+                  <h3 className="text-lg font-bold text-primary font-headline whitespace-nowrap">Serviços Lucrativos</h3>
+                  <div className="flex-1 h-px bg-slate-200/50"></div>
                   <span className="material-symbols-outlined text-slate-300">pie_chart</span>
                 </div>
-                <div className="space-y-6 text-center py-10">
-                   <p className="text-sm text-muted-foreground italic">Nenhum dado de vendas disponível para o ranking.</p>
+                <div className="space-y-6 text-center py-10 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                   <p className="text-sm text-slate-400 italic">Nenhum dado de vendas disponível para o ranking.</p>
                 </div>
              </Card>
-
-             <Card className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-black text-primary font-headline">Saúde Financeira</h3>
-                    <p className="text-xs text-muted-foreground">Comparativo de fluxos</p>
-                  </div>
+ 
+             <Card className="p-8 bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm rounded-2xl hover-card">
+                <div className="flex items-center gap-3 mb-8">
+                  <h3 className="text-lg font-bold text-primary font-headline whitespace-nowrap">Saúde Financeira</h3>
+                  <div className="flex-1 h-px bg-slate-200/50"></div>
                   <span className="material-symbols-outlined text-slate-300">analytics</span>
                 </div>
-                <div className="space-y-4">
-                   <div className="flex flex-col gap-2">
-                      <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-slate-500">
-                        <span>Receitas</span>
-                        <span className="text-emerald-500 font-black">88%</span>
+                <div className="space-y-8">
+                   <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          <span className="text-slate-500">Receitas</span>
+                        </div>
+                        <span className="text-emerald-500 font-bold">88%</span>
                       </div>
-                      <Progress value={88} className="h-2 bg-slate-100" />
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: '88%' }}></div>
+                      </div>
                    </div>
-                   <div className="flex flex-col gap-2">
-                      <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-slate-500">
-                        <span>Pendências</span>
-                        <span className="text-amber-500 font-black">12%</span>
+                   <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                          <span className="text-slate-500">Pendências</span>
+                        </div>
+                        <span className="text-secondary font-bold">12%</span>
                       </div>
-                      <Progress value={12} className="h-2 bg-slate-100" />
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-secondary rounded-full" style={{ width: '12%' }}></div>
+                      </div>
                    </div>
                 </div>
              </Card>

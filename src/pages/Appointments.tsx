@@ -91,58 +91,51 @@ const Appointments = () => {
   const todayPending = todayAppointments.filter(a => a.status === 'agendado').length;
 
   const stats = [
-    { label: 'Hoje', value: todayAppointments.length, icon: 'today', color: 'from-sky-500 to-blue-600', glow: 'shadow-sky-500/20' },
-    { label: 'Confirmados', value: todayConfirmed, icon: 'check_circle', color: 'from-emerald-500 to-green-600', glow: 'shadow-emerald-500/20' },
-    { label: 'Pendentes', value: todayPending, icon: 'schedule', color: 'from-amber-500 to-orange-500', glow: 'shadow-orange-500/20' },
-    { label: 'Total Geral', value: appointments.length, icon: 'calendar_month', color: 'from-violet-500 to-purple-600', glow: 'shadow-violet-500/20' },
+    { label: 'Hoje', value: todayAppointments.length, icon: 'today' },
+    { label: 'Confirmados', value: todayConfirmed, icon: 'check_circle' },
+    { label: 'Pendentes', value: todayPending, icon: 'schedule' },
+    { label: 'Total Geral', value: appointments.length, icon: 'calendar_month' },
   ];
 
   return (
-    <div className="w-full space-y-6 p-4 sm:p-6 md:p-8">
+    <div className="relative space-y-10 pb-10 overflow-hidden">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-sky-600 flex items-center justify-center shadow-lg shadow-primary/20">
-              <span className="material-symbols-outlined text-white text-xl">calendar_today</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-primary font-headline">
-              Agendamentos
-            </h1>
-          </div>
-          <p className="text-sm text-muted-foreground pl-13 ml-[52px]">
-            Gerencie seus compromissos e horários
-          </p>
+          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Agendamentos</h2>
+          <p className="text-on-surface-variant text-sm mt-1">Gerencie seus compromissos e horários</p>
         </div>
-
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-all btn-hover">
+          <Button variant="outline">
             <span className="material-symbols-outlined text-lg">filter_list</span>
             <span className="hidden sm:inline">Filtros</span>
-          </button>
-          <button
-            onClick={() => setOpenModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all btn-hover shadow-lg"
-            style={{ background: 'linear-gradient(135deg, hsl(219,74%,15%), hsl(219,74%,25%))', boxShadow: '0 4px 20px rgba(10,31,68,0.25)' }}
-          >
+          </Button>
+          <Button variant="secondary" size="xl" onClick={() => setOpenModal(true)} className="shadow-lg shadow-secondary/20">
             <span className="material-symbols-outlined text-lg">add</span>
             <span className="hidden sm:inline">Novo Agendamento</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* ── Stats Row ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
         {stats.map((s) => (
-          <Card key={s.label} className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center shadow-lg ${s.glow}`}>
-                <span className="material-symbols-outlined text-white text-base">{s.icon}</span>
+          <Card key={s.label} className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 bg-blue-50 text-accent rounded-lg">
+                <span className="material-symbols-outlined text-xl">{s.icon}</span>
               </div>
             </div>
-            <p className="text-3xl font-black text-primary font-headline leading-none">{s.value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+            <div className="space-y-1">
+              <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">{s.label}</p>
+              <h3 className="text-2xl font-extrabold text-primary font-headline">{s.value}</h3>
+            </div>
+            <div className="mt-6">
+              <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
+                <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: s.value > 0 ? '100%' : '0%' }} />
+              </div>
+            </div>
           </Card>
         ))}
       </div>
@@ -215,18 +208,12 @@ const Appointments = () => {
             <div className="p-4 border-b border-slate-100 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => navigateDate('prev')}
-                    className="w-8 h-8 rounded-xl border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 btn-hover transition-all"
-                  >
+                  <Button variant="outline" size="icon" onClick={() => navigateDate('prev')}>
                     <span className="material-symbols-outlined text-slate-600 text-base">chevron_left</span>
-                  </button>
-                  <button
-                    onClick={() => navigateDate('next')}
-                    className="w-8 h-8 rounded-xl border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 btn-hover transition-all"
-                  >
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => navigateDate('next')}>
                     <span className="material-symbols-outlined text-slate-600 text-base">chevron_right</span>
-                  </button>
+                  </Button>
                   <h2 className="text-base font-black text-primary font-headline ml-1">
                     {viewMode === 'day'
                       ? format(selectedDate, "dd 'de' MMM, yyyy", { locale: ptBR })
@@ -394,14 +381,10 @@ const Appointments = () => {
                   </div>
                   <p className="font-bold text-primary">Nenhum agendamento encontrado</p>
                   <p className="text-sm text-muted-foreground">Clique em "Novo Agendamento" para começar</p>
-                  <button
-                    onClick={() => setOpenModal(true)}
-                    className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white btn-hover shadow-lg"
-                    style={{ background: 'linear-gradient(135deg, hsl(25,95%,53%), hsl(25,95%,45%))', boxShadow: '0 4px 20px rgba(249,115,22,0.30)' }}
-                  >
+                  <Button variant="secondary" size="xl" onClick={() => setOpenModal(true)} className="mt-2 shadow-lg shadow-secondary/20">
                     <span className="material-symbols-outlined text-lg">add</span>
                     Novo Agendamento
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

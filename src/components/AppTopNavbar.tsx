@@ -7,13 +7,13 @@ const menuItems = [
   {
     title: 'Dashboard',
     url: '/dashboard',
-    icon: 'dashboard',
+    icon: 'grid_view',
     moduleCode: 'dashboard',
   },
   {
     title: 'Leads',
     url: '/clients',
-    icon: 'person_search',
+    icon: 'group',
     moduleCode: 'clientes',
   },
   {
@@ -25,13 +25,13 @@ const menuItems = [
   {
     title: 'Funil',
     url: '/sales-funnel',
-    icon: 'filter_list',
+    icon: 'filter_alt',
     moduleCode: 'funnel',
   },
   {
-    title: 'Gestão Financeira',
+    title: 'Financeiro',
     url: '/payments',
-    icon: 'payments',
+    icon: 'account_balance_wallet',
     moduleCode: 'pagamentos',
   },
   {
@@ -89,8 +89,8 @@ export function AppTopNavbar() {
   const roleName = professional?.role === 'admin' ? 'ADMIN' : 'PROFISSIONAL';
 
   return (
-    <header className="sticky top-0 w-full z-50 bg-primary text-white shadow-lg shadow-primary/10">
-      <div className="w-full px-4 lg:px-6 flex items-center h-14">
+    <header className="sticky top-0 w-full z-50 bg-[#0B1525] text-white shadow-lg shadow-[#0B1525]/10 border-b border-white/5">
+      <div className="w-full px-4 lg:px-6 flex items-center h-16">
         
         {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
@@ -102,7 +102,7 @@ export function AppTopNavbar() {
         </Link>
 
         {/* Navigation Items */}
-        <nav className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-hide">
+        <nav className="flex-1 flex justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide py-2">
           {filteredMenuItems.map((item) => {
             const isActive = location.pathname === item.url || 
               (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
@@ -111,36 +111,44 @@ export function AppTopNavbar() {
               <Link
                 key={item.title}
                 to={item.url}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold tracking-wide font-headline transition-all duration-200 rounded-lg whitespace-nowrap shrink-0",
-                  isActive
-                    ? 'bg-white/15 text-white shadow-sm'
-                    : 'text-white/60 hover:bg-white/8 hover:text-white/90'
-                )}
+                className="flex flex-col items-center justify-center gap-1.5 group w-20 md:w-24 shrink-0 transition-all duration-200"
+                title={item.title}
               >
-                <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                <span className="hidden md:inline">{item.title}</span>
+                <span className={cn(
+                  "material-symbols-outlined text-[24px] transition-colors",
+                  isActive
+                    ? "text-secondary drop-shadow-[0_0_8px_rgba(249,115,22,0.4)]"
+                    : "text-slate-500 group-hover:text-slate-400"
+                )}>
+                  {item.icon}
+                </span>
+                <span className={cn(
+                  "text-[9px] font-bold uppercase tracking-widest transition-colors font-headline mt-0.5",
+                  isActive ? "text-secondary" : "text-slate-500 group-hover:text-slate-400"
+                )}>
+                  {item.title}
+                </span>
               </Link>
             );
           })}
         </nav>
 
         {/* Right Side — Bell + Avatar Dropdown */}
-        <div className="flex items-center gap-3 ml-4 shrink-0" ref={menuRef}>
+        <div className="flex items-center gap-4 ml-4 shrink-0" ref={menuRef}>
           {/* Notification Bell */}
           <button
-            className="relative w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all"
+            className="relative flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors"
             title="Notificações"
           >
-            <span className="material-symbols-outlined text-[22px]">notifications</span>
+            <span className="material-symbols-outlined text-[26px]">notifications</span>
             {/* Red dot */}
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-primary" />
+            <span className="absolute top-0 right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0B1525]" />
           </button>
 
           {/* Avatar */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="w-9 h-9 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center text-sm font-bold text-white hover:bg-white/25 transition-all cursor-pointer"
+            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[13px] font-bold text-slate-300 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all cursor-pointer shadow-sm"
             title="Menu do usuário"
           >
             {initials}

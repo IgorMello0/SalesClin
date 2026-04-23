@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dashboardApi } from '@/lib/api';
 import { Card } from '@/components/ui/card';
+import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
   const [filter, setFilter] = useState<'today' | '7days' | 'custom'>('custom');
@@ -95,7 +98,23 @@ const Dashboard = () => {
 
   const formatCurrency = (val: number) => {
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-  };  return (
+  };
+
+  const getDateDisplay = () => {
+    const today = new Date();
+    if (filter === 'today') {
+      return format(today, "dd MMM, yyyy", { locale: ptBR });
+    } else if (filter === '7days') {
+      const sevenDaysAgo = subDays(today, 6);
+      return `${format(sevenDaysAgo, "dd MMM", { locale: ptBR })} - ${format(today, "dd MMM, yyyy", { locale: ptBR })}`;
+    } else {
+      const start = startOfMonth(today);
+      const end = endOfMonth(today);
+      return `${format(start, "dd MMM", { locale: ptBR })} - ${format(end, "dd MMM, yyyy", { locale: ptBR })}`;
+    }
+  };
+
+  return (
     <div className="relative space-y-10 pb-10 overflow-hidden">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
@@ -118,10 +137,10 @@ const Dashboard = () => {
           </button>
           <div 
             onClick={() => handleFilterChange('custom')}
-            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 cursor-pointer rounded-lg transition-all ${filter === 'custom' ? 'bg-primary/10 text-primary' : 'bg-primary/5 text-primary hover:bg-primary/10'}`}
+            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 cursor-pointer rounded-lg transition-all capitalize ${filter === 'custom' ? 'bg-primary/10 text-primary' : 'bg-primary/5 text-primary hover:bg-primary/10'}`}
           >
             <span className="material-symbols-outlined text-sm">calendar_today</span>
-            {filter === 'today' ? '16 Abr, 2024' : filter === '7days' ? '10 Abr - 16 Abr, 2024' : '01 Jan - 31 Jan, 2024'}
+            {getDateDisplay()}
           </div>
         </Card>
       </div>
@@ -326,12 +345,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="md:col-span-1 bg-primary/95 backdrop-blur-lg p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Receita Total</p>
-            <h4 className="text-2xl font-extrabold font-headline mb-4">{formatCurrency(counters.faturamento)}</h4>
-            <div className="space-y-2">
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '85%' }}></div>
-            </div>
-            </div>
+            <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.faturamento)}</h4>
           </div>
           <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
@@ -346,15 +360,6 @@ const Dashboard = () => {
                   <span className="text-primary text-[10px] font-bold uppercase tracking-tight">{item.label}</span>
                 </div>
                 <h5 className="text-lg font-bold text-primary">{formatCurrency(item.value)}</h5>
-                <div className="mt-4 space-y-1">
-                  <div className={`flex justify-between text-[9px] font-bold ${item.percent >= 100 ? 'text-secondary' : 'text-on-surface-variant'}`}>
-                    <span>{item.percent}% {item.percent >= 100 ? '(Superou)' : 'da Meta'}</span>
-                    <span>R$ {item.target / 1000}k</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: `${item.percent}%` }}></div>
-                  </div>
-                </div>
               </Card>
             ))}
           </div>
@@ -379,9 +384,14 @@ const Dashboard = () => {
             ].map((item) => (
               <div key={item.label} className="flex items-center gap-6">
                 <div className="w-24 text-right text-xs font-bold text-on-surface-variant">{item.label}</div>
-                <div className="flex-1 h-12 bg-slate-50/50 rounded-xl relative overflow-hidden group">
+                {/* Removed overflow-hidden so the shadow can glow outside */}
+                <div className="flex-1 h-12 bg-slate-100 rounded-xl relative group">
                   <div 
-                    className={`absolute inset-0 ${item.color} flex items-center justify-center text-white text-xs font-bold progress-bar-fill`} 
+                    className={cn(
+                      "absolute inset-y-0 left-0 rounded-xl flex items-center justify-center text-white text-xs font-bold progress-bar-fill transition-all duration-500",
+                      item.color,
+                      item.color === 'bg-secondary' ? 'shadow-[0_0_20px_rgba(249,115,22,0.4)] border border-orange-400/50' : ''
+                    )} 
                     style={{ width: `${item.percent}%` }}
                   >
                     <span>{item.val}</span>

@@ -298,23 +298,23 @@ const Clients = () => {
   const viewingTemplate = viewingForm ? templates.find(t => t.id === viewingForm.templateId) : null;
 
   return (
-    <div className="w-full space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8">
+    <div className="w-full max-w-7xl mx-auto space-y-8 p-4 sm:p-6 md:p-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
         <div className="space-y-1">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Clientes</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Gerencie sua base de clientes
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-primary font-headline">Clientes</h1>
+          <p className="text-sm text-slate-500 font-medium">
+            Gerencie sua base de clientes e históricos
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto text-sm">
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={() => handleOpenDialog()} className="bg-secondary hover:bg-secondary/90 text-white shadow-lg shadow-secondary/30 transition-all hover:-translate-y-0.5 rounded-xl font-bold px-6">
+              <Plus className="h-4 w-4 mr-2 font-bold" />
               Novo Cliente
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
                 {editingClient ? 'Editar Cliente' : 'Novo Cliente'}
@@ -376,78 +376,90 @@ const Clients = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
-            <CardTitle className="text-[0.65rem] sm:text-xs md:text-sm font-medium leading-tight">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Total de Clientes
             </CardTitle>
+            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+              <span className="material-symbols-outlined text-lg">group</span>
+            </div>
           </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-lg sm:text-xl md:text-2xl font-bold">{clients.length}</div>
-            <p className="text-[0.6rem] sm:text-[0.65rem] md:text-xs text-muted-foreground mt-0.5">
-              cadastrados
+          <CardContent className="p-6 pt-0">
+            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">{clients.length}</div>
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              cadastrados no sistema
             </p>
           </CardContent>
         </Card>
         
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
-            <CardTitle className="text-[0.65rem] sm:text-xs md:text-sm font-medium leading-tight">
+        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Ativos
             </CardTitle>
+            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+              <span className="material-symbols-outlined text-lg">check_circle</span>
+            </div>
           </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
+          <CardContent className="p-6 pt-0">
+            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">
               {clients.filter(c => c.status === 'ativo').length}
             </div>
-            <p className="text-[0.6rem] sm:text-[0.65rem] md:text-xs text-muted-foreground mt-0.5">
-              ativos
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              clientes ativos
             </p>
           </CardContent>
         </Card>
         
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
-            <CardTitle className="text-[0.65rem] sm:text-xs md:text-sm font-medium leading-tight">
+        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Novos
             </CardTitle>
+            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+              <span className="material-symbols-outlined text-lg">person_add</span>
+            </div>
           </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600">0</div>
-            <p className="text-[0.6rem] sm:text-[0.65rem] md:text-xs text-muted-foreground mt-0.5">
-              este mês
+          <CardContent className="p-6 pt-0">
+            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">0</div>
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              neste mês
             </p>
           </CardContent>
         </Card>
         
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
-            <CardTitle className="text-[0.65rem] sm:text-xs md:text-sm font-medium leading-tight">
+        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Agendamentos
             </CardTitle>
+            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+              <span className="material-symbols-outlined text-lg">event</span>
+            </div>
           </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-lg sm:text-xl md:text-2xl font-bold text-purple-600">
+          <CardContent className="p-6 pt-0">
+            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">
               {clients.reduce((acc, client) => acc + client.totalAppointments, 0)}
             </div>
-            <p className="text-[0.6rem] sm:text-[0.65rem] md:text-xs text-muted-foreground mt-0.5">
-              total
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              total agendado
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Clients Table */}
-      <Card className="w-full">
-        <CardHeader className="p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base sm:text-lg md:text-xl">Lista de Clientes</CardTitle>
-            <div className="relative w-full sm:w-64 md:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Card className="w-full hover-card border-slate-100 bg-white shadow-sm overflow-hidden rounded-3xl">
+        <CardHeader className="p-6 border-b border-slate-50 bg-slate-50/50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <CardTitle className="text-lg font-bold text-primary font-headline">Lista de Clientes</CardTitle>
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Buscar por nome, email ou telefone..."
-                className="pl-8 text-sm w-full"
+                className="pl-10 bg-white border-slate-200 focus-visible:ring-primary/20 transition-all rounded-full h-10"
                 value={searchDebounce}
                 onChange={(e) => setSearchDebounce(e.target.value)}
               />
@@ -572,16 +584,16 @@ const Clients = () => {
             <div className="w-full">
               <div className="w-full">
                 <Table className="w-full table-fixed">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[20%]">Nome</TableHead>
-                      <TableHead className="w-[25%]">Contato</TableHead>
-                      <TableHead className="w-[20%] hidden xl:table-cell">Endereço</TableHead>
-                      <TableHead className="w-[15%] text-center hidden lg:table-cell">Última Visita</TableHead>
-                      <TableHead className="w-[10%] text-center">Status</TableHead>
-                      <TableHead className="w-[10%] text-center hidden lg:table-cell">Agendamentos</TableHead>
-                      <TableHead className="w-[15%] text-center">Registros</TableHead>
-                      <TableHead className="w-[15%] text-center">Ações</TableHead>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="hover:bg-transparent border-b-slate-100">
+                      <TableHead className="w-[20%] text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Nome</TableHead>
+                      <TableHead className="w-[25%] text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Contato</TableHead>
+                      <TableHead className="w-[20%] hidden xl:table-cell text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Endereço</TableHead>
+                      <TableHead className="w-[15%] text-center hidden lg:table-cell text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Última Visita</TableHead>
+                      <TableHead className="w-[10%] text-center text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Status</TableHead>
+                      <TableHead className="w-[10%] text-center hidden lg:table-cell text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Agendamentos</TableHead>
+                      <TableHead className="w-[15%] text-center text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Registros</TableHead>
+                      <TableHead className="w-[15%] text-center text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

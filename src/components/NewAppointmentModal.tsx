@@ -41,6 +41,9 @@ interface NewAppointmentModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   initialDate?: Date;
+  initialClientId?: string;
+  initialClientName?: string;
+  initialClientPhone?: string;
 }
 
 export function NewAppointmentModal({
@@ -48,6 +51,9 @@ export function NewAppointmentModal({
   onOpenChange,
   onSuccess,
   initialDate,
+  initialClientId,
+  initialClientName,
+  initialClientPhone,
 }: NewAppointmentModalProps) {
   const { professional } = useAuth();
   const { toast } = useToast();
@@ -70,11 +76,29 @@ export function NewAppointmentModal({
   const [time, setTime] = useState<string>("09:00");
   const [notes, setNotes] = useState<string>("");
 
+  // Quick create state
+  const [isQuickCreate, setIsQuickCreate] = useState(false);
+  const [quickClientData, setQuickClientData] = useState({ name: "", phone: "" });
+
   useEffect(() => {
     if (open) {
       loadData();
+      if (initialClientId) {
+        setSelectedClient(initialClientId);
+        setIsQuickCreate(false);
+      } else if (initialClientName) {
+        setIsQuickCreate(true);
+        setQuickClientData({ 
+          name: initialClientName, 
+          phone: initialClientPhone || "" 
+        });
+        setSelectedClient("new");
+      } else {
+        setIsQuickCreate(false);
+        setSelectedClient("");
+      }
     }
-  }, [open]);
+  }, [open, initialClientId, initialClientName, initialClientPhone]);
 
   const loadData = async () => {
     setDataLoading(true);
@@ -94,7 +118,16 @@ export function NewAppointmentModal({
   };
 
   const handleSubmit = async () => {
-    if (!selectedClient || !selectedService || !date || !time) {
+    if ((!selectedClient || selectedClient === "new") && !isQuickCreate) {
+      toast({
+        title: "Erro",
+        description: "Selecione um paciente ou preencha os dados do novo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedService || !date || !time) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios.",
@@ -107,7 +140,26 @@ export function NewAppointmentModal({
 
     setLoading(true);
     try {
-      // Calcular endTime baseado na duração do serviço (padrão 30min se não tiver)
+      let clientId = selectedClient;
+
+      // 1. Se for Quick Create, criar o cliente primeiro
+      if (isQuickCreate && selectedClient === "new") {
+        const createRes = await clientsApi.create({
+          professionalId: Number(professional.id),
+          name: quickClientData.name,
+          phone: quickClientData.phone,
+          email: `${quickClientData.name.toLowerCase().replace(/ /g, '.')}@lead.com`,
+          status: 'active'
+        });
+
+        if (createRes.success && createRes.data) {
+          clientId = createRes.data.id.toString();
+        } else {
+          throw new Error(createRes.error?.message || "Erro ao criar novo cliente.");
+        }
+      }
+
+      // 2. Criar o agendamento
       const service = services.find(s => s.id.toString() === selectedService);
       const duration = service?.duration || 30;
       
@@ -116,7 +168,7 @@ export function NewAppointmentModal({
 
       const response = await appointmentsApi.create({
         professionalId: Number(professional.id),
-        clientId: Number(selectedClient),
+        clientId: Number(clientId),
         serviceId: Number(selectedService),
         startTime: startDateTime.toISOString(),
         endTime: endDateTime.toISOString(),
@@ -127,7 +179,7 @@ export function NewAppointmentModal({
       if (response.success) {
         toast({
           title: "Sucesso!",
-          description: "Agendamento criado com sucesso.",
+          description: isQuickCreate ? "Cliente cadastrado e agendamento criado!" : "Agendamento criado com sucesso.",
         });
         onSuccess();
         onOpenChange(false);
@@ -142,7 +194,7 @@ export function NewAppointmentModal({
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Erro de conexão com o servidor.",
+        description: error instanceof Error ? error.message : "Erro de conexão com o servidor.",
         variant: "destructive",
       });
     } finally {
@@ -177,50 +229,79 @@ export function NewAppointmentModal({
                   role="combobox"
                   aria-expanded={clientOpen}
                   className="w-full justify-between font-normal"
-                  disabled={dataLoading}
+                  disabled={dataLoading || isQuickCreate}
                 >
-                  {selectedClient
-                    ? clients.find((c) => c.id.toString() === selectedClient)?.name
-                    : "Selecionar paciente..."}
+                  {isQuickCreate ? (
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="font-bold text-primary">{quickClientData.name}</span>
+                      <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100">Novo Paciente</span>
+                    </div>
+                  ) : (
+                    selectedClient
+                      ? clients.find((c) => c.id.toString() === selectedClient)?.name
+                      : "Selecionar paciente..."
+                  )}
                   {dataLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin shrink-0 opacity-50" /> : <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Buscar paciente..." />
-                  <CommandList>
-                    <CommandEmpty>Nenhum paciente encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {clients.map((client) => (
-                        <CommandItem
-                          key={client.id}
-                          value={client.name}
-                          onSelect={() => {
-                            setSelectedClient(client.id.toString());
-                            setClientOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedClient === client.id.toString() ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {client.name}
-                          <span className="ml-2 text-xs text-muted-foreground">{client.phone}</span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                    <div className="p-2 border-t">
-                      <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-primary" onClick={() => window.location.href='/clients'}>
-                        <Plus className="mr-2 h-3 w-3" /> Cadastrar novo paciente
-                      </Button>
-                    </div>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
+              {!isQuickCreate && (
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar paciente..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum paciente encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {clients.map((client) => (
+                          <CommandItem
+                            key={client.id}
+                            value={client.name}
+                            onSelect={() => {
+                              setSelectedClient(client.id.toString());
+                              setClientOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedClient === client.id.toString() ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {client.name}
+                            <span className="ml-2 text-xs text-muted-foreground">{client.phone}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      <div className="p-2 border-t">
+                        <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-primary" onClick={() => window.location.href='/clients'}>
+                          <Plus className="mr-2 h-3 w-3" /> Cadastrar novo paciente
+                        </Button>
+                      </div>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              )}
             </Popover>
           </div>
+
+          {isQuickCreate && (
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 -mt-2 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                <span className="material-symbols-outlined text-sm">info</span>
+                Os dados deste lead serão usados para criar o cadastro de cliente automaticamente.
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nome</p>
+                  <p className="text-xs font-bold text-primary">{quickClientData.name}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</p>
+                  <p className="text-xs font-bold text-primary">{quickClientData.phone}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Service Selector */}
           <div className="space-y-2">
@@ -255,19 +336,21 @@ export function NewAppointmentModal({
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Horário *</Label>
-              <Select value={time} onValueChange={setTime}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  {Array.from({ length: 24 }, (_, i) => {
-                    const hour = i.toString().padStart(2, '0');
-                    return [`${hour}:00`, `${hour}:30`];
-                  }).flat().map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input 
+                type="text" 
+                placeholder="09:00" 
+                value={time} 
+                onChange={(e) => {
+                  let val = e.target.value.replace(/\D/g, "");
+                  if (val.length > 4) val = val.substring(0, 4);
+                  if (val.length > 2) {
+                    val = val.substring(0, 2) + ":" + val.substring(2);
+                  }
+                  setTime(val);
+                }}
+                className="font-bold text-primary"
+              />
+              <p className="text-[10px] text-slate-400">Formato: 24h (Ex: 09:30, 14:15)</p>
             </div>
           </div>
 

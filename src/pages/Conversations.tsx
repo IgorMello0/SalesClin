@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
@@ -105,26 +106,23 @@ const Conversations = () => {
       className="flex flex-col"
       style={{ height: '100vh' }}
     >
-      {/* ── Compact Top Bar ────────────────────────────────────── */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white/80 backdrop-blur-sm">
+      {/* ── Top Bar ── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20">
-            <span className="material-symbols-outlined text-white" style={{ fontSize: 16 }}>forum</span>
-          </div>
-          <h1 className="text-lg font-black text-primary font-headline">Conversas</h1>
-          <span className="text-xs text-muted-foreground hidden sm:block">WhatsApp &amp; IA</span>
+          <h2 className="text-lg font-extrabold text-primary font-headline tracking-tight">Conversas</h2>
+          <span className="text-xs text-on-surface-variant hidden sm:block">WhatsApp &amp; IA</span>
         </div>
 
-        {/* Mini stats inline */}
-        <div className="hidden md:flex items-center gap-6">
+        {/* Mini stats */}
+        <div className="hidden md:flex items-center gap-8">
           {[
-            { label: 'Ativas', value: totalActive, color: 'text-sky-600' },
-            { label: 'Convertidas', value: totalConverted, color: 'text-emerald-600' },
-            { label: 'Conversão', value: `${convRate}%`, color: 'text-violet-600' },
+            { label: 'Ativas',      value: totalActive,       color: 'text-primary' },
+            { label: 'Convertidas', value: totalConverted,    color: 'text-primary' },
+            { label: 'Conversão',   value: `${convRate}%`,   color: 'text-primary' },
           ].map(s => (
             <div key={s.label} className="text-center">
-              <p className={`text-lg font-black ${s.color} font-headline leading-none`}>{s.value}</p>
-              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{s.label}</p>
+              <p className={`text-xl font-extrabold ${s.color} font-headline leading-none`}>{s.value}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -134,10 +132,10 @@ const Conversations = () => {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             IA Ativa
           </span>
-          <button aria-label="Configurar IA" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 btn-hover transition-all">
+          <Button variant="outline" size="sm" aria-label="Configurar IA">
             <span className="material-symbols-outlined text-base">settings</span>
             <span className="hidden sm:inline">Configurar IA</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -272,16 +270,16 @@ const Conversations = () => {
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span> Humano
                   </span>
                 )}
-                <button aria-label="Agendar" className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 btn-hover flex items-center gap-1.5 transition-all">
+                <Button variant="outline" size="sm" aria-label="Agendar">
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calendar_today</span>
                   <span className="hidden lg:inline">Agendar</span>
-                </button>
-                <button aria-label="Ver perfil" className="w-9 h-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 btn-hover transition-all">
+                </Button>
+                <Button variant="outline" size="icon" aria-label="Ver perfil">
                   <span className="material-symbols-outlined text-slate-500" style={{ fontSize: 16 }}>person</span>
-                </button>
-                <button aria-label="Mais opções" className="w-9 h-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 btn-hover transition-all">
+                </Button>
+                <Button variant="outline" size="icon" aria-label="Mais opções">
                   <span className="material-symbols-outlined text-slate-500" style={{ fontSize: 16 }}>more_vert</span>
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -332,9 +330,9 @@ const Conversations = () => {
             {/* Input Bar */}
             <div className="flex-shrink-0 p-4 border-t border-slate-100 bg-white">
               <div className="flex items-center gap-3">
-                <button aria-label="Emoji" className="w-9 h-9 rounded-xl text-slate-400 hover:text-primary hover:bg-slate-50 flex items-center justify-center transition-all flex-shrink-0">
+                <Button variant="ghost" size="icon" aria-label="Emoji">
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>sentiment_satisfied</span>
-                </button>
+                </Button>
                 <div className="flex-1 relative">
                   <input
                     type="text"
@@ -345,15 +343,12 @@ const Conversations = () => {
                     className="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
                   />
                 </div>
-                <button aria-label="Anexar" className="w-9 h-9 rounded-xl text-slate-400 hover:text-primary hover:bg-slate-50 flex items-center justify-center transition-all flex-shrink-0">
+                <Button variant="ghost" size="icon" aria-label="Anexar">
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>attach_file</span>
-                </button>
-                <button
-                  aria-label="Enviar"
-                  className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center shadow-md shadow-primary/20 hover:bg-primary/90 btn-hover transition-all flex-shrink-0"
-                >
+                </Button>
+                <Button size="icon" aria-label="Enviar">
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>send</span>
-                </button>
+                </Button>
               </div>
               <p className="text-[10px] text-muted-foreground text-center mt-2">
                 Ao enviar, você assume o controle manual — a IA será pausada.

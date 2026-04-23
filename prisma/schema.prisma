@@ -118,6 +118,7 @@ model Professional {
   contracts        Contract[]
   conversas        Conversa[]
   permissions      ProfessionalPermission[]
+  leads            Lead[]
 
   @@map("professionals")
 }
@@ -144,6 +145,31 @@ model Client {
   conversas      Conversa[]
 
   @@map("clients")
+}
+
+// Leads para o funil de vendas (Prospecção)
+model Lead {
+  id             Int          @id @default(autoincrement())
+  professionalId Int          @map("professional_id")
+  name           String
+  value          Decimal      @default(0) @db.Decimal(10, 2)
+  origin         String?
+  avatar         String?
+  status         String
+  phone          String?
+  email          String?
+  age            Int?
+  observations   String?      @db.Text
+  city           String?
+  responsible    String?
+  isScheduled    Boolean      @default(false) @map("is_scheduled")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  professional   Professional @relation(fields: [professionalId], references: [id])
+
+  @@map("leads")
 }
 
 // Categorias de serviços ou produtos oferecidos pelos profissionais

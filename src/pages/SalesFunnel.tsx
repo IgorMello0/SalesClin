@@ -25,6 +25,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NewAppointmentModal } from '@/components/NewAppointmentModal';
+import { clientsApi, leadsApi } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from "lucide-react";
+import { useEffect } from 'react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -54,60 +59,13 @@ interface Lead {
   email: string;
   age: number;
   activities: Activity[];
+  isScheduled?: boolean;
+  observations?: string;
+  city?: string;
+  responsible?: string;
 }
 
-const initialLeads: Lead[] = [
-  { 
-    id: '1', 
-    name: 'Ana Silva', 
-    value: 2500, 
-    origin: 'Instagram', 
-    avatar: 'AS', 
-    status: 'prospect_lead', 
-    lastUpdate: '2h ago',
-    phone: '(11) 98765-4321',
-    email: 'ana.silva@email.com',
-    age: 28,
-    activities: [
-      { id: 'a1', type: 'system', user: 'Sistema', action: 'Oportunidade criada', date: '28/05/24 às 10:00', icon: 'flag', color: 'bg-pink-500' },
-      { id: 'a2', type: 'whatsapp', user: 'Lucas Sales', action: 'enviou mensagem no WhatsApp', content: 'Apresentação da clínica e boas-vindas.', date: '28/05/24 às 10:15', icon: 'chat', color: 'bg-emerald-500' },
-    ]
-  },
-  { 
-    id: '2', 
-    name: 'Bruno Costa', 
-    value: 4800, 
-    origin: 'Google Search', 
-    avatar: 'BC', 
-    status: 'prospect_qualified', 
-    lastUpdate: '5h ago',
-    phone: '(11) 91234-5678',
-    email: 'bruno.costa@email.com',
-    age: 35,
-    activities: [
-      { id: 'b1', type: 'system', user: 'Sistema', action: 'Oportunidade criada', date: '27/05/24 às 09:00', icon: 'flag', color: 'bg-pink-500' },
-      { id: 'b2', type: 'call', user: 'Luiza Fernandes', action: 'fez uma ligação', result: 'Ligação atendida.', content: 'Cliente confirmou interesse e pediu envio de proposta.', date: '28/05/24 às 13:07', icon: 'call', color: 'bg-blue-500' },
-    ]
-  },
-  { 
-    id: '4', 
-    name: 'Diego Ramos', 
-    value: 15000, 
-    origin: 'WhatsApp', 
-    avatar: 'DR', 
-    status: 'comercial_proposal', 
-    lastUpdate: '3h ago',
-    phone: '(21) 99887-7665',
-    email: 'diego.ramos@rh.com.br',
-    age: 42,
-    activities: [
-      { id: 'd1', type: 'system', user: 'Sistema', action: 'Oportunidade criada', date: '17/05/22 às 11:07', icon: 'flag', color: 'bg-pink-500' },
-      { id: 'd2', type: 'task', user: 'Luiza Fernandes', action: 'criou a tarefa', content: 'Ligar para o Mário', date: '17/05/22 às 11:10', icon: 'task_alt', color: 'bg-slate-400' },
-      { id: 'd3', type: 'system', user: 'Luiza Fernandes', action: 'adiou para a próxima semana a tarefa', content: 'Ligar para o Mário', date: '17/05/22 às 11:12', icon: 'history', color: 'bg-slate-400' },
-      { id: 'd4', type: 'call', user: 'Luiza Fernandes', action: 'fez uma ligação', result: 'Ligação atendida.', content: 'Cliente confirmou interesse e pediu envio de proposta.', date: '28/06/21 às 13:07', icon: 'call', color: 'bg-blue-500' },
-    ]
-  },
-];
+const initialLeads: Lead[] = [];
 
 const FUNNELS = [
   { id: 'prospecting', label: 'Prospecção', icon: 'person_search' },
@@ -142,12 +100,19 @@ const SalesFunnel = () => {
   const [isAddingLead, setIsAddingLead] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [newLeadStage, setNewLeadStage] = useState<string | null>(null);
-  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: 'Direto' });
+  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: 'Direto', phone: '' });
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<string | null>(null);
-  
-  // Note state
-  const [noteText, setNoteText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Appointment scheduling state
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [schedulingClientId, setSchedulingClientId] = useState<string | undefined>(undefined);
+  const [schedulingClientName, setSchedulingClientName] = useState<string | undefined>(undefined);
+  const [schedulingClientPhone, setSchedulingClientPhone] = useState<string | undefined>(undefined);
+  const [currentSchedulingLeadId, setCurrentSchedulingLeadId] = useState<string | null>(null);
+  const [isProcessingSchedule, setIsProcessingSchedule] = useState(false);
+  const { toast } = useToast();
 
   // Proposal state
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
@@ -164,13 +129,82 @@ const SalesFunnel = () => {
 
   const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
 
-  const moveLead = (leadId: string, newStatus: string) => {
+  const loadLeads = async () => {
+    setIsLoading(true);
+    try {
+      const res = await leadsApi.getAll();
+      if (res.success) {
+        const mappedLeads = res.data.map((l: any) => ({
+          ...l,
+          id: l.id.toString(),
+          isScheduled: l.is_scheduled,
+          lastUpdate: 'Recent',
+          activities: l.activities || []
+        }));
+        setLeads(mappedLeads);
+      }
+    } catch (error) {
+      console.error("Error loading leads:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLeads();
+  }, []);
+
+  const handleScheduleAppointment = async (lead: Lead) => {
+    if (lead.isScheduled) {
+      toast({
+        title: "Já Agendado",
+        description: "Este lead já possui um agendamento vinculado.",
+      });
+      return;
+    }
+
+    setIsProcessingSchedule(true);
+    setCurrentSchedulingLeadId(lead.id);
+    
+    try {
+      const searchRes = await clientsApi.getAll({ search: lead.phone || lead.name });
+      
+      if (searchRes.success && searchRes.data && searchRes.data.length > 0) {
+        setSchedulingClientId(searchRes.data[0].id.toString());
+        setSchedulingClientName(undefined);
+        setSchedulingClientPhone(undefined);
+      } else {
+        setSchedulingClientId(undefined);
+        setSchedulingClientName(lead.name);
+        setSchedulingClientPhone(lead.phone);
+      }
+
+      setIsScheduling(true);
+    } catch (error) {
+      toast({
+        title: "Erro ao buscar cliente",
+        description: "Não foi possível verificar se o cliente já existe.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessingSchedule(false);
+    }
+  };
+
+  const moveLead = async (leadId: string, newStatus: string) => {
     setLeads(prev => prev.map(lead => {
       if (lead.id === leadId) {
         return { ...lead, status: newStatus, lastUpdate: 'Just now' };
       }
       return lead;
     }));
+
+    try {
+      await leadsApi.update(Number(leadId), { status: newStatus });
+    } catch (error) {
+      toast({ title: "Erro ao mover lead", variant: "destructive" });
+      loadLeads();
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, leadId: string) => {
@@ -194,29 +228,53 @@ const SalesFunnel = () => {
     setDropTargetStage(null);
   };
 
-  const handleAddLead = () => {
-    if (!newLeadData.name) return;
+  const handleAddLead = async () => {
+    console.log("[Funnel] Tentando criar lead...", { name: newLeadData.name, professional: professional?.id });
+    
+    if (!newLeadData.name) {
+      toast({ title: "Campo obrigatório", description: "O nome do lead é obrigatório.", variant: "destructive" });
+      return;
+    }
 
-    const newLead: Lead = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newLeadData.name,
-      value: Number(newLeadData.value) || 0,
-      origin: newLeadData.origin,
-      avatar: newLeadData.name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2),
-      status: newLeadStage || activeStages[0].id,
-      lastUpdate: 'Just now',
-      phone: '(00) 00000-0000',
-      email: 'novo.contato@email.com',
-      age: 0,
-      activities: [
-        { id: Math.random().toString(), type: 'system', user: 'Sistema', action: 'Oportunidade criada', date: new Date().toLocaleString(), icon: 'flag', color: 'bg-pink-500' }
-      ]
-    };
+    if (!professional) {
+      console.error("[Funnel] Profissional não identificado.");
+      toast({ title: "Erro de Autenticação", description: "Não foi possível identificar o profissional logado.", variant: "destructive" });
+      return;
+    }
 
-    setLeads(prev => [newLead, ...prev]);
-    setIsAddingLead(false);
-    setNewLeadData({ name: '', value: '', origin: 'Direto' });
+    try {
+      const res = await leadsApi.create({
+        professional_id: Number(professional.id),
+        name: newLeadData.name,
+        phone: newLeadData.phone,
+        value: Number(newLeadData.value) || 0,
+        origin: newLeadData.origin,
+        status: newLeadStage || 'prospect_lead',
+        avatar: newLeadData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
+      });
+
+      console.log("[Funnel] Resposta criação lead:", res);
+
+      if (res.success) {
+        toast({ title: "Lead Criado!", description: "O lead foi salvo no banco de dados." });
+        loadLeads();
+        setIsAddingLead(false);
+        setNewLeadData({ name: '', value: '', origin: 'Direto', phone: '' });
+      } else {
+        toast({ 
+          title: "Erro ao criar lead", 
+          description: res.error?.message || "O servidor retornou um erro.", 
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error("[Funnel] Erro catch criação lead:", error);
+      toast({ title: "Erro de Conexão", description: "Não foi possível conectar ao servidor.", variant: "destructive" });
+    }
   };
+
+  // Note state
+  const [noteText, setNoteText] = useState('');
 
   const handleSaveNote = () => {
     if (!noteText.trim() || !selectedLead) return;
@@ -327,7 +385,9 @@ const SalesFunnel = () => {
           
           <Button 
             onClick={() => openAddLead()} 
-            className="rounded-xl h-12 px-6 bg-secondary hover:bg-secondary/90 text-white font-bold gap-2 btn-hover shadow-lg shadow-secondary/20"
+            size="xl"
+            variant="secondary"
+            className="h-12 px-6 font-bold gap-2 shadow-lg shadow-secondary/20"
           >
             <span className="material-symbols-outlined">add</span>
             Novo Lead
@@ -427,6 +487,30 @@ const SalesFunnel = () => {
 
                     {/* Stage specific acts */}
                     <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-slate-100">
+                      {stage.id === 'prospect_scheduled' && (
+                        lead.isScheduled ? (
+                          <div className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-100">
+                            Agendado
+                            <span className="material-symbols-outlined text-xs">check_circle</span>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
+                            disabled={isProcessingSchedule}
+                            className="w-full py-2 bg-violet-100 hover:bg-violet-600 text-violet-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-violet-200"
+                          >
+                            {isProcessingSchedule && currentSchedulingLeadId === lead.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <>
+                                Agendar agora
+                                <span className="material-symbols-outlined text-xs">calendar_today</span>
+                              </>
+                            )}
+                          </button>
+                        )
+                      )}
+
                       {stage.id === 'prospect_attended' && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); moveLead(lead.id, 'comercial_consult'); }}
@@ -486,14 +570,19 @@ const SalesFunnel = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="value" className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Estimado</Label>
+                <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-widest text-slate-400">WhatsApp / Celular</Label>
                 <Input 
-                  id="value" 
-                  type="number" 
-                  placeholder="2.500" 
+                  id="phone" 
+                  placeholder="(00) 00000-0000" 
                   className="rounded-xl border-slate-200 h-12"
-                  value={newLeadData.value}
-                  onChange={(e) => setNewLeadData({...newLeadData, value: e.target.value})}
+                  value={newLeadData.phone}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, "");
+                    if (val.length > 11) val = val.substring(0, 11);
+                    if (val.length > 2) val = `(${val.substring(0, 2)}) ${val.substring(2)}`;
+                    if (val.length > 9) val = `${val.substring(0, 9)}-${val.substring(9)}`;
+                    setNewLeadData({...newLeadData, phone: val})
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -507,10 +596,21 @@ const SalesFunnel = () => {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="value" className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Estimado (R$)</Label>
+              <Input 
+                id="value" 
+                type="number" 
+                placeholder="2.500" 
+                className="rounded-xl border-slate-200 h-12"
+                value={newLeadData.value}
+                onChange={(e) => setNewLeadData({...newLeadData, value: e.target.value})}
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="ghost" onClick={() => setIsAddingLead(false)} className="rounded-xl">Cancelar</Button>
-            <Button onClick={handleAddLead} className="bg-secondary hover:bg-secondary/90 text-white rounded-xl px-8 font-bold">Criar Lead</Button>
+            <Button onClick={handleAddLead} variant="secondary" className="rounded-xl px-8 font-bold">Criar Lead</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -574,8 +674,8 @@ const SalesFunnel = () => {
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Observações do Sistema</h4>
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      <p className="text-xs text-slate-600 leading-relaxed italic">
-                        "Lead interessada em tratamento ortodôntico. Origem via campanha de Instagram 'Sorriso Perfeito'. Prefere contato via WhatsApp após as 18h."
+                      <p className={cn("text-xs leading-relaxed italic", selectedLead.observations ? "text-slate-600" : "text-slate-400")}>
+                        {selectedLead.observations || "Nenhuma observação registrada para este lead no momento."}
                       </p>
                     </div>
                   </div>
@@ -585,15 +685,15 @@ const SalesFunnel = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">Cidade</span>
-                        <span className="font-bold text-primary">São Paulo</span>
+                        <span className="font-bold text-primary">{selectedLead.city || "Não informada"}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">Conversão de Origem</span>
-                        <span className="font-bold text-secondary">Instagram Ads</span>
+                        <span className="font-bold text-secondary">{selectedLead.origin || "Direto"}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">Responsável Atual</span>
-                        <span className="font-bold text-primary">Lucas Sales</span>
+                        <span className="font-bold text-primary">{selectedLead.responsible || professional?.name || "Sistema"}</span>
                       </div>
                     </div>
                   </div>
@@ -623,7 +723,8 @@ const SalesFunnel = () => {
                           <Button 
                             onClick={handleSaveNote}
                             disabled={!noteText.trim()}
-                            className="bg-secondary hover:bg-secondary/90 text-white rounded-xl px-6 font-bold h-10 gap-2"
+                            variant="secondary"
+                            className="rounded-xl px-6 font-bold h-10 gap-2"
                           >
                             <span className="material-symbols-outlined text-sm">save</span>
                             Salvar Nota
@@ -781,13 +882,37 @@ const SalesFunnel = () => {
             <Button variant="ghost" onClick={() => setIsCreatingProposal(false)} className="rounded-xl">Cancelar</Button>
             <Button 
               onClick={handleSaveProposal}
-              className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-10 font-bold shadow-lg shadow-orange-500/20"
+              variant="secondary"
+              className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20"
             >
               Gerar e Salvar Proposta
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Appointment Modal */}
+      <NewAppointmentModal
+        open={isScheduling}
+        onOpenChange={setIsScheduling}
+        initialClientId={schedulingClientId}
+        initialClientName={schedulingClientName}
+        initialClientPhone={schedulingClientPhone}
+        onSuccess={async () => {
+          if (currentSchedulingLeadId) {
+            // Update in DB
+            await leadsApi.update(Number(currentSchedulingLeadId), { is_scheduled: true });
+            
+            // Update in UI
+            setLeads(prev => prev.map(l => 
+              l.id === currentSchedulingLeadId ? { ...l, isScheduled: true } : l
+            ));
+          }
+          toast({
+            title: "Sucesso!",
+            description: "Agendamento realizado e vinculado ao lead.",
+          });
+        }}
+      />
     </div>
   );
 };

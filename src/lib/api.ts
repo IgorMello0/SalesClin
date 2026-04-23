@@ -180,6 +180,23 @@ export const appointmentsApi = {
   delete: async (id: number) => apiRequest<{ id: number }>(`/agendamentos/${id}`, { method: 'DELETE' }),
 }
 
+// Leads
+export const leadsApi = {
+  getAll: async (params?: { page?: number; pageSize?: number; search?: string; status?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.append('page', params.page.toString())
+    if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+    if (params?.search) query.append('search', params.search)
+    if (params?.status) query.append('status', params.status)
+    
+    return apiRequest<Array<any>>(`/leads?${query.toString()}`)
+  },
+  getById: async (id: number) => apiRequest<any>(`/leads/${id}`),
+  create: async (data: any) => apiRequest<any>('/leads', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: any) => apiRequest<any>(`/leads/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id: number) => apiRequest<{ id: number }>(`/leads/${id}`, { method: 'DELETE' }),
+}
+
 // Catálogos
 export const catalogsApi = {
   getAll: async (params?: { page?: number; pageSize?: number; search?: string }) => {

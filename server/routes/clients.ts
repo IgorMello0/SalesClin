@@ -8,8 +8,19 @@ export const router = Router()
 router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
+    const { search } = req.query as any
+
+    const where: any = {}
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+
     const [items, total] = await Promise.all([
       prisma.client.findMany({
+        where,
         skip,
         take,
         orderBy: { id: 'desc' },
@@ -23,11 +34,9 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
               status: true
             }
           }
-          // Removido payments, fichas, chatHistories e conversas temporariamente
-          // até as migrações serem executadas
         }
       }),
-      prisma.client.count()
+      prisma.client.count({ where })
     ])
     res.json(createSuccessResponse(items, { page, pageSize, total }))
   } catch (error: any) {
