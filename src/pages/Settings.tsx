@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,35 +32,197 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
+import { catalogsApi, professionalsApi } from '@/lib/api';
 
 // -- COMPONENTES DE CONFIGURAÇÃO (MOCKS) --
 
-const ServicosView = () => (
-  <div className="space-y-6">
-    <div className="flex justify-between items-center">
-      <h3 className="font-medium text-sm">Serviços Ativos (3)</h3>
-      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Novo</Button>
-    </div>
-    <div className="space-y-3">
-      {[
-        { name: 'Consulta Odontológica', price: 'R$ 150', time: '30 min' },
-        { name: 'Limpeza de Pele', price: 'R$ 120', time: '45 min' },
-        { name: 'Terapia Manual', price: 'R$ 200', time: '60 min' }
-      ].map((s, i) => (
-        <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-zinc-50/50 hover:border-primary/30 transition-colors">
+const ServicosView = () => {
+  const { professional } = useAuth();
+  const { toast } = useToast();
+  const [services, setServices] = useState<any[]>([]);
+  const [team, setTeam] = useState<any[]>([]);
+  const [selectedProfId, setSelectedProfId] = useState<string>(professional?.id?.toString() || '');
+  const [loading, setLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newService, setNewService] = useState({ name: '', price: '', durationMinutes: '30' });
+
+  const loadTeam = async () => {
+    try {
+      const res = await professionalsApi.getAll({ pageSize: 50 });
+      if (res.success && res.data) {
+        let teamData = res.data;
+        // Use loose equality (==) to handle string vs number ID mismatches
+        // Also check email as a fallback if available
+        const isAlreadyInList = teamData.find((t: any) => 
+          t.id == professional?.id || 
+          (t.email && professional?.email && t.email === professional.email)
+        );
+        
+        if (!isAlreadyInList && professional) {
+          teamData = [professional, ...teamData];
+        }
+        setTeam(teamData);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadServices = async (profId: string) => {
+    if (!profId) return;
+    try {
+      setLoading(true);
+      const res = await catalogsApi.getAll({ professionalId: Number(profId) });
+      setServices(res.data || []);
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível carregar serviços', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeam();
+  }, []);
+
+  useEffect(() => {
+    if (selectedProfId) {
+      loadServices(selectedProfId);
+    }
+  }, [selectedProfId]);
+
+  const handleSave = async () => {
+    if (!newService.name || !newService.price) {
+      toast({ title: 'Aviso', description: 'Preencha nome e preço', variant: 'destructive' });
+      return;
+    }
+    try {
+      await catalogsApi.create({
+        professionalId: Number(selectedProfId),
+        name: newService.name,
+        price: parseFloat(newService.price.replace(',', '.')),
+        durationMinutes: parseInt(newService.durationMinutes) || 30,
+        status: 'ativo'
+      });
+      toast({ title: 'Sucesso', description: 'Serviço adicionado' });
+      setIsAdding(false);
+      setNewService({ name: '', price: '', durationMinutes: '30' });
+      loadServices(selectedProfId);
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Falha ao salvar', variant: 'destructive' });
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await catalogsApi.delete(id);
+      toast({ title: 'Sucesso', description: 'Serviço removido' });
+      loadServices(selectedProfId);
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Falha ao remover', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Team Member Selector */}
+      {team.length > 1 && (
+        <div className="p-4 border rounded-lg bg-zinc-50/50 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="font-medium text-sm">{s.name}</div>
-            <div className="text-xs text-muted-foreground flex gap-3 mt-1">
-              <span className="font-semibold text-primary">{s.price}</span>
-              <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/>{s.time}</span>
-            </div>
+            <h4 className="font-medium text-sm">Profissional / Membro</h4>
+            <p className="text-xs text-muted-foreground">Selecione de quem é esta tabela de preços.</p>
           </div>
-          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4"/></Button>
+          <Select value={selectedProfId} onValueChange={setSelectedProfId}>
+            <SelectTrigger className="w-[200px] h-9 text-sm bg-white">
+              <SelectValue placeholder="Selecione o membro...">
+                {(() => {
+                  const member = team.find(m => m.id.toString() === selectedProfId);
+                  if (!member) return undefined;
+                  const isYou = member.id == professional?.id || (member.email && member.email === professional?.email);
+                  return `${member.name || member.nome} ${isYou ? '(Você)' : ''}`;
+                })()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {team.map(member => (
+                <SelectItem key={member.id} value={member.id.toString()}>
+                  {member.name || member.nome} {(member.id == professional?.id || (member.email && member.email === professional?.email)) ? '(Você)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      ))}
+      )}
+
+      <div className="flex justify-between items-center">
+        <h3 className="font-medium text-sm">Serviços Ativos ({services.length})</h3>
+        <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+          <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : 'Novo'}
+        </Button>
+      </div>
+
+      {isAdding && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="p-4 space-y-3">
+            <h4 className="font-medium text-sm">Novo Serviço</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Nome do Serviço</Label>
+                <Input value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} placeholder="Ex: Limpeza de Pele" className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Preço (R$)</Label>
+                <Input value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} placeholder="150,00" className="h-8 text-sm" type="number" />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs">Duração Média</Label>
+                <Select value={newService.durationMinutes} onValueChange={v => setNewService({...newService, durationMinutes: v})}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 minutos</SelectItem>
+                    <SelectItem value="30">30 minutos</SelectItem>
+                    <SelectItem value="45">45 minutos</SelectItem>
+                    <SelectItem value="60">1 hora</SelectItem>
+                    <SelectItem value="90">1h 30min</SelectItem>
+                    <SelectItem value="120">2 horas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button size="sm" className="w-full mt-2" onClick={handleSave}>Salvar Serviço</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <div className="text-sm text-muted-foreground text-center py-4">Carregando serviços...</div>
+      ) : (
+        <div className="space-y-3">
+          {services.map((s, i) => (
+            <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-zinc-50/50 hover:border-primary/30 transition-colors">
+              <div>
+                <div className="font-medium text-sm">{s.name}</div>
+                <div className="text-xs text-muted-foreground flex gap-3 mt-1">
+                  <span className="font-semibold text-primary">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(s.price || 0)}
+                  </span>
+                  <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/>{s.durationMinutes} min</span>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4"/></Button>
+            </div>
+          ))}
+          {services.length === 0 && !isAdding && (
+            <div className="text-sm text-center py-6 text-muted-foreground border border-dashed rounded-lg">
+              Nenhum serviço cadastrado para este profissional.
+            </div>
+          )}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 const CronogramaView = () => (
   <div className="space-y-6">
@@ -101,84 +264,112 @@ const CronogramaView = () => (
   </div>
 );
 
-const PagamentoOnlineView = () => (
-  <div className="space-y-6">
-    <div className="space-y-4">
-      <Card className="border-primary/50 shadow-sm bg-primary/5">
-        <CardContent className="p-4 flex items-start gap-4">
-          <div className="w-10 h-10 rounded bg-blue-600 flex items-center justify-center text-white font-bold">S</div>
-          <div className="flex-1">
-            <h4 className="font-bold text-sm text-blue-900">Stripe</h4>
-            <p className="text-xs text-blue-800/70">Cartão de Crédito, Apple Pay</p>
-          </div>
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">Conectado</Badge>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4 flex items-start gap-4 opacity-80">
-          <div className="w-10 h-10 rounded bg-[#009EE3] flex items-center justify-center text-white font-bold">MP</div>
-          <div className="flex-1">
-            <h4 className="font-bold text-sm">Mercado Pago</h4>
-            <p className="text-xs text-muted-foreground">Pix, Boleto, Cartão Local</p>
-          </div>
-          <Button variant="outline" size="sm">Conectar</Button>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4 flex items-start gap-4 opacity-80">
-          <div className="w-10 h-10 rounded bg-emerald-500 flex items-center justify-center text-white font-bold">P</div>
-          <div className="flex-1">
-            <h4 className="font-bold text-sm">Pagar.me</h4>
-            <p className="text-xs text-muted-foreground">Antecipação Automática</p>
-          </div>
-          <Button variant="outline" size="sm">Conectar</Button>
-        </CardContent>
-      </Card>
-    </div>
-    <Separator />
-    <div className="space-y-3">
-      <Label>Moeda de Cobrança Principal</Label>
-      <Select defaultValue="brl">
-        <SelectTrigger><SelectValue/></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="brl">BRL (R$) - Real Brasileiro</SelectItem>
-          <SelectItem value="usd">USD ($) - Dólar Americano</SelectItem>
-          <SelectItem value="eur">EUR (€) - Euro</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-);
 
-const EquipeView = () => (
-  <div className="space-y-6">
-    <div className="flex justify-between items-center">
-      <h3 className="font-medium text-sm">Membros Cadastrados (3)</h3>
-      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Convidar</Button>
-    </div>
-    <div className="space-y-3">
-      {[
-        { name: 'Dr. Roberto', role: 'Doutor', email: 'roberto@clinica.com' },
-        { name: 'Ana Souza', role: 'Recepcionista', email: 'ana@clinica.com' },
-        { name: 'Marcos Admin', role: 'Administrador', email: 'admin@clinica.com' }
-      ].map((u, i) => (
-        <div key={i} className="flex justify-between items-center p-3 border rounded-lg hover:bg-zinc-50 transition-colors cursor-pointer">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs uppercase">
-              {u.name.substring(0,2)}
+
+const EquipeView = () => {
+  const { toast } = useToast();
+  const [team, setTeam] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newMember, setNewMember] = useState({ name: '', email: '', password: '', role: 'Profissional' });
+
+  const loadTeam = async () => {
+    try {
+      const res = await professionalsApi.getAll({ pageSize: 50 });
+      if (res.success && res.data) {
+        setTeam(res.data);
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível carregar a equipe', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeam();
+  }, []);
+
+  const handleAddMember = async () => {
+    if (!newMember.name || !newMember.email || !newMember.password) {
+      toast({ title: 'Atenção', description: 'Preencha nome, email e senha.', variant: 'destructive' });
+      return;
+    }
+    
+    try {
+      const res = await professionalsApi.addTeamMember(newMember);
+      if (res.success) {
+        toast({ title: 'Sucesso', description: 'Membro adicionado com sucesso!' });
+        setIsAdding(false);
+        setNewMember({ name: '', email: '', password: '', role: 'Profissional' });
+        loadTeam();
+      } else {
+        throw new Error(res.error?.message || 'Erro ao adicionar');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="font-medium text-sm">Membros Cadastrados ({team.length})</h3>
+        <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+          <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : 'Convidar'}
+        </Button>
+      </div>
+      
+      {isAdding && (
+        <div className="p-4 border rounded-lg bg-zinc-50/50 space-y-4 mb-4">
+          <h4 className="font-medium text-sm">Novo Membro da Equipe</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Nome Completo</Label>
+              <Input value={newMember.name} onChange={e => setNewMember({...newMember, name: e.target.value})} placeholder="Ex: Dr. Roberto" />
             </div>
-            <div>
-              <div className="font-medium text-sm">{u.name}</div>
-              <div className="text-xs text-muted-foreground">{u.email}</div>
+            <div className="space-y-2">
+              <Label>E-mail (Login)</Label>
+              <Input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} placeholder="roberto@clinica.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Senha Temporária</Label>
+              <Input type="password" value={newMember.password} onChange={e => setNewMember({...newMember, password: e.target.value})} placeholder="******" />
+            </div>
+            <div className="space-y-2">
+              <Label>Cargo / Especialidade</Label>
+              <Input value={newMember.role} onChange={e => setNewMember({...newMember, role: e.target.value})} placeholder="Ex: Doutor, Recepcionista" />
             </div>
           </div>
-          <div className="text-xs font-medium px-2 py-1 bg-zinc-100 text-zinc-600 border rounded-full">{u.role}</div>
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleAddMember}>Adicionar à Equipe</Button>
+          </div>
         </div>
-      ))}
+      )}
+
+      <div className="space-y-3">
+        {loading ? (
+          <div className="text-sm text-center py-4 text-muted-foreground">Carregando equipe...</div>
+        ) : team.map((u, i) => (
+          <div key={i} className="flex justify-between items-center p-3 border rounded-lg hover:bg-zinc-50 transition-colors cursor-pointer">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs uppercase">
+                {u.name.substring(0,2)}
+              </div>
+              <div>
+                <div className="font-medium text-sm">{u.name}</div>
+                <div className="text-xs text-muted-foreground">{u.email}</div>
+              </div>
+            </div>
+            <div className="text-xs font-medium px-2 py-1 bg-zinc-100 text-zinc-600 border rounded-full">
+              {u.specialization || 'Membro'}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
-    <Button variant="outline" className="w-full">Gerenciar Permissões das Equipes</Button>
-  </div>
-);
+  );
+};
 
 const WebhookView = () => (
   <div className="space-y-6">
@@ -271,7 +462,6 @@ const GenericFallback = ({ name }: { name: string }) => (
 const ViewsMap: Record<string, React.FC<any>> = {
   'Serviços': ServicosView,
   'Cronograma': CronogramaView,
-  'Pagamento online': PagamentoOnlineView,
   'Equipe': EquipeView,
   'Webhook': WebhookView,
   'Informações': InfoNegocioView,
@@ -288,10 +478,8 @@ const Settings = () => {
       icon: SettingsIcon,
       items: [
         { name: 'Serviços', description: 'Gerencie os serviços oferecidos' },
-        { name: 'Cargos', description: 'Configure os cargos da equipe' },
         { name: 'Equipe', description: 'Gerencie membros da equipe' },
         { name: 'Cronograma', description: 'Configure horários de funcionamento' },
-        { name: 'Recursos', description: 'Gerencie recursos disponíveis' },
         { name: 'Calendário de agendamentos', description: 'Configurações do calendário' },
       ]
     },
@@ -299,16 +487,8 @@ const Settings = () => {
       title: 'Financeiro',
       icon: DollarSign,
       items: [
-        { name: 'Pagamento online', description: 'Configure métodos de pagamento' },
         { name: 'Checkout', description: 'Configurações do processo de pagamento' },
         { name: 'Recibos', description: 'Configurações de recibos e faturas' },
-      ]
-    },
-    {
-      title: 'Relatórios',
-      icon: BarChart3,
-      items: [
-        { name: 'Retenção', description: 'Relatórios de retenção de clientes' },
       ]
     },
     {
@@ -390,7 +570,11 @@ const Settings = () => {
                       <div className="font-semibold text-sm group-hover:text-primary transition-colors">{item.name}</div>
                       <div className="text-xs text-muted-foreground">{item.description}</div>
                     </div>
-                    <Button variant="outline" size="sm" className="hidden sm:inline-flex shrink-0 text-xs shadow-none group-hover:bg-primary group-hover:text-white transition-all w-24">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="hidden sm:inline-flex shrink-0 text-xs shadow-none hover:bg-primary hover:text-white transition-all w-24"
+                    >
                       Configurar
                     </Button>
                   </div>

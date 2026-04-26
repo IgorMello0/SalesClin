@@ -79,12 +79,12 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-white/5 bg-primary text-white transition-all duration-300">
+    <Sidebar collapsible="icon" className="border-r border-white/5 bg-primary text-primary-foreground transition-all duration-300">
       <SidebarHeader className={cn("py-8 transition-all duration-300", isCollapsed ? "px-4" : "px-8")}>
         <div className="flex items-center justify-center w-full min-h-[40px]">
           {isCollapsed ? (
              <div className="w-12 h-12 rounded-2xl bg-sky-500/20 flex items-center justify-center border border-sky-400/30 animate-in zoom-in duration-300 shadow-lg shadow-sky-500/10">
-                <span className="material-symbols-outlined text-white text-3xl">rocket_launch</span>
+                <span className="material-symbols-outlined text-primary-foreground text-3xl">rocket_launch</span>
              </div>
           ) : (
             <img 
@@ -107,8 +107,8 @@ export function AppSidebar() {
                 "flex items-center gap-3 py-3 text-sm font-semibold tracking-wide font-headline transition-all rounded-xl overflow-hidden group/item",
                 isCollapsed ? "justify-center px-0 w-14 mx-auto" : "px-4",
                 location.pathname === item.url 
-                  ? 'bg-white/10 text-white shadow-lg shadow-black/10 scale-[1.02]' 
-                  : 'text-white/60 hover:bg-white/5 hover:text-white'
+                  ? 'bg-white/10 text-primary-foreground shadow-lg shadow-black/10 scale-[1.02]' 
+                  : 'text-primary-foreground/60 hover:bg-white/5 hover:text-primary-foreground'
               )}
             >
               <span className={cn(
@@ -132,7 +132,7 @@ export function AppSidebar() {
               className={cn(
                 "flex items-center gap-3 py-1.5 text-sm font-medium transition-all rounded-xl",
                 isCollapsed ? "justify-center w-14" : "px-4",
-                location.pathname === '/profile' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                location.pathname === '/profile' ? 'bg-white/10 text-primary-foreground' : 'text-primary-foreground/60 hover:bg-white/5 hover:text-primary-foreground'
               )}
             >
               <span className="material-symbols-outlined text-xl shrink-0">account_circle</span>
@@ -144,7 +144,7 @@ export function AppSidebar() {
               className={cn(
                 "flex items-center gap-3 py-1.5 text-sm font-medium transition-all rounded-xl",
                 isCollapsed ? "justify-center w-14" : "px-4",
-                location.pathname === '/settings' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                location.pathname === '/settings' ? 'bg-white/10 text-primary-foreground' : 'text-primary-foreground/60 hover:bg-white/5 hover:text-primary-foreground'
               )}
             >
               <span className="material-symbols-outlined text-xl shrink-0">settings</span>
@@ -154,7 +154,7 @@ export function AppSidebar() {
               onClick={handleLogout}
               title={isCollapsed ? "Sair" : ""}
               className={cn(
-                "flex items-center gap-3 py-3 text-sm font-medium hover:text-red-400 transition-all text-white/60 hover:bg-red-500/10 rounded-xl text-left",
+                "flex items-center gap-3 py-3 text-sm font-medium hover:text-red-400 transition-all text-primary-foreground/60 hover:bg-red-500/10 rounded-xl text-left",
                 isCollapsed ? "justify-center w-14" : "px-4 w-full"
               )}
             >

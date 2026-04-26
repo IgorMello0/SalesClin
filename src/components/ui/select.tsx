@@ -20,9 +20,9 @@ const Select = ({ value: controlledValue, defaultValue, onValueChange, children 
 
 const SelectGroup = ({ children }: { children: React.ReactNode }) => <div role="group">{children}</div>
 
-const SelectValue = ({ placeholder }: { placeholder?: string }) => {
+const SelectValue = ({ placeholder, children }: { placeholder?: string; children?: React.ReactNode }) => {
   const { value } = React.useContext(SelectContext)
-  return <span>{value || placeholder}</span>
+  return <span>{children || value || placeholder}</span>
 }
 
 const SelectTrigger = ({ className, children, ref, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { ref?: React.Ref<HTMLButtonElement> }) => {

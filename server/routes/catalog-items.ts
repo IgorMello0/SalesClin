@@ -7,14 +7,25 @@ export const router = Router()
 
 router.get('/', auth(false), requireModule('catalogos'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
+  const professionalId = req.query.professionalId || req.user?.id
+  
+  const where: any = {}
+  if (professionalId) {
+    where.professionalId = Number(professionalId)
+  } else {
+    // Se não houver professionalId, retorna vazio para não misturar dados
+    return res.json(createSuccessResponse([], { page, pageSize, total: 0 }))
+  }
+
   const [items, total] = await Promise.all([
     prisma.catalogItem.findMany({
+      where,
       skip,
       take,
       orderBy: { id: 'desc' },
       include: { professional: true, category: true, appointments: true }
     }),
-    prisma.catalogItem.count()
+    prisma.catalogItem.count({ where })
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })

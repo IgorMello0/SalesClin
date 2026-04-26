@@ -200,8 +200,8 @@ const Conversations = () => {
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
                     <div className="relative flex-shrink-0 mt-0.5">
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center text-xs font-black text-white transition-all ${
-                        isActive ? 'bg-primary' : 'bg-slate-400 group-hover:bg-slate-500'
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center text-xs font-black text-primary-foreground transition-all ${
+                        isActive ? 'bg-primary' : 'bg-slate-400 group-hover:bg-slate-500 text-white'
                       }`}>
                         {conv.avatar}
                       </div>
@@ -248,7 +248,7 @@ const Conversations = () => {
             {/* Chat Header */}
             <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white shadow-sm">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-sm font-black text-white">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-sm font-black text-primary-foreground">
                   {selected.avatar}
                 </div>
                 <div>

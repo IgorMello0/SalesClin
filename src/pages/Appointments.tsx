@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { appointmentsApi } from '@/lib/api';
+import { appointmentsApi, professionalsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NewAppointmentModal } from '@/components/NewAppointmentModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Appointments = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -20,11 +21,16 @@ const Appointments = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [openModal, setOpenModal] = useState(false);
   const { toast } = useToast();
+  const { professional } = useAuth();
+  
+  const [professionalsList, setProfessionalsList] = useState<any[]>([]);
+  const [selectedProfFilter, setSelectedProfFilter] = useState<string>("");
 
   const loadAppointments = async () => {
+    if (!selectedProfFilter) return;
     setIsLoading(true);
     try {
-      const response = await appointmentsApi.getAll({ pageSize: 200 });
+      const response = await appointmentsApi.getAll({ pageSize: 200, professionalId: Number(selectedProfFilter) });
       if (response.success && response.data) {
         const mapped = response.data.map((apt: any) => ({
           id: apt.id,
@@ -44,7 +50,27 @@ const Appointments = () => {
     }
   };
 
-  useEffect(() => { loadAppointments(); }, []);
+  const loadProfessionals = async () => {
+    try {
+      const res = await professionalsApi.getAll({ pageSize: 50 });
+      if (res.success && res.data) {
+        setProfessionalsList(res.data);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar profissionais", error);
+    }
+  };
+
+  useEffect(() => { 
+    if (professional && !selectedProfFilter) {
+      setSelectedProfFilter(professional.id);
+      loadProfessionals();
+    }
+  }, [professional]);
+
+  useEffect(() => {
+    if (selectedProfFilter) loadAppointments();
+  }, [selectedProfFilter]);
 
   const weekDays = eachDayOfInterval({
     start: startOfWeek(currentWeek, { weekStartsOn: 0 }),
@@ -107,6 +133,23 @@ const Appointments = () => {
           <p className="text-on-surface-variant text-sm mt-1">Gerencie seus compromissos e horários</p>
         </div>
         <div className="flex items-center gap-2">
+          {professionalsList.length > 1 && (
+            <Select value={selectedProfFilter} onValueChange={setSelectedProfFilter}>
+              <SelectTrigger className="w-[200px] border-slate-200 bg-white">
+                <SelectValue placeholder="Filtrar por profissional">
+                  {professionalsList.find(p => p.id.toString() === selectedProfFilter)?.name || "Todos os profissionais"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {professionalsList.map((prof) => (
+                  <SelectItem key={prof.id} value={prof.id.toString()}>
+                    {prof.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           <Button variant="outline">
             <span className="material-symbols-outlined text-lg">filter_list</span>
             <span className="hidden sm:inline">Filtros</span>
@@ -263,29 +306,57 @@ const Appointments = () => {
                       <div className="text-xs text-muted-foreground">{filteredAppointments.filter(apt => isSameDay(apt.date, selectedDate)).length} agendamentos</div>
                     </div>
                   </div>
-                  {timeSlots.slice(7, 20).map((time) => {
-                    const dayApts = filteredAppointments.filter(apt => isSameDay(apt.date, selectedDate) && apt.time === time);
-                    return (
-                      <div key={time} className="grid grid-cols-[64px_1fr] border-b border-slate-100/60 min-h-[56px] hover:bg-slate-50/40 transition-colors">
-                        <div className="p-2 text-xs text-muted-foreground border-r border-slate-100 flex items-start justify-end pt-3 font-mono">{time}</div>
-                        <div className="p-2 space-y-1.5">
-                          {dayApts.map((apt) => {
-                            const st = getStatusConfig(apt.status);
-                            return (
-                              <div key={apt.id} className={`rounded-xl border px-3 py-2 cursor-pointer hover:scale-[1.01] transition-all ${st.bg}`}>
-                                <div className="flex items-center gap-2">
-                                  <span className={`w-2 h-2 rounded-full ${st.dot} shrink-0`} />
-                                  <span className="font-bold text-sm truncate">{apt.clientName}</span>
-                                  <span className="text-xs ml-auto opacity-70">{apt.duration}min</span>
-                                </div>
-                                <div className="text-xs opacity-70 mt-0.5 ml-4">{apt.service}</div>
-                              </div>
-                            );
-                          })}
+                  <div className="relative mt-2">
+                    {/* Grid de Fundo */}
+                    <div>
+                      {timeSlots.slice(7, 20).map((time) => (
+                        <div key={time} className="grid grid-cols-[64px_1fr] border-b border-slate-100/80 transition-colors" style={{ height: '64px' }}>
+                          <div className="p-2 text-xs text-muted-foreground border-r border-slate-100 flex items-start justify-end pt-2 font-mono bg-white/50">{time}</div>
+                          <div className="p-2" />
                         </div>
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </div>
+
+                    {/* Overlay de Agendamentos */}
+                    <div className="absolute top-0 left-[64px] right-0 bottom-0 pointer-events-none">
+                      {filteredAppointments.filter(apt => isSameDay(apt.date, selectedDate)).map((apt) => {
+                        const [h, m] = apt.time.split(':').map(Number);
+                        if (h < 7 || h >= 20) return null; // Fora do horário comercial visível
+
+                        const topOffset = ((h - 7) * 64) + ((m / 60) * 64);
+                        const height = (apt.duration / 60) * 64;
+                        const st = getStatusConfig(apt.status);
+
+                        // Calcula o horário de término para exibição
+                        const endTime = new Date(apt.date.getTime() + apt.duration * 60000);
+
+                        return (
+                          <div 
+                            key={apt.id} 
+                            className={`absolute left-2 right-4 rounded-xl border px-3 py-2 cursor-pointer hover:shadow-md transition-all overflow-hidden shadow-sm pointer-events-auto flex flex-col justify-center ${st.bg}`}
+                            style={{ top: `${topOffset}px`, height: `${Math.max(height - 4, 36)}px`, zIndex: 10 }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-2 h-2 rounded-full ${st.dot} shrink-0`} />
+                                  <span className="font-bold text-sm leading-none">{apt.clientName}</span>
+                                </div>
+                                {height > 40 && (
+                                  <span className="text-xs opacity-80 ml-3.5 leading-tight">{apt.service}</span>
+                                )}
+                              </div>
+                              {height > 50 && (
+                                <div className="text-xs font-mono font-medium opacity-70 shrink-0 bg-white/40 px-1.5 py-0.5 rounded-md">
+                                  {apt.time} - {format(endTime, 'HH:mm')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -305,31 +376,53 @@ const Appointments = () => {
                       );
                     })}
                   </div>
-                  <div>
-                    {timeSlots.slice(7, 20).map((time) => (
-                      <div key={time} className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b border-slate-100/60 min-h-[52px] hover:bg-slate-50/30 transition-colors">
-                        <div className="p-1.5 text-[10px] text-muted-foreground border-r border-slate-100 flex items-start justify-end pt-2 font-mono">{time}</div>
-                        {weekDays.map((day, idx) => {
-                          const dayApts = filteredAppointments.filter(apt => isSameDay(apt.date, day) && apt.time === time);
-                          return (
-                            <div key={`${day.toISOString()}-${time}`} className={`p-1 border-r border-slate-100/60 ${idx === 6 ? 'border-r-0' : ''}`}>
-                              {dayApts.map((apt) => {
-                                const st = getStatusConfig(apt.status);
-                                return (
-                                  <div key={apt.id} className={`rounded-lg border px-1.5 py-1 mb-1 cursor-pointer hover:scale-[1.02] transition-all text-[10px] overflow-hidden ${st.bg}`}>
-                                    <div className="flex items-center gap-1">
-                                      <span className={`w-1.5 h-1.5 rounded-full ${st.dot} shrink-0`} />
-                                      <span className="font-bold truncate">{apt.clientName}</span>
-                                    </div>
-                                    <div className="opacity-60 truncate mt-0.5 pl-2.5">{apt.service}</div>
+                  <div className="relative mt-2">
+                    {/* Grid de Fundo da Semana */}
+                    <div>
+                      {timeSlots.slice(7, 20).map((time) => (
+                        <div key={time} className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b border-slate-100/80 transition-colors" style={{ height: '64px' }}>
+                          <div className="p-1.5 text-[10px] text-muted-foreground border-r border-slate-100 flex items-start justify-end pt-2 font-mono bg-white/50">{time}</div>
+                          {weekDays.map((_, idx) => (
+                            <div key={idx} className={`border-r border-slate-100/40 ${idx === 6 ? 'border-r-0' : ''}`} />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Overlay de Agendamentos da Semana */}
+                    <div className="absolute top-0 left-[56px] right-0 bottom-0 pointer-events-none flex">
+                      {weekDays.map((day, idx) => {
+                        const dayApts = filteredAppointments.filter(apt => isSameDay(apt.date, day));
+                        return (
+                          <div key={idx} className="flex-1 relative">
+                            {dayApts.map((apt) => {
+                              const [h, m] = apt.time.split(':').map(Number);
+                              if (h < 7 || h >= 20) return null;
+
+                              const topOffset = ((h - 7) * 64) + ((m / 60) * 64);
+                              const height = (apt.duration / 60) * 64;
+                              const st = getStatusConfig(apt.status);
+
+                              return (
+                                <div 
+                                  key={apt.id} 
+                                  className={`absolute left-0.5 right-1 rounded-lg border px-1.5 py-1 cursor-pointer hover:shadow-md transition-all text-[10px] overflow-hidden shadow-sm pointer-events-auto flex flex-col ${st.bg}`}
+                                  style={{ top: `${topOffset}px`, height: `${Math.max(height - 2, 24)}px`, zIndex: 10 }}
+                                >
+                                  <div className="flex items-center gap-1">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot} shrink-0`} />
+                                    <span className="font-bold truncate leading-none">{apt.clientName}</span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
+                                  {height > 35 && (
+                                    <div className="opacity-70 truncate mt-1 pl-2.5 leading-none">{apt.service}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

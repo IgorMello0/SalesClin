@@ -96,7 +96,7 @@ model Professional {
   passwordHash     String    @map("password_hash")
   phone            String?
   specialization   String?
-  companyId        Int?      @unique @map("company_id")
+  companyId        Int?      @map("company_id")
   companyName      String?   @map("company_name")
   logoUrl          String?   @map("logo_url")
   contractType     String?   @map("contract_type")
@@ -393,7 +393,7 @@ model Empresa {
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional Professional?
+  professionals Professional[]
   usuarios     Usuario[]
   agentesIa    AgenteIa[]
   conversas    Conversa[]

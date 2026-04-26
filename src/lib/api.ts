@@ -124,6 +124,7 @@ export const professionalsApi = {
     return apiRequest<Array<any>>(`/profissionais/${id}/clientes?${query.toString()}`)
   },
   create: async (data: any) => apiRequest<any>('/profissionais', { method: 'POST', body: JSON.stringify(data) }),
+  addTeamMember: async (data: any) => apiRequest<any>('/profissionais/equipe', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) => apiRequest<any>(`/profissionais/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/profissionais/${id}`, { method: 'DELETE' }),
 }
@@ -176,18 +177,23 @@ export const appointmentsApi = {
   },
   getById: async (id: number) => apiRequest<any>(`/agendamentos/${id}`),
   create: async (data: any) => apiRequest<any>('/agendamentos', { method: 'POST', body: JSON.stringify(data) }),
+  checkAvailability: async (professionalId: string, startTime: string, endTime: string) => {
+    const query = new URLSearchParams({ professionalId, startTime, endTime })
+    return apiRequest<any>(`/agendamentos/check-availability?${query.toString()}`)
+  },
   update: async (id: number, data: any) => apiRequest<any>(`/agendamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/agendamentos/${id}`, { method: 'DELETE' }),
 }
 
 // Leads
 export const leadsApi = {
-  getAll: async (params?: { page?: number; pageSize?: number; search?: string; status?: string }) => {
+  getAll: async (params?: { page?: number; pageSize?: number; search?: string; status?: string; professionalId?: number }) => {
     const query = new URLSearchParams()
     if (params?.page) query.append('page', params.page.toString())
     if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
     if (params?.search) query.append('search', params.search)
     if (params?.status) query.append('status', params.status)
+    if (params?.professionalId) query.append('professionalId', params.professionalId.toString())
     
     return apiRequest<Array<any>>(`/leads?${query.toString()}`)
   },
@@ -199,11 +205,12 @@ export const leadsApi = {
 
 // Catálogos
 export const catalogsApi = {
-  getAll: async (params?: { page?: number; pageSize?: number; search?: string }) => {
+  getAll: async (params?: { page?: number; pageSize?: number; search?: string; professionalId?: number }) => {
     const query = new URLSearchParams()
     if (params?.page) query.append('page', params.page.toString())
     if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
     if (params?.search) query.append('search', params.search)
+    if (params?.professionalId) query.append('professionalId', params.professionalId.toString())
     
     return apiRequest<Array<any>>(`/catalogo?${query.toString()}`)
   },

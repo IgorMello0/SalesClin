@@ -9,9 +9,16 @@ export const router = Router()
 router.get('/', auth(false), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
-    const { search, status } = req.query as any
+    const { search, status, professionalId } = req.query as any
+    const profId = professionalId || req.user?.id
 
     const where: any = {}
+    if (profId) {
+      where.professionalId = Number(profId)
+    } else {
+      return res.json(createSuccessResponse([], { page, pageSize, total: 0 }))
+    }
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },

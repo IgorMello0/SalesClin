@@ -57,11 +57,11 @@ const SheetContent = ({ side = "right", className, children, ref, ...props }: Re
   if (!open) return null
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/80" onClick={() => onOpenChange(false)} />
+      <div className="fixed inset-0 z-[100] bg-white/10 backdrop-blur-md transition-all duration-300" onClick={() => onOpenChange(false)} />
       <div
         ref={ref}
         className={cn(
-          "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out",
+          "fixed z-[101] gap-4 bg-background p-6 shadow-2xl transition ease-in-out duration-300",
           sheetVariants[side],
           className
         )}

@@ -130,14 +130,15 @@ const SalesFunnel = () => {
   const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
 
   const loadLeads = async () => {
+    if (!professional?.id) return;
     setIsLoading(true);
     try {
-      const res = await leadsApi.getAll();
+      const res = await leadsApi.getAll({ professionalId: Number(professional.id) });
       if (res.success) {
         const mappedLeads = res.data.map((l: any) => ({
           ...l,
           id: l.id.toString(),
-          isScheduled: l.is_scheduled,
+          isScheduled: l.isScheduled || l.is_scheduled, // Handle both just in case
           lastUpdate: 'Recent',
           activities: l.activities || []
         }));
@@ -151,8 +152,8 @@ const SalesFunnel = () => {
   };
 
   useEffect(() => {
-    loadLeads();
-  }, []);
+    if (professional) loadLeads();
+  }, [professional]);
 
   const handleScheduleAppointment = async (lead: Lead) => {
     if (lead.isScheduled) {

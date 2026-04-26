@@ -125,13 +125,13 @@ const Dashboard = () => {
         <Card className="flex items-center gap-3 p-1.5">
           <button 
             onClick={() => handleFilterChange('today')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-slate-50'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-slate-50'}`}
           >
             Hoje
           </button>
           <button 
             onClick={() => handleFilterChange('7days')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === '7days' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-slate-50'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === '7days' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-slate-50'}`}
           >
             Últimos 7 dias
           </button>

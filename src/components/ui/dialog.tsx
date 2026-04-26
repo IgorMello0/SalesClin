@@ -42,7 +42,7 @@ const DialogOverlay = ({ className, ref, ...props }: React.HTMLAttributes<HTMLDi
   return (
     <div
       ref={ref}
-      className={cn("fixed inset-0 z-[100] bg-slate-900/20 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0", className)}
+      className={cn("fixed inset-0 z-[100] bg-white/10 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0", className)}
       onClick={() => onOpenChange(false)}
       {...props}
     />

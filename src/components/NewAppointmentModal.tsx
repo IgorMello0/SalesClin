@@ -29,9 +29,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Plus, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { clientsApi, catalogsApi, appointmentsApi } from "@/lib/api";
+import { clientsApi, catalogsApi, appointmentsApi, professionalsApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -61,11 +61,17 @@ export function NewAppointmentModal({
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   
+  // Availability check state
+  const [isTimeConflict, setIsTimeConflict] = useState(false);
+  const [checkingTime, setCheckingTime] = useState(false);
+  
   // Data lists
   const [clients, setClients] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [companyProfessionals, setCompanyProfessionals] = useState<any[]>([]);
   
   // Form state
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clientOpen, setClientOpen] = useState(false);
   
@@ -73,7 +79,7 @@ export function NewAppointmentModal({
   const [date, setDate] = useState<string>(
     initialDate ? format(initialDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd")
   );
-  const [time, setTime] = useState<string>("09:00");
+  const [time, setTime] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
   // Quick create state
@@ -81,8 +87,8 @@ export function NewAppointmentModal({
   const [quickClientData, setQuickClientData] = useState({ name: "", phone: "" });
 
   useEffect(() => {
-    if (open) {
-      loadData();
+    if (open && professional) {
+      loadInitialData();
       if (initialClientId) {
         setSelectedClient(initialClientId);
         setIsQuickCreate(false);
@@ -98,24 +104,93 @@ export function NewAppointmentModal({
         setSelectedClient("");
       }
     }
-  }, [open, initialClientId, initialClientName, initialClientPhone]);
+  }, [open, initialClientId, initialClientName, initialClientPhone, professional]);
 
-  const loadData = async () => {
+  const loadInitialData = async () => {
+    if (!professional?.id) return;
     setDataLoading(true);
     try {
-      const [clientsRes, servicesRes] = await Promise.all([
+      const [clientsRes, profsRes] = await Promise.all([
         clientsApi.getAll({ pageSize: 100 }),
-        catalogsApi.getAll({ pageSize: 100 })
+        professionalsApi.getAll({ pageSize: 50 })
       ]);
       
       if (clientsRes.success) setClients(clientsRes.data || []);
-      if (servicesRes.success) setServices(servicesRes.data || []);
+      
+      if (profsRes.success && profsRes.data) {
+        setCompanyProfessionals(profsRes.data);
+        if (profsRes.data.length > 0) {
+          const defaultProf = profsRes.data.find((p: any) => p.id.toString() === professional.id) || profsRes.data[0];
+          setSelectedProfessionalId(defaultProf.id.toString());
+        } else {
+          setSelectedProfessionalId(professional.id);
+        }
+      } else {
+        setSelectedProfessionalId(professional.id);
+      }
     } catch (error) {
-      console.error("Error loading modal data:", error);
+      console.error("Error loading modal initial data:", error);
     } finally {
       setDataLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (open && selectedProfessionalId) {
+      loadServices(selectedProfessionalId);
+    }
+  }, [open, selectedProfessionalId]);
+
+  const loadServices = async (profId: string) => {
+    try {
+      const res = await catalogsApi.getAll({ pageSize: 100, professionalId: Number(profId) });
+      if (res.success) {
+        setServices(res.data || []);
+        // Reset selected service if it's not in the new list
+        if (selectedService && !(res.data || []).some((s: any) => s.id.toString() === selectedService)) {
+          setSelectedService("");
+        }
+      }
+    } catch (error) {
+      console.error("Error loading services", error);
+    }
+  };
+
+  // Real-time availability check
+  useEffect(() => {
+    const checkTime = async () => {
+      if (!selectedProfessionalId || !date || !time || !selectedService) {
+        setIsTimeConflict(false);
+        return;
+      }
+      
+      const service = services.find(s => s.id.toString() === selectedService);
+      const duration = service?.durationMinutes || service?.duration || 30;
+      
+      const startDateTime = new Date(`${date}T${time}:00`);
+      const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+      
+      setCheckingTime(true);
+      try {
+        const res = await appointmentsApi.checkAvailability(
+          selectedProfessionalId, 
+          startDateTime.toISOString(), 
+          endDateTime.toISOString()
+        );
+        if (res.success && res.data) {
+          setIsTimeConflict(!res.data.available);
+        }
+      } catch (e) {
+        console.error("Availability check failed", e);
+      } finally {
+        setCheckingTime(false);
+      }
+    };
+    
+    // Add a small debounce to avoid spamming the backend while typing/selecting
+    const timeout = setTimeout(checkTime, 300);
+    return () => clearTimeout(timeout);
+  }, [selectedProfessionalId, date, time, selectedService, services]);
 
   const handleSubmit = async () => {
     if ((!selectedClient || selectedClient === "new") && !isQuickCreate) {
@@ -136,7 +211,7 @@ export function NewAppointmentModal({
       return;
     }
 
-    if (!professional) return;
+    if (!selectedProfessionalId) return;
 
     setLoading(true);
     try {
@@ -161,13 +236,13 @@ export function NewAppointmentModal({
 
       // 2. Criar o agendamento
       const service = services.find(s => s.id.toString() === selectedService);
-      const duration = service?.duration || 30;
+      const duration = service?.durationMinutes || service?.duration || 30;
       
       const startDateTime = new Date(`${date}T${time}:00`);
       const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
 
       const response = await appointmentsApi.create({
-        professionalId: Number(professional.id),
+        professionalId: Number(selectedProfessionalId),
         clientId: Number(clientId),
         serviceId: Number(selectedService),
         startTime: startDateTime.toISOString(),
@@ -185,6 +260,9 @@ export function NewAppointmentModal({
         onOpenChange(false);
         resetForm();
       } else {
+        if (response.error?.code === 409) {
+          throw new Error("Este horário já está ocupado para este profissional. Escolha outro horário.");
+        }
         toast({
           title: "Erro ao criar agendamento",
           description: response.error?.message || "Erro desconhecido",
@@ -219,6 +297,43 @@ export function NewAppointmentModal({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
+          {/* Professional Selector (Dynamic) */}
+          {companyProfessionals.length > 1 && (
+            <div className="space-y-2 flex flex-col">
+              <Label className="text-sm font-medium">Profissional Responsável *</Label>
+              <Select value={selectedProfessionalId} onValueChange={setSelectedProfessionalId} disabled={dataLoading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o profissional">
+                    {companyProfessionals.find(p => p.id.toString() === selectedProfessionalId)?.name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {companyProfessionals.map((prof) => (
+                    <SelectItem key={prof.id} value={prof.id.toString()} className="py-2">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-slate-700">{prof.name}</span>
+                        {prof.specialization && <span className="text-[10px] text-slate-500 font-medium">{prof.specialization}</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Conflict Warning */}
+          {isTimeConflict && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-start gap-3">
+              <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-red-600 font-bold text-xs">X</span>
+              </div>
+              <div className="text-sm">
+                <p className="font-bold">Profissional Indisponível</p>
+                <p>Este horário já está ocupado. Por favor, escolha outro horário ou profissional.</p>
+              </div>
+            </div>
+          )}
+
           {/* Patient Selector (Combobox) */}
           <div className="space-y-2 flex flex-col">
             <Label className="text-sm font-medium">Paciente *</Label>
@@ -308,15 +423,34 @@ export function NewAppointmentModal({
             <Label className="text-sm font-medium">Procedimento / Serviço *</Label>
             <Select value={selectedService} onValueChange={setSelectedService} disabled={dataLoading}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o serviço" />
+                <SelectValue placeholder="Selecione o serviço">
+                  {services.find(s => s.id.toString() === selectedService)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {services.length === 0 && !dataLoading && <SelectItem value="none" disabled>Nenhum serviço cadastrado</SelectItem>}
                 {services.map((service) => (
-                  <SelectItem key={service.id} value={service.id.toString()}>
-                    <div className="flex justify-between w-full gap-8">
-                      <span>{service.name}</span>
-                      <span className="text-muted-foreground text-xs">{service.price ? `R$ ${service.price}` : ""}</span>
+                  <SelectItem 
+                    key={service.id} 
+                    value={service.id.toString()}
+                    className="focus:bg-primary/5 cursor-pointer py-3"
+                  >
+                    <div className="flex items-center justify-between w-full gap-4 pr-2">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-slate-700 text-sm">{service.name}</span>
+                        {service.durationMinutes && (
+                          <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> {service.durationMinutes} min
+                          </span>
+                        )}
+                      </div>
+                      {service.price && (
+                        <div className="shrink-0">
+                          <span className="text-[11px] font-extrabold text-primary bg-primary/5 px-2 py-1 rounded-lg border border-primary/10 whitespace-nowrap">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(service.price))}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </SelectItem>
                 ))}
@@ -367,9 +501,9 @@ export function NewAppointmentModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Confirmar Agendamento
+          <Button onClick={handleSubmit} disabled={loading || dataLoading || checkingTime || isTimeConflict}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isQuickCreate ? "Salvar Paciente & Agendar" : "Confirmar Agendamento"}
           </Button>
         </DialogFooter>
       </DialogContent>

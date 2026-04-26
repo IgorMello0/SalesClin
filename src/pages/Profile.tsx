@@ -117,7 +117,7 @@ const Profile = () => {
               </Button>
             </>
           ) : (
-            <Button onClick={() => setIsEditing(true)} className="bg-primary hover:bg-primary/90 text-white font-bold rounded-xl font-headline shadow-lg shadow-primary/20">
+            <Button onClick={() => setIsEditing(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl font-headline shadow-lg shadow-primary/20">
               <Edit2 className="h-4 w-4 mr-2" />
               Editar Perfil
             </Button>
@@ -139,7 +139,7 @@ const Profile = () => {
               <div className="relative inline-block">
                 <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
                   <AvatarImage src={profileImage || undefined} />
-                  <AvatarFallback className="text-2xl bg-primary text-white font-headline">
+                  <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-headline">
                     {getInitials(formData.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -182,7 +182,7 @@ const Profile = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="text-center pt-2">
-                <Badge className="mb-2 bg-primary text-white font-bold px-4 py-1.5 rounded-xl shadow-md">
+                <Badge className="mb-2 bg-primary text-primary-foreground font-bold px-4 py-1.5 rounded-xl shadow-md">
                   Plano Premium
                 </Badge>
                 <p className="text-xs text-slate-400">Ativo desde Jan 2024</p>

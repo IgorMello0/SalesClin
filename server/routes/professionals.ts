@@ -59,26 +59,31 @@ router.post('/login', async (req, res) => {
 // Listar profissionais
 router.get('/', auth(false), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
+  
+  const where: any = {}
+  if (req.user?.type === 'profissional') {
+    const currentProf = await prisma.professional.findUnique({ where: { id: req.user.id } })
+    if (currentProf?.companyId) {
+      where.companyId = currentProf.companyId
+    }
+  }
+
   const [items, total] = await Promise.all([
     prisma.professional.findMany({
+      where,
       skip,
       take,
-      orderBy: { id: 'desc' },
-      include: {
-        categories: true,
-        catalogItems: true,
-        appointments: true,
-        payments: true,
-        fichaTemplates: true,
-        fichas: true,
-        chatHistories: true,
-        settingsProfile: true,
-        auditLogs: true,
-        contracts: true,
-        conversas: true
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        specialization: true,
+        phone: true,
+        companyId: true
       }
     }),
-    prisma.professional.count()
+    prisma.professional.count({ where })
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
@@ -106,7 +111,7 @@ router.get('/:id', auth(false), async (req, res) => {
   res.json(createSuccessResponse(item))
 })
 
-// Criar (signup)
+// Criar (signup público - cria nova empresa)
 router.post('/', async (req, res) => {
   try {
     const { name, email, password, phone, specialization, companyName, logoUrl, contractType } = req.body
@@ -179,6 +184,56 @@ router.post('/', async (req, res) => {
     }))
   } catch (error) {
     console.error('[Signup] Erro:', error)
+    res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
+  }
+})
+
+// Adicionar profissional à mesma equipe (logado)
+router.post('/equipe', auth(), async (req, res) => {
+  try {
+    const { name, email, password, phone, specialization, role } = req.body
+    
+    if (!name || !email || !password) {
+      return res.status(400).json(createErrorResponse('Nome, email e senha são obrigatórios', 400))
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
+    }
+    
+    const existing = await prisma.professional.findUnique({ where: { email } })
+    if (existing) {
+      return res.status(400).json(createErrorResponse('Email já cadastrado', 400))
+    }
+
+    const currentProf = await prisma.professional.findUnique({ where: { id: req.user!.id } })
+    if (!currentProf || !currentProf.companyId) {
+      return res.status(400).json(createErrorResponse('Empresa não encontrada', 400))
+    }
+    
+    const passwordHash = await bcrypt.hash(password, 10)
+    
+    const created = await prisma.professional.create({
+      data: { 
+        name, 
+        email, 
+        passwordHash, 
+        phone, 
+        specialization: specialization || role, 
+        companyId: currentProf.companyId,
+        companyName: currentProf.companyName, 
+      }
+    })
+    
+    res.status(201).json(createSuccessResponse({ 
+      id: created.id.toString(), 
+      name: created.name, 
+      email: created.email, 
+      phone: created.phone || '', 
+      specialization: created.specialization || ''
+    }))
+  } catch (error) {
+    console.error('[AddEquipe] Erro:', error)
     res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
   }
 })

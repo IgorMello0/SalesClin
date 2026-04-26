@@ -6,7 +6,7 @@ const buttonVariants = tv({
   base: "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   variants: {
     variant: {
-      default:       "bg-primary text-white rounded-xl hover:bg-primary/90 btn-hover",
+      default:       "bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 btn-hover",
       destructive:   "bg-destructive text-destructive-foreground rounded-xl hover:bg-destructive/90",
       outline:       "border border-slate-200 bg-white text-slate-600 rounded-xl hover:bg-slate-50 btn-hover",
       secondary:     "bg-secondary text-white rounded-xl hover:bg-secondary/80",

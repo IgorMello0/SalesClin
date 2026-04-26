@@ -26,6 +26,34 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
 
+// Check availability (olheiro em tempo real)
+router.get('/check-availability', auth(false), async (req, res) => {
+  try {
+    const { professionalId, startTime, endTime } = req.query as any
+    if (!professionalId || !startTime || !endTime) {
+      return res.status(400).json(createErrorResponse('Parâmetros incompletos', 400))
+    }
+
+    const conflicting = await prisma.appointment.findFirst({
+      where: {
+        professionalId: Number(professionalId),
+        status: { not: 'cancelado' },
+        AND: [
+          { startTime: { lt: new Date(endTime) } },
+          { endTime: { gt: new Date(startTime) } }
+        ]
+      }
+    })
+
+    if (conflicting) {
+      return res.json(createSuccessResponse({ available: false }))
+    }
+    return res.json(createSuccessResponse({ available: true }))
+  } catch (error) {
+    return res.status(500).json(createErrorResponse('Erro ao verificar disponibilidade', 500))
+  }
+})
+
 router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
   const item = await prisma.appointment.findUnique({
@@ -38,6 +66,23 @@ router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) 
 
 router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
   const { professionalId, clientId, serviceId, startTime, endTime, status, notes } = req.body
+  
+  // Overbooking Validation
+  const conflicting = await prisma.appointment.findFirst({
+    where: {
+      professionalId,
+      status: { not: 'cancelado' },
+      AND: [
+        { startTime: { lt: new Date(endTime) } },
+        { endTime: { gt: new Date(startTime) } }
+      ]
+    }
+  });
+
+  if (conflicting) {
+    return res.status(409).json(createErrorResponse('Este horário já está ocupado para este profissional.', 409));
+  }
+
   const created = await prisma.appointment.create({
     data: { professionalId, clientId, serviceId, startTime, endTime, status, notes }
   })
@@ -47,6 +92,24 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
 router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
   const { professionalId, clientId, serviceId, startTime, endTime, status, notes } = req.body
+
+  // Overbooking Validation
+  const conflicting = await prisma.appointment.findFirst({
+    where: {
+      professionalId,
+      id: { not: id },
+      status: { not: 'cancelado' },
+      AND: [
+        { startTime: { lt: new Date(endTime) } },
+        { endTime: { gt: new Date(startTime) } }
+      ]
+    }
+  });
+
+  if (conflicting) {
+    return res.status(409).json(createErrorResponse('Este horário já está ocupado para este profissional.', 409));
+  }
+
   const updated = await prisma.appointment.update({
     where: { id },
     data: { professionalId, clientId, serviceId, startTime, endTime, status, notes }
