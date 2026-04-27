@@ -14,9 +14,16 @@ const Dashboard = () => {
     comparada: 0,
     oportunidades: 0,
     faturamento: 0,
+    receita: 0,
     ticketOrcado: 0,
     ticketFechado: 0,
     conversao: 0
+  });
+
+  const [extraData, setExtraData] = useState({
+    metodos: { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+    funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
+    origem: [] as { origin: string, count: number }[]
   });
 
   const fetchTargetData = useCallback(async (currentFilter: string) => {
@@ -28,7 +35,13 @@ const Dashboard = () => {
     } catch (e) {
       console.error(e);
     }
-    return { leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, faturamento: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0 };
+    return { 
+      leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, 
+      faturamento: 0, receita: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
+      metodos: { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+      funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
+      origem: []
+    };
   }, []);
 
   const animationRef = useCallback((targets: any) => {
@@ -49,10 +62,19 @@ const Dashboard = () => {
         comparada: Math.floor(currentValues.comparada + ease * (targets.comparada - currentValues.comparada)),
         oportunidades: Math.floor(currentValues.oportunidades + ease * (targets.oportunidades - currentValues.oportunidades)),
         faturamento: Math.floor(currentValues.faturamento + ease * (targets.faturamento - currentValues.faturamento)),
+        receita: Math.floor(currentValues.receita + ease * (targets.receita - currentValues.receita)),
         ticketOrcado: Math.floor(currentValues.ticketOrcado + ease * (targets.ticketOrcado - currentValues.ticketOrcado)),
         ticketFechado: Math.floor(currentValues.ticketFechado + ease * (targets.ticketFechado - currentValues.ticketFechado)),
         conversao: Number((currentValues.conversao + ease * (targets.conversao - currentValues.conversao)).toFixed(1))
       });
+
+      if (progress === 1) {
+        setExtraData({
+          metodos: targets.metodos || { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+          funil: targets.funil || { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
+          origem: targets.origem || []
+        });
+      }
 
       if (progress < 1) {
         requestAnimationFrame(frame);
@@ -78,10 +100,20 @@ const Dashboard = () => {
           comparada: Math.floor(ease * targets.comparada),
           oportunidades: Math.floor(ease * targets.oportunidades),
           faturamento: Math.floor(ease * targets.faturamento),
+          receita: Math.floor(ease * targets.receita),
           ticketOrcado: Math.floor(ease * targets.ticketOrcado),
           ticketFechado: Math.floor(ease * targets.ticketFechado),
           conversao: Number((ease * targets.conversao).toFixed(1))
         });
+        
+        if (progress === 1) {
+          setExtraData({
+            metodos: targets.metodos || { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+            funil: targets.funil || { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
+            origem: targets.origem || []
+          });
+        }
+        
         if (progress < 1) requestAnimationFrame(frame);
       };
       requestAnimationFrame(frame);
@@ -93,7 +125,9 @@ const Dashboard = () => {
     if (newFilter === filter) return;
     setFilter(newFilter);
     const targets = await fetchTargetData(newFilter);
-    setCounters(targets);
+    
+    // Anima os contadores suavemente
+    animationRef(targets);
   };
 
   const formatCurrency = (val: number) => {
@@ -112,6 +146,35 @@ const Dashboard = () => {
       const end = endOfMonth(today);
       return `${format(start, "dd MMM", { locale: ptBR })} - ${format(end, "dd MMM, yyyy", { locale: ptBR })}`;
     }
+  };
+
+  const targetsData = {
+    leads: 1500,
+    agendamentos: 2500,
+    comparada: 1000,
+    oportunidades: 1000,
+    faturamento: 850000,
+    ticketOrcado: 2000,
+    ticketFechado: 2200,
+    conversao: 25.0
+  };
+
+  const getPercent = (current: number, target: number) => {
+    if (target === 0) return 0;
+    return Math.round((current / target) * 100);
+  };
+
+  const renderPercentBadge = (percent: number) => {
+    return <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">{percent}%</span>;
+  };
+
+  const renderProgressBar = (percent: number) => {
+    const cappedPercent = Math.min(100, percent);
+    return (
+      <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
+        <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: `${cappedPercent}%` }}></div>
+      </div>
+    );
   };
 
   return (
@@ -147,13 +210,13 @@ const Dashboard = () => {
 
       {/* Primary Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-        {/* Card 1: Total de Leads (70%) */}
+        {/* Card 1: Total de Leads */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">groups</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">70%</span>
+            {renderPercentBadge(getPercent(counters.leads, targetsData.leads))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Total de Leads</p>
@@ -161,22 +224,22 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: 1.500</span>
-              <span className="font-bold text-primary">70% alcançado</span>
+              <span>Meta: {targetsData.leads.toLocaleString('pt-BR')}</span>
+              <span className={`font-bold ${getPercent(counters.leads, targetsData.leads) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.leads, targetsData.leads) >= 100 ? 'Meta Superada!' : `${getPercent(counters.leads, targetsData.leads)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '70%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.leads, targetsData.leads))}
           </div>
         </Card>
 
-        {/* Card 2: Avaliação Agendada (35%) */}
+        {/* Card 2: Avaliação Agendada */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">event_available</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">35%</span>
+            {renderPercentBadge(getPercent(counters.agendamentos, targetsData.agendamentos))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Agendada</p>
@@ -184,22 +247,22 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: 2.500</span>
-              <span className="font-bold text-primary">35% alcançado</span>
+              <span>Meta: {targetsData.agendamentos.toLocaleString('pt-BR')}</span>
+              <span className={`font-bold ${getPercent(counters.agendamentos, targetsData.agendamentos) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.agendamentos, targetsData.agendamentos) >= 100 ? 'Meta Superada!' : `${getPercent(counters.agendamentos, targetsData.agendamentos)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '35%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.agendamentos, targetsData.agendamentos))}
           </div>
         </Card>
 
-        {/* Card 3: Avaliação Comparada (62%) */}
+        {/* Card 3: Avaliação Comparada */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">how_to_reg</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">62%</span>
+            {renderPercentBadge(getPercent(counters.comparada, targetsData.comparada))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Comparada</p>
@@ -207,22 +270,22 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: 1.000</span>
-              <span className="font-bold text-primary">62% alcançado</span>
+              <span>Meta: {targetsData.comparada.toLocaleString('pt-BR')}</span>
+              <span className={`font-bold ${getPercent(counters.comparada, targetsData.comparada) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.comparada, targetsData.comparada) >= 100 ? 'Meta Superada!' : `${getPercent(counters.comparada, targetsData.comparada)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '62%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.comparada, targetsData.comparada))}
           </div>
         </Card>
 
-        {/* Card 4: Oportunidades Geradas (42%) */}
+        {/* Card 4: Oportunidades Geradas */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">rocket_launch</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">42%</span>
+            {renderPercentBadge(getPercent(counters.oportunidades, targetsData.oportunidades))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Oportunidades Geradas</p>
@@ -230,12 +293,12 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: 1.000</span>
-              <span className="font-bold text-primary">42% alcançado</span>
+              <span>Meta: {targetsData.oportunidades.toLocaleString('pt-BR')}</span>
+              <span className={`font-bold ${getPercent(counters.oportunidades, targetsData.oportunidades) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.oportunidades, targetsData.oportunidades) >= 100 ? 'Meta Superada!' : `${getPercent(counters.oportunidades, targetsData.oportunidades)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '42%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.oportunidades, targetsData.oportunidades))}
           </div>
         </Card>
       </div>
@@ -248,7 +311,7 @@ const Dashboard = () => {
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">41%</span>
+            {renderPercentBadge(getPercent(counters.faturamento, targetsData.faturamento))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Faturamento Total</p>
@@ -256,12 +319,12 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: R$ 850.000</span>
-              <span className="font-bold text-primary">41% alcançado</span>
+              <span>Meta: {formatCurrency(targetsData.faturamento)}</span>
+              <span className={`font-bold ${getPercent(counters.faturamento, targetsData.faturamento) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.faturamento, targetsData.faturamento) >= 100 ? 'Meta Superada!' : `${getPercent(counters.faturamento, targetsData.faturamento)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '41%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.faturamento, targetsData.faturamento))}
           </div>
         </Card>
 
@@ -271,7 +334,7 @@ const Dashboard = () => {
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">calculate</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">233%</span>
+            {renderPercentBadge(getPercent(counters.ticketOrcado, targetsData.ticketOrcado))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Orçado)</p>
@@ -279,12 +342,12 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: R$ 2.000</span>
-              <span className="font-bold text-secondary">Meta Superada!</span>
+              <span>Meta: {formatCurrency(targetsData.ticketOrcado)}</span>
+              <span className={`font-bold ${getPercent(counters.ticketOrcado, targetsData.ticketOrcado) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.ticketOrcado, targetsData.ticketOrcado) >= 100 ? 'Meta Superada!' : `${getPercent(counters.ticketOrcado, targetsData.ticketOrcado)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '100%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.ticketOrcado, targetsData.ticketOrcado))}
           </div>
         </Card>
 
@@ -294,7 +357,7 @@ const Dashboard = () => {
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">handshake</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">173%</span>
+            {renderPercentBadge(getPercent(counters.ticketFechado, targetsData.ticketFechado))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Fechado)</p>
@@ -302,12 +365,12 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: R$ 2.200</span>
-              <span className="font-bold text-secondary">Meta Superada!</span>
+              <span>Meta: {formatCurrency(targetsData.ticketFechado)}</span>
+              <span className={`font-bold ${getPercent(counters.ticketFechado, targetsData.ticketFechado) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.ticketFechado, targetsData.ticketFechado) >= 100 ? 'Meta Superada!' : `${getPercent(counters.ticketFechado, targetsData.ticketFechado)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '100%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.ticketFechado, targetsData.ticketFechado))}
           </div>
         </Card>
 
@@ -317,7 +380,7 @@ const Dashboard = () => {
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">percent</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">104%</span>
+            {renderPercentBadge(getPercent(counters.conversao, targetsData.conversao))}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Taxa de Conversão</p>
@@ -325,12 +388,12 @@ const Dashboard = () => {
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: 25.0%</span>
-              <span className="font-bold text-primary">Meta Alcançada!</span>
+              <span>Meta: {targetsData.conversao}%</span>
+              <span className={`font-bold ${getPercent(counters.conversao, targetsData.conversao) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(counters.conversao, targetsData.conversao) >= 100 ? 'Meta Alcançada!' : `${getPercent(counters.conversao, targetsData.conversao)}% alcançado`}
+              </span>
             </div>
-            <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: '100%' }}></div>
-            </div>
+            {renderProgressBar(getPercent(counters.conversao, targetsData.conversao))}
           </div>
         </Card>
       </div>
@@ -345,14 +408,14 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="md:col-span-1 bg-primary/95 backdrop-blur-lg p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Receita Total</p>
-            <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.faturamento)}</h4>
+            <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.receita)}</h4>
           </div>
           <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { label: 'Boleto', value: 82400, target: 100000, percent: 24 },
-              { label: 'Cartão', value: 156900, target: 200000, percent: 46 },
-              { label: 'Pix / Débito', value: 94200, target: 80000, percent: 117 },
-              { label: 'Dinheiro', value: 9000, target: 20000, percent: 3 },
+              { label: 'Boleto', value: extraData.metodos.boleto },
+              { label: 'Cartão', value: extraData.metodos.cartao },
+              { label: 'Pix / Débito', value: extraData.metodos.pix },
+              { label: 'Dinheiro', value: extraData.metodos.dinheiro },
             ].map((item) => (
               <Card key={item.label} className="p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -377,11 +440,14 @@ const Dashboard = () => {
           </div>
           <div className="flex flex-col gap-4">
             {[
-              { label: 'Novos', val: 1248, color: 'bg-primary', percent: 100 },
-              { label: 'Contatados', val: 850, color: 'bg-secondary', percent: 68 },
-              { label: 'Agendados', val: 612, color: 'bg-secondary', percent: 49 },
-              { label: 'Fechados', val: 172, color: 'bg-secondary', percent: 14 },
-            ].map((item) => (
+              { label: 'Novos', val: extraData.funil.novos || 0, color: 'bg-primary' },
+              { label: 'Contatados', val: extraData.funil.contatados || 0, color: 'bg-secondary' },
+              { label: 'Agendados', val: extraData.funil.agendamentos || 0, color: 'bg-secondary' },
+              { label: 'Fechados', val: extraData.funil.fechados || 0, color: 'bg-secondary' },
+            ].map((item, index, arr) => {
+              const maxVal = Math.max(...arr.map(a => a.val)) || 1;
+              const percent = Math.round((item.val / maxVal) * 100);
+              return (
               <div key={item.label} className="flex items-center gap-6">
                 <div className="w-24 text-right text-xs font-bold text-on-surface-variant">{item.label}</div>
                 {/* Removed overflow-hidden so the shadow can glow outside */}
@@ -390,18 +456,23 @@ const Dashboard = () => {
                     className={cn(
                       "absolute inset-y-0 left-0 rounded-xl flex items-center justify-center text-white text-xs font-bold progress-bar-fill transition-all duration-500",
                       item.color,
-                      item.color === 'bg-secondary' ? 'shadow-[0_0_20px_rgba(249,115,22,0.4)] border border-orange-400/50' : ''
+                      item.color === 'bg-secondary' && percent > 0 ? 'shadow-[0_0_20px_rgba(249,115,22,0.4)] border border-orange-400/50' : ''
                     )} 
-                    style={{ width: `${item.percent}%` }}
+                    style={{ width: `${percent}%`, opacity: percent > 0 ? 1 : 0 }}
                   >
-                    <span>{item.val}</span>
+                    {percent > 10 && <span>{item.val}</span>}
                   </div>
+                  {percent <= 10 && (
+                    <div className="absolute inset-y-0 left-4 flex items-center text-xs font-bold text-on-surface-variant z-10">
+                      {item.val}
+                    </div>
+                  )}
                 </div>
-                <div className={`w-16 text-xs font-bold ${item.percent === 100 ? 'text-secondary' : 'text-on-surface-variant'}`}>
-                  {item.percent}%
+                <div className={`w-16 text-xs font-bold ${percent === 100 ? 'text-secondary' : 'text-on-surface-variant'}`}>
+                  {percent}%
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </Card>
 
@@ -414,23 +485,43 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-7">
-            {[
-              { label: 'Facebook Ads', val: 442, icon: 'https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg', percent: 35.4, bg: 'bg-blue-50' },
-              { label: 'Google Search', val: 315, icon: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg', percent: 25.2, bg: 'bg-red-50' },
-              { label: 'Instagram', val: 280, icon: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png', percent: 22.4, bg: 'bg-pink-50' },
-              { label: 'WhatsApp Direct', val: 211, icon: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg', percent: 16.9, bg: 'bg-green-50' },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-4 group cursor-default">
-                <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform overflow-hidden p-2 shadow-sm`}>
-                  <img src={item.icon} alt={item.label} className="w-full h-full object-contain" />
+            {extraData.origem.length > 0 ? extraData.origem.map((item, index) => {
+              const totalOrigins = extraData.origem.reduce((acc, curr) => acc + curr.count, 0) || 1;
+              const percent = ((item.count / totalOrigins) * 100).toFixed(1);
+              // Fallbacks de ícone se a origem não for Meta/Google etc
+              let icon = 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg'; // Default
+              let bg = 'bg-slate-100';
+              if (item.origin?.toLowerCase().includes('facebook') || item.origin?.toLowerCase().includes('meta')) {
+                icon = 'https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg';
+                bg = 'bg-blue-50';
+              } else if (item.origin?.toLowerCase().includes('google')) {
+                icon = 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg';
+                bg = 'bg-red-50';
+              } else if (item.origin?.toLowerCase().includes('instagram')) {
+                icon = 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png';
+                bg = 'bg-pink-50';
+              }
+
+              return (
+              <div key={item.origin} className="flex items-center gap-4 group cursor-default">
+                <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform overflow-hidden p-2 shadow-sm`}>
+                  <img src={icon} alt={item.origin} className="w-full h-full object-contain" />
                 </div>
                 <div className="flex-1">
+                  <div className="flex justify-between text-xs mb-1">
+                     <span className="font-bold">{item.origin}</span>
+                     <span className="text-on-surface-variant">{item.count} Leads ({percent}%)</span>
+                  </div>
                   <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: `${item.percent}%` }}></div>
+                    <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: `${percent}%` }}></div>
                   </div>
                 </div>
               </div>
-            ))}
+            )}) : (
+              <div className="text-center text-sm text-on-surface-variant py-8">
+                Nenhum dado de origem registrado no período.
+              </div>
+            )}
           </div>
         </Card>
       </div>

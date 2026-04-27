@@ -359,8 +359,8 @@ const SalesFunnel = () => {
       {/* Header & Funnel Switcher */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Pipeline de Vendas</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Gerencie seus leads através dos funis integrados.</p>
+          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Comercial</h2>
+          <p className="text-on-surface-variant text-sm mt-1">Gerencie seus leads e funis de vendas.</p>
         </div>
         
         <div className="flex items-center gap-4">

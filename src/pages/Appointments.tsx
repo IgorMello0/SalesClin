@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const Appointments = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
+  const [viewMode, setViewMode] = useState<'dia' | 'semana' | 'mes'>('semana');
   const [searchQuery, setSearchQuery] = useState('');
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,9 +90,9 @@ const Appointments = () => {
   };
 
   const navigateDate = (direction: 'prev' | 'next') => {
-    if (viewMode === 'day') {
+    if (viewMode === 'dia') {
       setSelectedDate(direction === 'prev' ? addDays(selectedDate, -1) : addDays(selectedDate, 1));
-    } else if (viewMode === 'week') {
+    } else if (viewMode === 'semana') {
       setCurrentWeek(direction === 'prev' ? subWeeks(currentWeek, 1) : addWeeks(currentWeek, 1));
     } else {
       setCurrentWeek(direction === 'prev'
@@ -102,8 +102,8 @@ const Appointments = () => {
   };
 
   const getDisplayDates = () => {
-    if (viewMode === 'day') return [selectedDate];
-    if (viewMode === 'week') return weekDays;
+    if (viewMode === 'dia') return [selectedDate];
+    if (viewMode === 'semana') return weekDays;
     return eachDayOfInterval({ start: startOfMonth(currentWeek), end: endOfMonth(currentWeek) });
   };
 
@@ -258,22 +258,22 @@ const Appointments = () => {
                     <span className="material-symbols-outlined text-slate-600 text-base">chevron_right</span>
                   </Button>
                   <h2 className="text-base font-black text-primary font-headline ml-1">
-                    {viewMode === 'day'
+                    {viewMode === 'dia'
                       ? format(selectedDate, "dd 'de' MMM, yyyy", { locale: ptBR })
-                      : viewMode === 'week'
+                      : viewMode === 'semana'
                       ? `${format(weekDays[0], "dd MMM", { locale: ptBR })} - ${format(weekDays[6], "dd MMM", { locale: ptBR })}`
                       : format(currentWeek, "MMMM yyyy", { locale: ptBR })}
                   </h2>
                 </div>
 
-                <Select value={viewMode} onValueChange={(v: 'day' | 'week' | 'month') => setViewMode(v)}>
+                <Select value={viewMode} onValueChange={(v: 'dia' | 'semana' | 'mes') => setViewMode(v)}>
                   <SelectTrigger className="w-28 rounded-xl border-slate-200 text-sm font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="day">Dia</SelectItem>
-                    <SelectItem value="week">Semana</SelectItem>
-                    <SelectItem value="month">Mês</SelectItem>
+                    <SelectItem value="dia">Dia</SelectItem>
+                    <SelectItem value="semana">Semana</SelectItem>
+                    <SelectItem value="mes">Mês</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -297,7 +297,7 @@ const Appointments = () => {
                 </div>
               )}
 
-              {!isLoading && viewMode === 'day' && (
+              {!isLoading && viewMode === 'dia' && (
                 <div>
                   <div className="grid grid-cols-[64px_1fr] sticky top-0 z-10 bg-primary/5 border-b border-slate-100">
                     <div className="p-3 text-xs text-muted-foreground border-r border-slate-100" />
@@ -360,7 +360,7 @@ const Appointments = () => {
                 </div>
               )}
 
-              {!isLoading && viewMode === 'week' && (
+              {!isLoading && viewMode === 'semana' && (
                 <div className="overflow-x-auto">
                   <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] sticky top-0 z-10 bg-primary/5 border-b border-slate-100">
                     <div className="p-2 border-r border-slate-100" />
@@ -427,7 +427,7 @@ const Appointments = () => {
                 </div>
               )}
 
-              {!isLoading && viewMode === 'month' && (
+              {!isLoading && viewMode === 'mes' && (
                 <div>
                   <div className="grid grid-cols-7 border-b border-slate-100">
                     {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((d) => (
@@ -442,7 +442,7 @@ const Appointments = () => {
                         <div
                           key={date.toISOString()}
                           className={`min-h-[90px] p-1.5 bg-white cursor-pointer hover:bg-primary/3 transition-colors ${isToday ? 'ring-2 ring-inset ring-secondary/60' : ''}`}
-                          onClick={() => { setSelectedDate(date); setViewMode('day'); }}
+                          onClick={() => { setSelectedDate(date); setViewMode('dia'); }}
                         >
                           <div className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-secondary text-white' : 'text-slate-600'}`}>
                             {format(date, 'd')}

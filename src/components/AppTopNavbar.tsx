@@ -11,7 +11,7 @@ const menuItems = [
     moduleCode: 'dashboard',
   },
   {
-    title: 'Leads',
+    title: 'Clientes',
     url: '/clients',
     icon: 'group',
     moduleCode: 'clientes',
@@ -23,7 +23,7 @@ const menuItems = [
     moduleCode: 'agendamentos',
   },
   {
-    title: 'Funil',
+    title: 'Comercial',
     url: '/sales-funnel',
     icon: 'filter_alt',
     moduleCode: 'funnel',
@@ -51,6 +51,12 @@ const menuItems = [
     url: '/contracts',
     icon: 'description',
     moduleCode: 'contratos',
+  },
+  {
+    title: 'Metas',
+    url: '/metas',
+    icon: 'trending_up',
+    moduleCode: 'metas',
   },
 ];
 
