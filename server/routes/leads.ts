@@ -110,6 +110,46 @@ router.put('/:id', auth(), async (req, res) => {
     }
     if (data.age !== undefined) prismaData.age = Number(data.age)
     if (data.value !== undefined) prismaData.value = Number(data.value)
+
+    // Buscar lead atual para verificar se já foi convertido
+    const currentLead = await prisma.lead.findUnique({ where: { id } })
+    if (!currentLead) {
+      return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+    }
+
+    // Conversão automática: quando status muda para 'comercial_closed'
+    const isClosing = prismaData.status === 'comercial_closed' && currentLead.status !== 'comercial_closed'
+    const alreadyConverted = !!currentLead.convertedToClientId
+
+    if (isClosing && !alreadyConverted) {
+      // Criar cliente automaticamente a partir dos dados do lead
+      const newClient = await prisma.client.create({
+        data: {
+          professionalId: currentLead.professionalId,
+          name: currentLead.name,
+          email: currentLead.email || null,
+          phone: currentLead.phone || null,
+          notes: currentLead.observations || null,
+        }
+      })
+
+      // Atualizar lead com referência ao cliente criado
+      prismaData.convertedToClientId = newClient.id
+      prismaData.convertedAt = new Date()
+
+      console.log(`[Leads] Lead #${id} convertido automaticamente para Cliente #${newClient.id}`)
+
+      const updated = await prisma.lead.update({
+        where: { id },
+        data: prismaData
+      })
+
+      return res.json(createSuccessResponse({
+        ...updated,
+        converted: true,
+        convertedClient: newClient
+      }))
+    }
     
     const updated = await prisma.lead.update({
       where: { id },

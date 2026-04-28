@@ -201,7 +201,16 @@ const SalesFunnel = () => {
     }));
 
     try {
-      await leadsApi.update(Number(leadId), { status: newStatus });
+      const res = await leadsApi.update(Number(leadId), { status: newStatus });
+      
+      // Se o lead foi convertido automaticamente em cliente
+      if (res.success && res.data?.converted) {
+        toast({ 
+          title: "🎉 Lead convertido em Cliente!", 
+          description: `${res.data.convertedClient.name} agora é um cliente ativo no sistema.`,
+        });
+        loadLeads(); // Recarregar para atualizar os dados
+      }
     } catch (error) {
       toast({ title: "Erro ao mover lead", variant: "destructive" });
       loadLeads();
@@ -535,6 +544,13 @@ const SalesFunnel = () => {
                           Gerar Proposta
                           <span className="material-symbols-outlined text-xs">description</span>
                         </button>
+                      )}
+
+                      {stage.id === 'comercial_closed' && (
+                        <div className="w-full py-2.5 bg-green-50 text-green-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200">
+                          <span className="material-symbols-outlined text-xs">how_to_reg</span>
+                          Cliente Ativo
+                        </div>
                       )}
                     </div>
                   </Card>

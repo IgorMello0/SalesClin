@@ -23,6 +23,12 @@ const menuItems = [
     moduleCode: 'clientes',
   },
   {
+    title: 'Leads',
+    url: '/leads',
+    icon: 'person_add',
+    moduleCode: 'clientes',
+  },
+  {
     title: 'Agenda',
     url: '/appointments',
     icon: 'calendar_today',

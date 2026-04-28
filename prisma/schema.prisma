@@ -104,7 +104,8 @@ model Professional {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
-  company          Empresa?  @relation(fields: [companyId], references: [id])
+  company          Empresa?  @relation("CompanyProfessionals", fields: [companyId], references: [id])
+  ownedCompanies   Empresa[] @relation("CompanyOwner")
   clients          Client[]
   categories       Category[]
   catalogItems     CatalogItem[]
@@ -143,31 +144,35 @@ model Client {
   fichas         Ficha[]
   chatHistories  ChatHistory[]
   conversas      Conversa[]
+  originLead     Lead?           // Lead que originou este cliente
 
   @@map("clients")
 }
 
 // Leads para o funil de vendas (Prospecção)
 model Lead {
-  id             Int          @id @default(autoincrement())
-  professionalId Int          @map("professional_id")
-  name           String
-  value          Decimal      @default(0) @db.Decimal(10, 2)
-  origin         String?
-  avatar         String?
-  status         String
-  phone          String?
-  email          String?
-  age            Int?
-  observations   String?      @db.Text
-  city           String?
-  responsible    String?
-  isScheduled    Boolean      @default(false) @map("is_scheduled")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                    Int          @id @default(autoincrement())
+  professionalId        Int          @map("professional_id")
+  name                  String
+  value                 Decimal      @default(0) @db.Decimal(10, 2)
+  origin                String?
+  avatar                String?
+  status                String
+  phone                 String?
+  email                 String?
+  age                   Int?
+  observations          String?      @db.Text
+  city                  String?
+  responsible           String?
+  isScheduled           Boolean      @default(false) @map("is_scheduled")
+  convertedToClientId   Int?         @unique @map("converted_to_client_id")
+  convertedAt           DateTime?    @map("converted_at")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional   Professional @relation(fields: [professionalId], references: [id])
+  professional          Professional @relation(fields: [professionalId], references: [id])
+  convertedToClient     Client?      @relation(fields: [convertedToClientId], references: [id])
 
   @@map("leads")
 }
@@ -383,6 +388,7 @@ model Contract {
 // Informações sobre as empresas que utilizam a plataforma
 model Empresa {
   id           Int           @id @default(autoincrement())
+  ownerId      Int?          @map("owner_id") // ID do profissional dono
   name         String        // Nome da empresa
   domain       String?       // Domínio da empresa
   whatsapp     String?
@@ -393,7 +399,8 @@ model Empresa {
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professionals Professional[]
+  owner        Professional? @relation("CompanyOwner", fields: [ownerId], references: [id])
+  professionals Professional[] @relation("CompanyProfessionals")
   usuarios     Usuario[]
   agentesIa    AgenteIa[]
   conversas    Conversa[]

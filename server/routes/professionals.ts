@@ -164,6 +164,12 @@ router.post('/', async (req, res) => {
         company: true
       }
     })
+
+    // Set the professional as the owner of the company
+    await prisma.empresa.update({
+      where: { id: empresa.id },
+      data: { ownerId: created.id }
+    })
     
     const token = jwt.sign({ id: created.id, type: 'profissional' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
     console.log('[Signup] Cadastro bem-sucedido:', email)
