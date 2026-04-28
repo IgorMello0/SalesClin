@@ -134,6 +134,7 @@ model Client {
   dateOfBirth    DateTime? @map("date_of_birth")
   document       String?
   notes          String?
+  tags           String[]  @default([])
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -160,6 +161,8 @@ model Lead {
   status                String
   phone                 String?
   email                 String?
+  socialMedia           String?      @map("social_media")
+  tags                  String[]     @default([])
   age                   Int?
   observations          String?      @db.Text
   city                  String?
@@ -173,6 +176,7 @@ model Lead {
   // Relacionamentos
   professional          Professional @relation(fields: [professionalId], references: [id])
   convertedToClient     Client?      @relation(fields: [convertedToClientId], references: [id])
+  appointments          Appointment[]
 
   @@map("leads")
 }
@@ -220,7 +224,8 @@ model CatalogItem {
 model Appointment {
   id             Int               @id @default(autoincrement())
   professionalId Int               @map("professional_id")
-  clientId       Int               @map("client_id")
+  clientId       Int?              @map("client_id")
+  leadId         Int?              @map("lead_id")
   serviceId      Int?              @map("service_id")
   startTime      DateTime          @map("start_time")
   endTime        DateTime          @map("end_time")
@@ -231,7 +236,8 @@ model Appointment {
 
   // Relacionamentos
   professional      Professional      @relation(fields: [professionalId], references: [id])
-  client            Client            @relation(fields: [clientId], references: [id])
+  client            Client?           @relation(fields: [clientId], references: [id])
+  lead              Lead?             @relation(fields: [leadId], references: [id])
   service           CatalogItem?      @relation(fields: [serviceId], references: [id])
   appointmentLogs   AppointmentLog[]
   payments          Payment[]

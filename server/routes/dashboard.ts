@@ -111,14 +111,13 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         where: { ...baseWhere, status: 'comercial_closed' }
       }),
 
-      // Faturamento por Método de Pagamento
+      // Faturamento por Método e Status (para separar gerados de pagos no boleto)
       prisma.payment.groupBy({
-        by: ['method'],
+        by: ['method', 'status'],
         _sum: { amount: true },
         where: { 
           professionalId: { in: professionalIds }, 
-          date: { gte: startDate, lte: endDate },
-          status: { in: ['pago', 'pendente', 'atrasado'] }
+          date: { gte: startDate, lte: endDate }
         }
       }),
 
@@ -142,13 +141,12 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     
     // 4. KPIs de Eficiência Matemáticos
     
-    // Ticket Orçado: Faturamento Total / Avaliações Comparecidas
-    // Evitar divisão por zero
-    const ticketOrcado = avaliacoesComparecidas > 0 
-      ? (faturamento / avaliacoesComparecidas) 
-      : (leadsCount > 0 ? (faturamento / leadsCount) : 0); 
+    // Ticket Orçado: Faturamento (Valor de Proposta) / Oportunidades (Número de Propostas)
+    const ticketOrcado = oportunidades > 0 
+      ? (faturamento / oportunidades) 
+      : 0; 
       
-    // Ticket Fechado: Receita / Vendas Fechadas
+    // Ticket Fechado: Receita (Valor Fechado) / Vendas Fechadas (Número de Contratos)
     const ticketFechado = leadsFechados > 0 
       ? (receita / leadsFechados) 
       : 0;
@@ -160,10 +158,13 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
 
     // Processamento dos Agrupamentos (Sub-Métricas)
     const metodos = {
-      boleto: Number(faturamentoPorMetodo.find(m => m.method === 'boleto')?._sum.amount || 0),
-      cartao: Number(faturamentoPorMetodo.find(m => m.method === 'cartao')?._sum.amount || 0),
-      pix: Number(faturamentoPorMetodo.find(m => m.method === 'pix')?._sum.amount || 0),
-      dinheiro: Number(faturamentoPorMetodo.find(m => m.method === 'dinheiro')?._sum.amount || 0),
+      boleto: {
+        gerados: faturamentoPorMetodo.filter(m => m.method === 'boleto').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
+        pagos: faturamentoPorMetodo.filter(m => m.method === 'boleto' && m.status === 'pago').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0)
+      },
+      cartao: faturamentoPorMetodo.filter(m => m.method === 'cartao' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
+      pix: faturamentoPorMetodo.filter(m => m.method === 'pix' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
+      dinheiro: faturamentoPorMetodo.filter(m => m.method === 'dinheiro' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
     };
 
     const funil = {

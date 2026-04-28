@@ -63,6 +63,7 @@ interface Lead {
   observations?: string;
   city?: string;
   responsible?: string;
+  tags?: string[];
 }
 
 const initialLeads: Lead[] = [];
@@ -100,7 +101,7 @@ const SalesFunnel = () => {
   const [isAddingLead, setIsAddingLead] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [newLeadStage, setNewLeadStage] = useState<string | null>(null);
-  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: 'Direto', phone: '' });
+  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: '', phone: '', email: '', socialMedia: '' });
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,6 +113,7 @@ const SalesFunnel = () => {
   const [schedulingClientPhone, setSchedulingClientPhone] = useState<string | undefined>(undefined);
   const [currentSchedulingLeadId, setCurrentSchedulingLeadId] = useState<string | null>(null);
   const [isProcessingSchedule, setIsProcessingSchedule] = useState(false);
+  const [services, setServices] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Proposal state
@@ -124,7 +126,8 @@ const SalesFunnel = () => {
     salesperson: '',
     specialist: '',
     treatment: '',
-    observations: ''
+    observations: '',
+    tags: [] as string[]
   });
 
   const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
@@ -151,8 +154,22 @@ const SalesFunnel = () => {
     }
   };
 
+  const loadServices = async () => {
+    if (!professional?.id) return;
+    try {
+      const { catalogsApi } = await import('@/lib/api');
+      const res = await catalogsApi.getAll({ professionalId: Number(professional.id) });
+      if (res.success) setServices(res.data || []);
+    } catch (e) {
+      console.error("Error loading services for tags:", e);
+    }
+  };
+
   useEffect(() => {
-    if (professional) loadLeads();
+    if (professional) {
+      loadLeads();
+      loadServices();
+    }
   }, [professional]);
 
   const handleScheduleAppointment = async (lead: Lead) => {
@@ -257,7 +274,9 @@ const SalesFunnel = () => {
         professional_id: Number(professional.id),
         name: newLeadData.name,
         phone: newLeadData.phone,
-        value: Number(newLeadData.value) || 0,
+        email: newLeadData.email,
+        socialMedia: newLeadData.socialMedia,
+        value: Number(newLeadData.value.toString().replace(/\./g, "")) || 0,
         origin: newLeadData.origin,
         status: newLeadStage || 'prospect_lead',
         avatar: newLeadData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
@@ -269,7 +288,7 @@ const SalesFunnel = () => {
         toast({ title: "Lead Criado!", description: "O lead foi salvo no banco de dados." });
         loadLeads();
         setIsAddingLead(false);
-        setNewLeadData({ name: '', value: '', origin: 'Direto', phone: '' });
+        setNewLeadData({ name: '', value: '', origin: '', phone: '', email: '', socialMedia: '' });
       } else {
         toast({ 
           title: "Erro ao criar lead", 
@@ -316,7 +335,7 @@ const SalesFunnel = () => {
     setNoteText('');
   };
 
-  const handleSaveProposal = () => {
+  const handleSaveProposal = async () => {
     if (!proposalLeadId) return;
 
     const lead = leads.find(l => l.id === proposalLeadId);
@@ -333,17 +352,32 @@ const SalesFunnel = () => {
       color: 'bg-orange-500'
     };
 
+    // Update locally
     setLeads(prev => prev.map(l => {
       if (l.id === proposalLeadId) {
         return { 
           ...l, 
           status: 'comercial_proposal',
           value: Number(proposalData.value) || l.value,
+          tags: proposalData.tags,
           activities: [...l.activities, newActivity] 
         };
       }
       return l;
     }));
+
+    // Persist in DB
+    try {
+      await leadsApi.update(Number(proposalLeadId), {
+        status: 'comercial_proposal',
+        value: Number(proposalData.value) || undefined,
+        tags: proposalData.tags
+      });
+      toast({ title: "Sucesso", description: "Proposta gerada e tags atualizadas." });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Erro", description: "Erro ao atualizar lead no servidor.", variant: "destructive" });
+    }
 
     setIsCreatingProposal(false);
     setProposalLeadId(null);
@@ -354,7 +388,8 @@ const SalesFunnel = () => {
       salesperson: '',
       specialist: '',
       treatment: '',
-      observations: ''
+      observations: '',
+      tags: []
     });
   };
 
@@ -596,20 +631,53 @@ const SalesFunnel = () => {
                   onChange={(e) => {
                     let val = e.target.value.replace(/\D/g, "");
                     if (val.length > 11) val = val.substring(0, 11);
-                    if (val.length > 2) val = `(${val.substring(0, 2)}) ${val.substring(2)}`;
-                    if (val.length > 9) val = `${val.substring(0, 9)}-${val.substring(9)}`;
+                    
+                    if (val.length > 2) {
+                      val = `(${val.substring(0, 2)}) ${val.substring(2)}`;
+                    }
+                    if (val.length > 10) {
+                      val = `${val.substring(0, 10)}-${val.substring(10)}`;
+                    }
                     setNewLeadData({...newLeadData, phone: val})
                   }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label htmlFor="origin" className="text-xs font-bold uppercase tracking-widest text-slate-400">Origem</Label>
+                <Select value={newLeadData.origin} onValueChange={(val) => setNewLeadData({...newLeadData, origin: val})}>
+                  <SelectTrigger className="rounded-xl border-slate-200 h-12 bg-white">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl">
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="indicação">Indicação</SelectItem>
+                    <SelectItem value="meta ads">Meta Ads</SelectItem>
+                    <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="influencer">Influencer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">E-mail</Label>
                 <Input 
-                  id="origin" 
-                  placeholder="Instagram" 
+                  id="email" 
+                  type="email"
+                  placeholder="email@exemplo.com" 
                   className="rounded-xl border-slate-200 h-12"
-                  value={newLeadData.origin}
-                  onChange={(e) => setNewLeadData({...newLeadData, origin: e.target.value})}
+                  value={newLeadData.email}
+                  onChange={(e) => setNewLeadData({...newLeadData, email: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="socialMedia" className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Rede Social</Label>
+                <Input 
+                  id="socialMedia" 
+                  placeholder="@usuario" 
+                  className="rounded-xl border-slate-200 h-12"
+                  value={newLeadData.socialMedia}
+                  onChange={(e) => setNewLeadData({...newLeadData, socialMedia: e.target.value})}
                 />
               </div>
             </div>
@@ -617,11 +685,19 @@ const SalesFunnel = () => {
               <Label htmlFor="value" className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Estimado (R$)</Label>
               <Input 
                 id="value" 
-                type="number" 
+                type="text" 
                 placeholder="2.500" 
                 className="rounded-xl border-slate-200 h-12"
                 value={newLeadData.value}
-                onChange={(e) => setNewLeadData({...newLeadData, value: e.target.value})}
+                onChange={(e) => {
+                  let val = e.target.value.replace(/\D/g, "");
+                  if (!val) {
+                    setNewLeadData({...newLeadData, value: ""});
+                    return;
+                  }
+                  const formatted = new Intl.NumberFormat('pt-BR').format(parseInt(val));
+                  setNewLeadData({...newLeadData, value: formatted});
+                }}
               />
             </div>
           </div>
@@ -706,7 +782,7 @@ const SalesFunnel = () => {
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">Conversão de Origem</span>
-                        <span className="font-bold text-secondary">{selectedLead.origin || "Direto"}</span>
+                        <span className="font-bold text-secondary">{selectedLead.origin || "Não informado"}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">Responsável Atual</span>
@@ -874,6 +950,37 @@ const SalesFunnel = () => {
               </div>
 
               <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tags da Proposta (Serviços)</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 min-h-[48px]">
+                  {services.map((service) => {
+                    const isSelected = proposalData.tags.includes(service.name);
+                    return (
+                      <button
+                        key={service.id}
+                        onClick={() => {
+                          const newTags = isSelected
+                            ? proposalData.tags.filter(t => t !== service.name)
+                            : [...proposalData.tags, service.name];
+                          setProposalData({ ...proposalData, tags: newTags });
+                        }}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                          isSelected
+                            ? "bg-primary text-white shadow-md shadow-primary/20 scale-105"
+                            : "bg-white text-slate-400 border border-slate-200 hover:border-primary/30 hover:text-primary"
+                        )}
+                      >
+                        {service.name}
+                      </button>
+                    );
+                  })}
+                  {services.length === 0 && (
+                    <span className="text-[10px] text-slate-400 font-medium italic">Nenhum serviço disponível</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tratamento Proposto</Label>
                 <Textarea 
                   value={proposalData.treatment}
@@ -911,9 +1018,9 @@ const SalesFunnel = () => {
       <NewAppointmentModal
         open={isScheduling}
         onOpenChange={setIsScheduling}
-        initialClientId={schedulingClientId}
-        initialClientName={schedulingClientName}
-        initialClientPhone={schedulingClientPhone}
+        initialLeadId={currentSchedulingLeadId?.toString()}
+        initialLeadName={schedulingClientName}
+        initialLeadPhone={schedulingClientPhone}
         onSuccess={async () => {
           if (currentSchedulingLeadId) {
             // Update in DB

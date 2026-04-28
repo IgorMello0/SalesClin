@@ -18,11 +18,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Plus, Search, Edit, Trash2, Phone, Mail, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from "@/lib/utils";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { leadsApi } from '@/lib/api';
 
 interface Lead {
@@ -37,9 +46,11 @@ interface Lead {
   observations: string | null;
   convertedToClientId: number | null;
   convertedAt: string | null;
-  createdAt: string;
   updatedAt: string;
   professionalId: number;
+  tags?: string[];
+  socialMedia?: string | null;
+  activities?: any[];
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -69,12 +80,16 @@ const getStatusStyle = (status: string, converted: boolean) => {
 const Leads = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     observations: '',
+    socialMedia: '',
+    value: '',
   });
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -83,6 +98,8 @@ const Leads = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchDebounce, setSearchDebounce] = useState('');
+  const [services, setServices] = useState<any[]>([]);
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
 
   useEffect(() => {
     if (professional?.id) loadLeads();
@@ -95,11 +112,29 @@ const Leads = () => {
     return () => clearTimeout(timer);
   }, [searchDebounce]);
 
+  useEffect(() => {
+    const loadServices = async () => {
+      if (!professional?.id) return;
+      try {
+        const { catalogsApi } = await import('@/lib/api');
+        const res = await catalogsApi.getAll({ professionalId: Number(professional.id) });
+        if (res.success) setServices(res.data || []);
+      } catch (e) { console.error(e); }
+    };
+    if (professional?.id) loadServices();
+  }, [professional]);
+
   const loadLeads = async () => {
     if (!professional?.id) return;
     setIsLoading(true);
     try {
-      const response = await leadsApi.getAll({ page: 1, pageSize: 100, search: searchQuery || undefined, professionalId: Number(professional.id) });
+      const response = await leadsApi.getAll({ 
+        page: 1, 
+        pageSize: 100, 
+        search: searchQuery || undefined, 
+        professionalId: Number(professional.id),
+        include: 'activities' // Try to include activities
+      });
       if (response.success && response.data) {
         setLeads(response.data);
       } else {
@@ -126,11 +161,15 @@ const Leads = () => {
     }
   }, [searchQuery]);
 
-  const filteredLeads = leads.filter(lead =>
-    lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (lead.email && lead.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (lead.phone && lead.phone.includes(searchQuery))
-  );
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.email && lead.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (lead.phone && lead.phone.includes(searchQuery));
+    
+    const matchesTag = !selectedTagFilter || (lead.tags && lead.tags.includes(selectedTagFilter));
+    
+    return matchesSearch && matchesTag;
+  });
 
   const convertedCount = leads.filter(l => !!l.convertedToClientId).length;
   const activeCount = leads.filter(l => !l.convertedToClientId).length;
@@ -143,10 +182,13 @@ const Leads = () => {
         email: lead.email || '',
         phone: lead.phone || '',
         observations: lead.observations || '',
+        socialMedia: lead.socialMedia || '',
+        value: lead.value ? new Intl.NumberFormat('pt-BR').format(lead.value) : '',
+        origin: lead.origin || '',
       });
     } else {
       setEditingLead(null);
-      setFormData({ name: '', email: '', phone: '', observations: '' });
+      setFormData({ name: '', email: '', phone: '', observations: '', socialMedia: '', value: '', origin: '' });
     }
     setIsDialogOpen(true);
   };
@@ -177,7 +219,10 @@ const Leads = () => {
         email: formData.email || null,
         phone: formData.phone || null,
         observations: formData.observations || null,
-        status: 'prospect_lead',
+        socialMedia: formData.socialMedia || null,
+        value: formData.value ? Number(formData.value.replace(/\./g, '').replace(',', '.')) : 0,
+        origin: formData.origin || null,
+        status: editingLead ? editingLead.status : 'prospect_lead',
       };
 
       if (editingLead) {
@@ -200,7 +245,7 @@ const Leads = () => {
 
       setIsDialogOpen(false);
       setEditingLead(null);
-      setFormData({ name: '', email: '', phone: '', observations: '' });
+      setFormData({ name: '', email: '', phone: '', observations: '', socialMedia: '', value: '', origin: '' });
     } catch (error) {
       toast({ title: "Erro", description: "Erro ao salvar lead", variant: "destructive" });
     }
@@ -218,6 +263,11 @@ const Leads = () => {
     } catch (error) {
       toast({ title: "Erro", description: "Erro ao remover lead", variant: "destructive" });
     }
+  };
+
+  const handleOpenDetails = (lead: Lead) => {
+    setSelectedLead(lead);
+    setIsDetailsOpen(true);
   };
 
   return (
@@ -270,9 +320,19 @@ const Leads = () => {
                 <Input
                   id="phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="(11) 99999-9999"
-                  className="text-sm"
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, "");
+                    if (val.length > 11) val = val.substring(0, 11);
+                    if (val.length > 2) {
+                      val = `(${val.substring(0, 2)}) ${val.substring(2)}`;
+                    }
+                    if (val.length > 10) {
+                      val = `${val.substring(0, 10)}-${val.substring(10)}`;
+                    }
+                    setFormData({ ...formData, phone: val });
+                  }}
+                  placeholder="(17) 99999-9999"
+                  className="text-sm font-medium"
                 />
               </div>
               <div className="space-y-2">
@@ -284,6 +344,56 @@ const Leads = () => {
                   placeholder="Observações sobre o lead"
                   className="text-sm"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="socialMedia" className="text-sm">Rede Social</Label>
+                <Input
+                  id="socialMedia"
+                  value={formData.socialMedia}
+                  onChange={(e) => setFormData({ ...formData, socialMedia: e.target.value })}
+                  placeholder="@usuario ou link"
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="origin" className="text-sm font-medium">Origem do Lead</Label>
+                <Select 
+                  value={formData.origin} 
+                  onValueChange={(v) => setFormData({ ...formData, origin: v })}
+                >
+                  <SelectTrigger className="w-full bg-white border-slate-200">
+                    <SelectValue placeholder="Selecione a origem..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="indicação">Indicação</SelectItem>
+                    <SelectItem value="meta ads">Meta Ads</SelectItem>
+                    <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="influencer">Influencer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="value" className="text-sm font-medium">Valor Estimado (R$)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                  <Input
+                    id="value"
+                    value={formData.value}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, "");
+                      if (!val) {
+                        setFormData({...formData, value: ""});
+                        return;
+                      }
+                      const formatted = new Intl.NumberFormat('pt-BR').format(parseInt(val));
+                      setFormData({...formData, value: formatted});
+                    }}
+                    placeholder="2.500"
+                    className="text-sm pl-9 font-bold text-primary"
+                  />
+                </div>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
@@ -378,14 +488,31 @@ const Leads = () => {
         <CardHeader className="p-6 border-b border-slate-50 bg-slate-50/50">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <CardTitle className="text-lg font-bold text-primary font-headline">Lista de Leads</CardTitle>
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Buscar por nome, email ou telefone..."
-                className="pl-10 bg-white border-slate-200 focus-visible:ring-primary/20 transition-all rounded-full h-10"
-                value={searchDebounce}
-                onChange={(e) => setSearchDebounce(e.target.value)}
-              />
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+              {/* Tag Filter */}
+              <div className="w-full sm:w-48">
+                <Select value={selectedTagFilter || "all"} onValueChange={(v) => setSelectedTagFilter(v === "all" ? null : v)}>
+                  <SelectTrigger className="rounded-full bg-white border-slate-200">
+                    <SelectValue placeholder="Filtrar por Tag" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Tags</SelectItem>
+                    {services.map(s => (
+                      <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar por nome, email ou telefone..."
+                  className="pl-10 bg-white border-slate-200 focus-visible:ring-primary/20 transition-all rounded-full h-10"
+                  value={searchDebounce}
+                  onChange={(e) => setSearchDebounce(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -398,7 +525,7 @@ const Leads = () => {
           ) : isMobile ? (
             <div className="space-y-3 p-3 sm:p-4">
               {filteredLeads.map((lead) => (
-                <Card key={lead.id} className="overflow-hidden w-full">
+                <Card key={lead.id} className="overflow-hidden w-full cursor-pointer hover:border-primary/30 transition-all" onClick={() => handleOpenDetails(lead)}>
                   <CardContent className="p-3 sm:p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -417,7 +544,7 @@ const Leads = () => {
                           </Badge>
                         </div>
                       </div>
-                      <div className="flex gap-1 flex-shrink-0 ml-2">
+                      <div className="flex gap-1 flex-shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(lead)} className="h-7 w-7 sm:h-8 sm:w-8 p-0">
                           <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
@@ -431,20 +558,24 @@ const Leads = () => {
                           <span className="truncate">{lead.email}</span>
                         </div>
                       )}
-                      {lead.phone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3 w-3 flex-shrink-0" />
-                          <span className="break-all">{lead.phone}</span>
-                        </div>
-                      )}
                     </div>
+
+                    {lead.tags && lead.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {lead.tags.map(tag => (
+                          <span key={tag} className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md border border-slate-200 uppercase tracking-tighter">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between mt-3 pt-3 border-t gap-2">
                       <div className="text-xs font-bold text-primary">
                         {Number(lead.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </div>
                       <div className="text-[0.65rem] text-muted-foreground">
-                        {lead.origin || 'Direto'}
+                        {lead.origin || '---'}
                       </div>
                     </div>
                   </CardContent>
@@ -466,7 +597,7 @@ const Leads = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredLeads.map((lead) => (
-                    <TableRow key={lead.id} className={lead.convertedToClientId ? 'bg-green-50/30' : ''}>
+                    <TableRow key={lead.id} className={cn("cursor-pointer hover:bg-slate-50/50 transition-colors", lead.convertedToClientId ? 'bg-green-50/30' : '')} onClick={() => handleOpenDetails(lead)}>
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -475,6 +606,16 @@ const Leads = () => {
                             </span>
                           </div>
                           <span className="truncate">{lead.name}</span>
+                          {lead.tags && lead.tags.length > 0 && (
+                            <div className="flex gap-1 ml-2">
+                              {lead.tags.slice(0, 2).map(tag => (
+                                <span key={tag} className="text-[8px] font-bold bg-primary/5 text-primary/70 px-1 rounded-sm border border-primary/10 whitespace-nowrap">
+                                  {tag}
+                                </span>
+                              ))}
+                              {lead.tags.length > 2 && <span className="text-[8px] text-slate-400">+{lead.tags.length - 2}</span>}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -494,7 +635,7 @@ const Leads = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-muted-foreground">{lead.origin || 'Direto'}</span>
+                        <span className="text-sm text-muted-foreground">{lead.origin || '---'}</span>
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="text-sm font-bold text-primary">
@@ -509,7 +650,7 @@ const Leads = () => {
                           {lead.convertedToClientId ? '✓ Cliente' : (STATUS_LABELS[lead.status] || lead.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center space-x-1">
                           <Button
                             variant="ghost"
@@ -535,16 +676,123 @@ const Leads = () => {
               </Table>
             </div>
           )}
-          
-          {filteredLeads.length === 0 && !isLoading && (
-            <div className="text-center py-8 px-4">
-              <p className="text-sm text-muted-foreground">
-                {searchQuery ? 'Nenhum lead encontrado.' : 'Nenhum lead cadastrado.'}
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
+
+      {/* Lead Details Dialog */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-3xl border-slate-100 bg-white p-0 overflow-hidden">
+          {selectedLead && (
+            <>
+              <div className="p-8 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100 relative">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary shadow-inner">
+                    {selectedLead.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-extrabold text-primary font-headline tracking-tight">{selectedLead.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className={getStatusStyle(selectedLead.status, !!selectedLead.convertedToClientId)}>
+                        {selectedLead.convertedToClientId ? '✓ Cliente' : (STATUS_LABELS[selectedLead.status] || selectedLead.status)}
+                      </Badge>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedLead.origin || 'Direto'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
+                {/* Contact Info */}
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contato</p>
+                    <div className="space-y-1.5">
+                      {selectedLead.email && (
+                        <div className="flex items-center text-sm font-medium text-slate-600 gap-2">
+                          <Mail className="h-3.5 w-3.5 text-slate-400" /> {selectedLead.email}
+                        </div>
+                      )}
+                      {selectedLead.phone && (
+                        <div className="flex items-center text-sm font-medium text-slate-600 gap-2">
+                          <Phone className="h-3.5 w-3.5 text-slate-400" /> {selectedLead.phone}
+                        </div>
+                      )}
+                      {selectedLead.socialMedia && (
+                        <div className="flex items-center text-sm font-medium text-slate-600 gap-2">
+                          <span className="material-symbols-outlined text-sm text-slate-400">link</span> {selectedLead.socialMedia}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Financeiro</p>
+                    <div className="text-xl font-extrabold text-primary">
+                      {Number(selectedLead.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                {selectedLead.tags && selectedLead.tags.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tags de Interesse</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedLead.tags.map(tag => (
+                        <span key={tag} className="bg-primary/5 text-primary text-[10px] font-bold px-3 py-1.5 rounded-xl border border-primary/10 shadow-sm">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Observations */}
+                {selectedLead.observations && (
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Observações</p>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-600 leading-relaxed italic">
+                      "{selectedLead.observations}"
+                    </div>
+                  </div>
+                )}
+
+                {/* Activities (Proposals/Notes) */}
+                <div className="space-y-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Histórico & Propostas</p>
+                  <div className="space-y-3">
+                    {selectedLead.activities && selectedLead.activities.length > 0 ? (
+                      selectedLead.activities.map((act: any, idx: number) => (
+                        <div key={idx} className="flex gap-4 relative">
+                          {idx !== selectedLead.activities.length - 1 && (
+                            <div className="absolute left-[15px] top-8 bottom-0 w-[1px] bg-slate-100" />
+                          )}
+                          <div className={cn("h-8 w-8 rounded-full flex items-center justify-center shrink-0 z-10 shadow-sm", act.color || 'bg-slate-200')}>
+                            <span className="material-symbols-outlined text-white text-xs">{act.icon || 'history'}</span>
+                          </div>
+                          <div className="flex-1 pb-4">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-xs font-bold text-slate-700">{act.action}</p>
+                              <span className="text-[10px] text-slate-300 font-bold">{act.date}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 leading-tight">{act.content}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">Nenhuma atividade registrada.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="p-6 bg-slate-50/50 border-t border-slate-100">
+                <Button variant="ghost" onClick={() => setIsDetailsOpen(false)} className="rounded-xl text-xs font-bold">Fechar</Button>
+                <Button variant="secondary" onClick={() => { setIsDetailsOpen(false); handleOpenDialog(selectedLead); }} className="rounded-xl text-xs font-bold px-6">Editar Lead</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

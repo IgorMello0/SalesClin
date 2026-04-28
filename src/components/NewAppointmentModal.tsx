@@ -44,6 +44,9 @@ interface NewAppointmentModalProps {
   initialClientId?: string;
   initialClientName?: string;
   initialClientPhone?: string;
+  initialLeadId?: string;
+  initialLeadName?: string;
+  initialLeadPhone?: string;
 }
 
 export function NewAppointmentModal({
@@ -54,6 +57,9 @@ export function NewAppointmentModal({
   initialClientId,
   initialClientName,
   initialClientPhone,
+  initialLeadId,
+  initialLeadName,
+  initialLeadPhone,
 }: NewAppointmentModalProps) {
   const { professional } = useAuth();
   const { toast } = useToast();
@@ -75,36 +81,31 @@ export function NewAppointmentModal({
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clientOpen, setClientOpen] = useState(false);
   
-  const [selectedService, setSelectedService] = useState<string>("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [date, setDate] = useState<string>(
     initialDate ? format(initialDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd")
   );
   const [time, setTime] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
-  // Quick create state
-  const [isQuickCreate, setIsQuickCreate] = useState(false);
-  const [quickClientData, setQuickClientData] = useState({ name: "", phone: "" });
+  // Computed values for Leads/Quick Create
+  const isQuickCreate = !!(initialLeadId || initialClientName);
+  const quickClientData = {
+    name: initialLeadName || initialClientName || "",
+    phone: initialLeadPhone || initialClientPhone || "",
+    leadId: initialLeadId
+  };
 
   useEffect(() => {
     if (open && professional) {
       loadInitialData();
       if (initialClientId) {
         setSelectedClient(initialClientId);
-        setIsQuickCreate(false);
-      } else if (initialClientName) {
-        setIsQuickCreate(true);
-        setQuickClientData({ 
-          name: initialClientName, 
-          phone: initialClientPhone || "" 
-        });
-        setSelectedClient("new");
       } else {
-        setIsQuickCreate(false);
         setSelectedClient("");
       }
     }
-  }, [open, initialClientId, initialClientName, initialClientPhone, professional]);
+  }, [open, initialClientId, professional]);
 
   const loadInitialData = async () => {
     if (!professional?.id) return;
@@ -146,10 +147,6 @@ export function NewAppointmentModal({
       const res = await catalogsApi.getAll({ pageSize: 100, professionalId: Number(profId) });
       if (res.success) {
         setServices(res.data || []);
-        // Reset selected service if it's not in the new list
-        if (selectedService && !(res.data || []).some((s: any) => s.id.toString() === selectedService)) {
-          setSelectedService("");
-        }
       }
     } catch (error) {
       console.error("Error loading services", error);
@@ -159,13 +156,12 @@ export function NewAppointmentModal({
   // Real-time availability check
   useEffect(() => {
     const checkTime = async () => {
-      if (!selectedProfessionalId || !date || !time || !selectedService) {
+      if (!selectedProfessionalId || !date || !time) {
         setIsTimeConflict(false);
         return;
       }
       
-      const service = services.find(s => s.id.toString() === selectedService);
-      const duration = service?.durationMinutes || service?.duration || 30;
+      const duration = 60; // Default 60 min
       
       const startDateTime = new Date(`${date}T${time}:00`);
       const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
@@ -190,22 +186,22 @@ export function NewAppointmentModal({
     // Add a small debounce to avoid spamming the backend while typing/selecting
     const timeout = setTimeout(checkTime, 300);
     return () => clearTimeout(timeout);
-  }, [selectedProfessionalId, date, time, selectedService, services]);
+  }, [selectedProfessionalId, date, time]);
 
   const handleSubmit = async () => {
-    if ((!selectedClient || selectedClient === "new") && !isQuickCreate) {
+    if (!initialLeadId && (!selectedClient || selectedClient === "new")) {
       toast({
         title: "Erro",
-        description: "Selecione um paciente ou preencha os dados do novo.",
+        description: "Selecione um paciente para o agendamento.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!selectedService || !date || !time) {
+    if (!date || !time) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios.",
+        description: "Preencha a data e o horário.",
         variant: "destructive",
       });
       return;
@@ -215,36 +211,16 @@ export function NewAppointmentModal({
 
     setLoading(true);
     try {
-      let clientId = selectedClient;
-
-      // 1. Se for Quick Create, criar o cliente primeiro
-      if (isQuickCreate && selectedClient === "new") {
-        const createRes = await clientsApi.create({
-          professionalId: Number(professional.id),
-          name: quickClientData.name,
-          phone: quickClientData.phone,
-          email: `${quickClientData.name.toLowerCase().replace(/ /g, '.')}@lead.com`,
-          status: 'active'
-        });
-
-        if (createRes.success && createRes.data) {
-          clientId = createRes.data.id.toString();
-        } else {
-          throw new Error(createRes.error?.message || "Erro ao criar novo cliente.");
-        }
-      }
-
-      // 2. Criar o agendamento
-      const service = services.find(s => s.id.toString() === selectedService);
-      const duration = service?.durationMinutes || service?.duration || 30;
+      const duration = 60; // default 60 min
       
       const startDateTime = new Date(`${date}T${time}:00`);
       const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
 
       const response = await appointmentsApi.create({
         professionalId: Number(selectedProfessionalId),
-        clientId: Number(clientId),
-        serviceId: Number(selectedService),
+        clientId: initialLeadId ? null : Number(selectedClient),
+        leadId: initialLeadId ? Number(initialLeadId) : null,
+        tags: selectedTags,
         startTime: startDateTime.toISOString(),
         endTime: endDateTime.toISOString(),
         status: 'agendado',
@@ -254,7 +230,7 @@ export function NewAppointmentModal({
       if (response.success) {
         toast({
           title: "Sucesso!",
-          description: isQuickCreate ? "Cliente cadastrado e agendamento criado!" : "Agendamento criado com sucesso.",
+          description: "Agendamento criado com sucesso.",
         });
         onSuccess();
         onOpenChange(false);
@@ -282,9 +258,9 @@ export function NewAppointmentModal({
 
   const resetForm = () => {
     setSelectedClient("");
-    setSelectedService("");
+    setSelectedTags([]);
     setNotes("");
-    setTime("09:00");
+    setTime("");
   };
 
   const selectedClientData = clients.find((c) => c.id.toString() === selectedClient);
@@ -418,44 +394,58 @@ export function NewAppointmentModal({
             </div>
           )}
 
-          {/* Service Selector */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Procedimento / Serviço *</Label>
-            <Select value={selectedService} onValueChange={setSelectedService} disabled={dataLoading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o serviço">
-                  {services.find(s => s.id.toString() === selectedService)?.name}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {services.length === 0 && !dataLoading && <SelectItem value="none" disabled>Nenhum serviço cadastrado</SelectItem>}
-                {services.map((service) => (
-                  <SelectItem 
-                    key={service.id} 
-                    value={service.id.toString()}
-                    className="focus:bg-primary/5 cursor-pointer py-3"
+          {/* Tag Selector (Services) */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Tags de Interesse / Procedimentos *</Label>
+            <div className="flex flex-wrap gap-2 mb-2 min-h-[40px] p-3 border rounded-xl bg-slate-50/50">
+              {selectedTags.length === 0 ? (
+                <span className="text-slate-400 text-xs italic">Nenhuma tag selecionada...</span>
+              ) : (
+                selectedTags.map(tag => (
+                  <div key={tag} className="flex items-center gap-1.5 bg-white border border-secondary/20 text-secondary px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm animate-in zoom-in-95">
+                    {tag}
+                    <button 
+                      onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
+                      className="hover:text-red-500 transition-colors"
+                    >
+                      <Plus className="w-3 h-3 rotate-45" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {services.slice(0, 6).map(service => {
+                const isSelected = selectedTags.includes(service.name);
+                return (
+                  <button
+                    key={service.id}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedTags(selectedTags.filter(t => t !== service.name));
+                      } else {
+                        setSelectedTags([...selectedTags, service.name]);
+                      }
+                    }}
+                    className={cn(
+                      "flex flex-col p-2.5 rounded-xl border text-left transition-all duration-200 hover:-translate-y-0.5",
+                      isSelected 
+                        ? "bg-secondary/10 border-secondary ring-1 ring-secondary/20 shadow-sm" 
+                        : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-md"
+                    )}
                   >
-                    <div className="flex items-center justify-between w-full gap-4 pr-2">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-slate-700 text-sm">{service.name}</span>
-                        {service.durationMinutes && (
-                          <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> {service.durationMinutes} min
-                          </span>
-                        )}
-                      </div>
-                      {service.price && (
-                        <div className="shrink-0">
-                          <span className="text-[11px] font-extrabold text-primary bg-primary/5 px-2 py-1 rounded-lg border border-primary/10 whitespace-nowrap">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(service.price))}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    <span className={cn("text-[11px] font-bold truncate mb-0.5", isSelected ? "text-secondary" : "text-slate-700")}>
+                      {service.name}
+                    </span>
+                    {service.price && (
+                      <span className="text-[9px] text-slate-400 font-medium">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(service.price))}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Date and Time */}

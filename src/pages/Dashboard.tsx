@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
   const [filter, setFilter] = useState<'today' | '7days' | 'custom'>('custom');
+  const [conversionMode, setConversionMode] = useState<'percent' | 'reais'>('percent');
   const [bottomActiveTab, setBottomActiveTab] = useState<'finance' | 'sales'>('finance');
   const [counters, setCounters] = useState({
     leads: 0,
@@ -21,7 +22,7 @@ const Dashboard = () => {
   });
 
   const [extraData, setExtraData] = useState({
-    metodos: { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+    metodos: { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
     funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
     origem: [] as { origin: string, count: number }[]
   });
@@ -38,7 +39,7 @@ const Dashboard = () => {
     return { 
       leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, 
       faturamento: 0, receita: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
-      metodos: { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+      metodos: { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
       funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
       origem: []
     };
@@ -70,7 +71,7 @@ const Dashboard = () => {
 
       if (progress === 1) {
         setExtraData({
-          metodos: targets.metodos || { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+          metodos: targets.metodos || { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
           funil: targets.funil || { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
           origem: targets.origem || []
         });
@@ -108,7 +109,7 @@ const Dashboard = () => {
         
         if (progress === 1) {
           setExtraData({
-            metodos: targets.metodos || { boleto: 0, cartao: 0, pix: 0, dinheiro: 0 },
+            metodos: targets.metodos || { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
             funil: targets.funil || { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
             origem: targets.origem || []
           });
@@ -279,7 +280,7 @@ const Dashboard = () => {
           </div>
         </Card>
 
-        {/* Card 4: Oportunidades Geradas */}
+        {/* Card 4: Propostas */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
@@ -288,7 +289,7 @@ const Dashboard = () => {
             {renderPercentBadge(getPercent(counters.oportunidades, targetsData.oportunidades))}
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Oportunidades Geradas</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Propostas</p>
             <h3 className="text-2xl font-extrabold text-primary font-headline">{counters.oportunidades}</h3>
           </div>
           <div className="mt-6 space-y-2">
@@ -378,22 +379,39 @@ const Dashboard = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-blue-50 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">percent</span>
+              <span className="material-symbols-outlined text-xl">{conversionMode === 'percent' ? 'percent' : 'payments'}</span>
             </div>
-            {renderPercentBadge(getPercent(counters.conversao, targetsData.conversao))}
+            <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
+               <button 
+                  onClick={() => setConversionMode('percent')}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'percent' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+               >
+                  %
+               </button>
+               <button 
+                  onClick={() => setConversionMode('reais')}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'reais' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+               >
+                  R$
+               </button>
+            </div>
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Taxa de Conversão</p>
-            <h4 className="text-2xl font-extrabold text-primary font-headline">{counters.conversao}%</h4>
+            <h4 className="text-2xl font-extrabold text-primary font-headline">
+               {conversionMode === 'percent' ? `${counters.conversao}%` : formatCurrency(counters.receita)}
+            </h4>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {targetsData.conversao}%</span>
+              <span>Meta: {conversionMode === 'percent' ? `${targetsData.conversao}%` : formatCurrency(targetsData.faturamento)}</span>
               <span className={`font-bold ${getPercent(counters.conversao, targetsData.conversao) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.conversao, targetsData.conversao) >= 100 ? 'Meta Alcançada!' : `${getPercent(counters.conversao, targetsData.conversao)}% alcançado`}
+                {conversionMode === 'percent' 
+                  ? `${getPercent(counters.conversao, targetsData.conversao)}% alcançado`
+                  : `${getPercent(counters.receita, targetsData.faturamento)}% alcançado`}
               </span>
             </div>
-            {renderProgressBar(getPercent(counters.conversao, targetsData.conversao))}
+            {renderProgressBar(conversionMode === 'percent' ? getPercent(counters.conversao, targetsData.conversao) : getPercent(counters.receita, targetsData.faturamento))}
           </div>
         </Card>
       </div>
@@ -410,9 +428,10 @@ const Dashboard = () => {
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Receita Total</p>
             <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.receita)}</h4>
           </div>
-          <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-5 gap-6">
             {[
-              { label: 'Boleto', value: extraData.metodos.boleto },
+              { label: 'Boleto (Gerados)', value: extraData.metodos.boleto?.gerados || 0 },
+              { label: 'Boleto (Pagos)', value: extraData.metodos.boleto?.pagos || 0 },
               { label: 'Cartão', value: extraData.metodos.cartao },
               { label: 'Pix / Débito', value: extraData.metodos.pix },
               { label: 'Dinheiro', value: extraData.metodos.dinheiro },
