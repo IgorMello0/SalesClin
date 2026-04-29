@@ -377,77 +377,61 @@ const Clients = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Total de Clientes
-            </CardTitle>
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total de Clientes</div>
             <div className="p-2 bg-blue-50 text-accent rounded-xl">
               <span className="material-symbols-outlined text-lg">group</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">{clients.length}</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              cadastrados no sistema
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="pt-2">
+            <div className="stats-value">{clients.length}</div>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">cadastrados no sistema</p>
+          </div>
+        </div>
         
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Ativos
-            </CardTitle>
-            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ativos</div>
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
               <span className="material-symbols-outlined text-lg">check_circle</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">
+          </div>
+          <div className="pt-2">
+            <div className="stats-value text-emerald-600">
               {clients.filter(c => c.status === 'ativo').length}
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              clientes ativos
-            </p>
-          </CardContent>
-        </Card>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">clientes ativos</p>
+          </div>
+        </div>
         
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Novos
-            </CardTitle>
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Novos</div>
             <div className="p-2 bg-blue-50 text-accent rounded-xl">
               <span className="material-symbols-outlined text-lg">person_add</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">0</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              neste mês
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="pt-2">
+            <div className="stats-value">0</div>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">neste mês</p>
+          </div>
+        </div>
         
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Agendamentos
-            </CardTitle>
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Agendamentos</div>
             <div className="p-2 bg-blue-50 text-accent rounded-xl">
               <span className="material-symbols-outlined text-lg">event</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">
+          </div>
+          <div className="pt-2">
+            <div className="stats-value">
               {clients.reduce((acc, client) => acc + client.totalAppointments, 0)}
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              total agendado
-            </p>
-          </CardContent>
-        </Card>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">total agendado</p>
+          </div>
+        </div>
       </div>
 
       {/* Clients Table */}

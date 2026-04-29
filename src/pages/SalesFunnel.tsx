@@ -64,6 +64,9 @@ interface Lead {
   city?: string;
   responsible?: string;
   tags?: string[];
+  justification?: string;
+  discountApplied?: boolean;
+  remarketingProposals?: any[];
 }
 
 const initialLeads: Lead[] = [];
@@ -127,8 +130,17 @@ const SalesFunnel = () => {
     specialist: '',
     treatment: '',
     observations: '',
-    tags: [] as string[]
+    tags: [] as string[],
+    justification: '',
+    justificationType: '' as 'desconto' | 'remocao' | ''
   });
+  const [allProfessionals, setAllProfessionals] = useState<any[]>([]);
+  const [showJustification, setShowJustification] = useState(false);
+  const [removedTags, setRemovedTags] = useState<string[]>([]);
+
+  // Schedule from closed lead
+  const [isSchedulingClosed, setIsSchedulingClosed] = useState(false);
+  const [closedLeadToSchedule, setClosedLeadToSchedule] = useState<Lead | null>(null);
 
   const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
 
@@ -165,12 +177,37 @@ const SalesFunnel = () => {
     }
   };
 
+  const loadProfessionals = async () => {
+    try {
+      const { professionalsApi } = await import('@/lib/api');
+      const res = await professionalsApi.getAll();
+      if (res.success) setAllProfessionals(res.data || []);
+    } catch (e) {
+      console.error("Error loading professionals:", e);
+    }
+  };
+
   useEffect(() => {
     if (professional) {
       loadLeads();
       loadServices();
+      loadProfessionals();
     }
   }, [professional]);
+
+  const formatCurrency = (value: string) => {
+    const numeric = value.replace(/\D/g, '');
+    if (!numeric) return '';
+    const val = Number(numeric) / 100;
+    return val.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+  };
+
+  const parseCurrency = (value: string) => {
+    return Number(value.replace(/\D/g, '')) / 100;
+  };
 
   const handleScheduleAppointment = async (lead: Lead) => {
     if (lead.isScheduled) {
@@ -341,45 +378,91 @@ const SalesFunnel = () => {
     const lead = leads.find(l => l.id === proposalLeadId);
     if (!lead) return;
 
+    const newValue = parseCurrency(proposalData.value);
+    const isLowerValue = newValue < lead.value;
+    
+    if (isLowerValue && !proposalData.justification) {
+      setShowJustification(true);
+      toast({ title: "Justificativa Obrigatória", description: "O valor é menor que o atual. Por favor, informe o motivo.", variant: "destructive" });
+      return;
+    }
+
+    const discountApplied = isLowerValue && proposalData.justificationType === 'desconto';
+    
+    // Se houve remoção de tags, preparar proposta de remarketing
+    let remarketingData = null;
+    if (isLowerValue && proposalData.justificationType === 'remocao' && removedTags.length > 0) {
+      remarketingData = {
+        tags: removedTags,
+        date: new Date().toISOString(),
+        originalValue: lead.value
+      };
+    }
+
     const newActivity: Activity = {
       id: Math.random().toString(),
       type: 'proposal',
       user: professional?.name || 'Vendedor',
       action: 'gerou uma proposta comercial',
-      content: `${proposalData.treatment} - Valor: ${Number(proposalData.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      content: `${proposalData.treatment} - Valor: ${newValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
       date: format(new Date(), "dd/MM/yy 'às' HH:mm", { locale: ptBR }),
       icon: 'description',
       color: 'bg-orange-500'
     };
 
-    // Update locally
-    setLeads(prev => prev.map(l => {
-      if (l.id === proposalLeadId) {
-        return { 
-          ...l, 
-          status: 'comercial_proposal',
-          value: Number(proposalData.value) || l.value,
-          tags: proposalData.tags,
-          activities: [...l.activities, newActivity] 
-        };
-      }
-      return l;
-    }));
+    if (remarketingData) {
+      const remarketingActivity: Activity = {
+        id: Math.random().toString(),
+        type: 'system',
+        user: 'Sistema',
+        action: 'arquivou itens para remarketing',
+        content: `Itens removidos: ${removedTags.join(', ')}`,
+        date: format(new Date(), "dd/MM/yy 'às' HH:mm", { locale: ptBR }),
+        icon: 'campaign',
+        color: 'bg-blue-400'
+      };
+      lead.activities.push(remarketingActivity);
+    }
 
     // Persist in DB
     try {
-      await leadsApi.update(Number(proposalLeadId), {
+      const updateData: any = {
         status: 'comercial_proposal',
-        value: Number(proposalData.value) || undefined,
-        tags: proposalData.tags
-      });
-      toast({ title: "Sucesso", description: "Proposta gerada e tags atualizadas." });
+        value: newValue,
+        tags: proposalData.tags,
+        justification: proposalData.justification || undefined,
+        discountApplied: discountApplied
+      };
+
+      if (remarketingData) {
+        const existingRemarketing = (lead as any).remarketingProposals || [];
+        updateData.remarketingProposals = [...existingRemarketing, remarketingData];
+      }
+
+      await leadsApi.update(Number(proposalLeadId), updateData);
+      
+      // Update UI
+      setLeads(prev => prev.map(l => {
+        if (l.id === proposalLeadId) {
+          return { 
+            ...l, 
+            status: 'comercial_proposal',
+            value: newValue,
+            tags: proposalData.tags,
+            activities: [...l.activities, newActivity] 
+          };
+        }
+        return l;
+      }));
+
+      toast({ title: "Sucesso", description: "Proposta salva com as novas regras." });
     } catch (e) {
       console.error(e);
       toast({ title: "Erro", description: "Erro ao atualizar lead no servidor.", variant: "destructive" });
     }
 
     setIsCreatingProposal(false);
+    setShowJustification(false);
     setProposalLeadId(null);
     setProposalData({
       title: '',
@@ -389,8 +472,11 @@ const SalesFunnel = () => {
       specialist: '',
       treatment: '',
       observations: '',
-      tags: []
+      tags: [],
+      justification: '',
+      justificationType: ''
     });
+    setRemovedTags([]);
   };
 
   const openAddLead = (stageId: string | null = null) => {
@@ -444,6 +530,13 @@ const SalesFunnel = () => {
       <div className="flex gap-6 overflow-x-auto pb-6 -mx-4 px-4 scrollbar-hide">
         {activeStages.map((stage) => {
           const stageLeads = leads.filter(l => {
+            // Regra de Roteamento: 
+            // - Mostrar se NÃO for convertido
+            // - OU se FOR convertido mas tiver propostas de remarketing (oportunidades pendentes)
+            const hasRemarketing = l.remarketingProposals && l.remarketingProposals.length > 0;
+            const isOperational = !l.convertedToClientId || hasRemarketing;
+            if (!isOperational) return false;
+
             if (stage.id === 'prospect_attended') {
               return l.status === 'prospect_attended' || l.status.startsWith('comercial_') || l.status.startsWith('sales_');
             }
@@ -485,19 +578,19 @@ const SalesFunnel = () => {
                 isOver && "bg-slate-100/80 border-secondary/30 scale-[1.01]"
               )}>
                 {stageLeads.map((lead) => (
-                  <Card 
+                  <div 
                     key={lead.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
                     onClick={() => setSelectedLead(lead)}
                     className={cn(
-                      "p-4 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
+                      "premium-card p-4 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
                       draggedLeadId === lead.id && "opacity-40 grayscale-[0.5]"
                     )}
                   >
                     {/* Badge for Converted Leads in Prospecting View */}
                     {(activeFunnel === 'prospecting' && lead.status.startsWith('comercial_')) && (
-                      <div className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                      <div className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
                         CONVERTIDO
                       </div>
                     )}
@@ -508,7 +601,7 @@ const SalesFunnel = () => {
                           {lead.avatar}
                         </div>
                         <div>
-                          <h4 className="text-sm font-bold text-primary group-hover:text-secondary transition-colors line-clamp-1">{lead.name}</h4>
+                          <h4 className="text-sm font-bold text-primary group-hover:text-secondary transition-colors flex items-center break-words">{lead.name}</h4>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="material-symbols-outlined text-[12px] text-emerald-500">chat</span>
                             <p className="text-[10px] text-slate-500 font-bold tracking-tight">{lead.phone}</p>
@@ -572,7 +665,12 @@ const SalesFunnel = () => {
                             e.stopPropagation(); 
                             setProposalLeadId(lead.id);
                             setIsCreatingProposal(true);
-                            setProposalData(prev => ({ ...prev, salesperson: professional?.name || '' }));
+                            setProposalData(prev => ({ 
+                              ...prev, 
+                              salesperson: professional?.name || '',
+                              value: lead.value > 0 ? formatCurrency((lead.value * 100).toString()) : '',
+                              tags: lead.tags || []
+                            }));
                           }}
                           className="w-full py-2 bg-orange-100 hover:bg-orange-500 text-orange-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-orange-200"
                         >
@@ -582,13 +680,26 @@ const SalesFunnel = () => {
                       )}
 
                       {stage.id === 'comercial_closed' && (
-                        <div className="w-full py-2.5 bg-green-50 text-green-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200">
-                          <span className="material-symbols-outlined text-xs">how_to_reg</span>
-                          Cliente Ativo
+                        <div className="flex flex-col gap-1.5">
+                          <div className="w-full py-2 bg-green-50 text-green-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200">
+                            <span className="material-symbols-outlined text-xs">how_to_reg</span>
+                            Cliente Ativo
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClosedLeadToSchedule(lead);
+                              setIsSchedulingClosed(true);
+                            }}
+                            className="w-full py-2 bg-indigo-100 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-indigo-200"
+                          >
+                            <span className="material-symbols-outlined text-xs">calendar_add_on</span>
+                            Agendar Agora
+                          </button>
                         </div>
                       )}
                     </div>
-                  </Card>
+                  </div>
                 ))}
 
                 {stageLeads.length === 0 && (
@@ -604,7 +715,7 @@ const SalesFunnel = () => {
 
       {/* Add Lead Dialog */}
       <Dialog open={isAddingLead} onOpenChange={setIsAddingLead}>
-        <DialogContent className="sm:max-w-[425px] rounded-3xl border-slate-100 bg-white">
+        <DialogContent className="sm:max-w-[425px] rounded-3xl border-slate-100 bg-white overflow-visible">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-primary font-headline">Cadastrar Novo Lead</DialogTitle>
             <p className="text-slate-500 text-sm">Adicione as informações básicas do novo lead para o pipeline.</p>
@@ -642,13 +753,13 @@ const SalesFunnel = () => {
                   }}
                 />
               </div>
-              <div className="space-y-2 relative">
+              <div className="space-y-2">
                 <Label htmlFor="origin" className="text-xs font-bold uppercase tracking-widest text-slate-400">Origem</Label>
                 <Select value={newLeadData.origin} onValueChange={(val) => setNewLeadData({...newLeadData, origin: val})}>
-                  <SelectTrigger className="rounded-xl border-slate-200 h-12 bg-white">
+                  <SelectTrigger id="origin" className="rounded-xl border-slate-200 h-12 bg-white">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
-                  <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl">
+                  <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
                     <SelectItem value="instagram">Instagram</SelectItem>
                     <SelectItem value="indicação">Indicação</SelectItem>
                     <SelectItem value="meta ads">Meta Ads</SelectItem>
@@ -884,7 +995,7 @@ const SalesFunnel = () => {
 
       {/* Create Proposal Dialog */}
       <Dialog open={isCreatingProposal} onOpenChange={setIsCreatingProposal}>
-        <DialogContent className="sm:max-w-[700px] rounded-3xl border-slate-100 bg-white p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 shadow-2xl">
           <div className="p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100">
             <h3 className="text-2xl font-extrabold text-primary font-headline tracking-tight">Criação de Proposta Comercial</h3>
             <p className="text-slate-500 text-sm mt-1">Defina os termos do tratamento e valores para o paciente.</p>
@@ -906,9 +1017,8 @@ const SalesFunnel = () => {
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Total</Label>
                   <Input 
-                    type="number"
                     value={proposalData.value}
-                    onChange={(e) => setProposalData({...proposalData, value: e.target.value})}
+                    onChange={(e) => setProposalData({...proposalData, value: formatCurrency(e.target.value)})}
                     placeholder="R$ 0,00" 
                     className="rounded-xl border-slate-200"
                   />
@@ -926,12 +1036,49 @@ const SalesFunnel = () => {
 
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Vendedor / Consultor</Label>
-                <Input 
+                <Select 
                   value={proposalData.salesperson}
-                  onChange={(e) => setProposalData({...proposalData, salesperson: e.target.value})}
-                  className="rounded-xl border-slate-200"
-                />
+                  onValueChange={(v) => setProposalData({...proposalData, salesperson: v})}
+                >
+                  <SelectTrigger className="rounded-xl border-slate-200">
+                    <SelectValue placeholder="Selecione o consultor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allProfessionals.map(p => (
+                      <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {showJustification && (
+                <div className="space-y-4 p-4 bg-orange-50 rounded-2xl border border-orange-100 animate-in fade-in slide-in-from-top-2">
+                   <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Motivo do Valor Menor</Label>
+                    <Select 
+                      value={proposalData.justificationType}
+                      onValueChange={(v: any) => setProposalData({...proposalData, justificationType: v})}
+                    >
+                      <SelectTrigger className="rounded-xl border-orange-200 bg-white">
+                        <SelectValue placeholder="Selecione o motivo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="desconto">Desconto Financeiro</SelectItem>
+                        <SelectItem value="remocao">Remoção de Procedimentos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Justificativa Detalhada</Label>
+                    <Textarea 
+                      value={proposalData.justification}
+                      onChange={(e) => setProposalData({...proposalData, justification: e.target.value})}
+                      placeholder="Explique o motivo do valor reduzido..."
+                      className="rounded-xl border-orange-200 bg-white min-h-[80px]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-6">
@@ -949,25 +1096,32 @@ const SalesFunnel = () => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tags da Proposta (Serviços)</Label>
-                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 min-h-[48px]">
+                <div className="flex flex-wrap gap-2 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 min-h-[60px] content-start">
                   {services.map((service) => {
                     const isSelected = proposalData.tags.includes(service.name);
                     return (
                       <button
                         key={service.id}
                         onClick={() => {
+                          const isRemoving = isSelected;
+                          if (isRemoving) {
+                            setRemovedTags(prev => [...prev, service.name]);
+                          } else {
+                            setRemovedTags(prev => prev.filter(t => t !== service.name));
+                          }
+
                           const newTags = isSelected
                             ? proposalData.tags.filter(t => t !== service.name)
                             : [...proposalData.tags, service.name];
                           setProposalData({ ...proposalData, tags: newTags });
                         }}
                         className={cn(
-                          "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                          "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 border",
                           isSelected
-                            ? "bg-primary text-white shadow-md shadow-primary/20 scale-105"
-                            : "bg-white text-slate-400 border border-slate-200 hover:border-primary/30 hover:text-primary"
+                            ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
+                            : "bg-white text-slate-400 border-slate-200 hover:border-primary/30 hover:text-primary hover:bg-white shadow-sm"
                         )}
                       >
                         {service.name}
@@ -975,7 +1129,9 @@ const SalesFunnel = () => {
                     );
                   })}
                   {services.length === 0 && (
-                    <span className="text-[10px] text-slate-400 font-medium italic">Nenhum serviço disponível</span>
+                    <div className="w-full flex items-center justify-center py-2">
+                      <span className="text-[10px] text-slate-400 font-medium italic">Nenhum serviço disponível</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1037,6 +1193,26 @@ const SalesFunnel = () => {
           });
         }}
       />
+      
+      {/* Agendar Agora — from closed lead */}
+      {closedLeadToSchedule && (
+        <NewAppointmentModal
+          open={isSchedulingClosed}
+          onOpenChange={(v) => { 
+            setIsSchedulingClosed(v); 
+            if (!v) setClosedLeadToSchedule(null); 
+          }}
+          onSuccess={() => { 
+            setIsSchedulingClosed(false); 
+            setClosedLeadToSchedule(null); 
+            loadLeads(); 
+          }}
+          initialLeadId={closedLeadToSchedule.id}
+          initialLeadName={closedLeadToSchedule.name}
+          initialLeadPhone={closedLeadToSchedule.phone || ''}
+          initialServiceTags={closedLeadToSchedule.tags || []}
+        />
+      )}
     </div>
   );
 };

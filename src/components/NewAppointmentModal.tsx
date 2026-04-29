@@ -29,7 +29,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, ChevronsUpDown, Loader2, Plus, Clock } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Plus, Clock, AlertCircle } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { clientsApi, catalogsApi, appointmentsApi, professionalsApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,6 +48,8 @@ interface NewAppointmentModalProps {
   initialLeadId?: string;
   initialLeadName?: string;
   initialLeadPhone?: string;
+  /** Serviços/tags pré-selecionados (ex: vindo da proposta fechada) */
+  initialServiceTags?: string[];
 }
 
 export function NewAppointmentModal({
@@ -60,50 +63,61 @@ export function NewAppointmentModal({
   initialLeadId,
   initialLeadName,
   initialLeadPhone,
+  initialServiceTags,
 }: NewAppointmentModalProps) {
   const { professional } = useAuth();
   const { toast } = useToast();
-  
+
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
-  
-  // Availability check state
-  const [isTimeConflict, setIsTimeConflict] = useState(false);
-  const [checkingTime, setCheckingTime] = useState(false);
-  
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
   // Data lists
   const [clients, setClients] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [companyProfessionals, setCompanyProfessionals] = useState<any[]>([]);
-  
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+
   // Form state
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clientOpen, setClientOpen] = useState(false);
-  
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [date, setDate] = useState<string>(
     initialDate ? format(initialDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd")
   );
   const [time, setTime] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
-  // Computed values for Leads/Quick Create
+  // Computed
   const isQuickCreate = !!(initialLeadId || initialClientName);
   const quickClientData = {
     name: initialLeadName || initialClientName || "",
     phone: initialLeadPhone || initialClientPhone || "",
-    leadId: initialLeadId
+    leadId: initialLeadId,
   };
 
+  const selectedService = services.find(s => s.id.toString() === selectedServiceId);
+  const serviceDuration = selectedService?.durationMinutes || 60;
+
+  const calculateEndTime = (startTime: string, durationMin: number) => {
+    if (!startTime) return "";
+    const [h, m] = startTime.split(':').map(Number);
+    const totalMin = h * 60 + m + durationMin;
+    const endH = Math.floor(totalMin / 60) % 24;
+    const endM = totalMin % 60;
+    return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+  };
+
+  // Load initial data when modal opens
   useEffect(() => {
     if (open && professional) {
       loadInitialData();
-      if (initialClientId) {
-        setSelectedClient(initialClientId);
-      } else {
-        setSelectedClient("");
-      }
+      if (initialClientId) setSelectedClient(initialClientId);
+      else setSelectedClient("");
+      setSelectedServiceId("");
+      setTime("");
+      setAvailableSlots([]);
     }
   }, [open, initialClientId, professional]);
 
@@ -113,19 +127,14 @@ export function NewAppointmentModal({
     try {
       const [clientsRes, profsRes] = await Promise.all([
         clientsApi.getAll({ pageSize: 100 }),
-        professionalsApi.getAll({ pageSize: 50 })
+        professionalsApi.getAll({ pageSize: 50 }),
       ]);
-      
       if (clientsRes.success) setClients(clientsRes.data || []);
-      
       if (profsRes.success && profsRes.data) {
         setCompanyProfessionals(profsRes.data);
-        if (profsRes.data.length > 0) {
-          const defaultProf = profsRes.data.find((p: any) => p.id.toString() === professional.id) || profsRes.data[0];
-          setSelectedProfessionalId(defaultProf.id.toString());
-        } else {
-          setSelectedProfessionalId(professional.id);
-        }
+        const defaultProf =
+          profsRes.data.find((p: any) => p.id.toString() === professional.id) || profsRes.data[0];
+        setSelectedProfessionalId(defaultProf?.id.toString() || professional.id);
       } else {
         setSelectedProfessionalId(professional.id);
       }
@@ -136,121 +145,103 @@ export function NewAppointmentModal({
     }
   };
 
+  // Load services when professional changes
   useEffect(() => {
-    if (open && selectedProfessionalId) {
-      loadServices(selectedProfessionalId);
-    }
+    if (open && selectedProfessionalId) loadServices(selectedProfessionalId);
   }, [open, selectedProfessionalId]);
 
   const loadServices = async (profId: string) => {
     try {
       const res = await catalogsApi.getAll({ pageSize: 100, professionalId: Number(profId) });
       if (res.success) {
-        setServices(res.data || []);
+        const svcList = res.data || [];
+        setServices(svcList);
+        // Pre-select first service matching initialServiceTags if provided
+        if (initialServiceTags && initialServiceTags.length > 0) {
+          const match = svcList.find((s: any) =>
+            initialServiceTags.some(tag => s.name.toLowerCase().includes(tag.toLowerCase()))
+          );
+          if (match) setSelectedServiceId(match.id.toString());
+        }
       }
     } catch (error) {
       console.error("Error loading services", error);
     }
   };
 
-  // Real-time availability check
+  // Load available slots when professional, date, or service (duration) changes
   useEffect(() => {
-    const checkTime = async () => {
-      if (!selectedProfessionalId || !date || !time) {
-        setIsTimeConflict(false);
-        return;
+    if (open && selectedProfessionalId && date) {
+      loadAvailableSlots();
+    }
+  }, [open, selectedProfessionalId, date, selectedServiceId]);
+
+  const loadAvailableSlots = async () => {
+    if (!selectedProfessionalId || !date) return;
+    setSlotsLoading(true);
+    setTime(""); // Reset time when inputs change
+    try {
+      const res = await appointmentsApi.getAvailableSlots(
+        selectedProfessionalId,
+        date,
+        serviceDuration
+      );
+      if (res.success && res.data) {
+        setAvailableSlots(res.data);
+      } else {
+        setAvailableSlots([]);
       }
-      
-      const duration = 60; // Default 60 min
-      
-      const startDateTime = new Date(`${date}T${time}:00`);
-      const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
-      
-      setCheckingTime(true);
-      try {
-        const res = await appointmentsApi.checkAvailability(
-          selectedProfessionalId, 
-          startDateTime.toISOString(), 
-          endDateTime.toISOString()
-        );
-        if (res.success && res.data) {
-          setIsTimeConflict(!res.data.available);
-        }
-      } catch (e) {
-        console.error("Availability check failed", e);
-      } finally {
-        setCheckingTime(false);
-      }
-    };
-    
-    // Add a small debounce to avoid spamming the backend while typing/selecting
-    const timeout = setTimeout(checkTime, 300);
-    return () => clearTimeout(timeout);
-  }, [selectedProfessionalId, date, time]);
+    } catch (e) {
+      console.error("Error loading slots", e);
+      setAvailableSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!initialLeadId && (!selectedClient || selectedClient === "new")) {
-      toast({
-        title: "Erro",
-        description: "Selecione um paciente para o agendamento.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Selecione um paciente para o agendamento.", variant: "destructive" });
       return;
     }
-
     if (!date || !time) {
-      toast({
-        title: "Erro",
-        description: "Preencha a data e o horário.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Selecione a data e o horário disponível.", variant: "destructive" });
       return;
     }
-
     if (!selectedProfessionalId) return;
 
     setLoading(true);
     try {
-      const duration = 60; // default 60 min
-      
       const startDateTime = new Date(`${date}T${time}:00`);
-      const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+      const endDateTime = new Date(startDateTime.getTime() + serviceDuration * 60000);
 
       const response = await appointmentsApi.create({
         professionalId: Number(selectedProfessionalId),
         clientId: initialLeadId ? null : Number(selectedClient),
         leadId: initialLeadId ? Number(initialLeadId) : null,
-        tags: selectedTags,
+        serviceId: selectedServiceId ? Number(selectedServiceId) : null,
+        tags: selectedService ? [selectedService.name] : (initialServiceTags || []),
         startTime: startDateTime.toISOString(),
         endTime: endDateTime.toISOString(),
-        status: 'agendado',
-        notes: notes
+        status: "agendado",
+        notes,
       });
 
       if (response.success) {
-        toast({
-          title: "Sucesso!",
-          description: "Agendamento criado com sucesso.",
-        });
+        toast({ title: "Sucesso!", description: "Agendamento criado com sucesso." });
         onSuccess();
         onOpenChange(false);
         resetForm();
       } else {
         if (response.error?.code === 409) {
-          throw new Error("Este horário já está ocupado para este profissional. Escolha outro horário.");
+          toast({ title: "Conflito de Horário", description: "Este horário já foi ocupado. Recarregue os slots disponíveis.", variant: "destructive" });
+          loadAvailableSlots();
+          return;
         }
-        toast({
-          title: "Erro ao criar agendamento",
-          description: response.error?.message || "Erro desconhecido",
-          variant: "destructive",
-        });
+        toast({ title: "Erro ao criar agendamento", description: response.error?.message || "Erro desconhecido", variant: "destructive" });
       }
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Erro de conexão com o servidor.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Erro de conexão.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -258,22 +249,36 @@ export function NewAppointmentModal({
 
   const resetForm = () => {
     setSelectedClient("");
-    setSelectedTags([]);
+    setSelectedServiceId("");
     setNotes("");
     setTime("");
+    setAvailableSlots([]);
   };
 
-  const selectedClientData = clients.find((c) => c.id.toString() === selectedClient);
+  // Format time label: "09:00  →  10:30  (1h30)"
+  const formatSlotLabel = (slot: string) => {
+    const [h, m] = slot.split(":").map(Number);
+    const endMinutes = h * 60 + m + serviceDuration;
+    const endH = Math.floor(endMinutes / 60);
+    const endM = endMinutes % 60;
+    const durationH = Math.floor(serviceDuration / 60);
+    const durationM = serviceDuration % 60;
+    const durationLabel = durationH > 0
+      ? `${durationH}h${durationM > 0 ? durationM : ""}`
+      : `${durationM}min`;
+    return `${slot}  →  ${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}  (${durationLabel})`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Novo Agendamento</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-6 py-4">
-          {/* Professional Selector (Dynamic) */}
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 shadow-2xl">
+        <div className="p-8 bg-gradient-to-br from-indigo-50 to-transparent border-b border-indigo-100">
+          <DialogTitle className="text-2xl font-extrabold text-primary font-headline tracking-tight">Novo Agendamento</DialogTitle>
+          <p className="text-slate-500 text-sm mt-1">Configure os detalhes da consulta ou procedimento.</p>
+        </div>
+
+        <div className="p-8 space-y-6">
+          {/* Professional Selector */}
           {companyProfessionals.length > 1 && (
             <div className="space-y-2 flex flex-col">
               <Label className="text-sm font-medium">Profissional Responsável *</Label>
@@ -297,20 +302,7 @@ export function NewAppointmentModal({
             </div>
           )}
 
-          {/* Conflict Warning */}
-          {isTimeConflict && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-start gap-3">
-              <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-red-600 font-bold text-xs">X</span>
-              </div>
-              <div className="text-sm">
-                <p className="font-bold">Profissional Indisponível</p>
-                <p>Este horário já está ocupado. Por favor, escolha outro horário ou profissional.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Patient Selector (Combobox) */}
+          {/* Patient Selector */}
           <div className="space-y-2 flex flex-col">
             <Label className="text-sm font-medium">Paciente *</Label>
             <Popover open={clientOpen} onOpenChange={setClientOpen}>
@@ -324,9 +316,9 @@ export function NewAppointmentModal({
                 >
                   {isQuickCreate ? (
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                       <span className="font-bold text-primary">{quickClientData.name}</span>
-                      <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100">Novo Paciente</span>
+                      <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100">Lead</span>
                     </div>
                   ) : (
                     selectedClient
@@ -347,24 +339,16 @@ export function NewAppointmentModal({
                           <CommandItem
                             key={client.id}
                             value={client.name}
-                            onSelect={() => {
-                              setSelectedClient(client.id.toString());
-                              setClientOpen(false);
-                            }}
+                            onSelect={() => { setSelectedClient(client.id.toString()); setClientOpen(false); }}
                           >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedClient === client.id.toString() ? "opacity-100" : "opacity-0"
-                              )}
-                            />
+                            <Check className={cn("mr-2 h-4 w-4", selectedClient === client.id.toString() ? "opacity-100" : "opacity-0")} />
                             {client.name}
                             <span className="ml-2 text-xs text-muted-foreground">{client.phone}</span>
                           </CommandItem>
                         ))}
                       </CommandGroup>
                       <div className="p-2 border-t">
-                        <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-primary" onClick={() => window.location.href='/clients'}>
+                        <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-primary" onClick={() => window.location.href = '/clients'}>
                           <Plus className="mr-2 h-3 w-3" /> Cadastrar novo paciente
                         </Button>
                       </div>
@@ -394,104 +378,180 @@ export function NewAppointmentModal({
             </div>
           )}
 
-          {/* Tag Selector (Services) */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Tags de Interesse / Procedimentos *</Label>
-            <div className="flex flex-wrap gap-2 mb-2 min-h-[40px] p-3 border rounded-xl bg-slate-50/50">
-              {selectedTags.length === 0 ? (
-                <span className="text-slate-400 text-xs italic">Nenhuma tag selecionada...</span>
-              ) : (
-                selectedTags.map(tag => (
-                  <div key={tag} className="flex items-center gap-1.5 bg-white border border-secondary/20 text-secondary px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm animate-in zoom-in-95">
-                    {tag}
-                    <button 
-                      onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
-                      className="hover:text-red-500 transition-colors"
-                    >
-                      <Plus className="w-3 h-3 rotate-45" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {services.slice(0, 6).map(service => {
-                const isSelected = selectedTags.includes(service.name);
-                return (
-                  <button
-                    key={service.id}
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedTags(selectedTags.filter(t => t !== service.name));
-                      } else {
-                        setSelectedTags([...selectedTags, service.name]);
-                      }
-                    }}
-                    className={cn(
-                      "flex flex-col p-2.5 rounded-xl border text-left transition-all duration-200 hover:-translate-y-0.5",
-                      isSelected 
-                        ? "bg-secondary/10 border-secondary ring-1 ring-secondary/20 shadow-sm" 
-                        : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-md"
-                    )}
-                  >
-                    <span className={cn("text-[11px] font-bold truncate mb-0.5", isSelected ? "text-secondary" : "text-slate-700")}>
-                      {service.name}
-                    </span>
-                    {service.price && (
-                      <span className="text-[9px] text-slate-400 font-medium">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(service.price))}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Procedure / Service Selector */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Procedimento *</Label>
+            <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+              <SelectTrigger className="rounded-xl border-slate-200 h-12">
+                <SelectValue placeholder="Selecione o procedimento..." />
+              </SelectTrigger>
+              <SelectContent>
+                {services.map(svc => (
+                  <SelectItem key={svc.id} value={svc.id.toString()}>
+                    <div className="flex items-center justify-between gap-4 w-full">
+                      <span className="font-semibold">{svc.name}</span>
+                      <div className="flex items-center gap-3 text-xs text-slate-400">
+                        {svc.durationMinutes && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {svc.durationMinutes >= 60
+                              ? `${Math.floor(svc.durationMinutes / 60)}h${svc.durationMinutes % 60 > 0 ? (svc.durationMinutes % 60) + 'min' : ''}`
+                              : `${svc.durationMinutes}min`}
+                          </span>
+                        )}
+                        {svc.price && (
+                          <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(svc.price))}</span>
+                        )}
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedService && (
+              <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl">
+                <Clock className="w-3.5 h-3.5 shrink-0" />
+                <span className="font-semibold">Duração: {serviceDuration >= 60 ? `${Math.floor(serviceDuration / 60)}h${serviceDuration % 60 > 0 ? ` ${serviceDuration % 60}min` : ''}` : `${serviceDuration}min`}</span>
+                <span className="text-indigo-400">— o período será bloqueado automaticamente</span>
+              </div>
+            )}
           </div>
 
-          {/* Date and Time */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Date and Time Slots */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Data *</Label>
-              <Input 
-                type="date" 
-                value={date} 
-                onChange={(e) => setDate(e.target.value)} 
-              />
+              <Label className="text-sm font-medium">Data do Agendamento *</Label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  min={format(new Date(), "yyyy-MM-dd")}
+                  className="rounded-xl border-slate-200 h-12 pl-10 font-bold text-primary"
+                />
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">calendar_month</span>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Horário *</Label>
-              <Input 
-                type="text" 
-                placeholder="09:00" 
-                value={time} 
-                onChange={(e) => {
-                  let val = e.target.value.replace(/\D/g, "");
-                  if (val.length > 4) val = val.substring(0, 4);
-                  if (val.length > 2) {
-                    val = val.substring(0, 2) + ":" + val.substring(2);
-                  }
-                  setTime(val);
-                }}
-                className="font-bold text-primary"
-              />
-              <p className="text-[10px] text-slate-400">Formato: 24h (Ex: 09:30, 14:15)</p>
+
+            <div className="space-y-3">
+              <Label className="text-sm font-medium flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  Horário Disponível *
+                  {slotsLoading && <Loader2 className="h-3 w-3 animate-spin text-indigo-500" />}
+                </span>
+                {!slotsLoading && availableSlots.length > 0 && (
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{availableSlots.length} horários livres</span>
+                )}
+              </Label>
+
+              <div className="bg-slate-50/50 rounded-2xl border border-slate-100 p-4">
+                {slotsLoading ? (
+                  <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Buscando disponibilidade...</span>
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-400 text-center">
+                    <span className="material-symbols-outlined text-3xl">event_busy</span>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider">Sem horários para este dia</p>
+                      <p className="text-[10px] font-medium mt-1">Tente outra data ou profissional</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[200px] pr-4">
+                    <div className="space-y-6">
+                      {/* Manhã */}
+                      {availableSlots.some(s => parseInt(s.split(':')[0]) < 12) && (
+                        <div className="space-y-3">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sm">light_mode</span> Manhã
+                          </h4>
+                          <div className="grid grid-cols-4 gap-2">
+                            {availableSlots.filter(s => parseInt(s.split(':')[0]) < 12).map(slot => (
+                              <button
+                                key={slot}
+                                type="button"
+                                onClick={() => setTime(slot)}
+                                className={cn(
+                                  "py-2 px-1 rounded-lg text-xs font-bold transition-all border",
+                                  time === slot 
+                                    ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]" 
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600"
+                                )}
+                              >
+                                {slot}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tarde */}
+                      {availableSlots.some(s => parseInt(s.split(':')[0]) >= 12) && (
+                        <div className="space-y-3">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sm">sunny</span> Tarde
+                          </h4>
+                          <div className="grid grid-cols-4 gap-2">
+                            {availableSlots.filter(s => parseInt(s.split(':')[0]) >= 12).map(slot => (
+                              <button
+                                key={slot}
+                                type="button"
+                                onClick={() => setTime(slot)}
+                                className={cn(
+                                  "py-2 px-1 rounded-lg text-xs font-bold transition-all border",
+                                  time === slot 
+                                    ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]" 
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600"
+                                )}
+                              >
+                                {slot}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+              
+              {time && (
+                <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-500 text-sm">check_circle</span>
+                    <span className="text-[11px] font-bold text-indigo-700">Horário: {time}</span>
+                  </div>
+                  {selectedService && (
+                    <div className="text-[10px] font-bold text-indigo-500 bg-white px-2 py-0.5 rounded-full shadow-sm">
+                      Término: {calculateEndTime(time, serviceDuration)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Notes */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Observações</Label>
-            <Input 
-              placeholder="Ex: Paciente com urgência, primeira vez..." 
+            <Input
+              placeholder="Ex: Paciente com urgência, primeira vez..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={loading || dataLoading || checkingTime || isTimeConflict}>
+        <DialogFooter className="p-8 bg-slate-50/50 border-t border-slate-100">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl font-bold">Cancelar</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || dataLoading || slotsLoading || !time}
+            variant="secondary"
+            className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20"
+          >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {isQuickCreate ? "Salvar Paciente & Agendar" : "Confirmar Agendamento"}
           </Button>

@@ -48,9 +48,11 @@ interface Lead {
   convertedAt: string | null;
   updatedAt: string;
   professionalId: number;
-  tags?: string[];
   socialMedia?: string | null;
   activities?: any[];
+  remarketingProposals?: any[];
+  justification?: string;
+  discountApplied?: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -90,6 +92,7 @@ const Leads = () => {
     observations: '',
     socialMedia: '',
     value: '',
+    origin: '',
   });
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -133,7 +136,7 @@ const Leads = () => {
         pageSize: 100, 
         search: searchQuery || undefined, 
         professionalId: Number(professional.id),
-        include: 'activities' // Try to include activities
+        include: 'activities'
       });
       if (response.success && response.data) {
         setLeads(response.data);
@@ -168,7 +171,13 @@ const Leads = () => {
     
     const matchesTag = !selectedTagFilter || (lead.tags && lead.tags.includes(selectedTagFilter));
     
-    return matchesSearch && matchesTag;
+    // Regra de Roteamento: 
+    // - Mostrar se NÃO for convertido
+    // - OU se FOR convertido mas tiver propostas de remarketing (oportunidades pendentes)
+    const hasRemarketing = lead.remarketingProposals && lead.remarketingProposals.length > 0;
+    const isOperational = !lead.convertedToClientId || hasRemarketing;
+
+    return matchesSearch && matchesTag && isOperational;
   });
 
   const convertedCount = leads.filter(l => !!l.convertedToClientId).length;
@@ -287,15 +296,19 @@ const Leads = () => {
               Novo Lead
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">
+          <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 shadow-2xl">
+            <div className="p-8 bg-gradient-to-br from-blue-50 to-transparent border-b border-blue-100">
+              <DialogTitle className="text-2xl font-extrabold text-primary font-headline tracking-tight">
                 {editingLead ? 'Editar Lead' : 'Novo Lead'}
               </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
+              <p className="text-slate-500 text-sm mt-1">
+                {editingLead ? 'Atualize as informações do lead selecionado.' : 'Preencha os dados básicos para iniciar o acompanhamento.'}
+              </p>
+            </div>
+            
+            <div className="p-8 space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm">Nome *</Label>
+                <Label htmlFor="name" className="text-xs font-bold uppercase tracking-widest text-slate-400">Nome *</Label>
                 <Input
                   id="name"
                   value={formData.name}
@@ -396,91 +409,74 @@ const Leads = () => {
                 </div>
               </div>
             </div>
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto text-sm">
+
+            <DialogFooter className="p-8 bg-slate-50/50 border-t border-slate-100">
+              <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold">
                 Cancelar
               </Button>
-              <Button onClick={handleSave} className="w-full sm:w-auto text-sm">
-                {editingLead ? 'Atualizar' : 'Cadastrar'}
+              <Button onClick={handleSave} variant="secondary" className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20">
+                {editingLead ? 'Atualizar Lead' : 'Cadastrar Lead'}
               </Button>
-            </div>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Total de Leads
-            </CardTitle>
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total de Leads</div>
             <div className="p-2 bg-blue-50 text-accent rounded-xl">
               <span className="material-symbols-outlined text-lg">group</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">{leads.length}</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              no pipeline
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="pt-2">
+            <div className="stats-value">{leads.length}</div>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">leads registrados</p>
+          </div>
+        </div>
         
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Em Processo
-            </CardTitle>
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Em Processo</div>
             <div className="p-2 bg-violet-50 text-violet-500 rounded-xl">
               <span className="material-symbols-outlined text-lg">pending</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-3xl md:text-4xl font-extrabold text-primary font-headline">
-              {activeCount}
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              leads ativos
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="pt-2">
+            <div className="stats-value">{activeCount}</div>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">leads ativos</p>
+          </div>
+        </div>
         
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Convertidos
-            </CardTitle>
-            <div className="p-2 bg-green-50 text-green-500 rounded-xl">
-              <span className="material-symbols-outlined text-lg">how_to_reg</span>
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Convertidos</div>
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+              <span className="material-symbols-outlined text-lg">check_circle</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-3xl md:text-4xl font-extrabold text-green-600 font-headline">{convertedCount}</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              viraram clientes
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="pt-2">
+            <div className="stats-value text-emerald-600">{convertedCount}</div>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">leads fechados</p>
+          </div>
+        </div>
         
-        <Card className="w-full hover-card border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden relative">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Valor Total
-            </CardTitle>
-            <div className="p-2 bg-orange-50 text-orange-500 rounded-xl">
+        <div className="premium-card p-6">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor em Aberto</div>
+            <div className="p-2 bg-blue-50 text-accent rounded-xl">
               <span className="material-symbols-outlined text-lg">payments</span>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="text-2xl md:text-3xl font-extrabold text-primary font-headline">
-              {leads.reduce((acc, l) => acc + Number(l.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </div>
+          <div className="pt-2">
+            <div className="stats-value text-primary">
+              {leads.reduce((acc, l) => acc + Number(l.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              no pipeline
-            </p>
-          </CardContent>
-        </Card>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">oportunidades</p>
+          </div>
+        </div>
       </div>
 
       {/* Leads Table */}
@@ -523,63 +519,78 @@ const Leads = () => {
               <span className="ml-2 text-sm text-muted-foreground">Carregando leads...</span>
             </div>
           ) : isMobile ? (
-            <div className="space-y-3 p-3 sm:p-4">
+            <div className="space-y-4 p-4">
               {filteredLeads.map((lead) => (
-                <Card key={lead.id} className="overflow-hidden w-full cursor-pointer hover:border-primary/30 transition-all" onClick={() => handleOpenDetails(lead)}>
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs sm:text-sm font-medium text-primary">
-                            {lead.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm sm:text-base truncate">{lead.name}</h3>
-                          <Badge 
-                            variant="outline" 
-                            className={`${getStatusStyle(lead.status, !!lead.convertedToClientId)} text-[0.65rem] sm:text-xs mt-1`}
-                          >
-                            {lead.convertedToClientId ? '✓ Cliente' : (STATUS_LABELS[lead.status] || lead.status)}
-                          </Badge>
-                        </div>
+                <div 
+                  key={lead.id} 
+                  className="premium-card p-5 cursor-pointer hover:border-primary/30 active:scale-[0.98] relative"
+                  onClick={() => handleOpenDetails(lead)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 border border-primary/5">
+                        <span className="text-sm font-bold text-primary">
+                          {lead.name.charAt(0).toUpperCase()}
+                        </span>
                       </div>
-                      <div className="flex gap-1 flex-shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(lead)} className="h-7 w-7 sm:h-8 sm:w-8 p-0">
-                          <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </Button>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-primary text-base truncate">{lead.name}</h3>
+                        <Badge 
+                          variant="outline" 
+                          className={`${getStatusStyle(lead.status, !!lead.convertedToClientId)} text-[10px] uppercase font-bold mt-1`}
+                        >
+                          {lead.remarketingProposals && lead.remarketingProposals.length > 0 ? (
+                            <span className="flex items-center gap-1">
+                              ✓ Cliente <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[8px] h-4">Remarketing</Badge>
+                            </span>
+                          ) : (
+                            lead.convertedToClientId ? '✓ Cliente' : (STATUS_LABELS[lead.status] || lead.status)
+                          )}
+                        </Badge>
                       </div>
                     </div>
-                    
-                    <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
-                      {lead.email && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Mail className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{lead.email}</span>
-                        </div>
-                      )}
+                    <div className="flex gap-1 flex-shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(lead)} className="h-8 w-8 p-0 rounded-full">
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     </div>
-
-                    {lead.tags && lead.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {lead.tags.map(tag => (
-                          <span key={tag} className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md border border-slate-200 uppercase tracking-tighter">
-                            {tag}
-                          </span>
-                        ))}
+                  </div>
+                  
+                  <div className="space-y-2 text-sm">
+                    {lead.email && (
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <span className="material-symbols-outlined text-sm">mail</span>
+                        <span className="truncate text-xs font-medium">{lead.email}</span>
                       </div>
                     )}
+                    {lead.phone && (
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <span className="material-symbols-outlined text-sm">chat</span>
+                        <span className="text-xs font-bold">{lead.phone}</span>
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t gap-2">
-                      <div className="text-xs font-bold text-primary">
-                        {Number(lead.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </div>
-                      <div className="text-[0.65rem] text-muted-foreground">
-                        {lead.origin || '---'}
-                      </div>
+                  {lead.tags && lead.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-3">
+                      {lead.tags.map(tag => (
+                        <span key={tag} className="text-[9px] font-bold bg-slate-50 text-slate-400 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tighter">
+                          {tag}
+                        </span>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
+                  )}
+
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50 gap-2">
+                    <div className="text-sm font-extrabold text-secondary font-headline">
+                      {Number(lead.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">explore</span>
+                      {lead.origin || 'Direto'}
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
@@ -647,7 +658,13 @@ const Leads = () => {
                           variant="outline" 
                           className={`${getStatusStyle(lead.status, !!lead.convertedToClientId)} whitespace-nowrap`}
                         >
-                          {lead.convertedToClientId ? '✓ Cliente' : (STATUS_LABELS[lead.status] || lead.status)}
+                          {lead.remarketingProposals && lead.remarketingProposals.length > 0 ? (
+                            <span className="flex items-center gap-1">
+                              ✓ Cliente <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[8px] h-4">Remarketing</Badge>
+                            </span>
+                          ) : (
+                            lead.convertedToClientId ? '✓ Cliente' : (STATUS_LABELS[lead.status] || lead.status)
+                          )}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
@@ -681,53 +698,64 @@ const Leads = () => {
 
       {/* Lead Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[600px] rounded-3xl border-slate-100 bg-white p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 shadow-2xl">
           {selectedLead && (
             <>
-              <div className="p-8 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100 relative">
+              <div className="p-8 bg-gradient-to-br from-slate-50 to-transparent border-b border-slate-100">
                 <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary shadow-inner">
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-xl font-bold text-primary border border-primary/5 shadow-sm">
                     {selectedLead.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-2xl font-extrabold text-primary font-headline tracking-tight">{selectedLead.name}</h3>
+                    <DialogTitle className="text-2xl font-extrabold text-primary font-headline tracking-tight">{selectedLead.name}</DialogTitle>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className={getStatusStyle(selectedLead.status, !!selectedLead.convertedToClientId)}>
+                      <Badge variant="outline" className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase", getStatusStyle(selectedLead.status, !!selectedLead.convertedToClientId))}>
                         {selectedLead.convertedToClientId ? '✓ Cliente' : (STATUS_LABELS[selectedLead.status] || selectedLead.status)}
                       </Badge>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedLead.origin || 'Direto'}</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">• {selectedLead.origin || 'Direto'}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="p-8 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
-                {/* Contact Info */}
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contato</p>
-                    <div className="space-y-1.5">
-                      {selectedLead.email && (
-                        <div className="flex items-center text-sm font-medium text-slate-600 gap-2">
-                          <Mail className="h-3.5 w-3.5 text-slate-400" /> {selectedLead.email}
+              <div className="p-8 space-y-8">
+                {/* Contact & Financial Info */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Informações de Contato</p>
+                    <div className="space-y-2">
+                      {selectedLead.phone && (
+                        <div className="flex items-center gap-3 text-sm text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-50">
+                          <Phone className="w-4 h-4 text-emerald-500" />
+                          <span className="font-medium">{selectedLead.phone}</span>
                         </div>
                       )}
-                      {selectedLead.phone && (
-                        <div className="flex items-center text-sm font-medium text-slate-600 gap-2">
-                          <Phone className="h-3.5 w-3.5 text-slate-400" /> {selectedLead.phone}
+                      {selectedLead.email && (
+                        <div className="flex items-center gap-3 text-sm text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-50">
+                          <Mail className="w-4 h-4 text-blue-500" />
+                          <span className="font-medium">{selectedLead.email}</span>
                         </div>
                       )}
                       {selectedLead.socialMedia && (
-                        <div className="flex items-center text-sm font-medium text-slate-600 gap-2">
-                          <span className="material-symbols-outlined text-sm text-slate-400">link</span> {selectedLead.socialMedia}
+                        <div className="flex items-center gap-3 text-sm text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-50">
+                          <span className="material-symbols-outlined text-[18px] text-pink-500">link</span>
+                          <span className="font-medium">{selectedLead.socialMedia}</span>
                         </div>
                       )}
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Financeiro</p>
-                    <div className="text-xl font-extrabold text-primary">
-                      {Number(selectedLead.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detalhes Comerciais</p>
+                    <div className="bg-slate-900 rounded-2xl p-4 shadow-xl shadow-slate-900/10">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mb-1">Valor Estimado</p>
+                      <p className="text-2xl font-black text-white font-headline">
+                        {Number(selectedLead.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[14px] text-orange-400">explore</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Origem: {selectedLead.origin || 'Direto'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 
 // Select implementation without Radix
@@ -47,14 +48,26 @@ const SelectTrigger = ({ className, children, ref, ...props }: React.ButtonHTMLA
 }
 SelectTrigger.displayName = "SelectTrigger"
 
-const SelectContent = ({ className, children, position = "popper", ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { position?: string; ref?: React.Ref<HTMLDivElement> }) => {
+const SelectContent = ({ className, children, position = "popper", ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { position?: string; sideOffset?: number; ref?: React.Ref<HTMLDivElement> }) => {
   const { open, setOpen } = React.useContext(SelectContext)
   const contentRef = React.useRef<HTMLDivElement>(null)
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null)
+  const [coords, setCoords] = React.useState({ top: 0, left: 0, width: 0 })
 
   React.useEffect(() => {
     if (!open) return
+    // Find the trigger button (parent combobox) to anchor below it
+    const trigger = document.querySelector('[role="combobox"][aria-expanded="true"]') as HTMLButtonElement
+    if (trigger) {
+      triggerRef.current = trigger
+      const rect = trigger.getBoundingClientRect()
+      setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    }
     const handleClick = (e: MouseEvent) => {
-      if (contentRef.current && !contentRef.current.contains(e.target as Node)) setOpen(false)
+      if (contentRef.current && !contentRef.current.contains(e.target as Node) &&
+          triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
     }
     const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
     document.addEventListener("mousedown", handleClick)
@@ -66,7 +79,8 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
   }, [open, setOpen])
 
   if (!open) return null
-  return (
+
+  return createPortal(
     <div
       ref={(node) => {
         (contentRef as React.MutableRefObject<HTMLDivElement | null>).current = node
@@ -74,14 +88,15 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
         else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node
       }}
       className={cn(
-        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
-        position === "popper" && "translate-y-1",
+        "fixed z-[9999] min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
         className
       )}
+      style={{ top: coords.top, left: coords.left, width: coords.width }}
       {...props}
     >
       <div className="p-1">{children}</div>
-    </div>
+    </div>,
+    document.body
   )
 }
 SelectContent.displayName = "SelectContent"

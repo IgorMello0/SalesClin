@@ -18,7 +18,8 @@ const Dashboard = () => {
     receita: 0,
     ticketOrcado: 0,
     ticketFechado: 0,
-    conversao: 0
+    conversao: 0,
+    conversaoFinanceira: 0
   });
 
   const [extraData, setExtraData] = useState({
@@ -66,7 +67,8 @@ const Dashboard = () => {
         receita: Math.floor(currentValues.receita + ease * (targets.receita - currentValues.receita)),
         ticketOrcado: Math.floor(currentValues.ticketOrcado + ease * (targets.ticketOrcado - currentValues.ticketOrcado)),
         ticketFechado: Math.floor(currentValues.ticketFechado + ease * (targets.ticketFechado - currentValues.ticketFechado)),
-        conversao: Number((currentValues.conversao + ease * (targets.conversao - currentValues.conversao)).toFixed(1))
+        conversao: Number((currentValues.conversao + ease * (targets.conversao - currentValues.conversao)).toFixed(1)),
+        conversaoFinanceira: Number((currentValues.conversaoFinanceira + ease * (targets.conversaoFinanceira - currentValues.conversaoFinanceira)).toFixed(1))
       });
 
       if (progress === 1) {
@@ -104,7 +106,8 @@ const Dashboard = () => {
           receita: Math.floor(ease * targets.receita),
           ticketOrcado: Math.floor(ease * targets.ticketOrcado),
           ticketFechado: Math.floor(ease * targets.ticketFechado),
-          conversao: Number((ease * targets.conversao).toFixed(1))
+          conversao: Number((ease * targets.conversao).toFixed(1)),
+          conversaoFinanceira: Number((ease * targets.conversaoFinanceira).toFixed(1))
         });
         
         if (progress === 1) {
@@ -221,7 +224,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Total de Leads</p>
-            <h3 className="text-2xl font-extrabold text-primary font-headline">{counters.leads}</h3>
+            <h3 className="stats-value">{counters.leads}</h3>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
@@ -244,7 +247,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Agendada</p>
-            <h3 className="text-2xl font-extrabold text-primary font-headline">{counters.agendamentos}</h3>
+            <h3 className="stats-value">{counters.agendamentos}</h3>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
@@ -267,7 +270,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Comparada</p>
-            <h3 className="text-2xl font-extrabold text-primary font-headline">{counters.comparada}</h3>
+            <h3 className="stats-value">{counters.comparada}</h3>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
@@ -290,7 +293,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Propostas</p>
-            <h3 className="text-2xl font-extrabold text-primary font-headline">{counters.oportunidades}</h3>
+            <h3 className="stats-value">{counters.oportunidades}</h3>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
@@ -316,7 +319,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Faturamento Total</p>
-            <h4 className="text-2xl font-extrabold text-primary font-headline">{formatCurrency(counters.faturamento)}</h4>
+            <h4 className="stats-value">{formatCurrency(counters.faturamento)}</h4>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
@@ -339,7 +342,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Orçado)</p>
-            <h4 className="text-2xl font-extrabold text-primary font-headline">{formatCurrency(counters.ticketOrcado)}</h4>
+            <h4 className="stats-value">{formatCurrency(counters.ticketOrcado)}</h4>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
@@ -362,7 +365,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Fechado)</p>
-            <h4 className="text-2xl font-extrabold text-primary font-headline">{formatCurrency(counters.ticketFechado)}</h4>
+            <h4 className="stats-value">{formatCurrency(counters.ticketFechado)}</h4>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
@@ -397,21 +400,28 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Taxa de Conversão</p>
-            <h4 className="text-2xl font-extrabold text-primary font-headline">
-               {conversionMode === 'percent' ? `${counters.conversao}%` : formatCurrency(counters.receita)}
-            </h4>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">
+              {conversionMode === 'percent' ? 'Conversão de Leads' : 'Conversão Financeira'}
+            </p>
+            <div className="flex items-baseline gap-2">
+              <h4 className="stats-value">
+                 {conversionMode === 'percent' ? `${counters.conversao}%` : `${counters.conversaoFinanceira}%`}
+              </h4>
+              {conversionMode === 'reais' && (
+                <span className="text-[10px] font-bold text-slate-400">
+                  (Realizado vs Orçado)
+                </span>
+              )}
+            </div>
           </div>
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {conversionMode === 'percent' ? `${targetsData.conversao}%` : formatCurrency(targetsData.faturamento)}</span>
-              <span className={`font-bold ${getPercent(counters.conversao, targetsData.conversao) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {conversionMode === 'percent' 
-                  ? `${getPercent(counters.conversao, targetsData.conversao)}% alcançado`
-                  : `${getPercent(counters.receita, targetsData.faturamento)}% alcançado`}
+              <span>Alvo: {conversionMode === 'percent' ? `${targetsData.conversao}%` : '100%'}</span>
+              <span className={`font-bold ${getPercent(conversionMode === 'percent' ? counters.conversao : counters.conversaoFinanceira, conversionMode === 'percent' ? targetsData.conversao : 100) >= 100 ? 'text-secondary' : 'text-primary'}`}>
+                {getPercent(conversionMode === 'percent' ? counters.conversao : counters.conversaoFinanceira, conversionMode === 'percent' ? targetsData.conversao : 100)}% alcançado
               </span>
             </div>
-            {renderProgressBar(conversionMode === 'percent' ? getPercent(counters.conversao, targetsData.conversao) : getPercent(counters.receita, targetsData.faturamento))}
+            {renderProgressBar(getPercent(conversionMode === 'percent' ? counters.conversao : counters.conversaoFinanceira, conversionMode === 'percent' ? targetsData.conversao : 100))}
           </div>
         </Card>
       </div>

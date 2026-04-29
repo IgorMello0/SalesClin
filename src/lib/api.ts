@@ -183,6 +183,10 @@ export const appointmentsApi = {
     const query = new URLSearchParams({ professionalId, startTime, endTime })
     return apiRequest<any>(`/agendamentos/check-availability?${query.toString()}`)
   },
+  getAvailableSlots: async (professionalId: string, date: string, durationMinutes: number) => {
+    const query = new URLSearchParams({ professionalId, date, durationMinutes: durationMinutes.toString() })
+    return apiRequest<string[]>(`/agendamentos/available-slots?${query.toString()}`)
+  },
   update: async (id: number, data: any) => apiRequest<any>(`/agendamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/agendamentos/${id}`, { method: 'DELETE' }),
 }

@@ -4,25 +4,29 @@ const prisma = new PrismaClient();
 async function cleanup() {
   console.log("Iniciando limpeza do banco de dados...");
   
-  // Apagar logs
-  await prisma.appointmentLog.deleteMany();
+  // Apagar fichas
+  await prisma.ficha.deleteMany();
+  
+  // Apagar histórico de chat e mensagens
+  await prisma.chatHistory.deleteMany();
   await prisma.chatLog.deleteMany();
-  
-  // Apagar pagamentos e faturamentos
-  await prisma.payment.deleteMany();
-  
-  // Apagar mensagens e conversas
   await prisma.mensagem.deleteMany();
   await prisma.conversa.deleteMany();
+  
+  // Apagar logs de sistema e auditoria
+  await prisma.appointmentLog.deleteMany();
+  await prisma.auditLog.deleteMany();
+  
+  // Apagar financeiro
+  await prisma.payment.deleteMany();
   
   // Apagar agendamentos
   await prisma.appointment.deleteMany();
   
-  // Apagar leads
+  // Apagar leads e clientes
   const deletedLeads = await prisma.lead.deleteMany();
   console.log(`- ${deletedLeads.count} leads deletados.`);
   
-  // Apagar clientes
   const deletedClients = await prisma.client.deleteMany();
   console.log(`- ${deletedClients.count} clientes deletados.`);
   

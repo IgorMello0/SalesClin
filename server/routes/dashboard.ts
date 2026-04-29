@@ -76,42 +76,43 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         where: { ...appointmentWhere, status: { in: ['agendado', 'confirmado'] } } 
       }),
       
-      // Avaliações Comparecidas (Concluídas)
-      prisma.appointment.count({ 
-        where: { ...appointmentWhere, status: 'concluido' } 
-      }),
-      
-      // Oportunidades Geradas (Valor > 0 ou status que indique negociação)
+      // Avaliações Comparecidas (Baseado no status do Funil: prospect_attended)
       prisma.lead.count({ 
-        where: { ...baseWhere, value: { gt: 0 } } 
+        where: { ...baseWhere, status: { in: ['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed'] } } 
       }),
       
-      // Faturamento Total (Tudo que foi vendido - Pago ou Pendente)
-      prisma.payment.aggregate({
-        _sum: { amount: true },
+      // Oportunidades Geradas (Status de proposta ou posterior)
+      prisma.lead.count({ 
         where: { 
-          professionalId: { in: professionalIds }, 
-          date: { gte: startDate, lte: endDate },
-          status: { in: ['pago', 'pendente', 'atrasado'] }
+          ...baseWhere, 
+          status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed'] } 
+        } 
+      }),
+      
+      // Faturamento Total (Tudo que foi orçado - Leads em Proposta ou superior)
+      prisma.lead.aggregate({
+        _sum: { value: true },
+        where: { 
+          ...baseWhere,
+          status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] }
         }
       }),
 
-      // Receita Total (O que de fato caiu na conta)
-      prisma.payment.aggregate({
-        _sum: { amount: true },
+      // Receita Total (Apenas o que chegou no funil de VENDAS/PAGAMENTO)
+      prisma.lead.aggregate({
+        _sum: { value: true },
         where: { 
-          professionalId: { in: professionalIds }, 
-          date: { gte: startDate, lte: endDate },
-          status: 'pago'
+          ...baseWhere,
+          status: { in: ['sales_payment', 'sales_contract', 'sales_post'] }
         }
       }),
 
-      // Total de Vendas Fechadas
+      // Total de Vendas Fechadas (Cards no 'comercial_closed')
       prisma.lead.count({
         where: { ...baseWhere, status: 'comercial_closed' }
       }),
 
-      // Faturamento por Método e Status (para separar gerados de pagos no boleto)
+      // Faturamento por Método e Status
       prisma.payment.groupBy({
         by: ['method', 'status'],
         _sum: { amount: true },
@@ -136,8 +137,8 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       })
     ]);
 
-    const faturamento = Number(faturamentoTotalAgg._sum.amount) || 0;
-    const receita = Number(receitaTotalAgg._sum.amount) || 0;
+    const faturamento = Number(faturamentoTotalAgg._sum.value) || 0;
+    const receita = Number(receitaTotalAgg._sum.value) || 0;
     
     // 4. KPIs de Eficiência Matemáticos
     
@@ -151,11 +152,16 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       ? (receita / leadsFechados) 
       : 0;
       
-    // Taxa de Conversão: Vendas Fechadas / Total de Leads
-    const conversao = leadsCount > 0 
+    // Taxa de Conversão de Leads: Vendas Fechadas / Total de Leads
+    const conversaoLeads = leadsCount > 0 
       ? ((leadsFechados / leadsCount) * 100) 
       : 0;
 
+    // Taxa de Conversão Financeira: Receita Efetiva / Faturamento Orçado
+    const conversaoFinanceira = faturamento > 0 
+      ? ((receita / faturamento) * 100) 
+      : 0;
+      
     // Processamento dos Agrupamentos (Sub-Métricas)
     const metodos = {
       boleto: {
@@ -168,9 +174,9 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     };
 
     const funil = {
-      novos: funilStatus.find(s => s.status === 'prospect_lead' || s.status === 'Novo')?._count.id || 0,
-      contatados: funilStatus.find(s => s.status === 'prospect_qualified' || s.status === 'Contatado')?._count.id || 0,
-      agendados: funilStatus.find(s => s.status === 'prospect_scheduled' || s.status === 'Agendado')?._count.id || 0,
+      novos: funilStatus.find(s => s.status === 'prospect_lead')?._count.id || 0,
+      contatados: funilStatus.find(s => s.status === 'prospect_qualified')?._count.id || 0,
+      agendados: funilStatus.find(s => s.status === 'prospect_scheduled')?._count.id || 0,
       fechados: leadsFechados,
     };
 
@@ -188,7 +194,8 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       receita: receita,
       ticketOrcado: ticketOrcado,
       ticketFechado: ticketFechado,
-      conversao: conversao.toFixed(1),
+      conversao: conversaoLeads.toFixed(1),
+      conversaoFinanceira: conversaoFinanceira.toFixed(1),
       metodos,
       funil,
       origem

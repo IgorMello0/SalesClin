@@ -19,7 +19,7 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
       skip,
       take,
       orderBy: { startTime: 'desc' },
-      include: { professional: true, client: true, service: true, appointmentLogs: true, payments: true }
+      include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
     }),
     prisma.appointment.count({ where })
   ])
@@ -54,11 +54,75 @@ router.get('/check-availability', auth(false), async (req, res) => {
   }
 })
 
+// Horários disponíveis para um dia específico
+router.get('/available-slots', auth(false), async (req, res) => {
+  try {
+    const { professionalId, date, durationMinutes } = req.query as any
+    if (!professionalId || !date) {
+      return res.status(400).json(createErrorResponse('Parâmetros incompletos', 400))
+    }
+
+    const duration = Number(durationMinutes) || 60
+    // Horário de funcionamento: 08:00 – 20:00
+    const OPEN_HOUR = 8
+    const CLOSE_HOUR = 20
+    const SLOT_INTERVAL = 30 // minutos
+
+    // Busca todos agendamentos do profissional no dia
+    const dayStart = new Date(`${date}T00:00:00.000Z`)
+    const dayEnd   = new Date(`${date}T23:59:59.999Z`)
+    const existingAppointments = await prisma.appointment.findMany({
+      where: {
+        professionalId: Number(professionalId),
+        status: { not: 'cancelado' },
+        startTime: { gte: dayStart, lte: dayEnd }
+      },
+      select: { startTime: true, endTime: true }
+    })
+
+    // Gera todos os slots possíveis
+    const slots: string[] = []
+    const totalMinutes = (CLOSE_HOUR - OPEN_HOUR) * 60
+    const now = new Date()
+
+    for (let m = 0; m <= totalMinutes - duration; m += SLOT_INTERVAL) {
+      const slotHour   = OPEN_HOUR + Math.floor(m / 60)
+      const slotMinute = m % 60
+      
+      // Cria o objeto de data para este slot específico
+      // Usamos o formato local para comparação com 'now'
+      const slotStart = new Date(`${date}T${String(slotHour).padStart(2,'0')}:${String(slotMinute).padStart(2,'0')}:00`)
+      const slotEnd   = new Date(slotStart.getTime() + duration * 60000)
+
+      // 1. Restrição de Passado: Não mostrar horários que já passaram se for hoje
+      if (slotStart < now) {
+        continue;
+      }
+
+      // 2. Verifica conflito com qualquer agendamento existente
+      const hasConflict = existingAppointments.some(apt => {
+        const aptStart = new Date(apt.startTime)
+        const aptEnd   = new Date(apt.endTime)
+        // O slot de 90min conflita se ele começar antes do fim de outro E terminar depois do início de outro
+        return slotStart < aptEnd && slotEnd > aptStart
+      })
+
+      if (!hasConflict) {
+        slots.push(`${String(slotHour).padStart(2,'0')}:${String(slotMinute).padStart(2,'0')}`)
+      }
+    }
+
+    return res.json(createSuccessResponse(slots))
+  } catch (error) {
+    return res.status(500).json(createErrorResponse('Erro ao buscar horários disponíveis', 500))
+  }
+})
+
 router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
   const item = await prisma.appointment.findUnique({
     where: { id },
-    include: { professional: true, client: true, service: true, appointmentLogs: true, payments: true }
+    include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
   })
   if (!item) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404))
   res.json(createSuccessResponse(item))

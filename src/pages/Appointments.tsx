@@ -36,10 +36,11 @@ const Appointments = () => {
           id: apt.id,
           date: parseISO(apt.startTime),
           time: format(parseISO(apt.startTime), "HH:mm"),
-          clientName: apt.client?.name || "Paciente s/ Nome",
+          clientName: apt.client?.name || apt.lead?.name || "Paciente s/ Nome",
           service: apt.service?.name || "Serviço s/ Nome",
           status: apt.status || "agendado",
-          duration: Math.round((new Date(apt.endTime).getTime() - new Date(apt.startTime).getTime()) / 60000)
+          duration: Math.round((new Date(apt.endTime).getTime() - new Date(apt.startTime).getTime()) / 60000),
+          leadStatus: apt.lead?.status || null,
         }));
         setAppointments(mapped);
       }
@@ -79,13 +80,28 @@ const Appointments = () => {
 
   const timeSlots = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
+  const getStatusConfig = (apt: any) => {
+    // Lead que compareceu (prospect_attended) ou consulta feita → verde mesmo
+    const effectiveStatus =
+      (apt.leadStatus === 'prospect_attended' || apt.leadStatus === 'comercial_consult')
+        ? 'confirmado'
+        : apt.status;
+    switch (effectiveStatus) {
       case 'confirmado': return { bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600', dot: 'bg-emerald-500', label: 'Confirmado' };
-      case 'agendado': return { bg: 'bg-amber-500/10 border-amber-500/20 text-amber-600', dot: 'bg-amber-500', label: 'Agendado' };
-      case 'cancelado': return { bg: 'bg-red-500/10 border-red-500/20 text-red-500', dot: 'bg-red-500', label: 'Cancelado' };
-      case 'concluido': return { bg: 'bg-sky-500/10 border-sky-500/20 text-sky-600', dot: 'bg-sky-500', label: 'Concluído' };
-      default: return { bg: 'bg-slate-100 border-slate-200 text-slate-600', dot: 'bg-slate-400', label: status };
+      case 'agendado':   return { bg: 'bg-amber-500/10 border-amber-500/20 text-amber-600',   dot: 'bg-amber-500',   label: 'Agendado' };
+      case 'cancelado':  return { bg: 'bg-red-500/10 border-red-500/20 text-red-500',         dot: 'bg-red-500',     label: 'Cancelado' };
+      case 'concluido':  return { bg: 'bg-sky-500/10 border-sky-500/20 text-sky-600',         dot: 'bg-sky-500',     label: 'Concluído' };
+      default:           return { bg: 'bg-slate-100 border-slate-200 text-slate-600',          dot: 'bg-slate-400',   label: effectiveStatus };
+    }
+  };
+
+  const handleCheckApt = async (aptId: number) => {
+    try {
+      await appointmentsApi.update(aptId, { status: 'confirmado' });
+      loadAppointments();
+      toast({ title: 'Confirmado!', description: 'Agendamento marcado como confirmado.' });
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o status.', variant: 'destructive' });
     }
   };
 
@@ -331,8 +347,8 @@ const Appointments = () => {
                         const endTime = new Date(apt.date.getTime() + apt.duration * 60000);
 
                         return (
-                          <div 
-                            key={apt.id} 
+                          <div
+                            key={apt.id}
                             className={`absolute left-2 right-4 rounded-xl border px-3 py-2 cursor-pointer hover:shadow-md transition-all overflow-hidden shadow-sm pointer-events-auto flex flex-col justify-center ${st.bg}`}
                             style={{ top: `${topOffset}px`, height: `${Math.max(height - 4, 36)}px`, zIndex: 10 }}
                           >
@@ -346,11 +362,22 @@ const Appointments = () => {
                                   <span className="text-xs opacity-80 ml-3.5 leading-tight">{apt.service}</span>
                                 )}
                               </div>
-                              {height > 50 && (
-                                <div className="text-xs font-mono font-medium opacity-70 shrink-0 bg-white/40 px-1.5 py-0.5 rounded-md">
-                                  {apt.time} - {format(endTime, 'HH:mm')}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-1 shrink-0">
+                                {height > 50 && (
+                                  <div className="text-xs font-mono font-medium opacity-70 bg-white/40 px-1.5 py-0.5 rounded-md">
+                                    {apt.time} - {format(endTime, 'HH:mm')}
+                                  </div>
+                                )}
+                                {apt.status !== 'confirmado' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleCheckApt(apt.id); }}
+                                    title="Marcar como compareceu"
+                                    className="w-6 h-6 rounded-full bg-white/70 hover:bg-emerald-500 hover:text-white text-emerald-600 flex items-center justify-center transition-all border border-current/20 shrink-0"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
@@ -401,7 +428,7 @@ const Appointments = () => {
 
                               const topOffset = ((h - 7) * 64) + ((m / 60) * 64);
                               const height = (apt.duration / 60) * 64;
-                              const st = getStatusConfig(apt.status);
+                              const st = getStatusConfig(apt);
 
                               return (
                                 <div 

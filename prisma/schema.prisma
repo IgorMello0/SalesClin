@@ -171,6 +171,9 @@ model Lead {
   city                  String?
   responsible           String?
   isScheduled           Boolean      @default(false) @map("is_scheduled")
+  justification         String?      @db.Text
+  discountApplied       Boolean      @default(false) @map("discount_applied")
+  remarketingProposals  Json?        @map("remarketing_proposals") // Array de propostas arquivadas
   convertedToClientId   Int?         @unique @map("converted_to_client_id")
   convertedAt           DateTime?    @map("converted_at")
   createdAt             DateTime     @default(now()) @map("created_at")

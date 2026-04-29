@@ -111,6 +111,14 @@ router.put('/:id', auth(), async (req, res) => {
     }
     if (data.age !== undefined) prismaData.age = Number(data.age)
     if (data.value !== undefined) prismaData.value = Number(data.value)
+    if (data.discount_applied !== undefined) {
+      prismaData.discountApplied = Boolean(data.discount_applied)
+      delete prismaData.discount_applied
+    }
+    if (data.remarketing_proposals !== undefined) {
+      prismaData.remarketingProposals = data.remarketing_proposals
+      delete prismaData.remarketing_proposals
+    }
 
     // Buscar lead atual para verificar se já foi convertido
     const currentLead = await prisma.lead.findUnique({ where: { id } })
@@ -118,11 +126,12 @@ router.put('/:id', auth(), async (req, res) => {
       return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
     }
 
-    // Conversão automática: quando status muda para 'comercial_closed'
+    // Conversão automática: quando status muda para 'comercial_closed' OU quando há propostas de remarketing (fechamento parcial)
     const isClosing = prismaData.status === 'comercial_closed' && currentLead.status !== 'comercial_closed'
+    const isPartialClosing = prismaData.remarketingProposals !== undefined
     const alreadyConverted = !!currentLead.convertedToClientId
 
-    if (isClosing && !alreadyConverted) {
+    if ((isClosing || isPartialClosing) && !alreadyConverted) {
       // Criar cliente automaticamente a partir dos dados do lead
       const newClient = await prisma.client.create({
         data: {

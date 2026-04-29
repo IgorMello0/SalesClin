@@ -280,3 +280,59 @@ h1, h2, h3, h4, h5, h6 {
 .bar-3d.orange .face {
   background-color: rgba(249, 115, 22, 0.1);
 }
+
+/* ========================================
+   PREMIUM UI STANDARDS (No-Cut Pattern)
+   ======================================== */
+
+.premium-card {
+  border-radius: 1.5rem;
+  border: 1px solid var(--color-border);
+  background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  height: fit-content;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.premium-card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  transform: translateY(-4px);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.stats-value {
+  font-family: var(--font-headline);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  font-size: clamp(1.25rem, 5vw, 2.25rem);
+  line-height: 1.2;
+  color: var(--color-primary);
+}
+
+.card-scroll {
+  overflow-y: auto;
+  max-height: 400px;
+  padding-right: 0.5rem;
+}
+
+/* Custom Scrollbar for Card Scroll */
+.card-scroll::-webkit-scrollbar {
+  width: 4px;
+  display: block;
+}
+
+.card-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.card-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 10px;
+}
+
+.card-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-container);
+}
