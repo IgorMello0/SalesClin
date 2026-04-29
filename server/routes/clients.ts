@@ -11,6 +11,19 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
     const { search } = req.query as any
 
     const where: any = {}
+
+    // Filtrar por professionalId do usuário logado
+    if (req.user?.type === 'profissional') {
+      where.professionalId = req.user.id
+    } else if (req.user?.type === 'usuario' && req.user?.companyId) {
+      // Usuário: busca clientes de todos os profissionais da empresa
+      const companyProfessionals = await prisma.professional.findMany({
+        where: { companyId: req.user.companyId },
+        select: { id: true }
+      })
+      where.professionalId = { in: companyProfessionals.map(p => p.id) }
+    }
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },

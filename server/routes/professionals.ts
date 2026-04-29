@@ -55,6 +55,47 @@ router.post('/login', async (req, res) => {
     res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
   }
 })
+// Obter perfil do profissional logado
+router.get('/me', auth(), async (req, res) => {
+  try {
+    const professional = await prisma.professional.findUnique({
+      where: { id: req.user!.id },
+      include: { company: true }
+    })
+    if (!professional) {
+      return res.status(404).json(createErrorResponse('Profissional não encontrado', 404))
+    }
+    res.json(createSuccessResponse(professional))
+  } catch (error) {
+    console.error('[Profile] Erro:', error)
+    res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
+  }
+})
+
+// Atualizar perfil do profissional logado
+router.put('/me', auth(), async (req, res) => {
+  try {
+    const { name, phone, specialization, photoUrl, bio, crm } = req.body
+
+    const updated = await prisma.professional.update({
+      where: { id: req.user!.id },
+      data: { 
+        name, 
+        phone, 
+        specialization, 
+        photoUrl,
+        bio,
+        crm
+      },
+      include: { company: true }
+    })
+
+    res.json(createSuccessResponse(updated))
+  } catch (error) {
+    console.error('[Profile] Erro ao atualizar:', error)
+    res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
+  }
+})
 
 // Listar profissionais
 router.get('/', auth(false), async (req, res) => {

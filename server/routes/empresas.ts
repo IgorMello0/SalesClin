@@ -5,6 +5,40 @@ import { createErrorResponse, createSuccessResponse, parsePagination } from '../
 
 export const router = Router()
 
+// Obter empresa do profissional logado
+router.get('/my-company', auth(), async (req, res) => {
+  try {
+    let companyId: number | undefined
+
+    if (req.user?.type === 'profissional') {
+      const prof = await prisma.professional.findUnique({
+        where: { id: req.user.id },
+        select: { companyId: true }
+      })
+      companyId = prof?.companyId || undefined
+    } else if (req.user?.type === 'usuario') {
+      companyId = req.user.companyId || undefined
+    }
+
+    if (!companyId) {
+      return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
+    }
+
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: companyId }
+    })
+
+    if (!empresa) {
+      return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
+    }
+
+    res.json(createSuccessResponse(empresa))
+  } catch (error: any) {
+    console.error('[Empresas] Erro ao buscar minha empresa:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar empresa', 500))
+  }
+})
+
 router.get('/', auth(), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
   const [items, total] = await Promise.all([

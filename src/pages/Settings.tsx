@@ -33,7 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { catalogsApi, professionalsApi, usuariosApi, permissionsApi } from '@/lib/api';
+import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi } from '@/lib/api';
 
 // -- COMPONENTES DE CONFIGURAÇÃO (MOCKS) --
 
@@ -595,43 +595,125 @@ const WebhookView = () => (
   </div>
 );
 
-const InfoNegocioView = () => (
-  <div className="space-y-5">
-    <div className="flex justify-center mb-4">
-      <div className="relative group cursor-pointer">
-        <div className="w-24 h-24 rounded-full bg-zinc-100 border-2 border-dashed border-zinc-300 flex items-center justify-center group-hover:border-primary/50 transition-colors">
-          <ImageIcon className="w-8 h-8 text-zinc-400 group-hover:text-primary transition-colors" />
+const InfoNegocioView = () => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [companyData, setCompanyData] = useState({
+    id: 0,
+    name: '',
+    domain: '',
+    whatsapp: '',
+    plan: '',
+  });
+
+  useEffect(() => {
+    loadCompany();
+  }, []);
+
+  const loadCompany = async () => {
+    try {
+      const res = await empresasApi.getMyCompany();
+      if (res.success && res.data) {
+        setCompanyData({
+          id: res.data.id,
+          name: res.data.name || '',
+          domain: res.data.domain || '',
+          whatsapp: res.data.whatsapp || '',
+          plan: res.data.plan || '',
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível carregar dados da empresa', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!companyData.name) {
+      toast({ title: 'Atenção', description: 'O nome da empresa é obrigatório.', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await empresasApi.update(companyData.id, {
+        name: companyData.name,
+        domain: companyData.domain || null,
+        whatsapp: companyData.whatsapp || null,
+        plan: companyData.plan || null,
+      });
+      if (res.success) {
+        toast({ title: 'Salvo!', description: 'Informações da empresa atualizadas.' });
+      } else {
+        throw new Error(res.error?.message || 'Erro ao salvar');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-sm text-center py-8 text-muted-foreground">Carregando dados da empresa...</div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm border border-blue-100 flex items-start gap-3">
+        <Building className="w-5 h-5 flex-shrink-0 mt-0.5" />
+        <div>
+          <strong className="block mb-0.5">Dados da Empresa</strong>
+          Informações cadastrais da sua empresa no sistema. Estas informações são compartilhadas com toda a equipe.
         </div>
-        <Badge className="absolute -bottom-2 font-normal text-xs left-1/2 -translate-x-1/2 whitespace-nowrap shadow-sm group-hover:bg-primary">
-          Fazer Upload
-        </Badge>
       </div>
-    </div>
-    <div className="space-y-2">
-      <Label>Razão Social / Nome de Exibição Público</Label>
-      <Input defaultValue="Clínica AuraMed Saudável Ltda" />
-    </div>
-    <div className="space-y-2">
-      <Label>CNPJ / Documento do País</Label>
-      <Input defaultValue="00.000.000/0001-00" />
-    </div>
-    <div className="grid grid-cols-2 gap-4">
+
       <div className="space-y-2">
-        <Label>CEP</Label>
-        <Input defaultValue="01001-000" />
+        <Label>Nome da Empresa *</Label>
+        <Input 
+          value={companyData.name} 
+          onChange={e => setCompanyData({...companyData, name: e.target.value})} 
+          placeholder="Ex: Clínica Estética Premium" 
+        />
       </div>
+
       <div className="space-y-2">
-        <Label>Número / Complemento</Label>
-        <Input defaultValue="123 - Sala 4B" />
+        <Label>Domínio / Site</Label>
+        <Input 
+          value={companyData.domain} 
+          onChange={e => setCompanyData({...companyData, domain: e.target.value})} 
+          placeholder="www.minhaempresa.com.br" 
+        />
       </div>
+
+      <div className="space-y-2">
+        <Label>WhatsApp</Label>
+        <Input 
+          value={companyData.whatsapp} 
+          onChange={e => setCompanyData({...companyData, whatsapp: e.target.value})} 
+          placeholder="(11) 99999-9999" 
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Plano Atual</Label>
+        <Input 
+          value={companyData.plan} 
+          onChange={e => setCompanyData({...companyData, plan: e.target.value})} 
+          placeholder="Ex: Profissional, Básico" 
+          disabled
+          className="bg-zinc-50 cursor-not-allowed"
+        />
+        <p className="text-xs text-muted-foreground">O plano é gerenciado pela plataforma.</p>
+      </div>
+
+      <Button className="w-full" onClick={handleSave} disabled={saving}>
+        {saving ? 'Salvando...' : 'Salvar Informações da Empresa'}
+      </Button>
     </div>
-    <div className="space-y-2">
-      <Label>Informação Extra no Cabeçalho de Faturas</Label>
-      <Textarea placeholder="Mensagem padrão no bottom da nota" />
-    </div>
-    <Button className="w-full">Salvar Informações da Empresa</Button>
-  </div>
-);
+  );
+};
 
 const GenericFallback = ({ name }: { name: string }) => (
   <div className="text-center py-10 space-y-4">
@@ -654,8 +736,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   'Cronograma': CronogramaView,
   'Equipe': EquipeView,
   'Webhook': WebhookView,
-  'Informações': InfoNegocioView,
-  'Configurações': InfoNegocioView // reusing Business configs
+  'Meu Negócio': InfoNegocioView,
 };
 
 const Settings = () => {
@@ -685,8 +766,7 @@ const Settings = () => {
       title: 'Meu negócio',
       icon: Building,
       items: [
-        { name: 'Configurações', description: 'Informações básicas do negócio' },
-        { name: 'Informações', description: 'Dados de contato e localização' },
+        { name: 'Meu Negócio', description: 'Informações e configurações da empresa' },
       ]
     },
     {

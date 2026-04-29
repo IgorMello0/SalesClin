@@ -107,6 +107,8 @@ export const professionalsApi = {
     apiRequest<{ token: string; professional: any }>('/profissionais/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   signup: async (data: { name: string; email: string; password: string; phone?: string; specialization?: string }) => 
     apiRequest<{ token: string; professional: any }>('/profissionais', { method: 'POST', body: JSON.stringify(data) }),
+  getMe: async () => apiRequest<any>('/profissionais/me'),
+  updateMe: async (data: any) => apiRequest<any>('/profissionais/me', { method: 'PUT', body: JSON.stringify(data) }),
   getAll: async (params?: { page?: number; pageSize?: number; search?: string }) => {
     const query = new URLSearchParams()
     if (params?.page) query.append('page', params.page.toString())
@@ -248,4 +250,10 @@ export const permissionsApi = {
     apiRequest<Array<{ moduleCode: string; moduleName: string; hasAccess: boolean }>>('/permissions/my-permissions'),
 }
 
+// Empresas
+export const empresasApi = {
+  getMyCompany: async () => apiRequest<any>('/empresas/my-company'),
+  getById: async (id: number) => apiRequest<any>(`/empresas/${id}`),
+  update: async (id: number, data: any) => apiRequest<any>(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+}
 
