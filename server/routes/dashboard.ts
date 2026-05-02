@@ -103,7 +103,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         _sum: { value: true },
         where: { 
           ...baseWhere,
-          status: { in: ['sales_payment', 'sales_contract', 'sales_post'] }
+          isPaid: true
         }
       }),
 

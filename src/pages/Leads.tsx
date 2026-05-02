@@ -172,10 +172,8 @@ const Leads = () => {
     const matchesTag = !selectedTagFilter || (lead.tags && lead.tags.includes(selectedTagFilter));
     
     // Regra de Roteamento: 
-    // - Mostrar se NÃO for convertido
-    // - OU se FOR convertido mas tiver propostas de remarketing (oportunidades pendentes)
-    const hasRemarketing = lead.remarketingProposals && lead.remarketingProposals.length > 0;
-    const isOperational = !lead.convertedToClientId || hasRemarketing;
+    // - Mostrar se NÃO estiver pago
+    const isOperational = !lead.isPaid;
 
     return matchesSearch && matchesTag && isOperational;
   });

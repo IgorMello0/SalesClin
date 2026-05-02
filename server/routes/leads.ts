@@ -111,6 +111,9 @@ router.put('/:id', auth(), async (req, res) => {
     }
     if (data.age !== undefined) prismaData.age = Number(data.age)
     if (data.value !== undefined) prismaData.value = Number(data.value)
+    if (data.isPaid !== undefined) {
+      prismaData.isPaid = Boolean(data.isPaid)
+    }
     if (data.discount_applied !== undefined) {
       prismaData.discountApplied = Boolean(data.discount_applied)
       delete prismaData.discount_applied

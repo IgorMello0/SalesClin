@@ -67,6 +67,7 @@ interface Lead {
   justification?: string;
   discountApplied?: boolean;
   remarketingProposals?: any[];
+  isPaid?: boolean;
 }
 
 const initialLeads: Lead[] = [];
@@ -479,6 +480,23 @@ const SalesFunnel = () => {
     setRemovedTags([]);
   };
 
+  const handleConfirmPayment = async (leadId: string) => {
+    try {
+      await leadsApi.update(leadId, { isPaid: true });
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, isPaid: true } : l));
+      toast({
+        title: "Pagamento Confirmado! 💰",
+        description: "O valor foi contabilizado na receita do dashboard.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao confirmar pagamento",
+        description: "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const openAddLead = (stageId: string | null = null) => {
     setNewLeadStage(stageId);
     setIsAddingLead(true);
@@ -531,10 +549,8 @@ const SalesFunnel = () => {
         {activeStages.map((stage) => {
           const stageLeads = leads.filter(l => {
             // Regra de Roteamento: 
-            // - Mostrar se NÃO for convertido
-            // - OU se FOR convertido mas tiver propostas de remarketing (oportunidades pendentes)
-            const hasRemarketing = l.remarketingProposals && l.remarketingProposals.length > 0;
-            const isOperational = !l.convertedToClientId || hasRemarketing;
+            // - Mostrar se NÃO estiver pago
+            const isOperational = !l.isPaid;
             if (!isOperational) return false;
 
             if (stage.id === 'prospect_attended') {
@@ -688,6 +704,17 @@ const SalesFunnel = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              moveLead(lead.id, 'sales_payment');
+                              setActiveFunnel('sales');
+                            }}
+                            className="w-full py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-primary/20"
+                          >
+                            <span className="material-symbols-outlined text-xs">payments</span>
+                            Iniciar Pagamento
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setClosedLeadToSchedule(lead);
                               setIsSchedulingClosed(true);
                             }}
@@ -697,6 +724,19 @@ const SalesFunnel = () => {
                             Agendar Agora
                           </button>
                         </div>
+                      )}
+
+                      {stage.id === 'sales_payment' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConfirmPayment(lead.id);
+                          }}
+                          className="w-full py-2 bg-cyan-100 hover:bg-cyan-600 text-cyan-700 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-cyan-200 animate-pulse-subtle"
+                        >
+                          <span className="material-symbols-outlined text-xs">check_circle</span>
+                          Confirmar Recebimento
+                        </button>
                       )}
                     </div>
                   </div>
