@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma'
 import { auth } from '../middleware/auth'
 import { createErrorResponse, createSuccessResponse } from '../utils/response'
+import { logAudit } from '../utils/audit'
 
 export const router = Router()
 
@@ -100,6 +101,10 @@ router.put('/professional/:id', auth(), async (req, res) => {
         include: { module: true },
       })
       results.push(result)
+    }
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'ATUALIZAR_PERMISSOES_PROFISSIONAL', 'ProfessionalPermission', professionalId)
     }
 
     res.json(createSuccessResponse(results))
@@ -288,6 +293,10 @@ router.put('/user/:id', auth(), async (req, res) => {
         include: { module: true },
       })
       results.push(result)
+    }
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'ATUALIZAR_PERMISSOES_USUARIO', 'UserPermission', userId)
     }
 
     res.json(createSuccessResponse(results))

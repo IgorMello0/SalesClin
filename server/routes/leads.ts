@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma'
 import { auth } from '../middleware/auth'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response'
+import { logAudit } from '../utils/audit'
 
 export const router = Router()
 
@@ -86,6 +87,11 @@ router.post('/', auth(), async (req, res) => {
         responsible 
       }
     })
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'CRIAR_LEAD', 'Lead', created.id)
+    }
+    
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {
     console.error('[Leads] Erro ao criar lead:', error)
@@ -156,6 +162,10 @@ router.put('/:id', auth(), async (req, res) => {
         where: { id },
         data: prismaData
       })
+      
+      if (req.user?.type === 'profissional') {
+        logAudit(req.user.id, 'CONVERTER_LEAD_EM_CLIENTE', 'Lead', id)
+      }
 
       return res.json(createSuccessResponse({
         ...updated,
@@ -168,6 +178,11 @@ router.put('/:id', auth(), async (req, res) => {
       where: { id },
       data: prismaData
     })
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'ATUALIZAR_LEAD', 'Lead', id)
+    }
+    
     res.json(createSuccessResponse(updated))
   } catch (error: any) {
     console.error('[Leads] Erro ao atualizar lead:', error)
@@ -183,6 +198,11 @@ router.delete('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     await prisma.lead.delete({ where: { id } })
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'DELETAR_LEAD', 'Lead', id)
+    }
+    
     res.json(createSuccessResponse({ id }))
   } catch (error: any) {
     console.error('[Leads] Erro ao deletar lead:', error)

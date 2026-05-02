@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma'
 import { auth, requireModule } from '../middleware/auth'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response'
+import { logAudit } from '../utils/audit'
 
 export const router = Router()
 
@@ -168,6 +169,11 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
       notes 
     }
   })
+  
+  if (req.user?.type === 'profissional') {
+    logAudit(req.user.id, 'CRIAR_AGENDAMENTO', 'Appointment', created.id)
+  }
+  
   res.status(201).json(createSuccessResponse(created))
 })
 
@@ -196,12 +202,22 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     where: { id },
     data: { professionalId, clientId, serviceId, startTime, endTime, status, notes }
   })
+  
+  if (req.user?.type === 'profissional') {
+    logAudit(req.user.id, 'ATUALIZAR_AGENDAMENTO', 'Appointment', id)
+  }
+  
   res.json(createSuccessResponse(updated))
 })
 
 router.delete('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
   await prisma.appointment.delete({ where: { id } })
+  
+  if (req.user?.type === 'profissional') {
+    logAudit(req.user.id, 'DELETAR_AGENDAMENTO', 'Appointment', id)
+  }
+  
   res.json(createSuccessResponse({ id }))
 })
 

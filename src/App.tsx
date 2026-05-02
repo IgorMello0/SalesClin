@@ -12,7 +12,6 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Appointments from "./pages/Appointments";
 import Clients from "./pages/Clients";
-import Leads from "./pages/Leads";
 import Reports from "./pages/Reports";
 import Payments from "./pages/Payments";
 import Conversations from "./pages/Conversations";
@@ -46,7 +45,6 @@ const App = () => (
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="appointments" element={<Appointments />} />
                 <Route path="clients" element={<Clients />} />
-                <Route path="leads" element={<Leads />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="payments" element={<Payments />} />
                 <Route path="conversations" element={<Conversations />} />

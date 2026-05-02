@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma'
 import { auth, requireModule } from '../middleware/auth'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response'
+import { logAudit } from '../utils/audit'
 
 export const router = Router()
 
@@ -128,6 +129,11 @@ router.post('/', auth(), requireModule('clientes'), async (req, res) => {
     const created = await prisma.client.create({
       data: { professionalId, name, email, phone, dateOfBirth, document, notes }
     })
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'CRIAR_CLIENTE', 'Client', created.id)
+    }
+    
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {
     console.error('[Clients] Erro ao criar cliente:', error)
@@ -144,6 +150,11 @@ router.put('/:id', auth(), requireModule('clientes'), async (req, res) => {
       where: { id },
       data: { professionalId, name, email, phone, dateOfBirth, document, notes }
     })
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'ATUALIZAR_CLIENTE', 'Client', id)
+    }
+    
     res.json(createSuccessResponse(updated))
   } catch (error: any) {
     console.error('[Clients] Erro ao atualizar cliente:', error)
@@ -158,6 +169,11 @@ router.delete('/:id', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const id = Number(req.params.id)
     await prisma.client.delete({ where: { id } })
+    
+    if (req.user?.type === 'profissional') {
+      logAudit(req.user.id, 'DELETAR_CLIENTE', 'Client', id)
+    }
+    
     res.json(createSuccessResponse({ id }))
   } catch (error: any) {
     console.error('[Clients] Erro ao deletar cliente:', error)
