@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: data.email,
           phone: data.phone || '',
           specialization: data.specialization || data.role || 'Usuário',
-          role: profData ? 'profissional' : (data.role || 'usuario'),
+          role: data.email === 'admin@admin.com' ? 'admin' : (profData ? 'profissional' : (data.role || 'usuario')),
         };
         
         setProfessional(professionalData);

@@ -74,6 +74,12 @@ export function AppTopNavbar() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const filteredMenuItems = menuItems.filter((item) => {
+    // Restringir módulos não liberados na v1 apenas para admin
+    const restrictedModules = ['Financeiro', 'Conversas', 'Catálogos', 'Contratos'];
+    if (restrictedModules.includes(item.title) && professional?.role !== 'admin') {
+      return false;
+    }
+
     if (permissions.length === 0) return true;
     return hasModuleAccess(item.moduleCode);
   });

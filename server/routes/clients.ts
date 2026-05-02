@@ -12,23 +12,37 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
 
     const where: any = {}
 
-    // Filtrar por professionalId do usuário logado
-    if (req.user?.type === 'profissional') {
-      where.professionalId = req.user.id
-    } else if (req.user?.type === 'usuario' && req.user?.companyId) {
-      // Usuário: busca clientes de todos os profissionais da empresa
-      const companyProfessionals = await prisma.professional.findMany({
-        where: { companyId: req.user.companyId },
-        select: { id: true }
-      })
-      where.professionalId = { in: companyProfessionals.map(p => p.id) }
+    let companyId = req.user?.companyId;
+
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({
+        where: { id: req.user.id },
+        select: { companyId: true }
+      });
+      companyId = prof?.companyId || undefined;
     }
+
+    if (companyId) {
+      const companyProfessionals = await prisma.professional.findMany({
+        where: { companyId },
+        select: { id: true }
+      });
+      where.professionalId = { in: companyProfessionals.map(p => p.id) };
+    } else if (req.user?.id) {
+      where.professionalId = req.user.id;
+    }
+
 
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { phone: { contains: search, mode: 'insensitive' } }
       ]
+    }
+    
+    // TEMPORARY DEBUG:
+    if (req.query.debug === 'true') {
+      return res.json({ success: true, debug: { user: req.user, where, companyId } });
     }
 
     const [items, total] = await Promise.all([
@@ -61,6 +75,16 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
 router.get('/:id', auth(false), async (req, res) => {
   try {
     const id = Number(req.params.id)
+    
+    let companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({
+        where: { id: req.user.id },
+        select: { companyId: true }
+      });
+      companyId = prof?.companyId || undefined;
+    }
+
     const item = await prisma.client.findUnique({
       where: { id },
       include: {
@@ -73,10 +97,19 @@ router.get('/:id', auth(false), async (req, res) => {
             status: true
           }
         }
-        // Removido payments, fichas, chatHistories e conversas temporariamente
       }
     })
+    
     if (!item) return res.status(404).json(createErrorResponse('Cliente não encontrado', 404))
+
+    if (companyId) {
+      if (item.professional.companyId !== companyId) {
+        return res.status(403).json(createErrorResponse('Acesso negado', 403))
+      }
+    } else if (req.user?.id && item.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403))
+    }
+
     res.json(createSuccessResponse(item))
   } catch (error: any) {
     console.error('[Clients] Erro ao buscar cliente:', error)

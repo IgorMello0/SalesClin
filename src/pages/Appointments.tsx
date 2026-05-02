@@ -494,19 +494,7 @@ const Appointments = () => {
                 </div>
               )}
 
-              {!isLoading && filteredAppointments.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary text-3xl">calendar_today</span>
-                  </div>
-                  <p className="font-bold text-primary">Nenhum agendamento encontrado</p>
-                  <p className="text-sm text-muted-foreground">Clique em "Novo Agendamento" para começar</p>
-                  <Button variant="secondary" size="xl" onClick={() => setOpenModal(true)} className="mt-2 shadow-lg shadow-secondary/20">
-                    <span className="material-symbols-outlined text-lg">add</span>
-                    Novo Agendamento
-                  </Button>
-                </div>
-              )}
+
             </div>
           </Card>
         </div>

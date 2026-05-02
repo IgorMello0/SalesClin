@@ -283,7 +283,6 @@ const EquipeView = () => {
     { value: 'atendente', label: 'Atendimento' },
     { value: 'recepcao', label: 'Recepção' },
     { value: 'financeiro', label: 'Financeiro' },
-    { value: 'admin', label: 'Administrador' },
   ];
 
   const loadTeam = async () => {
@@ -893,11 +892,11 @@ const Settings = () => {
 
       {/* THE DRAWING SHEET CONFIG MENU (The Magic Drawer) */}
       <Sheet open={!!selectedSetting} onOpenChange={(open) => !open && setSelectedSetting(null)}>
-        <SheetContent className="w-[90vw] sm:max-w-md md:max-w-xl overflow-y-auto p-0 flex flex-col border-l shadow-2xl">
+        <SheetContent className="w-[90vw] sm:max-w-md md:max-w-xl p-0 flex flex-col border-l shadow-2xl">
           {selectedSetting && (
             <>
               {/* Sheet Header Custom */}
-              <div className="px-6 py-6 border-b bg-zinc-50/80 sticky top-0 z-10 backdrop-blur pb-6">
+              <div className="px-6 py-6 border-b bg-zinc-50/80 z-10 backdrop-blur pb-6 shrink-0">
                 <SheetHeader>
                   <SheetTitle className="text-2xl font-bold flex items-center gap-2">
                     {selectedSetting.name}
@@ -909,12 +908,12 @@ const Settings = () => {
               </div>
               
               {/* Variable Content injected via Map */}
-              <div className="flex-1 p-6">
+              <div className="flex-1 p-6 overflow-y-auto min-h-0">
                 {ActiveView && <ActiveView name={selectedSetting.name} />}
               </div>
 
               {/* Universal Footer Action if applicable or just aesthetic spacer */}
-              <div className="p-4 bg-zinc-50 border-t mt-auto text-xs text-center text-muted-foreground">
+              <div className="p-4 bg-zinc-50 border-t mt-auto text-xs text-center text-muted-foreground shrink-0">
                 Módulo Auraia CRM v1.0.5 - Configurações protegidas.
               </div>
             </>
