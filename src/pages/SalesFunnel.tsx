@@ -57,11 +57,9 @@ interface Lead {
   lastUpdate: string;
   phone: string;
   email: string;
-  age: number;
   activities: Activity[];
   isScheduled?: boolean;
-  observations?: string;
-  city?: string;
+  notes?: string;
   responsible?: string;
   tags?: string[];
   justification?: string;
@@ -105,7 +103,7 @@ const SalesFunnel = () => {
   const [isAddingLead, setIsAddingLead] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [newLeadStage, setNewLeadStage] = useState<string | null>(null);
-  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: '', phone: '', email: '', socialMedia: '' });
+  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: '', phone: '', email: '' });
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -136,6 +134,7 @@ const SalesFunnel = () => {
     justificationType: '' as 'desconto' | 'remocao' | ''
   });
   const [allProfessionals, setAllProfessionals] = useState<any[]>([]);
+  const [specialists, setSpecialists] = useState<any[]>([]);
   const [showJustification, setShowJustification] = useState(false);
   const [removedTags, setRemovedTags] = useState<string[]>([]);
 
@@ -156,7 +155,21 @@ const SalesFunnel = () => {
           id: l.id.toString(),
           isScheduled: l.isScheduled || l.is_scheduled, // Handle both just in case
           lastUpdate: 'Recent',
-          activities: l.activities || []
+          activities: (l.activities || []).map((a: any) => {
+            const isNote = a.type === 'nota' || a.type === 'task';
+            const isProposal = a.type === 'proposta' || a.type === 'proposal';
+            
+            return {
+              id: a.id.toString(),
+              type: isNote ? 'task' : isProposal ? 'proposal' : 'system',
+              user: a.createdBy || 'Sistema',
+              action: isNote ? 'fez uma anotação' : isProposal ? 'gerou uma proposta comercial' : 'ação no sistema',
+              content: a.content,
+              date: format(new Date(a.createdAt), "dd/MM/yy 'às' HH:mm", { locale: ptBR }),
+              icon: isNote ? 'edit_note' : isProposal ? 'description' : 'info',
+              color: isNote ? 'bg-[#FF7A00]' : isProposal ? 'bg-orange-500' : 'bg-blue-400'
+            };
+          })
         }));
         setLeads(mappedLeads);
       }
@@ -188,11 +201,28 @@ const SalesFunnel = () => {
     }
   };
 
+  const loadUsuarios = async () => {
+    try {
+      const { usuariosApi } = await import('@/lib/api');
+      const res = await usuariosApi.getAll();
+      if (res.success && res.data) {
+        const medics = res.data.filter((u: any) => {
+          const role = (u.role || '').toLowerCase();
+          return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
+        });
+        setSpecialists(medics);
+      }
+    } catch (e) {
+      console.error("Error loading usuarios:", e);
+    }
+  };
+
   useEffect(() => {
     if (professional) {
       loadLeads();
       loadServices();
       loadProfessionals();
+      loadUsuarios();
     }
   }, [professional]);
 
@@ -313,7 +343,6 @@ const SalesFunnel = () => {
         name: newLeadData.name,
         phone: newLeadData.phone,
         email: newLeadData.email,
-        socialMedia: newLeadData.socialMedia,
         value: Number(newLeadData.value.toString().replace(/\./g, "")) || 0,
         origin: newLeadData.origin,
         status: newLeadStage || 'prospect_lead',
@@ -326,7 +355,7 @@ const SalesFunnel = () => {
         toast({ title: "Lead Criado!", description: "O lead foi salvo no banco de dados." });
         loadLeads();
         setIsAddingLead(false);
-        setNewLeadData({ name: '', value: '', origin: '', phone: '', email: '', socialMedia: '' });
+        setNewLeadData({ name: '', value: '', origin: '', phone: '', email: '' });
       } else {
         toast({ 
           title: "Erro ao criar lead", 
@@ -343,34 +372,26 @@ const SalesFunnel = () => {
   // Note state
   const [noteText, setNoteText] = useState('');
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!noteText.trim() || !selectedLead) return;
 
-    const newActivity: Activity = {
-      id: Math.random().toString(),
-      type: 'task',
-      user: professional?.name || 'Consultor',
-      action: 'fez uma anotação',
-      content: noteText,
-      date: format(new Date(), "dd/MM/yy 'às' HH:mm", { locale: ptBR }),
-      icon: 'edit_note',
-      color: 'bg-[#FF7A00]' // Brand Orange
-    };
+    try {
+      const res = await leadsApi.addActivity(Number(selectedLead.id), {
+        type: 'nota',
+        content: noteText,
+        createdBy: professional?.name || 'Consultor'
+      });
 
-    setLeads(prev => prev.map(l => {
-      if (l.id === selectedLead.id) {
-        return { ...l, activities: [...l.activities, newActivity] };
+      if (res.success) {
+        toast({ title: 'Nota salva com sucesso!' });
+        loadLeads(); // Recarrega para atualizar a linha do tempo e selectedLead
+        setNoteText('');
+      } else {
+        toast({ title: 'Erro ao salvar nota', description: res.error?.message, variant: 'destructive' });
       }
-      return l;
-    }));
-
-    // Local selectedLead state update
-    setSelectedLead({
-      ...selectedLead,
-      activities: [...selectedLead.activities, newActivity]
-    });
-
-    setNoteText('');
+    } catch (e) {
+      toast({ title: 'Erro de conexão', variant: 'destructive' });
+    }
   };
 
   const handleSaveProposal = async () => {
@@ -427,6 +448,35 @@ const SalesFunnel = () => {
 
     // Persist in DB
     try {
+      // 1. Salvar a Proposta Oficial no banco
+      const proposalRes = await leadsApi.addProposal(Number(proposalLeadId), {
+        title: proposalData.title || `Proposta para ${lead.name}`,
+        value: newValue,
+        validUntil: proposalData.validUntil || new Date().toISOString(),
+        salespersonId: proposalData.salesperson,
+        specialistId: proposalData.specialist,
+        tags: proposalData.tags,
+        justification: proposalData.justification,
+        discountApplied: discountApplied
+      });
+
+      // 2. Salvar Atividade correspondente (Proposta gerada)
+      await leadsApi.addActivity(Number(proposalLeadId), {
+        type: 'proposta',
+        content: `${proposalData.treatment || proposalData.title} - Valor: ${newValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
+        createdBy: professional?.name || 'Vendedor'
+      });
+
+      // 3. Se houve remarketing, salvar como atividade
+      if (remarketingData) {
+        await leadsApi.addActivity(Number(proposalLeadId), {
+          type: 'sistema',
+          content: `Itens removidos da proposta: ${removedTags.join(', ')}`,
+          createdBy: 'Sistema'
+        });
+      }
+
+      // 4. Atualizar os dados principais do Lead
       const updateData: any = {
         status: 'comercial_proposal',
         value: newValue,
@@ -442,25 +492,14 @@ const SalesFunnel = () => {
 
       await leadsApi.update(Number(proposalLeadId), updateData);
       
-      // Update UI
-      setLeads(prev => prev.map(l => {
-        if (l.id === proposalLeadId) {
-          return { 
-            ...l, 
-            status: 'comercial_proposal',
-            value: newValue,
-            tags: proposalData.tags,
-            activities: [...l.activities, newActivity] 
-          };
-        }
-        return l;
-      }));
-
-      toast({ title: "Sucesso", description: "Proposta salva com as novas regras." });
+      toast({ title: "Proposta Salva e Lead Atualizado!" });
+      loadLeads();
+      setIsCreatingProposal(false);
+      setProposalLeadId(null);
     } catch (e) {
-      console.error(e);
-      toast({ title: "Erro", description: "Erro ao atualizar lead no servidor.", variant: "destructive" });
+      toast({ title: 'Erro ao salvar proposta', variant: 'destructive' });
     }
+
 
     setIsCreatingProposal(false);
     setShowJustification(false);
@@ -809,28 +848,16 @@ const SalesFunnel = () => {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">E-mail</Label>
-                <Input 
-                  id="email" 
-                  type="email"
-                  placeholder="email@exemplo.com" 
-                  className="rounded-xl border-slate-200 h-12"
-                  value={newLeadData.email}
-                  onChange={(e) => setNewLeadData({...newLeadData, email: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="socialMedia" className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Rede Social</Label>
-                <Input 
-                  id="socialMedia" 
-                  placeholder="@usuario" 
-                  className="rounded-xl border-slate-200 h-12"
-                  value={newLeadData.socialMedia}
-                  onChange={(e) => setNewLeadData({...newLeadData, socialMedia: e.target.value})}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">E-mail</Label>
+              <Input 
+                id="email" 
+                type="email"
+                placeholder="email@exemplo.com" 
+                className="rounded-xl border-slate-200 h-12"
+                value={newLeadData.email}
+                onChange={(e) => setNewLeadData({...newLeadData, email: e.target.value})}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="value" className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Estimado (R$)</Label>
@@ -889,7 +916,7 @@ const SalesFunnel = () => {
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</p>
                         <p className="text-sm font-bold text-primary">{selectedLead.phone}</p>
@@ -897,10 +924,6 @@ const SalesFunnel = () => {
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</p>
                         <p className="text-sm font-bold text-primary truncate max-w-[150px]">{selectedLead.email}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Idade</p>
-                        <p className="text-sm font-bold text-primary">{selectedLead.age} anos</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor do Lead</p>
@@ -918,8 +941,8 @@ const SalesFunnel = () => {
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Observações do Sistema</h4>
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      <p className={cn("text-xs leading-relaxed italic", selectedLead.observations ? "text-slate-600" : "text-slate-400")}>
-                        {selectedLead.observations || "Nenhuma observação registrada para este lead no momento."}
+                      <p className={cn("text-xs leading-relaxed italic", selectedLead.notes ? "text-slate-600" : "text-slate-400")}>
+                        {selectedLead.notes || "Nenhuma observação registrada para este lead no momento."}
                       </p>
                     </div>
                   </div>
@@ -927,10 +950,6 @@ const SalesFunnel = () => {
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Detalhes Adicionais</h4>
                     <div className="space-y-3">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400">Cidade</span>
-                        <span className="font-bold text-primary">{selectedLead.city || "Não informada"}</span>
-                      </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">Conversão de Origem</span>
                         <span className="font-bold text-secondary">{selectedLead.origin || "Não informado"}</span>
@@ -1085,7 +1104,7 @@ const SalesFunnel = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {allProfessionals.map(p => (
-                      <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1129,9 +1148,11 @@ const SalesFunnel = () => {
                     <SelectValue placeholder="Selecione o especialista" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Dr. Henrique Santos">Dr. Henrique Santos</SelectItem>
-                    <SelectItem value="Dra. Marina Oliveira">Dra. Marina Oliveira</SelectItem>
-                    <SelectItem value="Dr. Ricardo Lima">Dr. Ricardo Lima</SelectItem>
+                    {specialists.length > 0 ? specialists.map(p => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    )) : (
+                      <SelectItem value="none" disabled>Nenhum especialista encontrado</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

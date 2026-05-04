@@ -1,0 +1,1 @@
+import { prisma } from './server/prisma'; async function run() { const inactiveCodes = ['relatorios', 'pagamentos', 'conversas', 'catalogos', 'contratos', 'test']; const res = await prisma.module.updateMany({ where: { code: { in: inactiveCodes } }, data: { isActive: false } }); console.log('Modules disabled:', res.count); } run().finally(()=>prisma.$disconnect());

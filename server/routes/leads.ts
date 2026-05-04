@@ -35,6 +35,10 @@ router.get('/', auth(false), async (req, res) => {
         where,
         skip,
         take,
+        include: {
+          activities: { orderBy: { createdAt: 'asc' } },
+          proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } }
+        },
         orderBy: { updatedAt: 'desc' }
       }),
       prisma.lead.count({ where })
@@ -51,7 +55,11 @@ router.get('/:id', auth(false), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const item = await prisma.lead.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        activities: { orderBy: { createdAt: 'asc' } },
+        proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } }
+      }
     })
     if (!item) return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
     res.json(createSuccessResponse(item))
@@ -64,7 +72,7 @@ router.get('/:id', auth(false), async (req, res) => {
 // Criar novo lead
 router.post('/', auth(), async (req, res) => {
   try {
-    const { professional_id, name, value, origin, status, avatar, phone, email, socialMedia, age, observations, city, responsible } = req.body
+    const { professional_id, name, value, origin, status, avatar, phone, email, notes, responsible } = req.body
     
     if (!professional_id || !name) {
       return res.status(400).json(createErrorResponse('professional_id e name são obrigatórios', 400))
@@ -80,10 +88,7 @@ router.post('/', auth(), async (req, res) => {
         avatar, 
         phone, 
         email, 
-        socialMedia,
-        age: Number(age) || null, 
-        observations, 
-        city, 
+        notes, 
         responsible 
       }
     })
@@ -96,6 +101,55 @@ router.post('/', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[Leads] Erro ao criar lead:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar lead', 500))
+  }
+})
+
+// Adicionar Atividade ao Lead
+router.post('/:id/activities', auth(), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const { type, content, createdBy } = req.body
+    
+    const activity = await prisma.leadActivity.create({
+      data: {
+        leadId: id,
+        type,
+        content,
+        createdBy
+      }
+    })
+    
+    res.status(201).json(createSuccessResponse(activity))
+  } catch (error: any) {
+    console.error('[Leads] Erro ao criar atividade:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao criar atividade', 500))
+  }
+})
+
+// Adicionar Proposta ao Lead
+router.post('/:id/proposals', auth(), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const { title, value, validUntil, salespersonId, specialistId, tags, justification, discountApplied } = req.body
+    
+    const proposal = await prisma.proposal.create({
+      data: {
+        leadId: id,
+        title,
+        value: Number(value) || 0,
+        validUntil: new Date(validUntil),
+        salespersonId: salespersonId ? Number(salespersonId) : null,
+        specialistId: specialistId ? Number(specialistId) : null,
+        tags: tags || [],
+        justification,
+        discountApplied: Boolean(discountApplied)
+      }
+    })
+    
+    res.status(201).json(createSuccessResponse(proposal))
+  } catch (error: any) {
+    console.error('[Leads] Erro ao criar proposta:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao criar proposta', 500))
   }
 })
 
@@ -115,7 +169,6 @@ router.put('/:id', auth(), async (req, res) => {
       prismaData.isScheduled = Boolean(data.is_scheduled)
       delete prismaData.is_scheduled
     }
-    if (data.age !== undefined) prismaData.age = Number(data.age)
     if (data.value !== undefined) prismaData.value = Number(data.value)
     if (data.isPaid !== undefined) {
       prismaData.isPaid = Boolean(data.isPaid)
@@ -148,7 +201,8 @@ router.put('/:id', auth(), async (req, res) => {
           name: currentLead.name,
           email: currentLead.email || null,
           phone: currentLead.phone || null,
-          notes: currentLead.observations || null,
+          notes: currentLead.notes || null,
+          avatar: currentLead.avatar || null,
         }
       })
 

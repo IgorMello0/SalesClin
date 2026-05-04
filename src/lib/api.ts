@@ -207,6 +207,8 @@ export const leadsApi = {
   create: async (data: any) => apiRequest<any>('/leads', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) => apiRequest<any>(`/leads/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/leads/${id}`, { method: 'DELETE' }),
+  addActivity: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/activities`, { method: 'POST', body: JSON.stringify(data) }),
+  addProposal: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/proposals`, { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // Catálogos

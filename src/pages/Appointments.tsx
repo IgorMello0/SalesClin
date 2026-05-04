@@ -120,7 +120,11 @@ const Appointments = () => {
   const getDisplayDates = () => {
     if (viewMode === 'dia') return [selectedDate];
     if (viewMode === 'semana') return weekDays;
-    return eachDayOfInterval({ start: startOfMonth(currentWeek), end: endOfMonth(currentWeek) });
+    
+    // Para alinhar corretamente o grid de Mês (iniciando no domingo)
+    const start = startOfWeek(startOfMonth(currentWeek), { weekStartsOn: 0 });
+    const end = endOfWeek(endOfMonth(currentWeek), { weekStartsOn: 0 });
+    return eachDayOfInterval({ start, end });
   };
 
   const filteredAppointments = appointments.filter(apt =>
@@ -178,24 +182,24 @@ const Appointments = () => {
       </div>
 
       {/* ── Stats Row ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 relative z-10">
         {stats.map((s) => (
-          <Card key={s.label} className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-blue-50 text-accent rounded-lg">
-                <span className="material-symbols-outlined text-xl">{s.icon}</span>
+          <div key={s.label} className="premium-card p-6">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{s.label}</div>
+              <div className="p-2 bg-blue-50 text-accent rounded-xl">
+                <span className="material-symbols-outlined text-lg">{s.icon}</span>
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">{s.label}</p>
-              <h3 className="text-2xl font-extrabold text-primary font-headline">{s.value}</h3>
+            <div className="pt-2">
+              <div className="stats-value">{s.value}</div>
+              <p className="text-[10px] text-slate-500 font-medium mt-1">
+                {s.label === 'Hoje' ? 'agendados para hoje' : 
+                 s.label === 'Confirmados' ? 'já confirmados' : 
+                 s.label === 'Pendentes' ? 'aguardando' : 'no sistema'}
+              </p>
             </div>
-            <div className="mt-6">
-              <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-                <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: s.value > 0 ? '100%' : '0%' }} />
-              </div>
-            </div>
-          </Card>
+          </div>
         ))}
       </div>
 
@@ -314,15 +318,16 @@ const Appointments = () => {
               )}
 
               {!isLoading && viewMode === 'dia' && (
-                <div>
-                  <div className="grid grid-cols-[64px_1fr] sticky top-0 z-10 bg-primary/5 border-b border-slate-100">
+                <div className="flex flex-col h-[calc(100vh-240px)] min-h-[500px] border border-slate-100 rounded-xl bg-white shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-[64px_1fr] bg-primary/5 border-b border-slate-100 shrink-0">
                     <div className="p-3 text-xs text-muted-foreground border-r border-slate-100" />
                     <div className="p-3">
                       <div className="text-sm font-black text-primary">{format(selectedDate, 'EEEE', { locale: ptBR })}</div>
                       <div className="text-xs text-muted-foreground">{filteredAppointments.filter(apt => isSameDay(apt.date, selectedDate)).length} agendamentos</div>
                     </div>
                   </div>
-                  <div className="relative mt-2">
+                  <div className="flex-1 overflow-y-auto pb-6 relative">
+                    <div className="relative">
                     {/* Grid de Fundo */}
                     <div>
                       {timeSlots.slice(7, 20).map((time) => (
@@ -384,12 +389,13 @@ const Appointments = () => {
                       })}
                     </div>
                   </div>
+                  </div>
                 </div>
               )}
 
               {!isLoading && viewMode === 'semana' && (
-                <div className="overflow-x-auto">
-                  <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] sticky top-0 z-10 bg-primary/5 border-b border-slate-100">
+                <div className="flex flex-col h-[calc(100vh-240px)] min-h-[500px] border border-slate-100 rounded-xl bg-white shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] bg-primary/5 border-b border-slate-100 shrink-0">
                     <div className="p-2 border-r border-slate-100" />
                     {weekDays.map((day, idx) => {
                       const isToday = isSameDay(day, new Date());
@@ -403,7 +409,8 @@ const Appointments = () => {
                       );
                     })}
                   </div>
-                  <div className="relative mt-2">
+                  <div className="flex-1 overflow-y-auto pb-6 relative">
+                    <div className="relative">
                     {/* Grid de Fundo da Semana */}
                     <div>
                       {timeSlots.slice(7, 20).map((time) => (
@@ -451,6 +458,7 @@ const Appointments = () => {
                       })}
                     </div>
                   </div>
+                  </div>
                 </div>
               )}
 
@@ -465,10 +473,11 @@ const Appointments = () => {
                     {getDisplayDates().map((date) => {
                       const dateApts = filteredAppointments.filter(apt => isSameDay(apt.date, date));
                       const isToday = isSameDay(date, new Date());
+                      const isCurrentMonth = date.getMonth() === currentWeek.getMonth();
                       return (
                         <div
                           key={date.toISOString()}
-                          className={`min-h-[90px] p-1.5 bg-white cursor-pointer hover:bg-primary/3 transition-colors ${isToday ? 'ring-2 ring-inset ring-secondary/60' : ''}`}
+                          className={`min-h-[90px] p-1.5 bg-white cursor-pointer hover:bg-primary/3 transition-colors ${isToday ? 'ring-2 ring-inset ring-secondary/60' : ''} ${!isCurrentMonth ? 'opacity-40 bg-slate-50' : ''}`}
                           onClick={() => { setSelectedDate(date); setViewMode('dia'); }}
                         >
                           <div className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-secondary text-white' : 'text-slate-600'}`}>

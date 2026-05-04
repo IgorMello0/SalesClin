@@ -136,6 +136,9 @@ model Client {
   phone          String?
   dateOfBirth    DateTime? @map("date_of_birth")
   document       String?
+  avatar         String?
+  socialMedia    String?   @map("social_media")
+  city           String?
   notes          String?
   tags           String[]  @default([])
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -164,11 +167,8 @@ model Lead {
   status                String
   phone                 String?
   email                 String?
-  socialMedia           String?      @map("social_media")
   tags                  String[]     @default([])
-  age                   Int?
-  observations          String?      @db.Text
-  city                  String?
+  notes                 String?      @db.Text
   responsible           String?
   isScheduled           Boolean      @default(false) @map("is_scheduled")
   justification         String?      @db.Text
@@ -184,8 +184,47 @@ model Lead {
   professional          Professional @relation(fields: [professionalId], references: [id])
   convertedToClient     Client?      @relation(fields: [convertedToClientId], references: [id])
   appointments          Appointment[]
+  activities            LeadActivity[]
+  proposals             Proposal[]
 
   @@map("leads")
+}
+
+// Histórico de atividades e anotações do Lead
+model LeadActivity {
+  id          Int      @id @default(autoincrement())
+  leadId      Int      @map("lead_id")
+  type        String   // 'nota', 'proposta', 'sistema', 'contato'
+  content     String   @db.Text
+  createdBy   String?  @map("created_by") // Nome de quem criou ou sistema
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("lead_activities")
+}
+
+// Propostas Comerciais geradas para o Lead
+model Proposal {
+  id              Int      @id @default(autoincrement())
+  leadId          Int      @map("lead_id")
+  title           String
+  value           Decimal  @db.Decimal(10, 2)
+  validUntil      DateTime @map("valid_until")
+  salespersonId   Int?     @map("salesperson_id")
+  specialistId    Int?     @map("specialist_id")
+  tags            String[] @default([])
+  status          String   @default("pending") // 'pending', 'accepted', 'rejected'
+  justification   String?  @db.Text
+  discountApplied Boolean  @default(false) @map("discount_applied")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  salesperson     Usuario? @relation("SalespersonProposals", fields: [salespersonId], references: [id])
+  specialist      Usuario? @relation("SpecialistProposals", fields: [specialistId], references: [id])
+
+  @@map("proposals")
 }
 
 // Categorias de serviços ou produtos oferecidos pelos profissionais
@@ -437,6 +476,8 @@ model Usuario {
   // Relacionamentos
   company      Empresa           @relation(fields: [companyId], references: [id])
   permissions  UserPermission[]
+  proposalsAsSalesperson Proposal[] @relation("SalespersonProposals")
+  proposalsAsSpecialist  Proposal[] @relation("SpecialistProposals")
 
   @@map("usuarios")
 }
