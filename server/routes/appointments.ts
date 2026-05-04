@@ -200,11 +200,18 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
 
   const updated = await prisma.appointment.update({
     where: { id },
-    data: { professionalId, clientId, serviceId, startTime, endTime, status, notes }
+    data: { professionalId, clientId, serviceId, startTime, endTime, status, notes },
+    include: { lead: true }
   })
   
   if (req.user?.type === 'profissional') {
     logAudit(req.user.id, 'ATUALIZAR_AGENDAMENTO', 'Appointment', id)
+  }
+
+  // Update Lead's isScheduled status
+  if (updated.leadId) {
+    // Keep isScheduled true even for cancelled/completed so the funnel can show the specific badge
+    await prisma.lead.update({ where: { id: updated.leadId }, data: { isScheduled: true } })
   }
   
   res.json(createSuccessResponse(updated))

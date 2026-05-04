@@ -37,7 +37,8 @@ router.get('/', auth(false), async (req, res) => {
         take,
         include: {
           activities: { orderBy: { createdAt: 'asc' } },
-          proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } }
+          proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } },
+          appointments: { orderBy: { startTime: 'desc' }, take: 1 }
         },
         orderBy: { updatedAt: 'desc' }
       }),

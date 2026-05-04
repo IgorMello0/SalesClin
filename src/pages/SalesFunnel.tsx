@@ -66,6 +66,7 @@ interface Lead {
   discountApplied?: boolean;
   remarketingProposals?: any[];
   isPaid?: boolean;
+  appointments?: any[];
 }
 
 const initialLeads: Lead[] = [];
@@ -241,10 +242,13 @@ const SalesFunnel = () => {
   };
 
   const handleScheduleAppointment = async (lead: Lead) => {
-    if (lead.isScheduled) {
+    const lastAppt = lead.appointments && lead.appointments[0];
+    const isActuallyCanceled = lastAppt?.status === 'cancelado';
+
+    if (lead.isScheduled && !isActuallyCanceled) {
       toast({
         title: "Já Agendado",
-        description: "Este lead já possui um agendamento vinculado.",
+        description: "Este lead já possui um agendamento ativo.",
       });
       return;
     }
@@ -681,12 +685,44 @@ const SalesFunnel = () => {
                     {/* Stage specific acts */}
                     <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-slate-100">
                       {stage.id === 'prospect_scheduled' && (
-                        lead.isScheduled ? (
-                          <div className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-100">
-                            Agendado
-                            <span className="material-symbols-outlined text-xs">check_circle</span>
-                          </div>
-                        ) : (
+                        lead.isScheduled ? (() => {
+                          const lastAppt = lead.appointments && lead.appointments[0];
+                          const apptStatus = lastAppt?.status || 'agendado';
+                          
+                          switch(apptStatus) {
+                            case 'concluido':
+                              return (
+                                <div className="w-full py-2 bg-sky-50 text-sky-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-sky-100">
+                                  Compareceu
+                                  <span className="material-symbols-outlined text-xs">check_circle</span>
+                                </div>
+                              );
+                            case 'cancelado':
+                              return (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
+                                  className="w-full py-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100"
+                                >
+                                  Faltou / Reagendar
+                                  <span className="material-symbols-outlined text-xs">event_busy</span>
+                                </button>
+                              );
+                            case 'confirmado':
+                              return (
+                                <div className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-100">
+                                  Confirmado
+                                  <span className="material-symbols-outlined text-xs">verified</span>
+                                </div>
+                              );
+                            default:
+                              return (
+                                <div className="w-full py-2 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-amber-100">
+                                  Agendado
+                                  <span className="material-symbols-outlined text-xs">schedule</span>
+                                </div>
+                              );
+                          }
+                        })() : (
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
                             disabled={isProcessingSchedule}

@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale';
 import { appointmentsApi, professionalsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NewAppointmentModal } from '@/components/NewAppointmentModal';
+import { AppointmentQuickView } from '@/components/AppointmentQuickView';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Appointments = () => {
@@ -20,6 +21,7 @@ const Appointments = () => {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openModal, setOpenModal] = useState(false);
+  const [quickViewAptId, setQuickViewAptId] = useState<number | null>(null);
   const { toast } = useToast();
   const { professional } = useAuth();
   
@@ -356,6 +358,7 @@ const Appointments = () => {
                             key={apt.id}
                             className={`absolute left-2 right-4 rounded-xl border px-3 py-2 cursor-pointer hover:shadow-md transition-all overflow-hidden shadow-sm pointer-events-auto flex flex-col justify-center ${st.bg}`}
                             style={{ top: `${topOffset}px`, height: `${Math.max(height - 4, 36)}px`, zIndex: 10 }}
+                            onClick={() => setQuickViewAptId(apt.id)}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex flex-col gap-0.5">
@@ -442,6 +445,7 @@ const Appointments = () => {
                                   key={apt.id} 
                                   className={`absolute left-0.5 right-1 rounded-lg border px-1.5 py-1 cursor-pointer hover:shadow-md transition-all text-[10px] overflow-hidden shadow-sm pointer-events-auto flex flex-col ${st.bg}`}
                                   style={{ top: `${topOffset}px`, height: `${Math.max(height - 2, 24)}px`, zIndex: 10 }}
+                                  onClick={() => setQuickViewAptId(apt.id)}
                                 >
                                   <div className="flex items-center gap-1">
                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot} shrink-0`} />
@@ -487,7 +491,11 @@ const Appointments = () => {
                             {dateApts.slice(0, 3).map((apt) => {
                               const st = getStatusConfig(apt.status);
                               return (
-                                <div key={apt.id} className={`text-[10px] px-1.5 py-0.5 rounded border truncate ${st.bg}`}>
+                                <div 
+                                  key={apt.id} 
+                                  className={`text-[10px] px-1.5 py-0.5 rounded border truncate cursor-pointer hover:opacity-80 transition-opacity ${st.bg}`}
+                                  onClick={(e) => { e.stopPropagation(); setQuickViewAptId(apt.id); }}
+                                >
                                   <span className="font-bold">{apt.time}</span> {apt.clientName}
                                 </div>
                               );
@@ -514,6 +522,13 @@ const Appointments = () => {
         onOpenChange={setOpenModal}
         onSuccess={loadAppointments}
         initialDate={selectedDate}
+      />
+
+      <AppointmentQuickView
+        isOpen={!!quickViewAptId}
+        appointmentId={quickViewAptId}
+        onClose={() => setQuickViewAptId(null)}
+        onUpdate={loadAppointments}
       />
     </div>
   );

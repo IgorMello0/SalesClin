@@ -12,77 +12,77 @@ datasource db {
 // ==================== ENUMS ====================
 
 enum CategoryStatus {
-  ativo   // Categoria ativa
+  ativo // Categoria ativa
   inativo // Categoria inativa
 }
 
 enum CatalogItemStatus {
-  ativo    // Item de catálogo ativo
+  ativo // Item de catálogo ativo
   rascunho // Item de catálogo em rascunho
-  inativo  // Item de catálogo inativo
+  inativo // Item de catálogo inativo
 }
 
 enum AppointmentStatus {
-  agendado   // Agendamento marcado
+  agendado // Agendamento marcado
   confirmado // Agendamento confirmado
-  cancelado  // Agendamento cancelado
-  concluido  // Agendamento concluído
+  cancelado // Agendamento cancelado
+  concluido // Agendamento concluído
 }
 
 enum AppointmentLogAction {
-  created     // Agendamento criado
-  updated     // Agendamento atualizado
-  canceled    // Agendamento cancelado
+  created // Agendamento criado
+  updated // Agendamento atualizado
+  canceled // Agendamento cancelado
   rescheduled // Agendamento reagendado
 }
 
 enum UserActionType {
-  admin        // Ação realizada por um administrador
+  admin // Ação realizada por um administrador
   profissional // Ação realizada por um profissional
-  cliente      // Ação realizada por um cliente
+  cliente // Ação realizada por um cliente
 }
 
 enum PaymentMethod {
-  pix           // Pagamento via Pix
-  cartao        // Pagamento via cartão
-  dinheiro      // Pagamento em dinheiro
+  pix // Pagamento via Pix
+  cartao // Pagamento via cartão
+  dinheiro // Pagamento em dinheiro
   transferencia // Pagamento via transferência bancária
 }
 
 enum PaymentStatus {
-  pago      // Pagamento realizado
-  pendente  // Pagamento pendente
-  atrasado  // Pagamento atrasado
+  pago // Pagamento realizado
+  pendente // Pagamento pendente
+  atrasado // Pagamento atrasado
   cancelado // Pagamento cancelado
 }
 
 enum FichaType {
   anamnese // Ficha de anamnese
   evolucao // Ficha de evolução
-  laser    // Ficha de laser
+  laser // Ficha de laser
   estetica // Ficha de estética
 }
 
 enum ChatSender {
-  bot          // Remetente é um bot
-  cliente      // Remetente é um cliente
+  bot // Remetente é um bot
+  cliente // Remetente é um cliente
   profissional // Remetente é um profissional
 }
 
 enum ThemeType {
   light // Tema claro
-  dark  // Tema escuro
+  dark // Tema escuro
 }
 
 enum ContractTypeEnum {
-  mensal        // Contrato mensal
-  anual         // Contrato anual
+  mensal // Contrato mensal
+  anual // Contrato anual
   personalizado // Contrato personalizado
 }
 
 enum ContractStatus {
-  ativo     // Contrato ativo
-  expirado  // Contrato expirado
+  ativo // Contrato ativo
+  expirado // Contrato expirado
   cancelado // Contrato cancelado
 }
 
@@ -90,39 +90,39 @@ enum ContractStatus {
 
 // Armazena informações sobre os profissionais
 model Professional {
-  id               Int       @id @default(autoincrement())
-  name             String
-  email            String    @unique
-  passwordHash     String    @map("password_hash")
-  phone            String?
-  specialization   String?
-  photoUrl         String?   @map("photo_url")
-  companyId        Int?      @map("company_id")
-  companyName      String?   @map("company_name")
-  logoUrl          String?   @map("logo_url")
-  contractType     String?   @map("contract_type")
-  bio              String?   @db.Text
-  crm              String?
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  phone          String?
+  specialization String?
+  photoUrl       String?  @map("photo_url")
+  companyId      Int?     @map("company_id")
+  companyName    String?  @map("company_name")
+  logoUrl        String?  @map("logo_url")
+  contractType   String?  @map("contract_type")
+  bio            String?  @db.Text
+  crm            String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  company          Empresa?  @relation("CompanyProfessionals", fields: [companyId], references: [id])
-  ownedCompanies   Empresa[] @relation("CompanyOwner")
-  clients          Client[]
-  categories       Category[]
-  catalogItems     CatalogItem[]
-  appointments     Appointment[]
-  payments         Payment[]
-  fichaTemplates   FichaTemplate[]
-  fichas           Ficha[]
-  chatHistories    ChatHistory[]
-  settingsProfile  SettingsProfile?
-  auditLogs        AuditLog[]
-  contracts        Contract[]
-  conversas        Conversa[]
-  permissions      ProfessionalPermission[]
-  leads            Lead[]
+  company         Empresa?                 @relation("CompanyProfessionals", fields: [companyId], references: [id])
+  ownedCompanies  Empresa[]                @relation("CompanyOwner")
+  clients         Client[]
+  categories      Category[]
+  catalogItems    CatalogItem[]
+  appointments    Appointment[]
+  payments        Payment[]
+  fichaTemplates  FichaTemplate[]
+  fichas          Ficha[]
+  chatHistories   ChatHistory[]
+  settingsProfile SettingsProfile?
+  auditLogs       AuditLog[]
+  contracts       Contract[]
+  conversas       Conversa[]
+  permissions     ProfessionalPermission[]
+  leads           Lead[]
 
   @@map("professionals")
 }
@@ -145,61 +145,61 @@ model Client {
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional   Professional    @relation(fields: [professionalId], references: [id])
-  appointments   Appointment[]
-  payments       Payment[]
-  fichas         Ficha[]
-  chatHistories  ChatHistory[]
-  conversas      Conversa[]
-  originLead     Lead?           // Lead que originou este cliente
+  professional  Professional  @relation(fields: [professionalId], references: [id])
+  appointments  Appointment[]
+  payments      Payment[]
+  fichas        Ficha[]
+  chatHistories ChatHistory[]
+  conversas     Conversa[]
+  originLead    Lead? // Lead que originou este cliente
 
   @@map("clients")
 }
 
 // Leads para o funil de vendas (Prospecção)
 model Lead {
-  id                    Int          @id @default(autoincrement())
-  professionalId        Int          @map("professional_id")
-  name                  String
-  value                 Decimal      @default(0) @db.Decimal(10, 2)
-  origin                String?
-  avatar                String?
-  status                String
-  phone                 String?
-  email                 String?
-  tags                  String[]     @default([])
-  notes                 String?      @db.Text
-  responsible           String?
-  isScheduled           Boolean      @default(false) @map("is_scheduled")
-  justification         String?      @db.Text
-  discountApplied       Boolean      @default(false) @map("discount_applied")
-  remarketingProposals  Json?        @map("remarketing_proposals") // Array de propostas arquivadas
-  isPaid                Boolean      @default(false) @map("is_paid")
-  convertedToClientId   Int?         @unique @map("converted_to_client_id")
-  convertedAt           DateTime?    @map("converted_at")
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
+  id                   Int       @id @default(autoincrement())
+  professionalId       Int       @map("professional_id")
+  name                 String
+  value                Decimal   @default(0) @db.Decimal(10, 2)
+  origin               String?
+  avatar               String?
+  status               String
+  phone                String?
+  email                String?
+  tags                 String[]  @default([])
+  notes                String?   @db.Text
+  responsible          String?
+  isScheduled          Boolean   @default(false) @map("is_scheduled")
+  justification        String?   @db.Text
+  discountApplied      Boolean   @default(false) @map("discount_applied")
+  remarketingProposals Json?     @map("remarketing_proposals") // Array de propostas arquivadas
+  isPaid               Boolean   @default(false) @map("is_paid")
+  convertedToClientId  Int?      @unique @map("converted_to_client_id")
+  convertedAt          DateTime? @map("converted_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional          Professional @relation(fields: [professionalId], references: [id])
-  convertedToClient     Client?      @relation(fields: [convertedToClientId], references: [id])
-  appointments          Appointment[]
-  activities            LeadActivity[]
-  proposals             Proposal[]
+  professional      Professional   @relation(fields: [professionalId], references: [id])
+  convertedToClient Client?        @relation(fields: [convertedToClientId], references: [id])
+  appointments      Appointment[]
+  activities        LeadActivity[]
+  proposals         Proposal[]
 
   @@map("leads")
 }
 
 // Histórico de atividades e anotações do Lead
 model LeadActivity {
-  id          Int      @id @default(autoincrement())
-  leadId      Int      @map("lead_id")
-  type        String   // 'nota', 'proposta', 'sistema', 'contato'
-  content     String   @db.Text
-  createdBy   String?  @map("created_by") // Nome de quem criou ou sistema
-  createdAt   DateTime @default(now()) @map("created_at")
+  id        Int      @id @default(autoincrement())
+  leadId    Int      @map("lead_id")
+  type      String // 'nota', 'proposta', 'sistema', 'contato'
+  content   String   @db.Text
+  createdBy String?  @map("created_by") // Nome de quem criou ou sistema
+  createdAt DateTime @default(now()) @map("created_at")
 
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@map("lead_activities")
 }
@@ -220,9 +220,9 @@ model Proposal {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  salesperson     Usuario? @relation("SalespersonProposals", fields: [salespersonId], references: [id])
-  specialist      Usuario? @relation("SpecialistProposals", fields: [specialistId], references: [id])
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  salesperson Usuario? @relation("SalespersonProposals", fields: [salespersonId], references: [id])
+  specialist  Usuario? @relation("SpecialistProposals", fields: [specialistId], references: [id])
 
   @@map("proposals")
 }
@@ -238,8 +238,8 @@ model Category {
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional   Professional   @relation(fields: [professionalId], references: [id])
-  catalogItems   CatalogItem[]
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  catalogItems CatalogItem[]
 
   @@map("categories")
 }
@@ -259,9 +259,9 @@ model CatalogItem {
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional    Professional      @relation(fields: [professionalId], references: [id])
-  category        Category?         @relation(fields: [categoryId], references: [id])
-  appointments    Appointment[]
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  appointments Appointment[]
 
   @@map("catalog_items")
 }
@@ -281,12 +281,12 @@ model Appointment {
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional      Professional      @relation(fields: [professionalId], references: [id])
-  client            Client?           @relation(fields: [clientId], references: [id])
-  lead              Lead?             @relation(fields: [leadId], references: [id])
-  service           CatalogItem?      @relation(fields: [serviceId], references: [id])
-  appointmentLogs   AppointmentLog[]
-  payments          Payment[]
+  professional    Professional     @relation(fields: [professionalId], references: [id])
+  client          Client?          @relation(fields: [clientId], references: [id])
+  lead            Lead?            @relation(fields: [leadId], references: [id])
+  service         CatalogItem?     @relation(fields: [serviceId], references: [id])
+  appointmentLogs AppointmentLog[]
+  payments        Payment[]
 
   @@map("appointments")
 }
@@ -302,7 +302,7 @@ model AppointmentLog {
   updatedAt     DateTime             @updatedAt @map("updated_at")
 
   // Relacionamentos
-  appointment   Appointment          @relation(fields: [appointmentId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
 
   @@map("appointment_logs")
 }
@@ -322,9 +322,9 @@ model Payment {
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   // Relacionamentos
-  appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
-  client          Client        @relation(fields: [clientId], references: [id])
-  professional    Professional  @relation(fields: [professionalId], references: [id])
+  appointment  Appointment? @relation(fields: [appointmentId], references: [id])
+  client       Client       @relation(fields: [clientId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
 
   @@map("payments")
 }
@@ -341,27 +341,27 @@ model FichaTemplate {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  creator     Professional @relation(fields: [createdBy], references: [id])
-  fichas      Ficha[]
+  creator Professional @relation(fields: [createdBy], references: [id])
+  fichas  Ficha[]
 
   @@map("ficha_templates")
 }
 
 // Fichas preenchidas para clientes
 model Ficha {
-  id             Int           @id @default(autoincrement())
-  clientId       Int           @map("client_id")
-  professionalId Int           @map("professional_id")
+  id             Int       @id @default(autoincrement())
+  clientId       Int       @map("client_id")
+  professionalId Int       @map("professional_id")
   type           FichaType
-  templateId     Int?          @map("template_id")
+  templateId     Int?      @map("template_id")
   content        Json
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
-  client         Client        @relation(fields: [clientId], references: [id])
-  professional   Professional  @relation(fields: [professionalId], references: [id])
-  template       FichaTemplate? @relation(fields: [templateId], references: [id])
+  client       Client         @relation(fields: [clientId], references: [id])
+  professional Professional   @relation(fields: [professionalId], references: [id])
+  template     FichaTemplate? @relation(fields: [templateId], references: [id])
 
   @@map("fichas")
 }
@@ -379,25 +379,25 @@ model ChatHistory {
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
   // Relacionamentos
-  client         Client?       @relation(fields: [clientId], references: [id])
-  professional   Professional  @relation(fields: [professionalId], references: [id])
+  client       Client?      @relation(fields: [clientId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
 
   @@map("chat_histories")
 }
 
 // Configurações de perfil para profissionais
 model SettingsProfile {
-  id             Int        @id @default(autoincrement())
-  professionalId Int        @unique @map("professional_id")
-  theme          ThemeType  @default(light)
-  signatureUrl   String?    @map("signature_url")
+  id             Int       @id @default(autoincrement())
+  professionalId Int       @unique @map("professional_id")
+  theme          ThemeType @default(light)
+  signatureUrl   String?   @map("signature_url")
   preferences    Json?
   language       String?
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional   Professional @relation(fields: [professionalId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
 
   @@map("settings_profile")
 }
@@ -414,7 +414,7 @@ model AuditLog {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  user        Professional @relation(fields: [userId], references: [id])
+  user Professional @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
 }
@@ -432,31 +432,31 @@ model Contract {
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional   Professional     @relation(fields: [professionalId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
 
   @@map("contracts")
 }
 
 // Informações sobre as empresas que utilizam a plataforma
 model Empresa {
-  id           Int           @id @default(autoincrement())
-  ownerId      Int?          @map("owner_id") // ID do profissional dono
-  name         String        // Nome da empresa
-  logoUrl      String?       @map("logo_url") // Logo da empresa
-  domain       String?       // Domínio da empresa
-  whatsapp     String?
-  apiKey       String?       @map("api_key")
-  plan         String?       // Plano de assinatura da empresa
-  isActive     Boolean       @default(true) @map("is_active") // Indica se a empresa está ativa
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  id        Int      @id @default(autoincrement())
+  ownerId   Int?     @map("owner_id") // ID do profissional dono
+  name      String // Nome da empresa
+  logoUrl   String?  @map("logo_url") // Logo da empresa
+  domain    String? // Domínio da empresa
+  whatsapp  String?
+  apiKey    String?  @map("api_key")
+  plan      String? // Plano de assinatura da empresa
+  isActive  Boolean  @default(true) @map("is_active") // Indica se a empresa está ativa
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  owner        Professional? @relation("CompanyOwner", fields: [ownerId], references: [id])
+  owner         Professional?  @relation("CompanyOwner", fields: [ownerId], references: [id])
   professionals Professional[] @relation("CompanyProfessionals")
-  usuarios     Usuario[]
-  agentesIa    AgenteIa[]
-  conversas    Conversa[]
+  usuarios      Usuario[]
+  agentesIa     AgenteIa[]
+  conversas     Conversa[]
 
   @@map("empresas")
 }
@@ -465,19 +465,19 @@ model Empresa {
 model Usuario {
   id           Int      @id @default(autoincrement())
   companyId    Int      @map("company_id")
-  name         String   // Nome do usuário
+  name         String // Nome do usuário
   email        String   @unique
   passwordHash String   @map("password_hash") // Hash da senha do usuário
-  role         String?  // Função do usuário (admin, atendente, suporte, etc.)
+  role         String? // Função do usuário (admin, atendente, suporte, etc.)
   isActive     Boolean  @default(true) @map("is_active") // Indica se o usuário está ativo
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  company      Empresa           @relation(fields: [companyId], references: [id])
-  permissions  UserPermission[]
-  proposalsAsSalesperson Proposal[] @relation("SalespersonProposals")
-  proposalsAsSpecialist  Proposal[] @relation("SpecialistProposals")
+  company                Empresa          @relation(fields: [companyId], references: [id])
+  permissions            UserPermission[]
+  proposalsAsSalesperson Proposal[]       @relation("SalespersonProposals")
+  proposalsAsSpecialist  Proposal[]       @relation("SpecialistProposals")
 
   @@map("usuarios")
 }
@@ -486,17 +486,17 @@ model Usuario {
 model AgenteIa {
   id          Int      @id @default(autoincrement())
   companyId   Int      @map("company_id")
-  name        String   // Nome do agente de IA
+  name        String // Nome do agente de IA
   basePrompt  String   @map("base_prompt") // Prompt base para o comportamento do agente de IA
   temperature Float    @default(0.7) // Temperatura do modelo de IA
-  mode        String?  // Modo de operação do agente (atendimento, agendamento, resumo, etc.)
+  mode        String? // Modo de operação do agente (atendimento, agendamento, resumo, etc.)
   isActive    Boolean  @default(true) @map("is_active") // Indica se o agente de IA está ativo
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  company     Empresa    @relation(fields: [companyId], references: [id])
-  conversas   Conversa[]
+  company   Empresa    @relation(fields: [companyId], references: [id])
+  conversas Conversa[]
 
   @@map("agentes_ia")
 }
@@ -508,18 +508,18 @@ model Conversa {
   agentId        Int?     @map("agent_id")
   clientId       Int?     @map("client_id")
   professionalId Int?     @map("professional_id")
-  app            String?  // Aplicação de origem da conversa
-  channel        String?  // Canal da conversa (whatsapp, web, telegram, etc.)
+  app            String? // Aplicação de origem da conversa
+  channel        String? // Canal da conversa (whatsapp, web, telegram, etc.)
   startedAt      DateTime @map("started_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   createdAt      DateTime @default(now()) @map("created_at")
 
   // Relacionamentos
-  company        Empresa      @relation(fields: [companyId], references: [id])
-  agent          AgenteIa?    @relation(fields: [agentId], references: [id])
-  client         Client?      @relation(fields: [clientId], references: [id])
-  professional   Professional? @relation(fields: [professionalId], references: [id])
-  mensagens      Mensagem[]
+  company      Empresa       @relation(fields: [companyId], references: [id])
+  agent        AgenteIa?     @relation(fields: [agentId], references: [id])
+  client       Client?       @relation(fields: [clientId], references: [id])
+  professional Professional? @relation(fields: [professionalId], references: [id])
+  mensagens    Mensagem[]
 
   @@map("conversas")
 }
@@ -529,15 +529,15 @@ model Mensagem {
   id             Int        @id @default(autoincrement())
   conversationId Int        @map("conversation_id")
   sender         ChatSender
-  content        String     // Conteúdo da mensagem
+  content        String // Conteúdo da mensagem
   rawJson        Json?      @map("raw_json") // Dados brutos da mensagem em formato JSON
-  origin         String?    // Origem da mensagem (sistema, api, integração, etc.)
+  origin         String? // Origem da mensagem (sistema, api, integração, etc.)
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
   // Relacionamentos
-  conversation   Conversa   @relation(fields: [conversationId], references: [id])
-  chatLogs       ChatLog[]
+  conversation Conversa  @relation(fields: [conversationId], references: [id])
+  chatLogs     ChatLog[]
 
   @@map("mensagens")
 }
@@ -551,7 +551,7 @@ model ChatLog {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  message   Mensagem @relation(fields: [messageId], references: [id])
+  message Mensagem @relation(fields: [messageId], references: [id])
 
   @@map("chat_logs")
 }
@@ -562,16 +562,16 @@ model ChatLog {
 model Module {
   id          Int      @id @default(autoincrement())
   code        String   @unique // Ex: "dashboard", "clientes", "agendamentos"
-  name        String   // Ex: "Dashboard", "Clientes", "Agendamentos"
-  description String?  // Descrição do módulo
-  icon        String?  // Nome do ícone lucide-react
+  name        String // Ex: "Dashboard", "Clientes", "Agendamentos"
+  description String? // Descrição do módulo
+  icon        String? // Nome do ícone lucide-react
   isActive    Boolean  @default(true) @map("is_active") // Indica se o módulo está ativo
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
   professionalPermissions ProfessionalPermission[]
-  userPermissions        UserPermission[]
+  userPermissions         UserPermission[]
 
   @@map("modules")
 }
@@ -586,8 +586,8 @@ model ProfessionalPermission {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  module         Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  module       Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([professionalId, moduleId])
   @@map("professional_permissions")
@@ -603,8 +603,8 @@ model UserPermission {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  user      Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  user   Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, moduleId])
   @@map("user_permissions")
