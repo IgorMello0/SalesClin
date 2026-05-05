@@ -184,27 +184,27 @@ const Dashboard = () => {
   return (
     <div className="relative space-y-10 pb-10 overflow-hidden">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
+      <div className="flex flex-col gap-4 sm:gap-6 relative z-10">
         <div>
-          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Dashboard de Vendas</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Bem-vindo ao centro de comando SalesClin.</p>
+          <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Dashboard de Vendas</h2>
+          <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Bem-vindo ao centro de comando SalesClin.</p>
         </div>
-        <Card className="flex items-center gap-3 p-1.5">
+        <Card className="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5">
           <button 
             onClick={() => handleFilterChange('today')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
           >
             Hoje
           </button>
           <button 
             onClick={() => handleFilterChange('7days')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === '7days' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${filter === '7days' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
           >
             Últimos 7 dias
           </button>
           <div 
             onClick={() => handleFilterChange('custom')}
-            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 cursor-pointer rounded-lg transition-all capitalize ${filter === 'custom' ? 'bg-primary/10 text-primary' : 'bg-primary/5 text-primary hover:bg-primary/10'}`}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 cursor-pointer rounded-lg transition-all capitalize ${filter === 'custom' ? 'bg-primary/10 text-primary' : 'bg-primary/5 text-primary hover:bg-primary/10'}`}
           >
             <span className="material-symbols-outlined text-sm">calendar_today</span>
             {getDateDisplay()}
@@ -215,7 +215,7 @@ const Dashboard = () => {
       {/* Primary Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
         {/* Card 1: Total de Leads */}
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">groups</span>
@@ -433,12 +433,12 @@ const Dashboard = () => {
           <h3 className="text-xl font-bold text-primary font-headline">Detalhamento de Receita</h3>
           <div className="flex-1 h-px bg-border"></div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <div className="md:col-span-1 bg-primary/95 backdrop-blur-lg p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6">
+          <div className="sm:col-span-2 md:col-span-1 bg-primary/95 backdrop-blur-lg p-4 sm:p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Receita Total</p>
             <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.receita)}</h4>
           </div>
-          <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="sm:col-span-2 md:col-span-4 grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6">
             {[
               { label: 'Boleto (Gerados)', value: extraData.metodos.boleto?.gerados || 0 },
               { label: 'Boleto (Pagos)', value: extraData.metodos.boleto?.pagos || 0 },
@@ -460,7 +460,7 @@ const Dashboard = () => {
 
       {/* Two Column Section: Funnel and Origin */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 relative z-10">
-        <Card className="p-8 space-y-8">
+        <Card className="p-4 sm:p-8 space-y-4 sm:space-y-8">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold text-primary font-headline">Funil de Leads SalesClin</h3>
             <button className="text-on-surface-variant hover:text-primary transition-colors btn-hover">

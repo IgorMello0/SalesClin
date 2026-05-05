@@ -302,23 +302,24 @@ const Clients = () => {
   return (
     <div className="space-y-8 pb-10 min-h-screen animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div className="flex flex-col gap-4 sm:gap-6">
         <div>
-          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Pacientes</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Gerencie sua base de pacientes e históricos clínicos.</p>
+          <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Pacientes</h2>
+          <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Gerencie sua base de pacientes e históricos clínicos.</p>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button 
                 onClick={() => handleOpenDialog()} 
                 size="xl"
                 variant="secondary"
-                className="h-12 px-6 font-bold gap-2 shadow-lg shadow-secondary/20 rounded-xl transition-all hover:-translate-y-0.5"
+                className="h-10 sm:h-12 px-3 sm:px-6 font-bold gap-1 sm:gap-2 shadow-lg shadow-secondary/20 rounded-xl transition-all hover:-translate-y-0.5 text-sm"
               >
-                <span className="material-symbols-outlined">person_add</span>
-                Novo Paciente
+                <span className="material-symbols-outlined text-lg">person_add</span>
+                <span className="hidden sm:inline">Novo Paciente</span>
+                <span className="sm:hidden">Novo</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-3xl bg-white p-0">
@@ -391,7 +392,7 @@ const Clients = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="premium-card p-6 border-0 shadow-sm">
+        <div className="premium-card p-4 sm:p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total de Pacientes</div>
             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
@@ -404,7 +405,7 @@ const Clients = () => {
           </div>
         </div>
         
-        <div className="premium-card p-6 border-0 shadow-sm">
+        <div className="premium-card p-4 sm:p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ativos</div>
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -419,7 +420,7 @@ const Clients = () => {
           </div>
         </div>
         
-        <div className="premium-card p-6 border-0 shadow-sm">
+        <div className="premium-card p-4 sm:p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Novos</div>
             <div className="p-2 bg-secondary/10 text-secondary rounded-xl">
@@ -432,7 +433,7 @@ const Clients = () => {
           </div>
         </div>
         
-        <div className="premium-card p-6 border-0 shadow-sm">
+        <div className="premium-card p-4 sm:p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Agendamentos</div>
             <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">

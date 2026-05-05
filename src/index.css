@@ -346,3 +346,48 @@ h1, h2, h3, h4, h5, h6 {
 .card-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--color-primary-container);
 }
+
+/* ========================================
+   MOBILE RESPONSIVE UTILITIES
+   ======================================== */
+
+/* Disable hover transform on touch devices to avoid sticky states */
+@media (hover: none) {
+  .premium-card:hover {
+    transform: none;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  }
+  .hover-card:hover {
+    transform: none;
+  }
+}
+
+/* Responsive stats text */
+@media (max-width: 640px) {
+  .stats-value {
+    font-size: clamp(1rem, 6vw, 1.75rem);
+  }
+}
+
+/* Safe area padding for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Touch-friendly scrollbar for mobile kanban */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile dialog fixes */
+@media (max-width: 640px) {
+  [data-radix-popper-content-wrapper] {
+    z-index: 200 !important;
+  }
+}

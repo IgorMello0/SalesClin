@@ -149,15 +149,15 @@ const Appointments = () => {
     <div className="relative space-y-10 pb-10 overflow-hidden">
 
       {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
+      <div className="flex flex-col gap-4 sm:gap-6 relative z-10">
         <div>
-          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Agendamentos</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Gerencie seus compromissos e horários</p>
+          <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Agendamentos</h2>
+          <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Gerencie seus compromissos e horários</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {professionalsList.length > 1 && (
             <Select value={selectedProfFilter} onValueChange={setSelectedProfFilter}>
-              <SelectTrigger className="w-[200px] border-slate-200 bg-white">
+              <SelectTrigger className="w-[160px] sm:w-[200px] border-slate-200 bg-white text-xs sm:text-sm">
                 <SelectValue placeholder="Filtrar por profissional">
                   {professionalsList.find(p => p.id.toString() === selectedProfFilter)?.name || "Todos os profissionais"}
                 </SelectValue>
@@ -176,9 +176,10 @@ const Appointments = () => {
             <span className="material-symbols-outlined text-lg">filter_list</span>
             <span className="hidden sm:inline">Filtros</span>
           </Button>
-          <Button variant="secondary" size="xl" onClick={() => setOpenModal(true)} className="shadow-lg shadow-secondary/20">
-            <span className="material-symbols-outlined text-lg">add</span>
+          <Button variant="secondary" size="xl" onClick={() => setOpenModal(true)} className="shadow-lg shadow-secondary/20 h-9 sm:h-auto text-xs sm:text-sm">
+            <span className="material-symbols-outlined text-base sm:text-lg">add</span>
             <span className="hidden sm:inline">Novo Agendamento</span>
+            <span className="sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
@@ -186,7 +187,7 @@ const Appointments = () => {
       {/* ── Stats Row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 relative z-10">
         {stats.map((s) => (
-          <div key={s.label} className="premium-card p-6">
+          <div key={s.label} className="premium-card p-4 sm:p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{s.label}</div>
               <div className="p-2 bg-blue-50 text-accent rounded-xl">
@@ -279,7 +280,7 @@ const Appointments = () => {
                   <Button variant="outline" size="icon" onClick={() => navigateDate('next')}>
                     <span className="material-symbols-outlined text-slate-600 text-base">chevron_right</span>
                   </Button>
-                  <h2 className="text-base font-black text-primary font-headline ml-1">
+                  <h2 className="text-xs sm:text-base font-black text-primary font-headline ml-1 truncate">
                     {viewMode === 'dia'
                       ? format(selectedDate, "dd 'de' MMM, yyyy", { locale: ptBR })
                       : viewMode === 'semana'

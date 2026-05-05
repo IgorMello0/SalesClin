@@ -130,7 +130,7 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full md:max-w-4xl p-0 border-0 shadow-2xl rounded-3xl bg-slate-50 overflow-hidden h-[85vh] flex flex-col">
+      <DialogContent className="max-w-[100vw] sm:max-w-[95vw] w-full md:max-w-4xl p-0 border-0 shadow-2xl rounded-none sm:rounded-3xl bg-slate-50 overflow-hidden h-[100vh] sm:h-[85vh] flex flex-col">
         <DialogTitle className="sr-only">Dossiê Comercial do Paciente</DialogTitle>
         
         {loading || !dossier ? (

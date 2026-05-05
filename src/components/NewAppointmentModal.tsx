@@ -271,13 +271,13 @@ export function NewAppointmentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 shadow-2xl">
-        <div className="p-8 bg-gradient-to-br from-indigo-50 to-transparent border-b border-indigo-100">
-          <DialogTitle className="text-2xl font-extrabold text-primary font-headline tracking-tight">Novo Agendamento</DialogTitle>
-          <p className="text-slate-500 text-sm mt-1">Configure os detalhes da consulta ou procedimento.</p>
+      <DialogContent className="sm:max-w-[550px] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 shadow-2xl">
+        <div className="p-4 sm:p-8 bg-gradient-to-br from-indigo-50 to-transparent border-b border-indigo-100">
+          <DialogTitle className="text-lg sm:text-2xl font-extrabold text-primary font-headline tracking-tight">Novo Agendamento</DialogTitle>
+          <p className="text-slate-500 text-xs sm:text-sm mt-1">Configure os detalhes da consulta ou procedimento.</p>
         </div>
 
-        <div className="p-8 space-y-6">
+        <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
           {/* Professional Selector */}
           {companyProfessionals.length > 1 && (
             <div className="space-y-2 flex flex-col">

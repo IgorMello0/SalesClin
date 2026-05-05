@@ -94,7 +94,7 @@ const Login = () => {
 
           {/* Headline */}
           <div className="space-y-3">
-            <h1 className="text-3xl font-extrabold text-white leading-tight" style={{ fontFamily: 'Manrope, sans-serif' }}>
+            <h1 className="text-2xl lg:text-3xl font-extrabold text-white leading-tight" style={{ fontFamily: 'Manrope, sans-serif' }}>
               Gerencie seus leads<br />
               <span style={{ color: 'hsl(25,95%,63%)' }}>com inteligência.</span>
             </h1>
@@ -147,7 +147,7 @@ const Login = () => {
       </div>
 
       {/* Right panel — form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-16 bg-[hsl(210,40%,98%)]">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-16 bg-[hsl(210,40%,98%)] min-h-screen lg:min-h-0">
         <div className="w-full max-w-md space-y-8">
 
           {/* Mobile logo */}
@@ -159,7 +159,7 @@ const Login = () => {
 
           {/* Header */}
           <div className="space-y-2">
-            <h2 className="text-3xl font-extrabold" style={{ color: 'hsl(219,74%,15%)', fontFamily: 'Manrope, sans-serif' }}>
+            <h2 className="text-2xl sm:text-3xl font-extrabold" style={{ color: 'hsl(219,74%,15%)', fontFamily: 'Manrope, sans-serif' }}>
               Bem-vindo de volta
             </h2>
             <p className="text-[hsl(215,16%,47%)]">

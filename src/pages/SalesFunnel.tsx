@@ -690,42 +690,24 @@ const SalesFunnel = () => {
   };
 
   return (
-    <div className="space-y-8 pb-10 min-h-screen">
+    <div className="space-y-4 sm:space-y-8 pb-10 min-h-screen">
       {/* Header & Funnel Switcher */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Comercial</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Gerencie seus leads e funis de vendas.</p>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="flex p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-2xl border border-slate-200/50 w-fit">
-            {FUNNELS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setActiveFunnel(f.id)}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300",
-                  activeFunnel === f.id 
-                    ? "bg-white text-primary shadow-sm scale-105" 
-                    : "text-slate-400 hover:text-primary hover:bg-white/50"
-                )}
-              >
-                <span className={cn("material-symbols-outlined text-lg", activeFunnel === f.id ? "text-secondary" : "")}>
-                  {f.icon}
-                </span>
-                {f.label}
-              </button>
-            ))}
+      <div className="flex flex-col gap-4 sm:gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
+          <div>
+            <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Comercial</h2>
+            <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Gerencie seus leads e funis de vendas.</p>
           </div>
           
-          <DropdownMenu>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <DropdownMenu>
+          
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="ghost"
-                className="h-12 w-12 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="h-10 w-10 sm:h-12 sm:w-12 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                <span className="material-symbols-outlined text-2xl">settings</span>
+                <span className="material-symbols-outlined text-xl sm:text-2xl">settings</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-xl border-slate-100">
@@ -751,20 +733,44 @@ const SalesFunnel = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button 
-            onClick={() => openAddLead()} 
-            size="xl"
-            variant="secondary"
-            className="h-12 px-6 font-bold gap-2 shadow-lg shadow-secondary/20"
-          >
-            <span className="material-symbols-outlined">add</span>
-            Novo Lead
-          </Button>
+            <Button 
+              onClick={() => openAddLead()} 
+              size="xl"
+              variant="secondary"
+              className="h-10 sm:h-12 px-3 sm:px-6 font-bold gap-1 sm:gap-2 shadow-lg shadow-secondary/20 text-sm"
+            >
+              <span className="material-symbols-outlined text-lg">add</span>
+              <span className="hidden sm:inline">Novo Lead</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Funnel Tabs — scrollable on mobile */}
+        <div className="flex overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+          <div className="flex p-1 sm:p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-slate-200/50 w-fit">
+            {FUNNELS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setActiveFunnel(f.id)}
+                className={cn(
+                  "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 whitespace-nowrap",
+                  activeFunnel === f.id 
+                    ? "bg-white text-primary shadow-sm" 
+                    : "text-slate-400 hover:text-primary hover:bg-white/50"
+                )}
+              >
+                <span className={cn("material-symbols-outlined text-base sm:text-lg", activeFunnel === f.id ? "text-secondary" : "")}>
+                  {f.icon}
+                </span>
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Board */}
-      <div className="flex gap-4 overflow-x-auto pb-6 -mx-4 px-4 scrollbar-hide">
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-4 sm:px-4 scrollbar-hide snap-x snap-mandatory sm:snap-none">
         {activeStages.map((stage) => {
           const stageLeads = leads.filter(l => {
             // Regra de Roteamento: 
@@ -780,7 +786,7 @@ const SalesFunnel = () => {
           return (
             <div 
               key={stage.id} 
-              className="flex-shrink-0 w-72 flex flex-col gap-3"
+              className="flex-shrink-0 w-[280px] sm:w-72 flex flex-col gap-3 snap-center"
               onDragOver={(e) => handleDragOver(e, stage.id)}
               onDrop={(e) => handleDrop(e, stage.id)}
               onDragLeave={() => setDropTargetStage(null)}
@@ -1115,19 +1121,19 @@ const SalesFunnel = () => {
 
       {/* Lead Details Modal */}
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 flex flex-col w-full h-full sm:h-auto">
           {selectedLead && (
             <>
               {/* Header Profile Section */}
-              <div className="p-8 bg-gradient-to-br from-primary/5 to-transparent border-b border-slate-100">
-                <div className="flex flex-col md:flex-row gap-8 items-start">
-                  <div className="w-24 h-24 rounded-3xl bg-primary flex items-center justify-center text-3xl font-extrabold text-white shadow-xl shadow-primary/20">
+              <div className="p-4 sm:p-8 bg-gradient-to-br from-primary/5 to-transparent border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 items-start">
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-primary flex items-center justify-center text-2xl sm:text-3xl font-extrabold text-white shadow-xl shadow-primary/20">
                     {selectedLead.avatar}
                   </div>
                   <div className="flex-1 space-y-4">
                     <div className="flex justify-between items-start w-full">
                       <div>
-                        <h3 className="text-3xl font-extrabold text-primary font-headline tracking-tighter">{selectedLead.name}</h3>
+                        <h3 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tighter">{selectedLead.name}</h3>
                         <p className="text-on-surface-variant font-medium text-sm flex items-center gap-2 mt-1">
                           <span className="w-2 h-2 rounded-full bg-secondary"></span>
                           Estágio: {STAGES[activeFunnel as keyof typeof STAGES].find(s => s.id === selectedLead.status)?.label || selectedLead.status}
@@ -1155,7 +1161,7 @@ const SalesFunnel = () => {
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 pt-3 sm:pt-4">
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</p>
                         <p className="text-sm font-bold text-primary">{selectedLead.phone}</p>
@@ -1176,7 +1182,7 @@ const SalesFunnel = () => {
               {/* Main Body: Info vs Timeline */}
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 bg-white">
                 {/* Left Side: General Info */}
-                <div className="p-8 border-r border-slate-100 space-y-8">
+                <div className="p-4 sm:p-8 border-b lg:border-b-0 lg:border-r border-slate-100 space-y-4 sm:space-y-8">
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Observações do Sistema</h4>
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -1253,7 +1259,7 @@ const SalesFunnel = () => {
                 <div className="lg:col-span-2 bg-slate-50/30 flex flex-col min-h-0 h-full">
                   <div className="flex flex-col h-full">
                     {/* Activity Top Action */}
-                    <div className="p-8 border-b border-slate-100 bg-white/50 space-y-4">
+                    <div className="p-4 sm:p-8 border-b border-slate-100 bg-white/50 space-y-3 sm:space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Linha do Tempo de Atividades</h4>
                         <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
@@ -1286,7 +1292,7 @@ const SalesFunnel = () => {
                     {/* Scrollable Timeline / Proposals */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
                       <Tabs value={activeDetailsTab} onValueChange={setActiveDetailsTab} className="w-full flex-1 flex flex-col">
-                        <div className="px-8 border-b border-slate-100 bg-white">
+                        <div className="px-4 sm:px-8 border-b border-slate-100 bg-white">
                           <TabsList className="bg-transparent border-0 h-14 p-0 gap-8">
                             <TabsTrigger 
                               value="activities" 
@@ -1310,7 +1316,7 @@ const SalesFunnel = () => {
                           </TabsList>
                         </div>
 
-                        <TabsContent value="activities" className="flex-1 p-8 m-0 outline-none">
+                        <TabsContent value="activities" className="flex-1 p-4 sm:p-8 m-0 outline-none">
                           <div className="relative pl-8 space-y-12">
                             {/* The Vertical Line */}
                             <div className="absolute left-[15px] top-2 bottom-4 w-[2px] bg-slate-200"></div>
@@ -1363,7 +1369,7 @@ const SalesFunnel = () => {
                           </div>
                         </TabsContent>
 
-                        <TabsContent value="proposals" className="flex-1 p-8 m-0 outline-none">
+                        <TabsContent value="proposals" className="flex-1 p-4 sm:p-8 m-0 outline-none">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {leadProposals.map((proposal) => (
                               <div 
@@ -1431,13 +1437,13 @@ const SalesFunnel = () => {
 
       {/* Create Proposal Dialog */}
       <Dialog open={isCreatingProposal} onOpenChange={setIsCreatingProposal}>
-        <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto rounded-3xl border-slate-100 bg-white p-0 shadow-2xl">
-          <div className="p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100">
-            <h3 className="text-2xl font-extrabold text-primary font-headline tracking-tight">Criação de Proposta Comercial</h3>
-            <p className="text-slate-500 text-sm mt-1">Defina os termos do tratamento e valores para o paciente.</p>
+        <DialogContent className="sm:max-w-[750px] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 shadow-2xl">
+          <div className="p-4 sm:p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100">
+            <h3 className="text-lg sm:text-2xl font-extrabold text-primary font-headline tracking-tight">Criação de Proposta Comercial</h3>
+            <p className="text-slate-500 text-xs sm:text-sm mt-1">Defina os termos do tratamento e valores para o paciente.</p>
           </div>
 
-          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="p-4 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
             <div className="space-y-6">
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Título da Proposta</Label>

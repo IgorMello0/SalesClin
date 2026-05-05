@@ -149,38 +149,38 @@ const Goals = () => {
   return (
     <div className="relative space-y-10 pb-10 overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
+      <div className="flex flex-col gap-4 sm:gap-6 relative z-10">
         <div>
-          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Engenharia de Metas</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Calcule o volume de leads necessário para atingir seu faturamento.</p>
+          <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Engenharia de Metas</h2>
+          <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Calcule o volume de leads necessário para atingir seu faturamento.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             onClick={applyFacebookPreset}
             variant="outline"
-            className="text-sm font-semibold"
+            className="text-xs sm:text-sm font-semibold"
           >
-            <span className="material-symbols-outlined text-base mr-1.5">campaign</span>
+            <span className="material-symbols-outlined text-base mr-1">campaign</span>
             Config. Facebook
           </Button>
           <Button
             onClick={applyIndicationsPreset}
             variant="secondary"
             size="sm"
-            className="text-sm font-semibold shadow-lg shadow-secondary/20"
+            className="text-xs sm:text-sm font-semibold shadow-lg shadow-secondary/20"
           >
-            <span className="material-symbols-outlined text-base mr-1.5">share</span>
+            <span className="material-symbols-outlined text-base mr-1">share</span>
             Config. Indicações
           </Button>
         </div>
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative z-10">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start relative z-10">
 
         {/* Left: Parameters Panel */}
         <div className="lg:col-span-4">
-          <Card className="p-6 space-y-6">
+          <Card className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 text-accent rounded-lg">
                 <span className="material-symbols-outlined text-xl">tune</span>
