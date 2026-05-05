@@ -8,6 +8,7 @@ interface Professional {
   phone: string;
   specialization: string;
   role?: string;
+  photoUrl?: string;
 }
 
 interface Permission {
@@ -25,6 +26,7 @@ interface AuthContextType {
   hasModuleAccess: (moduleCode: string) => boolean;
   isLoading: boolean;
   loadPermissions: () => Promise<void>;
+  updateProfilePhoto: (photoUrl: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,6 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('[Auth] Error loading permissions:', error);
     }
+  };
+
+  const updateProfilePhoto = (photoUrl: string) => {
+    setProfessional(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, photoUrl };
+      localStorage.setItem('professional', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   // Verificar se o usuário tem acesso a um módulo
@@ -113,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone: data.phone || '',
           specialization: data.specialization || data.role || 'Usuário',
           role: data.email === 'admin@admin.com' ? 'admin' : (profData ? 'profissional' : (data.role || 'usuario')),
+          photoUrl: data.photoUrl || undefined,
         };
         
         setProfessional(professionalData);
@@ -223,7 +235,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signup,
       hasModuleAccess,
       isLoading,
-      loadPermissions
+      loadPermissions,
+      updateProfilePhoto
     }}>
       {children}
     </AuthContext.Provider>

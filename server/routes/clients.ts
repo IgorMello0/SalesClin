@@ -184,4 +184,223 @@ router.delete('/:id', auth(), requireModule('clientes'), async (req, res) => {
   }
 })
 
+router.get('/:id/dossier', auth(false), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    
+    let companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({
+        where: { id: req.user.id },
+        select: { companyId: true }
+      });
+      companyId = prof?.companyId || undefined;
+    }
 
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        professional: true,
+        appointments: {
+          orderBy: { startTime: 'desc' },
+          include: { service: true }
+        },
+        payments: {
+          orderBy: { date: 'desc' }
+        },
+        originLead: {
+          include: {
+            proposals: {
+              orderBy: { createdAt: 'desc' }
+            }
+          }
+        }
+      }
+    })
+    
+    if (!client) return res.status(404).json(createErrorResponse('Cliente não encontrado', 404))
+
+    if (companyId && client.professional.companyId !== companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403))
+    } else if (!companyId && req.user?.id && client.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403))
+    }
+
+    // Calculando LTV (Lifetime Value)
+    const ltv = client.payments
+      .filter(p => p.status === 'pago')
+      .reduce((sum, p) => sum + Number(p.amount), 0)
+
+    // Calculando Tickets Pendentes
+    const pendingTickets = client.payments
+      .filter(p => p.status === 'pendente' || p.status === 'atrasado')
+      .reduce((sum, p) => sum + Number(p.amount), 0)
+
+    // Calculando Recorrência (Dias desde a última visita)
+    let daysSinceLastVisit = null;
+    const pastAppointments = client.appointments.filter(a => new Date(a.startTime) < new Date());
+    if (pastAppointments.length > 0) {
+      const lastVisit = new Date(pastAppointments[0].startTime);
+      const diffTime = Math.abs(new Date().getTime() - lastVisit.getTime());
+      daysSinceLastVisit = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    // Montando a Timeline Comercial
+    const timeline = [];
+    
+    // Cadastro
+    timeline.push({
+      id: `created-${client.id}`,
+      type: 'registration',
+      title: '1º Cadastro',
+      date: client.createdAt,
+      description: client.notes ? `Notas iniciais: ${client.notes}` : 'Cliente cadastrado no sistema',
+      icon: 'how_to_reg'
+    });
+
+        // Propostas Comerciais
+    if (client.originLead?.proposals) {
+      client.originLead.proposals.forEach((ficha: any) => {
+        timeline.push({
+          id: `proposal-${ficha.id}`,
+          type: 'proposal',
+          title: `Proposta Comercial`,
+          date: ficha.createdAt,
+          description: `Título: ${ficha.title} | Valor: R$ ${Number(ficha.value).toFixed(2).replace('.', ',')}`,
+          icon: 'request_quote'
+        });
+      });
+    }
+
+    // Agendamentos (com serviço se tiver)
+    client.appointments.forEach(app => {
+      timeline.push({
+        id: `app-${app.id}`,
+        type: 'appointment',
+        title: app.service ? `Sessão: ${app.service.name}` : 'Agendamento Clínico',
+        date: app.startTime,
+        description: `Status: ${app.status}`,
+        icon: app.status === 'concluido' ? 'done_all' : 'calendar_today'
+      });
+    });
+
+    // Pagamentos Realizados
+    client.payments.filter(p => p.status === 'pago').forEach(pay => {
+      timeline.push({
+        id: `pay-${pay.id}`,
+        type: 'payment',
+        title: 'Pagamento Realizado',
+        date: pay.date,
+        description: `Valor: R$ ${Number(pay.amount).toFixed(2).replace('.', ',')}`,
+        icon: 'payments'
+      });
+    });
+
+    // Ordenar timeline do mais recente pro mais antigo
+    timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Sugerir Retorno se faz muito tempo (Ex: > 180 dias)
+    if (daysSinceLastVisit && daysSinceLastVisit > 150) {
+      timeline.unshift({
+        id: `suggestion-return`,
+        type: 'suggestion',
+        title: 'Retorno Sugerido',
+        date: new Date(), // Hoje
+        description: `O paciente não vem há ${daysSinceLastVisit} dias. Ligar para agendar revisão ou limpeza.`,
+        icon: 'add_task',
+        isActionable: true
+      });
+    } else if (!daysSinceLastVisit && client.appointments.length === 0) {
+      timeline.unshift({
+        id: `suggestion-first`,
+        type: 'suggestion',
+        title: 'Primeiro Contato',
+        date: new Date(),
+        description: 'Paciente cadastrado mas ainda não possui agendamentos. Entrar em contato.',
+        icon: 'add_task',
+        isActionable: true
+      });
+    }
+
+    const dossier = {
+      client: {
+        id: client.id,
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        notes: client.notes,
+        createdAt: client.createdAt,
+        leadId: client.originLead?.id
+      },
+      stats: {
+        ltv,
+        pendingTickets,
+        daysSinceLastVisit,
+      },
+      timeline,
+      proposals: client.originLead?.proposals || []
+    };
+
+    res.json(createSuccessResponse(dossier))
+  } catch (error: any) {
+    console.error('[Clients] Erro ao carregar dossiê:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao carregar dossiê', 500))
+  }
+})
+
+router.post('/:id/proposals', auth(false), async (req, res) => {
+  try {
+    const clientId = Number(req.params.id)
+    const { title, value, status, validUntil } = req.body
+
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      include: { originLead: true }
+    })
+
+    if (!client) {
+      return res.status(404).json(createErrorResponse('Cliente não encontrado', 404))
+    }
+
+    let leadId = client.originLead?.id
+
+    // If client doesn't have an origin lead, we create one and link it
+    if (!leadId) {
+      const newLead = await prisma.lead.create({
+        data: {
+          professionalId: client.professionalId,
+          name: client.name,
+          email: client.email,
+          phone: client.phone,
+          status: 'comercial_proposal',
+          convertedToClientId: client.id,
+        }
+      })
+      leadId = newLead.id
+    }
+
+    const proposal = await prisma.proposal.create({
+      data: {
+        leadId,
+        title: title || 'Nova Proposta',
+        value: value || 0,
+        status: status || 'pending',
+        validUntil: validUntil ? new Date(validUntil) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
+      }
+    })
+
+    if (req.user) {
+      await logAudit(
+        req.user.id,
+        `Criou proposta ${proposal.id} para o cliente ${client.id}`,
+        'proposals',
+        proposal.id
+      )
+    }
+
+    res.json(createSuccessResponse(proposal))
+  } catch (error: any) {
+    console.error('[Clients] Erro ao criar proposta:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao criar proposta', 500))
+  }
+})

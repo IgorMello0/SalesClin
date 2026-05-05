@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useForms, FilledForm } from '@/contexts/FormsContext';
 import { FormFillModal } from '@/components/FormFillModal';
 import { FormViewModal } from '@/components/FormViewModal';
+import { ClientDossierModal } from '@/components/ClientDossierModal';
 import { clientsApi } from '@/lib/api';
 
 interface Client {
@@ -298,99 +300,111 @@ const Clients = () => {
   const viewingTemplate = viewingForm ? templates.find(t => t.id === viewingForm.templateId) : null;
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 p-4 sm:p-6 md:p-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="space-y-8 pb-10 min-h-screen animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-primary font-headline">Clientes</h1>
-          <p className="text-sm text-slate-500 font-medium">
-            Gerencie sua base de clientes e históricos
-          </p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h2 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Pacientes</h2>
+          <p className="text-on-surface-variant text-sm mt-1">Gerencie sua base de pacientes e históricos clínicos.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()} className="bg-secondary hover:bg-secondary/90 text-white shadow-lg shadow-secondary/30 transition-all hover:-translate-y-0.5 rounded-xl font-bold px-6">
-              <Plus className="h-4 w-4 mr-2 font-bold" />
-              Novo Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">
-                {editingClient ? 'Editar Cliente' : 'Novo Cliente'}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm">Nome *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Nome completo do cliente"
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm">E-mail *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="email@exemplo.com"
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm">Telefone *</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="(11) 99999-9999"
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address" className="text-sm">Endereço</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="Endereço completo"
-                  className="text-sm"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto text-sm">
-                Cancelar
+        
+        <div className="flex items-center gap-4">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={() => handleOpenDialog()} 
+                size="xl"
+                variant="secondary"
+                className="h-12 px-6 font-bold gap-2 shadow-lg shadow-secondary/20 rounded-xl transition-all hover:-translate-y-0.5"
+              >
+                <span className="material-symbols-outlined">person_add</span>
+                Novo Paciente
               </Button>
-              <Button onClick={handleSave} className="w-full sm:w-auto text-sm">
-                {editingClient ? 'Atualizar' : 'Cadastrar'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-3xl bg-white p-0">
+              <div className="relative p-6 bg-[#0B1525] border-b border-[#0B1525] overflow-hidden shrink-0 rounded-t-3xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                <DialogTitle className="text-xl font-bold text-white font-headline relative z-10">
+                  {editingClient ? 'Editar Paciente' : 'Novo Paciente'}
+                </DialogTitle>
+                <p className="text-sm text-white/70 mt-1 relative z-10">
+                  {editingClient ? 'Atualize as informações cadastradas' : 'Preencha os dados do novo paciente'}
+                </p>
+              </div>
+              <div className="p-6 space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nome Completo *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ex: João da Silva"
+                    className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-xs font-bold text-slate-400 uppercase tracking-widest">Telefone *</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="(11) 99999-9999"
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-xs font-bold text-slate-400 uppercase tracking-widest">E-mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="email@exemplo.com"
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address" className="text-xs font-bold text-slate-400 uppercase tracking-widest">Anotações / Endereço</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Informações adicionais..."
+                    className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                  />
+                </div>
+              </div>
+              <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 rounded-b-3xl">
+                <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold text-slate-500 hover:bg-slate-200 h-11 px-6">
+                  Cancelar
+                </Button>
+                <Button onClick={handleSave} className="bg-primary hover:bg-primary/90 text-white rounded-xl font-bold h-11 px-6 shadow-sm">
+                  {editingClient ? 'Atualizar' : 'Salvar Paciente'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="premium-card p-6">
+        <div className="premium-card p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total de Clientes</div>
-            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total de Pacientes</div>
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
               <span className="material-symbols-outlined text-lg">group</span>
             </div>
           </div>
           <div className="pt-2">
-            <div className="stats-value">{clients.length}</div>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">cadastrados no sistema</p>
+            <div className="text-3xl font-extrabold text-primary font-headline tracking-tight">{clients.length}</div>
+            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">Cadastrados</p>
           </div>
         </div>
         
-        <div className="premium-card p-6">
+        <div className="premium-card p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ativos</div>
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -398,361 +412,226 @@ const Clients = () => {
             </div>
           </div>
           <div className="pt-2">
-            <div className="stats-value text-emerald-600">
+            <div className="text-3xl font-extrabold text-emerald-600 font-headline tracking-tight">
               {clients.filter(c => c.status === 'ativo').length}
             </div>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">clientes ativos</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">Pacientes Ativos</p>
           </div>
         </div>
         
-        <div className="premium-card p-6">
+        <div className="premium-card p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Novos</div>
-            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+            <div className="p-2 bg-secondary/10 text-secondary rounded-xl">
               <span className="material-symbols-outlined text-lg">person_add</span>
             </div>
           </div>
           <div className="pt-2">
-            <div className="stats-value">0</div>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">neste mês</p>
+            <div className="text-3xl font-extrabold text-primary font-headline tracking-tight">0</div>
+            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">Neste Mês</p>
           </div>
         </div>
         
-        <div className="premium-card p-6">
+        <div className="premium-card p-6 border-0 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Agendamentos</div>
-            <div className="p-2 bg-blue-50 text-accent rounded-xl">
+            <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
               <span className="material-symbols-outlined text-lg">event</span>
             </div>
           </div>
           <div className="pt-2">
-            <div className="stats-value">
+            <div className="text-3xl font-extrabold text-primary font-headline tracking-tight">
               {clients.reduce((acc, client) => acc + client.totalAppointments, 0)}
             </div>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">total agendado</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">Histórico Total</p>
           </div>
         </div>
       </div>
 
-      {/* Clients Table */}
-      <Card className="w-full hover-card border-slate-100 bg-white shadow-sm overflow-hidden rounded-3xl">
-        <CardHeader className="p-6 border-b border-slate-50 bg-slate-50/50">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="text-lg font-bold text-primary font-headline">Lista de Clientes</CardTitle>
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Buscar por nome, email ou telefone..."
-                className="pl-10 bg-white border-slate-200 focus-visible:ring-primary/20 transition-all rounded-full h-10"
-                value={searchDebounce}
-                onChange={(e) => setSearchDebounce(e.target.value)}
-              />
-            </div>
+      {/* Clients Table Area */}
+      <div className="premium-card overflow-hidden rounded-3xl border-0 shadow-sm">
+        <div className="p-6 border-b border-slate-100/50 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h3 className="text-lg font-bold text-primary font-headline flex items-center gap-2">
+            <span className="material-symbols-outlined text-secondary">list_alt</span>
+            Lista de Pacientes
+          </h3>
+          <div className="relative w-full sm:w-80">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+            <Input
+              placeholder="Buscar por nome, email ou telefone..."
+              className="pl-10 bg-white border-slate-200 focus-visible:ring-secondary/20 transition-all rounded-xl h-11 shadow-sm"
+              value={searchDebounce}
+              onChange={(e) => setSearchDebounce(e.target.value)}
+            />
           </div>
-        </CardHeader>
-        <CardContent className="p-0 overflow-hidden">
+        </div>
+        
+        <div className="p-0 overflow-hidden bg-white">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">Carregando clientes...</span>
+            <div className="flex flex-col items-center justify-center py-16">
+              <span className="material-symbols-outlined text-secondary text-4xl animate-spin mb-3">progress_activity</span>
+              <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Carregando pacientes...</span>
             </div>
           ) : isMobile ? (
-            // Mobile View - Card Layout
-            <div className="space-y-3 p-3 sm:p-4">
+            // Mobile View
+            <div className="space-y-3 p-4">
               {filteredClients.map((client) => (
-                <Card key={client.id} className="overflow-hidden w-full">
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs sm:text-sm font-medium text-primary">
-                            {client.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm sm:text-base truncate">{client.name}</h3>
-                          <Badge 
-                            variant="outline" 
-                            className={`${getStatusColor(client.status)} text-[0.65rem] sm:text-xs mt-1`}
-                          >
-                            {client.status}
-                          </Badge>
-                        </div>
+                <div key={client.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10">
+                        <span className="text-sm font-bold text-primary font-headline">
+                          {client.name.charAt(0).toUpperCase()}
+                        </span>
                       </div>
-                      <div className="flex gap-1 flex-shrink-0 ml-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
-                              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                            <PopoverContent className="w-44 sm:w-48" align="end">
-                              <div className="space-y-2">
-                                {assignedTemplates.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground text-center py-2">
-                                    Nenhuma ficha atribuída
-                                  </p>
-                                ) : (
-                                  assignedTemplates.map((template) => (
-                                    <Button
-                                      key={template.id}
-                                      variant="ghost"
-                                      className="w-full justify-start text-xs sm:text-sm h-8"
-                                      onClick={() => handleOpenFormFill(client, template.id)}
-                                    >
-                                      <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
-                                      {template.nome}
-                                    </Button>
-                                  ))
-                                )}
-                              </div>
-                            </PopoverContent>
-                        </Popover>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenDialog(client)}
-                          className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                      <div>
+                        <h3 className="font-bold text-primary text-sm">{client.name}</h3>
+                        <Badge 
+                          variant="outline" 
+                          className={cn("text-[9px] uppercase tracking-wider mt-1 font-bold", getStatusColor(client.status))}
                         >
-                          <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </Button>
+                          {client.status}
+                        </Badge>
                       </div>
                     </div>
-                    
-                    <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
-                      {client.email && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Mail className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{client.email}</span>
-                        </div>
-                      )}
-                      {client.phone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3 w-3 flex-shrink-0" />
-                          <span className="break-all">{client.phone}</span>
-                        </div>
-                      )}
-                      {client.notes && (
-                        <div className="flex items-start gap-2 text-muted-foreground">
-                          <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                          <span className="break-words line-clamp-2">{client.notes}</span>
-                        </div>
-                      )}
-                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 mt-4 pt-3 border-t border-slate-100">
+                    {client.phone && (
+                      <div className="flex items-center gap-2 text-slate-500 text-xs font-medium">
+                        <span className="material-symbols-outlined text-[14px]">phone</span>
+                        <span>{client.phone}</span>
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-3 pt-3 border-t gap-2">
-                      <div className="flex gap-3 sm:gap-4 text-[0.65rem] sm:text-xs text-muted-foreground">
-                        <div>
-                          <span className="font-medium">{client.totalAppointments}</span> agendamentos
-                        </div>
-                        <div>
-                          <span className="font-medium">{getClientRecordCount(client.id)}</span> registros
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewTimeline(client.id)}
-                        className="h-7 text-xs w-full sm:w-auto"
-                      >
-                        <Eye className="h-3 w-3 mr-1.5" />
-                        Ver Timeline
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100">
+                    <Button variant="outline" size="sm" onClick={() => handleOpenDialog(client)} className="flex-1 h-8 rounded-lg text-[10px] font-bold">
+                      <span className="material-symbols-outlined text-[14px] mr-1">edit</span> Editar
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleViewTimeline(client.id)} className="flex-1 h-8 rounded-lg text-[10px] font-bold text-secondary border-secondary/20 hover:bg-secondary/5">
+                      <span className="material-symbols-outlined text-[14px] mr-1">query_stats</span> Dossiê
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
-            // Desktop View - Table Layout
+            // Desktop View
             <div className="w-full">
-              <div className="w-full">
-                <Table className="w-full table-fixed">
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="hover:bg-transparent border-b-slate-100">
-                      <TableHead className="w-[20%] text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Nome</TableHead>
-                      <TableHead className="w-[25%] text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Contato</TableHead>
-                      <TableHead className="w-[20%] hidden xl:table-cell text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Endereço</TableHead>
-                      <TableHead className="w-[15%] text-center hidden lg:table-cell text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Última Visita</TableHead>
-                      <TableHead className="w-[10%] text-center text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Status</TableHead>
-                      <TableHead className="w-[10%] text-center hidden lg:table-cell text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Agendamentos</TableHead>
-                      <TableHead className="w-[15%] text-center text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Registros</TableHead>
-                      <TableHead className="w-[15%] text-center text-xs font-bold uppercase tracking-wider text-slate-400 h-12">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredClients.map((client) => (
-                      <TableRow key={client.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center space-x-2">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-medium text-primary">
-                                {client.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <span className="truncate">{client.name}</span>
+              <Table className="w-full">
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent border-b-slate-100/50">
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 px-6">Paciente</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12">Contato</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 text-center">Status</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 text-center">Agendamentos</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 text-center">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredClients.map((client) => (
+                    <TableRow key={client.id} className="hover:bg-slate-50/50 border-b-slate-100/50 transition-colors">
+                      <TableCell className="px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 flex-shrink-0">
+                            <span className="text-sm font-bold text-primary font-headline">
+                              {client.name.charAt(0).toUpperCase()}
+                            </span>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {client.email && (
-                              <div className="flex items-center text-sm">
-                                <Mail className="h-3 w-3 mr-1 flex-shrink-0 text-muted-foreground" />
-                                <span className="truncate">{client.email}</span>
-                              </div>
-                            )}
-                            {client.phone && (
-                              <div className="flex items-center text-sm text-muted-foreground">
-                                <Phone className="h-3 w-3 mr-1 flex-shrink-0" />
-                                <span className="truncate">{client.phone}</span>
-                              </div>
+                          <div>
+                            <p className="font-bold text-primary text-sm">{client.name}</p>
+                            {client.notes && (
+                              <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px] flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[12px]">location_on</span>
+                                {client.notes}
+                              </p>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className="hidden xl:table-cell">
-                          {client.notes && (
-                            <div className="flex items-center text-sm text-muted-foreground">
-                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                              <span className="truncate">{client.notes}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="space-y-1">
+                          {client.phone && (
+                            <div className="flex items-center text-xs font-bold text-slate-600 gap-1.5">
+                              <span className="material-symbols-outlined text-[14px] text-slate-400">phone</span>
+                              {client.phone}
                             </div>
                           )}
-                        </TableCell>
-                        <TableCell className="text-center hidden lg:table-cell">
-                          <span className="text-sm text-muted-foreground whitespace-nowrap">
-                            {client.lastVisit ? new Date(client.lastVisit).toLocaleDateString('pt-BR') : '-'}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge 
-                            variant="outline" 
-                            className={`${getStatusColor(client.status)} whitespace-nowrap`}
-                          >
-                            {client.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center hidden lg:table-cell">
-                          <span className="font-medium">{client.totalAppointments}</span>
-                        </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <Badge variant="outline" className="text-xs whitespace-nowrap">
-                            {getClientRecordCount(client.id)} registros
-                          </Badge>
+                          {client.email && (
+                            <div className="flex items-center text-[10px] text-slate-500 gap-1.5">
+                              <span className="material-symbols-outlined text-[12px] text-slate-400">mail</span>
+                              {client.email}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center py-4">
+                        <Badge 
+                          variant="outline" 
+                          className={cn("text-[9px] uppercase tracking-wider font-bold", getStatusColor(client.status))}
+                        >
+                          {client.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center py-4">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">
+                          {client.totalAppointments}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center py-4">
+                        <div className="flex items-center justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewTimeline(client.id)}
-                            className="h-8 w-8 p-0 flex-shrink-0"
+                            className="h-9 px-3 text-[11px] font-bold text-secondary hover:bg-secondary/10 rounded-lg flex items-center gap-1"
                           >
-                            <Eye className="h-3 w-3" />
+                            <span className="material-symbols-outlined text-[16px]">query_stats</span>
+                            Dossiê
                           </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center space-x-1">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48" align="end">
-                              <div className="space-y-2">
-                                {assignedTemplates.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground text-center py-2">
-                                    Nenhuma ficha atribuída
-                                  </p>
-                                ) : (
-                                  assignedTemplates.map((template) => (
-                                    <Button
-                                      key={template.id}
-                                      variant="ghost"
-                                      className="w-full justify-start h-8 px-2 text-sm"
-                                      onClick={() => handleOpenFormFill(client, template.id)}
-                                    >
-                                      <FileText className="h-3 w-3 mr-2 flex-shrink-0" />
-                                      {template.nome}
-                                    </Button>
-                                  ))
-                                )}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                          <div className="w-[1px] h-4 bg-slate-200 mx-1"></div>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleOpenDialog(client)}
-                            className="h-8 w-8 p-0 flex-shrink-0"
+                            className="h-9 w-9 p-0 text-slate-400 hover:text-primary hover:bg-slate-100 rounded-lg"
                           >
-                            <Edit className="h-3 w-3" />
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(client.id)}
-                            className="h-8 w-8 p-0 flex-shrink-0 text-destructive hover:text-destructive"
+                            className="h-9 w-9 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
                           </Button>
                         </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
           
-          {filteredClients.length === 0 && (
-            <div className="text-center py-8 px-4">
-              <p className="text-sm text-muted-foreground">
-                {searchQuery ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado.'}
+          {filteredClients.length === 0 && !isLoading && (
+            <div className="text-center py-16 px-4">
+              <span className="material-symbols-outlined text-4xl text-slate-200 mb-2">sentiment_dissatisfied</span>
+              <p className="text-sm font-bold text-slate-500">
+                {searchQuery ? 'Nenhum paciente encontrado com essa busca.' : 'Nenhum paciente cadastrado.'}
               </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
       
-      {/* Timeline for selected client */}
-      {showTimeline && (
-        <Card className="w-full">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg md:text-xl break-words">
-              Histórico do Paciente - {clients.find(c => c.id === showTimeline)?.name}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
-            {getClientForms(showTimeline.toString()).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Nenhuma ficha preenchida para este cliente.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {getClientForms(showTimeline.toString()).map((form) => (
-                  <Card key={form.id} className="cursor-pointer hover:bg-accent/50 transition-colors">
-                    <CardContent className="p-4" onClick={() => setViewingFormId(form.id)}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{form.templateName}</h4>
-                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
-                            <span>Por: {form.professionalName}</span>
-                            <span>•</span>
-                            <span>{new Date(form.criadoEm).toLocaleString('pt-BR')}</span>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <ClientDossierModal 
+        open={!!showTimeline} 
+        clientId={showTimeline} 
+        onOpenChange={(open) => setShowTimeline(open ? showTimeline : null)} 
+      />
 
       {/* Form Fill Modal */}
       {selectedClient && selectedTemplate && (

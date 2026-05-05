@@ -247,10 +247,7 @@ const Index = () => {
           <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
             <div className={`glass-card rounded-2xl px-6 py-3 flex items-center justify-between border-slate-200/50 shadow-sm`}>
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 bg-[var(--primary)] rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
-                  <Target className="text-white w-5 h-5" />
-                </div>
-                <span className="font-headline font-extrabold text-2xl tracking-tight text-[var(--primary)]">SalesClin</span>
+                <img src="/logo-oficial-v3.png" alt="SalesClin Logo" className="h-14 w-auto object-contain" />
               </div>
 
               <div className="hidden lg:flex items-center gap-8">
@@ -558,11 +555,8 @@ const Index = () => {
         <footer className="py-20 border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
             <div className="flex flex-col md:flex-row items-center justify-between gap-12 mb-12">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[var(--primary)] rounded-xl flex items-center justify-center">
-                  <Target className="text-white w-6 h-6" />
-                </div>
-                <span className="font-headline font-bold text-2xl text-[var(--primary)]">SalesClin</span>
+              <div className="flex items-center gap-2">
+                <img src="/logo-oficial-v3.png" alt="SalesClin Logo" className="h-14 w-auto object-contain" />
               </div>
               
               <div className="flex gap-10">

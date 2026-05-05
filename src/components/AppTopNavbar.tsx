@@ -99,6 +99,7 @@ export function AppTopNavbar() {
     : 'U';
 
   const roleName = professional?.role === 'admin' ? 'ADMIN' : 'PROFISSIONAL';
+  const isProfileActive = location.pathname === '/profile' || location.pathname === '/settings';
 
   return (
     <header className="sticky top-0 w-full z-50 bg-[#0B1525] text-white shadow-lg shadow-[#0B1525]/10 border-b border-white/5">
@@ -108,8 +109,8 @@ export function AppTopNavbar() {
         <Link to="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
           <img
             alt="SalesClin Logo"
-            className="h-7 w-auto object-contain"
-            src="/logo-salesclin.png"
+            className="h-10 w-auto object-contain"
+            src="/logo-oficial-v3.png"
           />
         </Link>
 
@@ -160,10 +161,28 @@ export function AppTopNavbar() {
           {/* Avatar */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[13px] font-bold text-slate-300 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all cursor-pointer shadow-sm"
+            className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-bold transition-all cursor-pointer shadow-sm overflow-hidden",
+              isProfileActive 
+                ? "border-2 border-secondary shadow-[0_0_12px_rgba(249,115,22,0.3)]" 
+                : "border border-white/20 hover:border-white/40"
+            )}
             title="Menu do usuário"
           >
-            {initials}
+            {professional?.photoUrl ? (
+              <img 
+                src={professional.photoUrl} 
+                alt="Foto do perfil" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className={cn(
+                "w-full h-full flex items-center justify-center",
+                isProfileActive ? "bg-secondary/10 text-secondary" : "bg-white/5 text-slate-300"
+              )}>
+                {initials}
+              </span>
+            )}
           </button>
 
           {/* Dropdown Menu */}

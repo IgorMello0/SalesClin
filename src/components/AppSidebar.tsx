@@ -95,8 +95,8 @@ export function AppSidebar() {
           ) : (
             <img 
               alt="SalesClin Logo" 
-              className="w-full h-auto object-contain max-w-[160px] animate-in fade-in zoom-in duration-300" 
-              src="/logo-salesclin.png" 
+              className="w-full h-auto object-contain max-w-[200px] animate-in fade-in zoom-in duration-300" 
+              src="/logo-oficial-v3.png" 
             />
           )}
         </div>

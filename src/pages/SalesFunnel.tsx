@@ -9,6 +9,12 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,10 +32,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NewAppointmentModal } from '@/components/NewAppointmentModal';
+import { ConfirmPaymentModal } from '@/components/ConfirmPaymentModal';
 import { clientsApi, leadsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from "lucide-react";
 import { useEffect } from 'react';
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExportModal } from "@/components/ExportModal";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -66,6 +75,7 @@ interface Lead {
   discountApplied?: boolean;
   remarketingProposals?: any[];
   isPaid?: boolean;
+  subStatus?: string | null;
   appointments?: any[];
 }
 
@@ -97,6 +107,14 @@ const STAGES = {
   ]
 };
 
+const QUICK_STATUSES = [
+  { id: 'aguardando', label: 'Aguardando', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+  { id: 'ligar_tarde', label: 'Ligar mais tarde', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { id: 'retorna_amanha', label: 'Retorna amanhã', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { id: 'nao_respondeu', label: 'Não respondeu', color: 'bg-red-100 text-red-700 border-red-200' },
+  { id: 'negociacao', label: 'Em negociação', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+];
+
 const SalesFunnel = () => {
   const { professional } = useAuth();
   const [activeFunnel, setActiveFunnel] = useState('prospecting');
@@ -108,6 +126,11 @@ const SalesFunnel = () => {
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Multi-select & Export State
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
 
   // Appointment scheduling state
   const [isScheduling, setIsScheduling] = useState(false);
@@ -139,6 +162,9 @@ const SalesFunnel = () => {
   const [showJustification, setShowJustification] = useState(false);
   const [removedTags, setRemovedTags] = useState<string[]>([]);
 
+  // Payment Confirmation State
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [paymentLead, setPaymentLead] = useState<{id: string, value: number} | null>(null);
   // Schedule from closed lead
   const [isSchedulingClosed, setIsSchedulingClosed] = useState(false);
   const [closedLeadToSchedule, setClosedLeadToSchedule] = useState<Lead | null>(null);
@@ -523,26 +549,39 @@ const SalesFunnel = () => {
     setRemovedTags([]);
   };
 
-  const handleConfirmPayment = async (leadId: string) => {
+  const handleConfirmPayment = (lead: Lead) => {
+    setPaymentLead({ id: lead.id, value: lead.value });
+    setIsConfirmingPayment(true);
+  };
+
+  const handleSubStatusChange = async (leadId: string, subStatus: string | null) => {
     try {
-      await leadsApi.update(leadId, { isPaid: true });
-      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, isPaid: true } : l));
-      toast({
-        title: "Pagamento Confirmado! 💰",
-        description: "O valor foi contabilizado na receita do dashboard.",
-      });
+      await leadsApi.update(Number(leadId), { subStatus });
+      setLeads(leads.map(l => l.id === leadId ? { ...l, subStatus } : l));
+      toast({ title: "Status rápido atualizado!" });
     } catch (error) {
-      toast({
-        title: "Erro ao confirmar pagamento",
-        description: "Tente novamente mais tarde.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao atualizar status", variant: "destructive" });
     }
   };
 
   const openAddLead = (stageId: string | null = null) => {
     setNewLeadStage(stageId);
     setIsAddingLead(true);
+  };
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds(prev => 
+      prev.includes(leadId) ? prev.filter(id => id !== leadId) : [...prev, leadId]
+    );
+  };
+
+  const handleExport = (format: string, scope: string) => {
+    // Aqui vai a lógica de exportação final (ex: API ou frontend CSV gen)
+    // Usaremos os ids em `selectedLeadIds` se scope for 'selected'
+    toast({ title: "Exportação Iniciada", description: `Exportando em formato ${format.toUpperCase()} (${scope === 'all' ? 'Todos' : 'Selecionados'})` });
+    if (scope === 'selected') {
+      setSelectedLeadIds([]); // limpar após exportar (opcional)
+    }
   };
 
   return (
@@ -575,6 +614,38 @@ const SalesFunnel = () => {
             ))}
           </div>
           
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost"
+                className="h-12 w-12 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <span className="material-symbols-outlined text-2xl">settings</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-xl border-slate-100">
+              <DropdownMenuItem 
+                onClick={() => {
+                  setIsMultiSelectMode(!isMultiSelectMode);
+                  if (isMultiSelectMode) setSelectedLeadIds([]);
+                }} 
+                className="cursor-pointer rounded-xl font-medium py-2.5"
+              >
+                <span className="material-symbols-outlined mr-3 text-[18px] text-slate-500">
+                  {isMultiSelectMode ? 'close' : 'checklist'}
+                </span>
+                {isMultiSelectMode ? 'Cancelar Seleção' : 'Selecionar Vários'}
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setIsExportModalOpen(true)} 
+                className="cursor-pointer rounded-xl font-medium py-2.5 text-primary"
+              >
+                <span className="material-symbols-outlined mr-3 text-[18px] text-primary">download</span>
+                Exportar Dados
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button 
             onClick={() => openAddLead()} 
             size="xl"
@@ -656,6 +727,15 @@ const SalesFunnel = () => {
 
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-3">
+                        {isMultiSelectMode && (
+                          <div onClick={(e) => e.stopPropagation()} className="animate-in zoom-in-95 duration-200">
+                            <Checkbox 
+                              checked={selectedLeadIds.includes(lead.id)} 
+                              onCheckedChange={() => toggleLeadSelection(lead.id)}
+                              className="border-slate-300 data-[state=checked]:bg-secondary data-[state=checked]:border-secondary"
+                            />
+                          </div>
+                        )}
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/5">
                           {lead.avatar}
                         </div>
@@ -672,11 +752,44 @@ const SalesFunnel = () => {
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-                      <div className="text-xs font-bold text-primary">
-                        {lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    <div className="flex items-start justify-between mt-4 pt-3 border-t border-slate-100">
+                      <div className="flex flex-col gap-2">
+                        <div className="text-xs font-bold text-primary">
+                          {lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </div>
+                        {activeFunnel === 'prospecting' && (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className={cn(
+                                  "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors border text-left",
+                                  lead.subStatus ? QUICK_STATUSES.find(s => s.id === lead.subStatus)?.color : QUICK_STATUSES[0].color
+                                )}>
+                                  {lead.subStatus ? QUICK_STATUSES.find(s => s.id === lead.subStatus)?.label : 'Status (Nenhum)'}
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-48 rounded-xl p-2 bg-white shadow-xl border-slate-100">
+                                {QUICK_STATUSES.map(status => (
+                                  <DropdownMenuItem 
+                                    key={status.id}
+                                    onClick={() => handleSubStatusChange(lead.id, status.id)}
+                                    className={cn("text-xs font-bold cursor-pointer rounded-lg mb-1 last:mb-0", status.color)}
+                                  >
+                                    {status.label}
+                                  </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuItem 
+                                  onClick={() => handleSubStatusChange(lead.id, null)}
+                                  className="text-xs font-bold text-slate-400 cursor-pointer rounded-lg"
+                                >
+                                  Limpar Status
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                      <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">
                         <span className="material-symbols-outlined text-[10px]">schedule</span>
                         {lead.lastUpdate}
                       </div>
@@ -805,7 +918,7 @@ const SalesFunnel = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleConfirmPayment(lead.id);
+                            handleConfirmPayment(lead);
                           }}
                           className="w-full py-2 bg-cyan-100 hover:bg-cyan-600 text-cyan-700 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-cyan-200 animate-pulse-subtle"
                         >
@@ -893,25 +1006,6 @@ const SalesFunnel = () => {
                 className="rounded-xl border-slate-200 h-12"
                 value={newLeadData.email}
                 onChange={(e) => setNewLeadData({...newLeadData, email: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="value" className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Estimado (R$)</Label>
-              <Input 
-                id="value" 
-                type="text" 
-                placeholder="2.500" 
-                className="rounded-xl border-slate-200 h-12"
-                value={newLeadData.value}
-                onChange={(e) => {
-                  let val = e.target.value.replace(/\D/g, "");
-                  if (!val) {
-                    setNewLeadData({...newLeadData, value: ""});
-                    return;
-                  }
-                  const formatted = new Intl.NumberFormat('pt-BR').format(parseInt(val));
-                  setNewLeadData({...newLeadData, value: formatted});
-                }}
               />
             </div>
           </div>
@@ -1310,6 +1404,24 @@ const SalesFunnel = () => {
           initialServiceTags={closedLeadToSchedule.tags || []}
         />
       )}
+
+      <ExportModal 
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={handleExport}
+        selectedCount={selectedLeadIds.length}
+      />
+
+      {/* Confirm Payment Modal */}
+      <ConfirmPaymentModal
+        open={isConfirmingPayment}
+        onOpenChange={setIsConfirmingPayment}
+        leadId={paymentLead?.id || null}
+        leadValue={paymentLead?.value || 0}
+        onSuccess={() => {
+          loadLeads();
+        }}
+      />
     </div>
   );
 };

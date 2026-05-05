@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { professionalsApi } from '@/lib/api';
 
 const Profile = () => {
-  const { professional } = useAuth();
+  const { professional, updateProfilePhoto } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -94,6 +94,7 @@ const Profile = () => {
       });
       if (res.success) {
         toast({ title: 'Perfil atualizado', description: 'Suas informações foram salvas com sucesso.' });
+        if (formData.photoUrl) updateProfilePhoto(formData.photoUrl);
         setIsEditing(false);
       } else {
         throw new Error(res.error?.message || 'Erro ao salvar');

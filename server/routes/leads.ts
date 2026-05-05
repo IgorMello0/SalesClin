@@ -248,6 +248,68 @@ router.put('/:id', auth(), async (req, res) => {
   }
 })
 
+// Confirm payment logic
+router.post('/:id/confirm-payment', auth(), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const { payments } = req.body // Array of { amount, date, method, status }
+
+    const lead = await prisma.lead.findUnique({ where: { id } })
+    if (!lead) return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+
+    let clientId = lead.convertedToClientId
+
+    // Se o lead ainda não foi convertido, criar cliente
+    if (!clientId) {
+      const newClient = await prisma.client.create({
+        data: {
+          professionalId: lead.professionalId,
+          name: lead.name,
+          email: lead.email,
+          phone: lead.phone,
+          notes: lead.notes,
+        }
+      })
+      clientId = newClient.id
+
+      await prisma.lead.update({
+        where: { id },
+        data: { 
+          convertedToClientId: clientId,
+          convertedAt: new Date()
+        }
+      })
+    }
+
+    // Criar os pagamentos no banco de dados
+    const paymentRecords = []
+    for (const p of payments) {
+      const payment = await prisma.payment.create({
+        data: {
+          clientId: clientId,
+          professionalId: lead.professionalId,
+          amount: p.amount,
+          date: new Date(p.date),
+          method: p.method, // 'cartao', 'pix', 'boleto', 'dinheiro'
+          status: p.status || 'pago'
+        }
+      })
+      paymentRecords.push(payment)
+    }
+
+    // Atualiza status do Lead para pago e move para o funil pós-venda ou similar se quiser
+    const updatedLead = await prisma.lead.update({
+      where: { id },
+      data: { isPaid: true } // Mantendo o status onde está, apenas marcando como pago
+    })
+
+    res.json(createSuccessResponse({ payments: paymentRecords, lead: updatedLead }))
+  } catch (error: any) {
+    console.error('[Leads] Erro ao confirmar pagamento:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao confirmar pagamento', 500))
+  }
+})
+
 // Deletar lead
 router.delete('/:id', auth(), async (req, res) => {
   try {

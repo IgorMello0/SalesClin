@@ -175,6 +175,7 @@ model Lead {
   discountApplied      Boolean   @default(false) @map("discount_applied")
   remarketingProposals Json?     @map("remarketing_proposals") // Array de propostas arquivadas
   isPaid               Boolean   @default(false) @map("is_paid")
+  subStatus            String?   @map("sub_status")
   convertedToClientId  Int?      @unique @map("converted_to_client_id")
   convertedAt          DateTime? @map("converted_at")
   createdAt            DateTime  @default(now()) @map("created_at")

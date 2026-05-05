@@ -90,6 +90,8 @@ export const clientsApi = {
     return apiRequest<Array<any>>(`/clientes?${query.toString()}`)
   },
   getById: async (id: number) => apiRequest<any>(`/clientes/${id}`),
+  getDossier: async (id: number) => apiRequest<any>(`/clientes/${id}/dossier`),
+  addProposal: async (id: number, data: any) => apiRequest<any>(`/clientes/${id}/proposals`, { method: 'POST', body: JSON.stringify(data) }),
   create: async (data: any) => apiRequest<any>('/clientes', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) => apiRequest<any>(`/clientes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/clientes/${id}`, { method: 'DELETE' }),
@@ -209,6 +211,7 @@ export const leadsApi = {
   delete: async (id: number) => apiRequest<{ id: number }>(`/leads/${id}`, { method: 'DELETE' }),
   addActivity: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/activities`, { method: 'POST', body: JSON.stringify(data) }),
   addProposal: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/proposals`, { method: 'POST', body: JSON.stringify(data) }),
+  confirmPayment: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/confirm-payment`, { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // Catálogos
