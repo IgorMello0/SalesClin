@@ -85,13 +85,20 @@ const Signup = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 py-8">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Criar Conta
-          </CardTitle>
-          <CardDescription className="text-center">
-            Configure sua área profissional
-          </CardDescription>
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col items-center justify-center gap-6">
+            <Link to="/" className="transition-transform hover:scale-105 duration-300">
+              <img src="/logo-site.png" alt="SalesClin Logo" className="h-32 w-auto object-contain" />
+            </Link>
+            <div className="space-y-1 text-center">
+              <CardTitle className="text-2xl font-bold">
+                Criar Conta
+              </CardTitle>
+              <CardDescription>
+                Configure sua área profissional
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -176,10 +183,16 @@ const Signup = () => {
             </Button>
           </form>
           
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">Já tem conta? </span>
-            <Link to="/login" className="text-primary hover:underline">
-              Fazer login
+          <div className="mt-6 text-center text-sm space-y-4">
+            <div>
+              <span className="text-muted-foreground">Já tem conta? </span>
+              <Link to="/login" className="text-primary hover:underline font-bold">
+                Fazer login
+              </Link>
+            </div>
+            <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors group">
+              <span className="material-symbols-outlined text-[18px] group-hover:-translate-x-1 transition-transform">arrow_back</span>
+              Voltar ao site
             </Link>
           </div>
         </CardContent>
