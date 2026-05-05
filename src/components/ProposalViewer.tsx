@@ -71,37 +71,41 @@ export function ProposalViewer({ open, onOpenChange, proposal, lead, companyInfo
             }
 
             /* 3. Mostrar APENAS a print-area e forçar no topo */
-            /* Como o Dialog está num portal, precisamos mostrar o portal pai, mas esconder o overlay */
             [data-radix-portal] {
               display: block !important;
-              position: static !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
             }
             
-            [data-radix-portal] > div {
-              background: none !important;
-              backdrop-filter: none !important;
-              box-shadow: none !important;
+            /* Esconder o overlay escuro e o botão de fechar do Dialog */
+            [data-radix-portal] > div:first-child,
+            button[aria-label="Close"] {
+              display: none !important;
             }
 
             .print-area {
-              display: block !important;
+              display: flex !important;
+              flex-direction: column !important;
               visibility: visible !important;
-              position: fixed !important; /* Fixar no topo absoluto */
+              position: absolute !important;
               top: 0 !important;
               left: 0 !important;
               width: 210mm !important;
-              min-height: 297mm !important;
+              height: 297mm !important; /* Travar no tamanho A4 */
+              max-height: 297mm !important;
               margin: 0 !important;
-              padding: 15mm !important;
+              padding: 12mm 15mm !important;
               background: white !important;
               border: none !important;
               box-shadow: none !important;
               z-index: 99999 !important;
+              overflow: hidden !important; /* Evitar que qualquer coisa "vaze" para pág 2 */
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
 
-            /* Garantir que todos os filhos da print-area sejam visíveis */
             .print-area * {
               visibility: visible !important;
             }
