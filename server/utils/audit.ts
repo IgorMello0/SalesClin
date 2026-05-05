@@ -1,4 +1,4 @@
-import { prisma } from '../prisma'
+import { prisma } from '../prisma.js'
 
 /**
  * Registra uma ação no log de auditoria
