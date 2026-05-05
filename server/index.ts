@@ -22,6 +22,7 @@ import { router as dashboardRouter } from './routes/dashboard'
 import { router as leadsRouter } from './routes/leads'
 import { router as metasRouter } from './routes/metas'
 import { router as webhooksRouter } from './routes/webhooks'
+import { router as rolesRouter } from './routes/roles'
 import { createErrorResponse } from './utils/response'
 import path from 'path'
 
@@ -56,6 +57,7 @@ app.use('/api/dashboard', dashboardRouter)
 app.use('/api/leads', leadsRouter)
 app.use('/api/metas', metasRouter)
 app.use('/api/webhooks', webhooksRouter)
+app.use('/api/roles', rolesRouter)
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))

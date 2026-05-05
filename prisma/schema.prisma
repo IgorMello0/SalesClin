@@ -459,6 +459,7 @@ model Empresa {
   usuarios      Usuario[]
   agentesIa     AgenteIa[]
   conversas     Conversa[]
+  roles         Role[]
 
   @@map("empresas")
 }
@@ -628,4 +629,19 @@ model Goal {
   professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
   @@map("goals")
+}
+
+// Cargos customizados por empresa
+model Role {
+  id        Int      @id @default(autoincrement())
+  companyId Int      @map("company_id")
+  name      String   // Nome exibido (Ex: "Dentista")
+  value     String   // Valor simplificado (Ex: "dentista")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Empresa @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, value])
+  @@map("roles")
 }

@@ -274,3 +274,10 @@ export const goalsApi = {
   delete: async (id: number) => apiRequest<any>(`/metas/${id}`, { method: 'DELETE' }),
 }
 
+// Cargos
+export const rolesApi = {
+  getAll: async () => apiRequest<Array<any>>('/roles'),
+  create: async (data: { name: string; value: string }) => apiRequest<any>('/roles', { method: 'POST', body: JSON.stringify(data) }),
+  delete: async (id: number) => apiRequest<any>(`/roles/${id}`, { method: 'DELETE' }),
+}
+

@@ -24,7 +24,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi } from '@/lib/api';
+import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi } from '@/lib/api';
 
 // -- CARGOS HELPERS --
 const DEFAULT_ROLES = [
@@ -33,25 +33,6 @@ const DEFAULT_ROLES = [
   { value: 'recepcao', label: 'Recepção' },
   { value: 'financeiro', label: 'Financeiro' },
 ];
-
-const STORAGE_KEY = 'salesclin_custom_roles';
-
-const getCustomRoles = (): { value: string; label: string }[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveCustomRoles = (roles: { value: string; label: string }[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(roles));
-};
-
-const getAllRoles = () => {
-  return [...DEFAULT_ROLES, ...getCustomRoles()];
-};
 
 // -- COMPONENTES DE CONFIGURAÇÃO --
 
@@ -257,7 +238,22 @@ const EquipeView = () => {
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
-  const ROLES = getAllRoles();
+  const [customRoles, setCustomRoles] = useState<any[]>([]);
+
+  const loadRoles = async () => {
+    try {
+      const res = await rolesApi.getAll();
+      if (res.success) setCustomRoles(res.data || []);
+    } catch (e) {
+      console.error('Erro ao carregar cargos:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadRoles();
+  }, []);
+
+  const allRoles = [...DEFAULT_ROLES, ...customRoles];
 
   const loadTeam = async () => {
     try {
@@ -382,7 +378,7 @@ const EquipeView = () => {
     };
     // Build labels from default + custom roles
     const allLabels: Record<string, string> = {};
-    getAllRoles().forEach(r => { allLabels[r.value] = r.label; });
+    allRoles.forEach(r => { allLabels[r.value] = r.label || r.name; });
     allLabels['admin'] = 'Admin';
     
     return (
@@ -394,11 +390,11 @@ const EquipeView = () => {
 
   return (
     <div className="space-y-6">
-      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm border border-blue-100 dark:border-blue-900 flex items-start gap-3">
-        <Users className="w-5 h-5 flex-shrink-0 mt-0.5" />
-        <div>
-          <strong className="block mb-0.5">Gestão de Equipe</strong>
-          Adicione funcionários (comercial, atendimento, recepção) e controle quais módulos cada um pode acessar. Eles fazem login na mesma tela de login.
+      <div className="p-4 bg-blue-500/10 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-2xl text-sm border border-blue-200/50 dark:border-blue-800/50 flex items-start gap-3 shadow-sm">
+        <Users className="w-5 h-5 flex-shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+        <div className="leading-relaxed">
+          <strong className="block mb-0.5 text-blue-900 dark:text-blue-100 font-bold">Gestão de Equipe</strong>
+          Adicione funcionários e controle o acesso. Eles acessam o sistema pela mesma tela de login.
         </div>
       </div>
 
@@ -432,8 +428,8 @@ const EquipeView = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent position="item-aligned" className="z-[200]">
-                  {ROLES.map(r => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  {allRoles.map(r => (
+                    <SelectItem key={r.value} value={r.value}>{r.label || r.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -657,52 +653,83 @@ const InfoNegocioView = () => {
 // -- CARGOS VIEW --
 const CargosView = () => {
   const { toast } = useToast();
-  const [customRoles, setCustomRoles] = useState(getCustomRoles());
+  const [customRoles, setCustomRoles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newRoleName, setNewRoleName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
+  const loadRoles = async () => {
+    setLoading(true);
+    try {
+      const res = await rolesApi.getAll();
+      if (res.success) setCustomRoles(res.data || []);
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Erro ao carregar cargos', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRoles();
+  }, []);
+
   const allRoles = [...DEFAULT_ROLES, ...customRoles];
 
-  const handleAddRole = () => {
+  const handleAddRole = async () => {
     const trimmed = newRoleName.trim();
     if (!trimmed) {
       toast({ title: 'Aviso', description: 'Digite o nome do cargo', variant: 'destructive' });
       return;
     }
     const value = trimmed.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
+    
     if (allRoles.find(r => r.value === value)) {
       toast({ title: 'Aviso', description: 'Esse cargo já existe', variant: 'destructive' });
       return;
     }
-    const updated = [...customRoles, { value, label: trimmed }];
-    setCustomRoles(updated);
-    saveCustomRoles(updated);
-    setNewRoleName('');
-    setIsAdding(false);
-    toast({ title: 'Cargo criado!', description: `"${trimmed}" agora está disponível na criação de funcionários.` });
+
+    try {
+      const res = await rolesApi.create({ name: trimmed, value });
+      if (res.success) {
+        toast({ title: 'Cargo criado!', description: `"${trimmed}" agora está salvo no banco de dados.` });
+        setNewRoleName('');
+        setIsAdding(false);
+        loadRoles();
+      } else {
+        throw new Error(res.error?.message || 'Erro ao criar');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
   };
 
-  const handleDeleteRole = (value: string) => {
-    const updated = customRoles.filter(r => r.value !== value);
-    setCustomRoles(updated);
-    saveCustomRoles(updated);
-    toast({ title: 'Removido', description: 'Cargo removido com sucesso.' });
+  const handleDeleteRole = async (id: number) => {
+    try {
+      const res = await rolesApi.delete(id);
+      if (res.success) {
+        toast({ title: 'Removido', description: 'Cargo removido com sucesso.' });
+        loadRoles();
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: 'Erro ao remover cargo', variant: 'destructive' });
+    }
   };
 
   const roleColors: Record<string, string> = {
-    comercial: 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900',
-    atendente: 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900',
-    recepcao: 'bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-900',
-    financeiro: 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900',
+    comercial: 'bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    atendente: 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    recepcao: 'bg-violet-100 dark:bg-violet-900/30 text-violet-900 dark:text-violet-300 border-violet-200 dark:border-violet-800',
+    financeiro: 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-300 border-green-200 dark:border-green-800',
   };
 
   return (
     <div className="space-y-6">
-      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm border border-blue-100 dark:border-blue-900 flex items-start gap-3">
-        <Tag className="w-5 h-5 flex-shrink-0 mt-0.5" />
-        <div>
-          <strong className="block mb-0.5">Cargos e Funções</strong>
-          Crie cargos personalizados para sua clínica. Eles aparecerão automaticamente no dropdown ao adicionar um novo funcionário na seção de Equipe.
+      <div className="p-4 bg-blue-500/10 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-2xl text-sm border border-blue-200/50 dark:border-blue-800/50 flex items-start gap-3 shadow-sm">
+        <Tag className="w-5 h-5 flex-shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+        <div className="leading-relaxed">
+          <strong className="block mb-0.5 text-blue-900 dark:text-blue-100 font-bold">Cargos e Funções</strong>
+          Crie cargos personalizados para sua clínica. Eles aparecerão automaticamente no dropdown de Equipe.
         </div>
       </div>
 
@@ -752,14 +779,14 @@ const CargosView = () => {
               <div key={role.value} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 hover:border-primary/30 transition-colors">
                 <div className="flex items-center gap-3">
                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/20">
-                    {role.label}
+                    {role.name}
                   </span>
                   <span className="text-xs text-muted-foreground font-mono">{role.value}</span>
                 </div>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => handleDeleteRole(role.value)}
+                  onClick={() => handleDeleteRole(role.id)}
                   className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 h-7 w-7 p-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
