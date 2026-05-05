@@ -41,7 +41,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ExportModal } from "@/components/ExportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, History, FileDown, Edit2, Check, X } from "lucide-react";
+import { FileText, History, FileDown, Edit2, Check, X, Eye } from "lucide-react";
 
 const safeFormatDate = (dateStr: any, formatStr: string = "dd/MM/yyyy") => {
   try {
@@ -207,6 +207,12 @@ const SalesFunnel = () => {
     return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
   };
 
+  const openWhatsApp = (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const finalPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+    window.location.href = `whatsapp://send?phone=${finalPhone}`;
+  };
+
   const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
 
   useEffect(() => {
@@ -237,7 +243,7 @@ const SalesFunnel = () => {
               user: a.createdBy || 'Sistema',
               action: isNote ? 'fez uma anotação' : isProposal ? 'gerou uma proposta comercial' : 'ação no sistema',
               content: a.content,
-              date: format(new Date(a.createdAt), "dd/MM/yy 'às' HH:mm", { locale: ptBR }),
+              date: safeFormatDate(a.createdAt, "dd/MM/yy 'às' HH:mm"),
               icon: isNote ? 'edit_note' : isProposal ? 'description' : 'info',
               color: isNote ? 'bg-[#FF7A00]' : isProposal ? 'bg-orange-500' : 'bg-blue-400'
             };
@@ -379,16 +385,27 @@ const SalesFunnel = () => {
   };
 
   const moveLead = async (leadId: string, newStatus: string) => {
+    // REGRA DE NEGÓCIO: Se o lead foi para "Compareceu", mover automaticamente para "Consulta Feita"
+    // Isso tira o lead do funil de prospecção e o joga no comercial
+    const finalStatus = newStatus === 'prospect_attended' ? 'comercial_consult' : newStatus;
+
     setLeads(prev => prev.map(lead => {
       if (lead.id === leadId) {
-        return { ...lead, status: newStatus, lastUpdate: 'Just now' };
+        return { ...lead, status: finalStatus, lastUpdate: 'Just now' };
       }
       return lead;
     }));
 
     try {
-      const res = await leadsApi.update(Number(leadId), { status: newStatus });
+      const res = await leadsApi.update(Number(leadId), { status: finalStatus });
       
+      if (res.success && newStatus === 'prospect_attended') {
+        toast({ 
+          title: "Lead Movido!", 
+          description: "O lead compareceu e foi movido automaticamente para 'Consulta Feita' no Funil Comercial.",
+        });
+      }
+
       // Se o lead foi convertido automaticamente em cliente
       if (res.success && res.data?.converted) {
         toast({ 
@@ -438,6 +455,8 @@ const SalesFunnel = () => {
       return;
     }
 
+    const finalStatus = newLeadStage === 'prospect_attended' ? 'comercial_consult' : (newLeadStage || 'prospect_lead');
+    
     try {
       const res = await leadsApi.create({
         professional_id: Number(professional.id),
@@ -446,7 +465,7 @@ const SalesFunnel = () => {
         email: newLeadData.email,
         value: Number(newLeadData.value.toString().replace(/\./g, "")) || 0,
         origin: newLeadData.origin,
-        status: newLeadStage || 'prospect_lead',
+        status: finalStatus,
         avatar: newLeadData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
       });
 
@@ -528,7 +547,7 @@ const SalesFunnel = () => {
       user: professional?.name || 'Vendedor',
       action: 'gerou uma proposta comercial',
       content: `${proposalData.treatment} - Valor: ${newValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
-      date: format(new Date(), "dd/MM/yy 'às' HH:mm", { locale: ptBR }),
+      date: safeFormatDate(new Date(), "dd/MM/yy 'às' HH:mm"),
       icon: 'description',
       color: 'bg-orange-500'
     };
@@ -540,7 +559,7 @@ const SalesFunnel = () => {
         user: 'Sistema',
         action: 'arquivou itens para remarketing',
         content: `Itens removidos: ${removedTags.join(', ')}`,
-        date: format(new Date(), "dd/MM/yy 'às' HH:mm", { locale: ptBR }),
+        date: safeFormatDate(new Date(), "dd/MM/yy 'às' HH:mm"),
         icon: 'campaign',
         color: 'bg-blue-400'
       };
@@ -745,7 +764,7 @@ const SalesFunnel = () => {
       </div>
 
       {/* Board */}
-      <div className="flex gap-6 overflow-x-auto pb-6 -mx-4 px-4 scrollbar-hide">
+      <div className="flex gap-4 overflow-x-auto pb-6 -mx-4 px-4 scrollbar-hide">
         {activeStages.map((stage) => {
           const stageLeads = leads.filter(l => {
             // Regra de Roteamento: 
@@ -753,12 +772,6 @@ const SalesFunnel = () => {
             const isOperational = !l.isPaid;
             if (!isOperational) return false;
 
-            if (stage.id === 'prospect_attended') {
-              return l.status === 'prospect_attended' || l.status.startsWith('comercial_') || l.status.startsWith('sales_');
-            }
-            if (stage.id === 'comercial_consult') {
-              return l.status === 'comercial_consult' || l.status === 'prospect_attended';
-            }
             return l.status === stage.id;
           });
           
@@ -767,7 +780,7 @@ const SalesFunnel = () => {
           return (
             <div 
               key={stage.id} 
-              className="flex-shrink-0 w-80 flex flex-col gap-4"
+              className="flex-shrink-0 w-72 flex flex-col gap-3"
               onDragOver={(e) => handleDragOver(e, stage.id)}
               onDrop={(e) => handleDrop(e, stage.id)}
               onDragLeave={() => setDropTargetStage(null)}
@@ -789,7 +802,7 @@ const SalesFunnel = () => {
               </div>
 
               <div className={cn(
-                "flex-1 min-h-[600px] rounded-2xl p-3 space-y-3 transition-all duration-200",
+                "flex-1 min-h-[500px] rounded-2xl p-2.5 space-y-2 transition-all duration-200",
                 "bg-slate-50/50 border border-slate-100/50",
                 isOver && "bg-slate-100/80 border-secondary/30 scale-[1.01]"
               )}>
@@ -800,19 +813,14 @@ const SalesFunnel = () => {
                     onDragStart={(e) => handleDragStart(e, lead.id)}
                     onClick={() => setSelectedLead(lead)}
                     className={cn(
-                      "premium-card p-4 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
+                      "premium-card p-3 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
                       draggedLeadId === lead.id && "opacity-40 grayscale-[0.5]"
                     )}
                   >
-                    {/* Badge for Converted Leads in Prospecting View */}
-                    {(activeFunnel === 'prospecting' && lead.status.startsWith('comercial_')) && (
-                      <div className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
-                        CONVERTIDO
-                      </div>
-                    )}
+                    {/* Card Content */}
 
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
                         {isMultiSelectMode && (
                           <div onClick={(e) => e.stopPropagation()} className="animate-in zoom-in-95 duration-200">
                             <Checkbox 
@@ -822,24 +830,38 @@ const SalesFunnel = () => {
                             />
                           </div>
                         )}
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/5">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary border border-primary/5">
                           {lead.avatar}
                         </div>
                         <div>
-                          <h4 className="text-sm font-bold text-primary group-hover:text-secondary transition-colors flex items-center break-words">{lead.name}</h4>
+                          <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors flex items-center break-words">{lead.name}</h4>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="material-symbols-outlined text-[12px] text-emerald-500">chat</span>
                             <p className="text-[10px] text-slate-500 font-bold tracking-tight">{lead.phone}</p>
                           </div>
                         </div>
                       </div>
-                      <button className="text-slate-300 group-hover:text-slate-400 transition-colors">
-                        <span className="material-symbols-outlined text-base">more_vert</span>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openWhatsApp(lead.phone);
+                          }}
+                          className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                          title="Abrir no WhatsApp"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                          </svg>
+                        </button>
+                        <button className="text-slate-300 group-hover:text-slate-400 transition-colors">
+                          <span className="material-symbols-outlined text-base">more_vert</span>
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-start justify-between mt-4 pt-3 border-t border-slate-100">
-                      <div className="flex flex-col gap-2">
+                    <div className="flex items-start justify-between mt-2 pt-1.5 border-t border-slate-100">
+                      <div className="flex flex-col gap-1">
                         <div className="text-xs font-bold text-primary">
                           {lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
@@ -882,7 +904,7 @@ const SalesFunnel = () => {
                     </div>
 
                     {/* Stage specific acts */}
-                    <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-slate-100">
+                    <div className="flex flex-col gap-1 mt-2 pt-1.5 border-t border-slate-100">
                       {stage.id === 'prospect_scheduled' && (
                         lead.isScheduled ? (() => {
                           const lastAppt = lead.appointments && lead.appointments[0];
@@ -891,7 +913,7 @@ const SalesFunnel = () => {
                           switch(apptStatus) {
                             case 'concluido':
                               return (
-                                <div className="w-full py-2 bg-sky-50 text-sky-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-sky-100">
+                                <div className="w-full py-1.5 bg-sky-50 text-sky-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-sky-100">
                                   Compareceu
                                   <span className="material-symbols-outlined text-xs">check_circle</span>
                                 </div>
@@ -900,7 +922,7 @@ const SalesFunnel = () => {
                               return (
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
-                                  className="w-full py-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100"
+                                  className="w-full py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100"
                                 >
                                   Faltou / Reagendar
                                   <span className="material-symbols-outlined text-xs">event_busy</span>
@@ -908,14 +930,14 @@ const SalesFunnel = () => {
                               );
                             case 'confirmado':
                               return (
-                                <div className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-100">
+                                <div className="w-full py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-100">
                                   Confirmado
                                   <span className="material-symbols-outlined text-xs">verified</span>
                                 </div>
                               );
                             default:
                               return (
-                                <div className="w-full py-2 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-amber-100">
+                                <div className="w-full py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-amber-100">
                                   Agendado
                                   <span className="material-symbols-outlined text-xs">schedule</span>
                                 </div>
@@ -925,7 +947,7 @@ const SalesFunnel = () => {
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
                             disabled={isProcessingSchedule}
-                            className="w-full py-2 bg-violet-100 hover:bg-violet-600 text-violet-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-violet-200"
+                            className="w-full py-1.5 bg-violet-100 hover:bg-violet-600 text-violet-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-violet-200"
                           >
                             {isProcessingSchedule && currentSchedulingLeadId === lead.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -939,15 +961,6 @@ const SalesFunnel = () => {
                         )
                       )}
 
-                      {stage.id === 'prospect_attended' && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); moveLead(lead.id, 'comercial_consult'); }}
-                          className="w-full py-2 bg-secondary/10 hover:bg-secondary text-secondary hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                        >
-                          Encaminhar Comercial
-                          <span className="material-symbols-outlined text-xs">arrow_forward</span>
-                        </button>
-                      )}
 
                       {stage.id === 'comercial_consult' && (
                         <button 
@@ -1121,10 +1134,22 @@ const SalesFunnel = () => {
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" className="rounded-full h-10 w-10 p-0 border-slate-200 text-emerald-500 hover:bg-emerald-50">
-                          <span className="material-symbols-outlined text-xl">chat</span>
+                        <Button 
+                          onClick={() => openWhatsApp(selectedLead.phone)}
+                          variant="outline" 
+                          className="rounded-full h-10 w-10 p-0 border-slate-200 text-emerald-500 hover:bg-emerald-50"
+                          title="Abrir WhatsApp"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                          </svg>
                         </Button>
-                        <Button variant="outline" className="rounded-full h-10 w-10 p-0 border-slate-200 text-blue-500 hover:bg-blue-50">
+                        <Button 
+                          onClick={() => window.open(`tel:${selectedLead.phone}`)}
+                          variant="outline" 
+                          className="rounded-full h-10 w-10 p-0 border-slate-200 text-blue-500 hover:bg-blue-50"
+                          title="Ligar"
+                        >
                           <span className="material-symbols-outlined text-xl">call</span>
                         </Button>
                       </div>

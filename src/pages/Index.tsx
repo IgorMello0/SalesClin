@@ -245,9 +245,9 @@ const Index = () => {
         {/* Navbar */}
         <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'py-3' : 'py-6'}`}>
           <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
-            <div className={`glass-card rounded-2xl px-8 flex items-center justify-between border-slate-200/50 shadow-sm min-h-[110px] py-2`}>
+            <div className={`glass-card rounded-2xl px-8 flex items-center justify-between border-slate-200/50 shadow-sm min-h-[80px] py-2`}>
               <div className="flex items-center">
-                <img src="/logo-site.png" alt="SalesClin Logo" className="h-[140px] w-auto object-contain" />
+                <img src="/logo-site.png" alt="SalesClin Logo" className="h-[60px] w-auto object-contain" />
               </div>
 
               <div className="hidden lg:flex items-center gap-8">
@@ -556,7 +556,7 @@ const Index = () => {
           <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
             <div className="flex flex-col md:flex-row items-center justify-between gap-12 mb-12">
               <div className="flex items-center gap-2">
-                <img src="/logo-site.png" alt="SalesClin Logo" className="h-20 w-auto object-contain" />
+                <img src="/logo-site.png" alt="SalesClin Logo" className="h-12 w-auto object-contain" />
               </div>
               
               <div className="flex gap-10">

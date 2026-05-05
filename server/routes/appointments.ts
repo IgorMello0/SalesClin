@@ -208,10 +208,19 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     logAudit(req.user.id, 'ATUALIZAR_AGENDAMENTO', 'Appointment', id)
   }
 
-  // Update Lead's isScheduled status
+  // Update Lead's isScheduled status and auto-transition status if concluded
   if (updated.leadId) {
-    // Keep isScheduled true even for cancelled/completed so the funnel can show the specific badge
-    await prisma.lead.update({ where: { id: updated.leadId }, data: { isScheduled: true } })
+    const leadUpdateData: any = { isScheduled: true };
+    
+    // REGRA: Se a consulta foi concluída (Compareceu), move o lead para "Consulta Feita"
+    if (status === 'concluido') {
+      leadUpdateData.status = 'comercial_consult';
+    }
+    
+    await prisma.lead.update({ 
+      where: { id: updated.leadId }, 
+      data: leadUpdateData 
+    });
   }
   
   res.json(createSuccessResponse(updated))
