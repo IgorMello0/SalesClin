@@ -24,6 +24,7 @@ import CatalogDetail from "./pages/CatalogDetail";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import DentalTest from "./pages/DentalTest";
+import Leads from "./pages/Leads";
 import SalesFunnel from "./pages/SalesFunnel";
 import Goals from "./pages/Goals";
 
@@ -45,6 +46,7 @@ const App = () => (
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="appointments" element={<Appointments />} />
                 <Route path="clients" element={<Clients />} />
+                <Route path="leads" element={<Leads />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="payments" element={<Payments />} />
                 <Route path="conversations" element={<Conversations />} />

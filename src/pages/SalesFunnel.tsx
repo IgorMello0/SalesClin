@@ -39,6 +39,20 @@ import { Loader2 } from "lucide-react";
 import { useEffect } from 'react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { ExportModal } from "@/components/ExportModal";
+import { ProposalViewer } from "@/components/ProposalViewer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, History, FileDown } from "lucide-react";
+
+const safeFormatDate = (dateStr: any, formatStr: string = "dd/MM/yyyy") => {
+  try {
+    if (!dateStr) return "N/A";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "Data Inválida";
+    return format(date, formatStr, { locale: ptBR });
+  } catch (e) {
+    return "Erro na data";
+  }
+};
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -168,6 +182,13 @@ const SalesFunnel = () => {
   // Schedule from closed lead
   const [isSchedulingClosed, setIsSchedulingClosed] = useState(false);
   const [closedLeadToSchedule, setClosedLeadToSchedule] = useState<Lead | null>(null);
+
+  // Proposals Viewing
+  const [leadProposals, setLeadProposals] = useState<any[]>([]);
+  const [isViewingProposal, setIsViewingProposal] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<any>(null);
+  const [isLoadingProposals, setIsLoadingProposals] = useState(false);
+  const [activeDetailsTab, setActiveDetailsTab] = useState("activities");
 
   const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
 
@@ -305,6 +326,32 @@ const SalesFunnel = () => {
     } finally {
       setIsProcessingSchedule(false);
     }
+  };
+
+  useEffect(() => {
+    if (selectedLead) {
+      loadProposals(Number(selectedLead.id));
+      setActiveDetailsTab("activities");
+    }
+  }, [selectedLead]);
+
+  const loadProposals = async (leadId: number) => {
+    setIsLoadingProposals(true);
+    try {
+      const res = await leadsApi.getProposals(leadId);
+      if (res.success) {
+        setLeadProposals(res.data || []);
+      }
+    } catch (e) {
+      console.error("Error loading proposals:", e);
+    } finally {
+      setIsLoadingProposals(false);
+    }
+  };
+
+  const handleViewProposal = (proposal: any) => {
+    setSelectedProposal(proposal);
+    setIsViewingProposal(true);
   };
 
   const moveLead = async (leadId: string, newStatus: string) => {
@@ -1126,53 +1173,143 @@ const SalesFunnel = () => {
                       </div>
                     </div>
 
-                    {/* Scrollable Timeline */}
-                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                      <div className="relative pl-8 space-y-12">
-                        {/* The Vertical Line */}
-                        <div className="absolute left-[15px] top-2 bottom-4 w-[2px] bg-slate-200"></div>
-
-                        {selectedLead.activities.map((act, idx) => (
-                          <div key={act.id} className="relative animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
-                            {/* Node Dot/Icon */}
-                            <div className={cn(
-                              "absolute -left-[32px] top-0 w-8 h-8 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10",
-                              act.color || "bg-[#001B3D]" // Default Navy
-                            )}>
-                              <span className="material-symbols-outlined text-white text-[16px]">{act.icon}</span>
-                            </div>
-
-                            {/* Content Card */}
-                            <div className="space-y-2">
-                              <header className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                <span className="text-sm font-extrabold text-primary font-headline">{act.user}</span>
-                                <span className="text-xs text-slate-400 font-medium">{act.action}</span>
-                              </header>
-
-                              {act.result && (
-                                <div className="space-y-1">
-                                  <p className="text-[10px] font-bold text-slate-500 uppercase">Resultado</p>
-                                  <p className="text-xs font-bold text-slate-700">{act.result}</p>
-                                </div>
+                    {/* Scrollable Timeline / Proposals */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+                      <Tabs value={activeDetailsTab} onValueChange={setActiveDetailsTab} className="w-full flex-1 flex flex-col">
+                        <div className="px-8 border-b border-slate-100 bg-white">
+                          <TabsList className="bg-transparent border-0 h-14 p-0 gap-8">
+                            <TabsTrigger 
+                              value="activities" 
+                              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0 text-xs font-bold uppercase tracking-widest text-slate-400 gap-2"
+                            >
+                              <History className="w-4 h-4" />
+                              Atividades
+                            </TabsTrigger>
+                            <TabsTrigger 
+                              value="proposals" 
+                              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0 text-xs font-bold uppercase tracking-widest text-slate-400 gap-2"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Propostas
+                              {leadProposals.length > 0 && (
+                                <span className="bg-secondary text-white text-[9px] px-1.5 py-0.5 rounded-full">
+                                  {leadProposals.length}
+                                </span>
                               )}
+                            </TabsTrigger>
+                          </TabsList>
+                        </div>
 
-                              {act.content && (
-                                <div className="space-y-1">
-                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detalhamento</p>
-                                  <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm border-l-4 border-secondary/20">
-                                    <p className="text-xs text-slate-600 leading-relaxed font-medium">{act.content}</p>
+                        <TabsContent value="activities" className="flex-1 p-8 m-0 outline-none">
+                          <div className="relative pl-8 space-y-12">
+                            {/* The Vertical Line */}
+                            <div className="absolute left-[15px] top-2 bottom-4 w-[2px] bg-slate-200"></div>
+
+                            {selectedLead.activities.map((act, idx) => (
+                              <div key={act.id} className="relative animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                                {/* Node Dot/Icon */}
+                                <div className={cn(
+                                  "absolute -left-[32px] top-0 w-8 h-8 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10",
+                                  act.color || "bg-[#001B3D]" // Default Navy
+                                )}>
+                                  <span className="material-symbols-outlined text-white text-[16px]">{act.icon}</span>
+                                </div>
+
+                                {/* Content Card */}
+                                <div className="space-y-2">
+                                  <header className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                    <span className="text-sm font-extrabold text-primary font-headline">{act.user}</span>
+                                    <span className="text-xs text-slate-400 font-medium">{act.action}</span>
+                                  </header>
+
+                                  {act.result && (
+                                    <div className="space-y-1">
+                                      <p className="text-[10px] font-bold text-slate-500 uppercase">Resultado</p>
+                                      <p className="text-xs font-bold text-slate-700">{act.result}</p>
+                                    </div>
+                                  )}
+
+                                  {act.content && (
+                                    <div className="space-y-1">
+                                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detalhamento</p>
+                                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm border-l-4 border-secondary/20">
+                                        <p className="text-xs text-slate-600 leading-relaxed font-medium">{act.content}</p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <footer className="text-[10px] font-bold text-slate-300 pt-1 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                    {act.date}
+                                  </footer>
+                                </div>
+                              </div>
+                            ))}
+                            {selectedLead.activities.length === 0 && (
+                              <div className="text-center py-10">
+                                <p className="text-sm text-slate-400 italic">Nenhuma atividade registrada.</p>
+                              </div>
+                            )}
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="proposals" className="flex-1 p-8 m-0 outline-none">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {leadProposals.map((proposal) => (
+                              <div 
+                                key={proposal.id} 
+                                className="group bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md hover:border-secondary/20 transition-all cursor-pointer relative overflow-hidden"
+                                onClick={() => handleViewProposal(proposal)}
+                              >
+                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Eye className="w-5 h-5 text-secondary" />
+                                </div>
+                                
+                                <div className="flex items-start gap-4">
+                                  <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                                    <FileText className="w-6 h-6" />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <h5 className="font-bold text-primary text-sm line-clamp-1">{proposal.title}</h5>
+                                    <p className="text-xs text-slate-400 font-medium">#{proposal.id}</p>
                                   </div>
                                 </div>
-                              )}
 
-                              <footer className="text-[10px] font-bold text-slate-300 pt-1 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[12px]">schedule</span>
-                                {act.date}
-                              </footer>
-                            </div>
+                                <div className="mt-6 pt-4 border-t border-slate-50 flex justify-between items-end">
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</p>
+                                    <p className="text-sm font-bold text-secondary">
+                                      {Number(proposal.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Data</p>
+                                    <p className="text-[10px] font-bold text-primary">
+                                      {safeFormatDate(proposal.createdAt)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {leadProposals.length === 0 && !isLoadingProposals && (
+                              <div className="col-span-2 text-center py-20 bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-200">
+                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                                  <FileText className="w-8 h-8 text-slate-200" />
+                                </div>
+                                <h5 className="font-bold text-slate-400">Nenhuma proposta encontrada</h5>
+                                <p className="text-xs text-slate-400 mt-1">Gere sua primeira proposta para este lead.</p>
+                              </div>
+                            )}
+
+                            {isLoadingProposals && (
+                              <div className="col-span-2 flex items-center justify-center py-20">
+                                <Loader2 className="w-8 h-8 text-secondary animate-spin" />
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   </div>
                 </div>
@@ -1412,7 +1549,6 @@ const SalesFunnel = () => {
         selectedCount={selectedLeadIds.length}
       />
 
-      {/* Confirm Payment Modal */}
       <ConfirmPaymentModal
         open={isConfirmingPayment}
         onOpenChange={setIsConfirmingPayment}
@@ -1420,6 +1556,18 @@ const SalesFunnel = () => {
         leadValue={paymentLead?.value || 0}
         onSuccess={() => {
           loadLeads();
+        }}
+      />
+
+      <ProposalViewer
+        open={isViewingProposal}
+        onOpenChange={setIsViewingProposal}
+        proposal={selectedProposal}
+        lead={selectedLead}
+        companyInfo={{
+          name: "SalesClin CRM",
+          address: "Av. Paulista, 1000 - São Paulo, SP",
+          phone: "(11) 99999-9999"
         }}
       />
     </div>

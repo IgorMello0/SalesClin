@@ -127,6 +127,25 @@ router.post('/:id/activities', auth(), async (req, res) => {
   }
 })
 
+// Listar Propostas do Lead
+router.get('/:id/proposals', auth(false), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const proposals = await prisma.proposal.findMany({
+      where: { leadId: id },
+      include: {
+        specialist: true,
+        salesperson: true
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+    res.json(createSuccessResponse(proposals))
+  } catch (error: any) {
+    console.error('[Leads] Erro ao buscar propostas:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar propostas', 500))
+  }
+})
+
 // Adicionar Proposta ao Lead
 router.post('/:id/proposals', auth(), async (req, res) => {
   try {
