@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { createErrorResponse } from '../utils/response'
+import { createErrorResponse } from '../utils/response.js'
 
 export type AuthUser = {
   id: number
@@ -63,7 +63,7 @@ export function requireModule(moduleCode: string) {
       }
 
       // Importar prisma aqui para evitar circular dependency
-      const { prisma } = await import('../prisma')
+      const { prisma } = await import('../prisma.js')
 
       // Buscar o módulo pelo código
       const module = await prisma.module.findUnique({
