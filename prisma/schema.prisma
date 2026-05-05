@@ -123,6 +123,7 @@ model Professional {
   conversas       Conversa[]
   permissions     ProfessionalPermission[]
   leads           Lead[]
+  goals           Goal[]
 
   @@map("professionals")
 }
@@ -609,4 +610,22 @@ model UserPermission {
 
   @@unique([userId, moduleId])
   @@map("user_permissions")
+}
+
+// Metas e projeções salvas pelos profissionais
+model Goal {
+  id             Int          @id @default(autoincrement())
+  professionalId Int          @map("professional_id")
+  name           String
+  revenueTarget  Decimal      @map("revenue_target") @db.Decimal(12, 2)
+  avgTicket      Decimal      @map("avg_ticket") @db.Decimal(10, 2)
+  schedulingRate Float        @map("scheduling_rate")
+  showupRate     Float        @map("showup_rate")
+  closingRate    Float        @map("closing_rate")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@map("goals")
 }

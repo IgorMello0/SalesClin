@@ -290,7 +290,9 @@ const Appointments = () => {
 
                 <Select value={viewMode} onValueChange={(v: 'dia' | 'semana' | 'mes') => setViewMode(v)}>
                   <SelectTrigger className="w-28 rounded-xl border-slate-200 text-sm font-semibold">
-                    <SelectValue />
+                    <SelectValue>
+                      {viewMode === 'dia' ? 'Dia' : viewMode === 'semana' ? 'Semana' : 'Mês'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dia">Dia</SelectItem>

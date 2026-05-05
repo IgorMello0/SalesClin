@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { useAuth } from '@/contexts/AuthContext';
+import { goalsApi } from '@/lib/api';
 
 const Goals = () => {
   const [revenueTarget, setRevenueTarget] = useState(150000);
@@ -13,6 +17,9 @@ const Goals = () => {
   const [results, setResults] = useState({
     sales: 0, showups: 0, appointments: 0, leads: 0
   });
+  const [savedPlans, setSavedPlans] = useState<any[]>([]);
+  const { toast } = useToast();
+  const { professional } = useAuth();
 
   useEffect(() => {
     const salesNeeded = avgTicket > 0 ? Math.ceil(revenueTarget / avgTicket) : 0;
@@ -21,6 +28,73 @@ const Goals = () => {
     const leadsNeeded = schedulingRate > 0 ? Math.ceil(appointmentsNeeded / (schedulingRate / 100)) : 0;
     setResults({ sales: salesNeeded, showups: showupsNeeded, appointments: appointmentsNeeded, leads: leadsNeeded });
   }, [revenueTarget, avgTicket, schedulingRate, showupRate, closingRate]);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [professional]);
+
+  const fetchPlans = async () => {
+    if (!professional) return;
+    try {
+      const response = await goalsApi.list(Number(professional.id));
+      if (response.success) setSavedPlans(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar planos:', error);
+    }
+  };
+
+  const handleSavePlan = async () => {
+    console.log('Botão Salvar Plano clicado');
+    console.log('Professional status:', professional);
+    if (!professional) {
+      toast({ title: "Erro: Profissional não identificado", variant: "destructive" });
+      return;
+    }
+    try {
+      const newPlan = {
+        professionalId: Number(professional.id),
+        name: `Plano ${format(new Date(), 'dd/MM/yy HH:mm')}`,
+        revenueTarget,
+        avgTicket,
+        schedulingRate,
+        showupRate,
+        closingRate
+      };
+      console.log('Enviando plano para o backend:', newPlan);
+      const response = await goalsApi.create(newPlan);
+      console.log('Resposta do backend:', response);
+      if (response.success) {
+        setSavedPlans([response.data, ...savedPlans]);
+        toast({ title: "Plano salvo no backend!" });
+      } else {
+        toast({ title: "Erro: " + response.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      console.error('Erro ao salvar plano:', error);
+      toast({ title: "Erro ao salvar plano: " + error.message, variant: "destructive" });
+    }
+  };
+
+  const handleLoadPlan = (plan: any) => {
+    setRevenueTarget(plan.revenueTarget);
+    setAvgTicket(plan.avgTicket);
+    setSchedulingRate(plan.schedulingRate);
+    setShowupRate(plan.showupRate);
+    setClosingRate(plan.closingRate);
+    toast({ title: "Plano carregado!" });
+  };
+
+  const handleDeletePlan = async (id: number) => {
+    try {
+      const response = await goalsApi.delete(id);
+      if (response.success) {
+        setSavedPlans(savedPlans.filter(p => p.id !== id));
+        toast({ title: "Plano excluído!" });
+      }
+    } catch (error) {
+      toast({ title: "Erro ao excluir plano", variant: "destructive" });
+    }
+  };
 
   const applyFacebookPreset = () => {
     setRevenueTarget(150000); setAvgTicket(5000); setSchedulingRate(60); setShowupRate(60); setClosingRate(45);
@@ -51,16 +125,16 @@ const Goals = () => {
       label: 'Agendamentos',
       value: results.appointments.toLocaleString(),
       sub: `${schedulingRate}% de taxa`,
-      color: 'text-violet-500',
-      bg: 'bg-violet-50',
+      color: 'text-secondary',
+      bg: 'bg-orange-50',
     },
     {
       icon: 'how_to_reg',
       label: 'Presenças',
       value: results.showups.toLocaleString(),
       sub: `${showupRate}% de taxa`,
-      color: 'text-indigo-500',
-      bg: 'bg-indigo-50',
+      color: 'text-accent',
+      bg: 'bg-blue-50',
     },
     {
       icon: 'handshake',
@@ -166,7 +240,7 @@ const Goals = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-on-surface-variant text-xs font-semibold">Presença → Venda</span>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">{closingRate}%</span>
+                  <span className="text-xs font-bold text-accent bg-blue-50 px-2 py-1 rounded">{closingRate}%</span>
                 </div>
                 <Slider value={[closingRate]} onValueChange={(v) => setClosingRate(v[0])} max={100} min={5} step={1} />
               </div>
@@ -206,8 +280,8 @@ const Goals = () => {
             <div className="space-y-3">
               {[
                 { label: 'Leads', value: results.leads, color: 'bg-accent', pct: 100 },
-                { label: 'Agendamentos', value: results.appointments, color: 'bg-violet-500', pct: schedulingRate },
-                { label: 'Presenças', value: results.showups, color: 'bg-indigo-500', pct: showupRate },
+                { label: 'Agendamentos', value: results.appointments, color: 'bg-secondary', pct: schedulingRate },
+                { label: 'Presenças', value: results.showups, color: 'bg-accent', pct: showupRate },
                 { label: 'Vendas', value: results.sales, color: 'bg-secondary', pct: closingRate },
               ].map((row, i) => (
                 <div key={i} className="flex items-center gap-4">
@@ -239,8 +313,8 @@ const Goals = () => {
                   <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2.5 py-1 rounded">
                     CPL Máx: R$ {cplMax}
                   </span>
-                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-blue-50 px-2.5 py-1 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse inline-block"></span>
                     Plano Viável
                   </span>
                 </div>
@@ -250,12 +324,62 @@ const Goals = () => {
                 variant="secondary"
                 size="xl"
                 className="shadow-lg shadow-secondary/20 font-bold"
+                onClick={handleSavePlan}
               >
                 <span className="material-symbols-outlined text-lg mr-1">save</span>
                 Salvar Plano
               </Button>
             </div>
           </Card>
+
+          {/* Saved Plans List */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">history</span>
+              <h3 className="text-base font-bold text-primary">Planos Salvos</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {savedPlans.length === 0 ? (
+                <div className="col-span-full py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-slate-400 text-sm italic">Nenhum plano salvo ainda.</p>
+                </div>
+              ) : (
+                savedPlans.map(plan => (
+                  <Card key={plan.id} className="p-4 hover:shadow-md transition-all group border-slate-100">
+                    <div className="flex justify-between items-center">
+                      <div className="space-y-1">
+                        <h4 className="font-bold text-primary text-sm">{plan.name}</h4>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-semibold uppercase">
+                          <span>{formatCurrency(plan.revenueTarget)}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-200"></span>
+                          <span>Tkt: {formatCurrency(plan.avgTicket)}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 text-slate-300 hover:text-red-500 rounded-full"
+                          onClick={() => handleDeletePlan(plan.id)}
+                        >
+                          <span className="material-symbols-outlined text-lg">delete</span>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 rounded-lg text-xs font-bold border-slate-200 hover:bg-primary hover:text-white transition-all"
+                          onClick={() => handleLoadPlan(plan)}
+                        >
+                          Carregar
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
 
         </div>
       </div>

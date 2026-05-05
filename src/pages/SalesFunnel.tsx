@@ -41,7 +41,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ExportModal } from "@/components/ExportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, History, FileDown } from "lucide-react";
+import { FileText, History, FileDown, Edit2, Check, X } from "lucide-react";
 
 const safeFormatDate = (dateStr: any, formatStr: string = "dd/MM/yyyy") => {
   try {
@@ -129,6 +129,17 @@ const QUICK_STATUSES = [
   { id: 'negociacao', label: 'Em negociação', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
 ];
 
+const ORIGIN_OPTIONS = [
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'indicação', label: 'Indicação' },
+  { value: 'meta ads', label: 'Meta Ads' },
+  { value: 'google', label: 'Google' },
+  { value: 'influencer', label: 'Influencer' },
+  { value: 'whatsapp', label: 'Whatsapp' },
+  { value: 'site', label: 'Site' },
+  { value: 'outro', label: 'Outro' },
+];
+
 const SalesFunnel = () => {
   const { professional } = useAuth();
   const [activeFunnel, setActiveFunnel] = useState('prospecting');
@@ -189,8 +200,21 @@ const SalesFunnel = () => {
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
   const [activeDetailsTab, setActiveDetailsTab] = useState("activities");
+  const [isEditingOrigin, setIsEditingOrigin] = useState(false);
+  const [tempOrigin, setTempOrigin] = useState("");
+
+  const getOriginLabel = (origin: string) => {
+    return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
+  };
 
   const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
+
+  useEffect(() => {
+    if (selectedLead) {
+      setTempOrigin(selectedLead.origin || "");
+      setIsEditingOrigin(false);
+    }
+  }, [selectedLead?.id]);
 
   const loadLeads = async () => {
     if (!professional?.id) return;
@@ -594,6 +618,21 @@ const SalesFunnel = () => {
       justificationType: ''
     });
     setRemovedTags([]);
+  };
+
+  const handleUpdateOrigin = async () => {
+    if (!selectedLead) return;
+    try {
+      const res = await leadsApi.update(Number(selectedLead.id), { origin: tempOrigin });
+      if (res.success) {
+        toast({ title: "Origem atualizada com sucesso!" });
+        setSelectedLead({ ...selectedLead, origin: tempOrigin });
+        setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, origin: tempOrigin } : l));
+        setIsEditingOrigin(false);
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar origem", variant: "destructive" });
+    }
   };
 
   const handleConfirmPayment = (lead: Lead) => {
@@ -1035,11 +1074,9 @@ const SalesFunnel = () => {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="indicação">Indicação</SelectItem>
-                    <SelectItem value="meta ads">Meta Ads</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="influencer">Influencer</SelectItem>
+                    {ORIGIN_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1127,9 +1164,57 @@ const SalesFunnel = () => {
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Detalhes Adicionais</h4>
                     <div className="space-y-3">
-                      <div className="flex justify-between items-center text-xs">
+                      <div className="flex justify-between items-center text-xs group/origin h-6">
                         <span className="text-slate-400">Conversão de Origem</span>
-                        <span className="font-bold text-secondary">{selectedLead.origin || "Não informado"}</span>
+                        {isEditingOrigin ? (
+                          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-1">
+                            <Select 
+                              value={tempOrigin} 
+                              onValueChange={(val) => {
+                                setTempOrigin(val);
+                                // Auto save on change for better UX with Select
+                                const saveOrigin = async (newVal: string) => {
+                                  try {
+                                    const res = await leadsApi.update(Number(selectedLead.id), { origin: newVal });
+                                    if (res.success) {
+                                      toast({ title: "Origem atualizada!" });
+                                      setSelectedLead({ ...selectedLead, origin: newVal });
+                                      setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, origin: newVal } : l));
+                                      setIsEditingOrigin(false);
+                                    }
+                                  } catch (e) {
+                                    toast({ title: "Erro ao atualizar", variant: "destructive" });
+                                  }
+                                };
+                                saveOrigin(val);
+                              }}
+                            >
+                              <SelectTrigger className="h-7 py-0 px-2 text-xs font-bold border-secondary focus-visible:ring-secondary/20 w-32 bg-white">
+                                <SelectValue placeholder="Origem">
+                                  {getOriginLabel(tempOrigin)}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent className="z-[300]">
+                                {ORIGIN_OPTIONS.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <button onClick={() => setIsEditingOrigin(false)} className="text-slate-400 hover:text-slate-500 transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-secondary capitalize">{getOriginLabel(selectedLead.origin || "Não informado")}</span>
+                            <button 
+                              onClick={() => setIsEditingOrigin(true)}
+                              className="opacity-0 group-hover/origin:opacity-100 text-slate-300 hover:text-secondary transition-all"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400">Responsável Atual</span>
@@ -1367,7 +1452,9 @@ const SalesFunnel = () => {
                   onValueChange={(v) => setProposalData({...proposalData, salesperson: v})}
                 >
                   <SelectTrigger className="rounded-xl border-slate-200">
-                    <SelectValue placeholder="Selecione o consultor" />
+                    <SelectValue placeholder="Selecione o consultor">
+                      {allProfessionals.find(p => p.id.toString() === proposalData.salesperson)?.name}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {allProfessionals.map(p => (
@@ -1386,7 +1473,10 @@ const SalesFunnel = () => {
                       onValueChange={(v: any) => setProposalData({...proposalData, justificationType: v})}
                     >
                       <SelectTrigger className="rounded-xl border-orange-200 bg-white">
-                        <SelectValue placeholder="Selecione o motivo" />
+                        <SelectValue placeholder="Selecione o motivo">
+                          {proposalData.justificationType === 'desconto' ? 'Desconto Financeiro' : 
+                           proposalData.justificationType === 'remocao' ? 'Remoção de Procedimentos' : ''}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="desconto">Desconto Financeiro</SelectItem>

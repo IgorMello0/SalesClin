@@ -20,6 +20,7 @@ import { router as modulesRouter } from './routes/modules'
 import { router as permissionsRouter } from './routes/permissions'
 import { router as dashboardRouter } from './routes/dashboard'
 import { router as leadsRouter } from './routes/leads'
+import { router as metasRouter } from './routes/metas'
 import { router as webhooksRouter } from './routes/webhooks'
 import { createErrorResponse } from './utils/response'
 import path from 'path'
@@ -53,6 +54,7 @@ app.use('/api/modules', modulesRouter)
 app.use('/api/permissions', permissionsRouter)
 app.use('/api/dashboard', dashboardRouter)
 app.use('/api/leads', leadsRouter)
+app.use('/api/metas', metasRouter)
 app.use('/api/webhooks', webhooksRouter)
 
 // Servir arquivos estáticos da pasta uploads

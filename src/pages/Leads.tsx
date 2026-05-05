@@ -19,6 +19,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -169,7 +176,7 @@ const Leads = () => {
         phone: lead.phone || '',
         value: lead.value.toString(),
         origin: lead.origin,
-        status: lead.status,
+        status: lead.status?.toLowerCase() || 'prospect_lead',
         tags: lead.tags || []
       });
     } else {
@@ -279,17 +286,25 @@ const Leads = () => {
       'prospect_qualified': 'Qualificado',
       'prospect_scheduled': 'Agendado',
       'prospect_attended': 'Compareceu',
+      'comercial_consult': 'Consulta Feita',
       'comercial_proposal': 'Proposta',
+      'comercial_follow': 'Follow-up',
       'comercial_closed': 'Fechado',
+      'sales_payment': 'Pagamento',
+      'sales_contract': 'Contrato',
+      'sales_post': 'Pós-Venda',
       'lost': 'Perdido'
     };
-    return statuses[status] || status;
+    return statuses[status.toLowerCase()] || status;
   };
 
   const getStatusColor = (status: string) => {
-    if (status.includes('closed')) return 'bg-green-100 text-green-800 border-green-200';
-    if (status.includes('prospect')) return 'bg-blue-100 text-blue-800 border-blue-200';
-    if (status.includes('proposal')) return 'bg-orange-100 text-orange-800 border-orange-200';
+    const s = status.toLowerCase();
+    if (s.includes('closed')) return 'bg-green-100 text-green-800 border-green-200';
+    if (s.includes('prospect')) return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (s.includes('comercial')) return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (s.includes('sales')) return 'bg-cyan-100 text-cyan-800 border-cyan-200';
+    if (s === 'lost') return 'bg-red-100 text-red-800 border-red-200';
     return 'bg-slate-100 text-slate-800 border-slate-200';
   };
 
@@ -379,6 +394,34 @@ const Leads = () => {
                         placeholder="Ex: Instagram, Google..."
                         className="h-11 rounded-xl bg-slate-50 border-slate-200"
                       />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Status Atual</Label>
+                      <Select 
+                        value={formData.status} 
+                        onValueChange={(val) => setFormData({ ...formData, status: val })}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200">
+                          <SelectValue placeholder="Selecione o status">
+                            {getStatusLabel(formData.status)}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+                          <SelectItem value="prospect_lead">Novo Lead</SelectItem>
+                          <SelectItem value="prospect_qualified">Qualificado</SelectItem>
+                          <SelectItem value="prospect_scheduled">Agendado</SelectItem>
+                          <SelectItem value="prospect_attended">Compareceu</SelectItem>
+                          <SelectItem value="comercial_consult">Consulta Feita</SelectItem>
+                          <SelectItem value="comercial_proposal">Proposta</SelectItem>
+                          <SelectItem value="comercial_follow">Follow-up</SelectItem>
+                          <SelectItem value="comercial_closed">Fechado</SelectItem>
+                          <SelectItem value="sales_payment">Pagamento</SelectItem>
+                          <SelectItem value="sales_contract">Contrato</SelectItem>
+                          <SelectItem value="sales_post">Pós-Venda</SelectItem>
+                          <SelectItem value="lost">Perdido</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>

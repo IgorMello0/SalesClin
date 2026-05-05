@@ -115,7 +115,12 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Forma de Pagamento</Label>
               <Select value={method} onValueChange={(val) => { setMethod(val); if(val !== 'cartao') setInstallmentsCount(1); }}>
                 <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione...">
+                    {method === 'cartao' ? 'Cartão de Crédito' : 
+                     method === 'pix' ? 'PIX' : 
+                     method === 'dinheiro' ? 'Dinheiro' : 
+                     method === 'boleto' ? 'Boleto' : method}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cartao">Cartão de Crédito</SelectItem>
@@ -126,23 +131,26 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Parcelas</Label>
-              <Select 
-                value={installmentsCount.toString()} 
-                onValueChange={(val) => setInstallmentsCount(Number(val))}
-                disabled={method !== 'cartao'}
-              >
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Parcelas" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
-                    <SelectItem key={n} value={n.toString()}>{n}x</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {method === 'cartao' && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-right-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Parcelas</Label>
+                <Select 
+                  value={installmentsCount.toString()} 
+                  onValueChange={(val) => setInstallmentsCount(Number(val))}
+                >
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Parcelas">
+                      {installmentsCount}x
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                      <SelectItem key={n} value={n.toString()}>{n}x</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 mt-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
@@ -177,7 +185,9 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                 <div className="flex-1">
                   <Select value={inst.status} onValueChange={(val) => handleInstallmentChange(idx, 'status', val)}>
                     <SelectTrigger className="h-9 text-sm">
-                      <SelectValue />
+                      <SelectValue>
+                        {inst.status === 'pago' ? 'Pago' : 'Pendente'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pendente">Pendente</SelectItem>

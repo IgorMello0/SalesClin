@@ -267,3 +267,10 @@ export const empresasApi = {
   update: async (id: number, data: any) => apiRequest<any>(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 }
 
+// Metas
+export const goalsApi = {
+  list: async (professionalId?: number) => apiRequest<any[]>(`/metas?professionalId=${professionalId || ''}`),
+  create: async (data: any) => apiRequest<any>('/metas', { method: 'POST', body: JSON.stringify(data) }),
+  delete: async (id: number) => apiRequest<any>(`/metas/${id}`, { method: 'DELETE' }),
+}
+

@@ -173,7 +173,9 @@ export const ProfessionalManagement = () => {
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filtrar status" />
+                <SelectValue placeholder="Filtrar status">
+                  {statusFilter === 'all' ? 'Todos' : statusFilter === 'ativo' ? 'Ativo' : 'Inativo'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>

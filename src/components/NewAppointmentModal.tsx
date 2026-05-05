@@ -383,7 +383,9 @@ export function NewAppointmentModal({
             <Label className="text-sm font-medium">Procedimento *</Label>
             <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
               <SelectTrigger className="rounded-xl border-slate-200 h-12">
-                <SelectValue placeholder="Selecione o procedimento..." />
+                <SelectValue placeholder="Selecione o procedimento...">
+                  {services.find(s => s.id.toString() === selectedServiceId)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {services.map(svc => (
