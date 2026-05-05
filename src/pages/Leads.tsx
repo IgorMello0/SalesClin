@@ -508,7 +508,7 @@ const Leads = () => {
         <div className="premium-card p-4 sm:p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Filtrado</div>
-            <div className="p-2 bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-xl">
+            <div className="text-blue-600 dark:text-blue-400">
               <span className="material-symbols-outlined text-lg">group</span>
             </div>
           </div>
@@ -521,7 +521,7 @@ const Leads = () => {
         <div className="premium-card p-4 sm:p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Novos Leads</div>
-            <div className="p-2 bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-xl">
+            <div className="text-amber-600 dark:text-amber-400">
               <span className="material-symbols-outlined text-lg">star</span>
             </div>
           </div>
@@ -536,7 +536,7 @@ const Leads = () => {
         <div className="premium-card p-4 sm:p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Propostas</div>
-            <div className="p-2 bg-purple-100 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 rounded-xl">
+            <div className="text-purple-600 dark:text-purple-400">
               <span className="material-symbols-outlined text-lg">sync_alt</span>
             </div>
           </div>
@@ -551,7 +551,7 @@ const Leads = () => {
         <div className="premium-card p-4 sm:p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ticket Médio</div>
-            <div className="p-2 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl">
+            <div className="text-emerald-600 dark:text-emerald-400">
               <span className="material-symbols-outlined text-lg">payments</span>
             </div>
           </div>

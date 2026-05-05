@@ -52,67 +52,63 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     };
 
     // 3. Consultas em Paralelo para Performance
-    console.log("[DASHBOARD DEBUG] companyId:", companyId);
-    console.log("[DASHBOARD DEBUG] professionalIds:", professionalIds);
-    console.log("[DASHBOARD DEBUG] baseWhere:", baseWhere);
-
     const [
       leadsCount,
       agendamentosConfirmados,
       avaliacoesComparecidas,
       oportunidades,
       faturamentoTotalAgg,
-      receitaTotalAgg,
       leadsFechados,
       faturamentoPorMetodo,
       funilStatus,
       origemData
     ] = await Promise.all([
-      // Total de Leads
+      // 1. Total de Novos Leads (Criados no período)
       prisma.lead.count({ where: baseWhere }),
       
-      // Avaliações Agendadas
+      // 2. Avaliações Agendadas (Para o período selecionado)
       prisma.appointment.count({ 
         where: { ...appointmentWhere, status: { in: ['agendado', 'confirmado'] } } 
       }),
       
-      // Avaliações Comparecidas (Baseado no status do Funil: prospect_attended)
-      prisma.lead.count({ 
-        where: { ...baseWhere, status: { in: ['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed'] } } 
-      }),
-      
-      // Oportunidades Geradas (Status de proposta ou posterior)
+      // 3. Avaliações Comparecidas (Leads que estão em status de comparecimento ou superior)
+      // Nota: Filtramos por updatedAt para pegar quem mudou para esse status no período
       prisma.lead.count({ 
         where: { 
-          ...baseWhere, 
-          status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed'] } 
+          professionalId: { in: professionalIds },
+          updatedAt: { gte: startDate, lte: endDate },
+          status: { in: ['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
         } 
       }),
       
-      // Faturamento Total (Tudo que foi orçado - Leads em Proposta ou superior)
+      // 4. Oportunidades (Leads em Proposta ou superior no período)
+      prisma.lead.count({ 
+        where: { 
+          professionalId: { in: professionalIds },
+          updatedAt: { gte: startDate, lte: endDate },
+          status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
+        } 
+      }),
+      
+      // 5. Faturamento Total (Tudo que foi orçado - Leads em Proposta ou superior - Total histórico ou período)
       prisma.lead.aggregate({
         _sum: { value: true },
         where: { 
-          ...baseWhere,
+          professionalId: { in: professionalIds },
           status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] }
         }
       }),
 
-      // Receita Total (Apenas o que chegou no funil de VENDAS/PAGAMENTO)
-      prisma.lead.aggregate({
-        _sum: { value: true },
+      // 6. Total de Vendas Fechadas (Mudaram para status de fechamento no período)
+      prisma.lead.count({
         where: { 
-          ...baseWhere,
-          isPaid: true
+          professionalId: { in: professionalIds },
+          updatedAt: { gte: startDate, lte: endDate },
+          status: { in: ['comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
         }
       }),
 
-      // Total de Vendas Fechadas (Cards no 'comercial_closed')
-      prisma.lead.count({
-        where: { ...baseWhere, status: 'comercial_closed' }
-      }),
-
-      // Faturamento por Método e Status
+      // 7. Faturamento por Método (Baseado na tabela de Pagamentos - O MAIS PRECISO)
       prisma.payment.groupBy({
         by: ['method', 'status'],
         _sum: { amount: true },
@@ -122,23 +118,28 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         }
       }),
 
-      // Funil de Leads (Agrupado por Status)
+      // 8. Distribuição Atual do Funil (TODOS os leads do profissional - Snapshot)
       prisma.lead.groupBy({
         by: ['status'],
         _count: { id: true },
-        where: baseWhere
+        where: { professionalId: { in: professionalIds } }
       }),
 
-      // Leads por Origem
+      // 9. Leads por Origem (Total Histórico)
       prisma.lead.groupBy({
         by: ['origin'],
         _count: { id: true },
-        where: baseWhere
+        where: { professionalId: { in: professionalIds } }
       })
     ]);
 
+    // Cálculo da Receita Real (Soma de todos os pagamentos realizados no período)
+    const receitaTotalPeriodo = faturamentoPorMetodo
+      .filter(m => m.status === 'pago')
+      .reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0);
+
     const faturamento = Number(faturamentoTotalAgg._sum.value) || 0;
-    const receita = Number(receitaTotalAgg._sum.value) || 0;
+    const receita = receitaTotalPeriodo;
     
     // 4. KPIs de Eficiência Matemáticos
     
@@ -173,11 +174,23 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       dinheiro: faturamentoPorMetodo.filter(m => m.method === 'dinheiro' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
     };
 
+    const totalLeadsGlobal = funilStatus.reduce((acc, curr) => acc + curr._count.id, 0);
+
     const funil = {
-      novos: funilStatus.find(s => s.status === 'prospect_lead')?._count.id || 0,
-      contatados: funilStatus.find(s => s.status === 'prospect_qualified')?._count.id || 0,
-      agendados: funilStatus.find(s => s.status === 'prospect_scheduled')?._count.id || 0,
-      fechados: leadsFechados,
+      novos: totalLeadsGlobal, // Estado atual: todos os leads no topo do funil
+      contatados: funilStatus.filter(s => ![
+        'prospect_lead'
+      ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
+      agendados: funilStatus.filter(s => ![
+        'prospect_lead', 
+        'prospect_qualified'
+      ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
+      fechados: funilStatus.filter(s => [
+        'comercial_closed', 
+        'sales_payment', 
+        'sales_contract', 
+        'sales_post'
+      ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
     };
 
     const origem = origemData.map(o => ({

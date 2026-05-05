@@ -202,6 +202,8 @@ const SalesFunnel = () => {
   const [activeDetailsTab, setActiveDetailsTab] = useState("activities");
   const [isEditingOrigin, setIsEditingOrigin] = useState(false);
   const [tempOrigin, setTempOrigin] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState("");
 
   const getOriginLabel = (origin: string) => {
     return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
@@ -219,8 +221,25 @@ const SalesFunnel = () => {
     if (selectedLead) {
       setTempOrigin(selectedLead.origin || "");
       setIsEditingOrigin(false);
+      setTempName(selectedLead.name || "");
+      setIsEditingName(false);
     }
   }, [selectedLead?.id]);
+
+  const handleUpdateName = async () => {
+    if (!selectedLead || !tempName.trim()) return;
+    try {
+      const res = await leadsApi.update(Number(selectedLead.id), { name: tempName });
+      if (res.success) {
+        toast({ title: "Nome atualizado!" });
+        setSelectedLead({ ...selectedLead, name: tempName });
+        setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, name: tempName } : l));
+        setIsEditingName(false);
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar nome", variant: "destructive" });
+    }
+  };
 
   const loadLeads = async () => {
     if (!professional?.id) return;
@@ -1127,13 +1146,59 @@ const SalesFunnel = () => {
               {/* Header Profile Section */}
               <div className="p-4 sm:p-8 bg-gradient-to-br from-primary/5 to-transparent border-b border-slate-100">
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 items-start">
-                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-primary flex items-center justify-center text-2xl sm:text-3xl font-extrabold text-white shadow-xl shadow-primary/20">
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-primary flex items-center justify-center text-2xl sm:text-3xl font-extrabold text-white">
                     {selectedLead.avatar}
                   </div>
                   <div className="flex-1 space-y-4">
                     <div className="flex justify-between items-start w-full">
-                      <div>
-                        <h3 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tighter">{selectedLead.name}</h3>
+                      <div className="flex-1">
+                        {isEditingName ? (
+                          <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2">
+                            <Input 
+                              value={tempName}
+                              onChange={(e) => setTempName(e.target.value)}
+                              className="text-xl sm:text-2xl font-extrabold text-primary font-headline tracking-tighter h-12 rounded-xl border-secondary focus-visible:ring-secondary/20 bg-white"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleUpdateName();
+                                if (e.key === 'Escape') setIsEditingName(false);
+                              }}
+                            />
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                onClick={handleUpdateName}
+                                variant="secondary" 
+                                size="sm" 
+                                className="h-9 w-9 rounded-xl p-0"
+                              >
+                                <span className="material-symbols-outlined text-sm">check</span>
+                              </Button>
+                              <Button 
+                                onClick={() => setIsEditingName(false)}
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-9 w-9 rounded-xl p-0 text-slate-400"
+                              >
+                                <span className="material-symbols-outlined text-sm">close</span>
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 group/name">
+                            <h3 
+                              className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tighter cursor-pointer hover:text-primary/80 transition-colors"
+                              onClick={() => setIsEditingName(true)}
+                            >
+                              {selectedLead.name}
+                            </h3>
+                            <button 
+                              onClick={() => setIsEditingName(true)}
+                              className="opacity-0 group-hover/name:opacity-100 text-slate-300 hover:text-secondary transition-all"
+                            >
+                              <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                          </div>
+                        )}
                         <p className="text-on-surface-variant font-medium text-sm flex items-center gap-2 mt-1">
                           <span className="w-2 h-2 rounded-full bg-secondary"></span>
                           Estágio: {STAGES[activeFunnel as keyof typeof STAGES].find(s => s.id === selectedLead.status)?.label || selectedLead.status}
@@ -1325,7 +1390,7 @@ const SalesFunnel = () => {
                               <div key={act.id} className="relative animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
                                 {/* Node Dot/Icon */}
                                 <div className={cn(
-                                  "absolute -left-[32px] top-0 w-8 h-8 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10",
+                                  "absolute -left-[32px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white z-10",
                                   act.color || "bg-[#001B3D]" // Default Navy
                                 )}>
                                   <span className="material-symbols-outlined text-white text-[16px]">{act.icon}</span>
