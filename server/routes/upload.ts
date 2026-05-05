@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { auth } from '../middleware/auth'
-import { createErrorResponse, createSuccessResponse } from '../utils/response'
+import { auth } from '../middleware/auth.js'
+import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'

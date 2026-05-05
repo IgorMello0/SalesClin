@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { prisma } from '../prisma';
-import { createErrorResponse, createSuccessResponse } from '../utils/response';
+import { prisma } from '../prisma.js';
+import { createErrorResponse, createSuccessResponse } from '../utils/response.js';
 
 export const router = Router();
 

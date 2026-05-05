@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import { prisma } from '../prisma'
-import { auth } from '../middleware/auth'
-import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response'
+import { prisma } from '../prisma.js'
+import { auth } from '../middleware/auth.js'
+import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 
 export const router = Router()
 
