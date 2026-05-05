@@ -353,7 +353,7 @@ const Leads = () => {
                 Novo Lead
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[95vw] max-w-[600px] border-0 shadow-2xl rounded-3xl bg-white p-0 overflow-hidden">
+            <DialogContent className="w-[95vw] max-w-[600px] border-0 shadow-2xl rounded-3xl bg-card p-0 overflow-hidden">
               <div className="p-6 bg-[#0B1525] border-b border-[#0B1525] rounded-t-3xl">
                 <DialogTitle className="text-xl font-bold text-white font-headline">
                   {editingLead ? 'Editar Lead' : 'Novo Lead'}
@@ -371,7 +371,7 @@ const Leads = () => {
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Ex: João Silva"
-                        className="h-11 rounded-xl bg-slate-50 border-slate-200"
+                        className="h-11 rounded-xl bg-muted border-border"
                       />
                     </div>
                     <div className="space-y-2">
@@ -380,7 +380,7 @@ const Leads = () => {
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="(11) 99999-9999"
-                        className="h-11 rounded-xl bg-slate-50 border-slate-200"
+                        className="h-11 rounded-xl bg-muted border-border"
                       />
                     </div>
                   </div>
@@ -392,7 +392,7 @@ const Leads = () => {
                         value={formData.origin}
                         onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                         placeholder="Ex: Instagram, Google..."
-                        className="h-11 rounded-xl bg-slate-50 border-slate-200"
+                        className="h-11 rounded-xl bg-muted border-border"
                       />
                     </div>
                     
@@ -402,7 +402,7 @@ const Leads = () => {
                         value={formData.status} 
                         onValueChange={(val) => setFormData({ ...formData, status: val })}
                       >
-                        <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200">
+                        <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
                           <SelectValue placeholder="Selecione o status">
                             {getStatusLabel(formData.status)}
                           </SelectValue>
@@ -428,7 +428,7 @@ const Leads = () => {
 
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tags de Serviços</Label>
-                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 min-h-[60px]">
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-2xl border border-border min-h-[60px]">
                     {services.map((service) => {
                       const isSelected = formData.tags.includes(service.name);
                       return (
@@ -444,7 +444,7 @@ const Leads = () => {
                             "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border",
                             isSelected
                               ? "bg-primary text-white border-primary shadow-sm"
-                              : "bg-white text-slate-400 border-slate-200 hover:border-primary/30"
+                              : "bg-card text-muted-foreground border-border hover:border-primary/30"
                           )}
                         >
                           {service.name}
@@ -454,7 +454,7 @@ const Leads = () => {
                   </div>
                 </div>
               </div>
-              <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 rounded-b-3xl">
+              <div className="p-5 border-t border-border bg-muted/50 flex justify-end gap-3 rounded-b-3xl">
                 <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold h-11 px-6">
                   Cancelar
                 </Button>
@@ -482,7 +482,7 @@ const Leads = () => {
                 "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border",
                 selectedTags.includes(service.name)
                   ? "bg-secondary text-white border-secondary shadow-md scale-105"
-                  : "bg-white text-slate-400 border-slate-100 hover:border-slate-300 hover:text-slate-600 shadow-sm"
+                  : "bg-card text-muted-foreground border-border hover:border-foreground/20 hover:text-foreground shadow-sm"
               )}
             >
               {service.name}
@@ -506,7 +506,7 @@ const Leads = () => {
         <div className="premium-card p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Filtrado</div>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+            <div className="p-2 bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-xl">
               <span className="material-symbols-outlined text-lg">group</span>
             </div>
           </div>
@@ -519,7 +519,7 @@ const Leads = () => {
         <div className="premium-card p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Novos Leads</div>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+            <div className="p-2 bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-xl">
               <span className="material-symbols-outlined text-lg">star</span>
             </div>
           </div>
@@ -534,7 +534,7 @@ const Leads = () => {
         <div className="premium-card p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Propostas</div>
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+            <div className="p-2 bg-purple-100 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 rounded-xl">
               <span className="material-symbols-outlined text-lg">sync_alt</span>
             </div>
           </div>
@@ -549,7 +549,7 @@ const Leads = () => {
         <div className="premium-card p-6 border-0 shadow-sm overflow-hidden">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ticket Médio</div>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+            <div className="p-2 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl">
               <span className="material-symbols-outlined text-lg">payments</span>
             </div>
           </div>
@@ -564,7 +564,7 @@ const Leads = () => {
 
       {/* Table Area */}
       <div className="premium-card overflow-hidden rounded-3xl border-0 shadow-sm">
-        <div className="p-6 border-b border-slate-100/50 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-6 border-b border-border bg-muted/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h3 className="text-lg font-bold text-primary font-headline flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">list_alt</span>
             Gerenciamento de Leads
@@ -573,14 +573,14 @@ const Leads = () => {
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
             <Input
               placeholder="Buscar por nome, fone ou origem..."
-              className="pl-10 bg-white border-slate-200 transition-all rounded-xl h-11 shadow-sm"
+              className="pl-10 bg-card border-border transition-all rounded-xl h-11 shadow-sm"
               value={searchDebounce}
               onChange={(e) => setSearchDebounce(e.target.value)}
             />
           </div>
         </div>
         
-        <div className="p-0 bg-white">
+        <div className="p-0 bg-card">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="w-8 h-8 text-secondary animate-spin mb-3" />
@@ -588,7 +588,7 @@ const Leads = () => {
             </div>
           ) : (
             <Table>
-              <TableHeader className="bg-slate-50/50">
+              <TableHeader className="bg-muted/50">
                 <TableRow className="hover:bg-transparent border-b-slate-100/50">
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 px-6">Lead</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12">Tags</TableHead>
@@ -599,7 +599,7 @@ const Leads = () => {
               </TableHeader>
               <TableBody>
                 {filteredLeads.map((lead) => (
-                  <TableRow key={lead.id} className="hover:bg-slate-50/50 border-b-slate-100/50 transition-colors">
+                  <TableRow key={lead.id} className="hover:bg-muted/50 border-b-border transition-colors">
                     <TableCell className="px-6 py-4 cursor-pointer group/lead" onClick={() => handleOpenProposals(lead)}>
                       <div className="flex items-center space-x-3">
                         <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 flex-shrink-0 group-hover/lead:bg-secondary/10 group-hover/lead:border-secondary/20 transition-all">
@@ -619,7 +619,7 @@ const Leads = () => {
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {(lead.tags || []).map((tag, idx) => (
-                          <span key={idx} className="bg-slate-100 text-slate-600 text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                          <span key={idx} className="bg-muted text-muted-foreground text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">
                             {tag}
                           </span>
                         ))}
@@ -692,7 +692,7 @@ const Leads = () => {
 
       {/* Proposals List Dialog */}
       <Dialog open={isProposalsListOpen} onOpenChange={setIsProposalsListOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-3xl border-0 shadow-2xl bg-white p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[500px] rounded-3xl border-0 shadow-2xl bg-card p-0 overflow-hidden">
           <div className="p-6 bg-[#0B1525] text-white">
             <DialogTitle className="text-xl font-bold font-headline flex items-center gap-2">
               <FileText className="w-5 h-5 text-secondary" />
@@ -708,11 +708,11 @@ const Leads = () => {
               leadProposals.map((p) => (
                 <div 
                   key={p.id} 
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-secondary/30 hover:bg-white transition-all group cursor-pointer"
+                  className="flex items-center justify-between p-4 bg-muted rounded-2xl border border-border hover:border-secondary/30 hover:bg-card transition-all group cursor-pointer"
                   onClick={() => handleViewProposal(p)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-950/30 flex items-center justify-center text-orange-600 dark:text-orange-400">
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>

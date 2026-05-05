@@ -192,13 +192,13 @@ const Dashboard = () => {
         <Card className="flex items-center gap-3 p-1.5">
           <button 
             onClick={() => handleFilterChange('today')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-slate-50'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
           >
             Hoje
           </button>
           <button 
             onClick={() => handleFilterChange('7days')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === '7days' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-slate-50'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${filter === '7days' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
           >
             Últimos 7 dias
           </button>
@@ -217,7 +217,7 @@ const Dashboard = () => {
         {/* Card 1: Total de Leads */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">groups</span>
             </div>
             {renderPercentBadge(getPercent(counters.leads, targetsData.leads))}
@@ -240,7 +240,7 @@ const Dashboard = () => {
         {/* Card 2: Avaliação Agendada */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">event_available</span>
             </div>
             {renderPercentBadge(getPercent(counters.agendamentos, targetsData.agendamentos))}
@@ -263,7 +263,7 @@ const Dashboard = () => {
         {/* Card 3: Avaliação Comparada */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">how_to_reg</span>
             </div>
             {renderPercentBadge(getPercent(counters.comparada, targetsData.comparada))}
@@ -286,7 +286,7 @@ const Dashboard = () => {
         {/* Card 4: Propostas */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">rocket_launch</span>
             </div>
             {renderPercentBadge(getPercent(counters.oportunidades, targetsData.oportunidades))}
@@ -312,7 +312,7 @@ const Dashboard = () => {
         {/* Card 5: Faturamento Total */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
             </div>
             {renderPercentBadge(getPercent(counters.faturamento, targetsData.faturamento))}
@@ -335,7 +335,7 @@ const Dashboard = () => {
         {/* Card 6: Ticket (Orçado) */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">calculate</span>
             </div>
             {renderPercentBadge(getPercent(counters.ticketOrcado, targetsData.ticketOrcado))}
@@ -358,7 +358,7 @@ const Dashboard = () => {
         {/* Card 7: Ticket (Fechado) */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">handshake</span>
             </div>
             {renderPercentBadge(getPercent(counters.ticketFechado, targetsData.ticketFechado))}
@@ -381,19 +381,19 @@ const Dashboard = () => {
         {/* Card 8: Taxa de Conversão */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-accent rounded-lg">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">{conversionMode === 'percent' ? 'percent' : 'payments'}</span>
             </div>
-            <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg border border-border">
                <button 
                   onClick={() => setConversionMode('percent')}
-                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'percent' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'percent' ? 'bg-card text-secondary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                >
                   %
                </button>
                <button 
                   onClick={() => setConversionMode('reais')}
-                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'reais' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'reais' ? 'bg-card text-secondary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                >
                   R$
                </button>
@@ -431,7 +431,7 @@ const Dashboard = () => {
       <section className="space-y-6 relative z-10">
         <div className="flex items-center gap-3">
           <h3 className="text-xl font-bold text-primary font-headline">Detalhamento de Receita</h3>
-          <div className="flex-1 h-px bg-slate-200/50"></div>
+          <div className="flex-1 h-px bg-border"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="md:col-span-1 bg-primary/95 backdrop-blur-lg p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
@@ -480,7 +480,7 @@ const Dashboard = () => {
               <div key={item.label} className="flex items-center gap-6">
                 <div className="w-24 text-right text-xs font-bold text-on-surface-variant">{item.label}</div>
                 {/* Removed overflow-hidden so the shadow can glow outside */}
-                <div className="flex-1 h-12 bg-slate-100 rounded-xl relative group">
+                <div className="flex-1 h-12 bg-muted rounded-xl relative group">
                   <div 
                     className={cn(
                       "absolute inset-y-0 left-0 rounded-xl flex items-center justify-center text-white text-xs font-bold progress-bar-fill transition-all duration-500",
@@ -510,7 +510,7 @@ const Dashboard = () => {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold text-primary font-headline">Leads por Origem</h3>
             <div className="flex gap-2">
-              <span className="text-[10px] font-bold text-on-surface-variant bg-slate-100 px-3 py-1 rounded uppercase tracking-wider">Volume Mensal</span>
+              <span className="text-[10px] font-bold text-on-surface-variant bg-muted px-3 py-1 rounded uppercase tracking-wider">Volume Mensal</span>
             </div>
           </div>
           <div className="space-y-7">
@@ -519,16 +519,16 @@ const Dashboard = () => {
               const percent = ((item.count / totalOrigins) * 100).toFixed(1);
               // Fallbacks de ícone se a origem não for Meta/Google etc
               let icon = 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg'; // Default
-              let bg = 'bg-slate-100';
+              let bg = 'bg-muted';
               if (item.origin?.toLowerCase().includes('facebook') || item.origin?.toLowerCase().includes('meta')) {
                 icon = 'https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg';
-                bg = 'bg-blue-50';
+                bg = 'bg-blue-50 dark:bg-blue-950/30';
               } else if (item.origin?.toLowerCase().includes('google')) {
                 icon = 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg';
-                bg = 'bg-red-50';
+                bg = 'bg-red-50 dark:bg-red-950/30';
               } else if (item.origin?.toLowerCase().includes('instagram')) {
                 icon = 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png';
-                bg = 'bg-pink-50';
+                bg = 'bg-pink-50 dark:bg-pink-950/30';
               }
 
               return (

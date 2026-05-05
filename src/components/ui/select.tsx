@@ -63,6 +63,15 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
       const rect = trigger.getBoundingClientRect()
       setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width })
     }
+
+    // Recalculate on scroll (handles scrollable containers like Sheet)
+    const updatePosition = () => {
+      if (triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect()
+        setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+      }
+    }
+
     const handleClick = (e: MouseEvent) => {
       if (contentRef.current && !contentRef.current.contains(e.target as Node) &&
           triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
@@ -72,9 +81,13 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
     const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
     document.addEventListener("mousedown", handleClick)
     document.addEventListener("keydown", handleEsc)
+    window.addEventListener("scroll", updatePosition, true)
+    window.addEventListener("resize", updatePosition)
     return () => {
       document.removeEventListener("mousedown", handleClick)
       document.removeEventListener("keydown", handleEsc)
+      window.removeEventListener("scroll", updatePosition, true)
+      window.removeEventListener("resize", updatePosition)
     }
   }, [open, setOpen])
 

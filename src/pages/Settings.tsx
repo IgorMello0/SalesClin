@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,33 +9,51 @@ import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
+
+
 import { 
   Settings as SettingsIcon, 
-  DollarSign, 
-  BarChart3, 
   Building, 
-  Package, 
-  Monitor,
-  Bell,
-  Wifi,
-  Webhook,
   Plus,
   Trash2,
   Clock,
-  CreditCard,
-  Image as ImageIcon,
-  CheckCircle2,
   Lock,
-  Users
+  Users,
+  Tag
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi } from '@/lib/api';
 
-// -- COMPONENTES DE CONFIGURAÇÃO (MOCKS) --
+// -- CARGOS HELPERS --
+const DEFAULT_ROLES = [
+  { value: 'comercial', label: 'Comercial' },
+  { value: 'atendente', label: 'Atendimento' },
+  { value: 'recepcao', label: 'Recepção' },
+  { value: 'financeiro', label: 'Financeiro' },
+];
+
+const STORAGE_KEY = 'salesclin_custom_roles';
+
+const getCustomRoles = (): { value: string; label: string }[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCustomRoles = (roles: { value: string; label: string }[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(roles));
+};
+
+const getAllRoles = () => {
+  return [...DEFAULT_ROLES, ...getCustomRoles()];
+};
+
+// -- COMPONENTES DE CONFIGURAÇÃO --
 
 const ServicosView = () => {
   const { professional } = useAuth();
@@ -128,13 +146,13 @@ const ServicosView = () => {
     <div className="space-y-6">
       {/* Team Member Selector */}
       {team.length > 1 && (
-        <div className="p-4 border rounded-lg bg-zinc-50/50 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 border rounded-lg bg-muted/50 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h4 className="font-medium text-sm">Profissional / Membro</h4>
             <p className="text-xs text-muted-foreground">Selecione de quem é esta tabela de preços.</p>
           </div>
           <Select value={selectedProfId} onValueChange={setSelectedProfId}>
-            <SelectTrigger className="w-[200px] h-9 text-sm bg-white">
+            <SelectTrigger className="w-[200px] h-9 text-sm bg-background">
               <SelectValue placeholder="Selecione o membro...">
                 {(() => {
                   const member = team.find(m => m.id.toString() === selectedProfId);
@@ -200,7 +218,7 @@ const ServicosView = () => {
       ) : (
         <div className="space-y-3">
           {services.map((s, i) => (
-            <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-zinc-50/50 hover:border-primary/30 transition-colors">
+            <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50 hover:border-primary/30 transition-colors">
               <div>
                 <div className="font-medium text-sm">{s.name}</div>
                 <div className="text-xs text-muted-foreground flex gap-3 mt-1">
@@ -224,45 +242,6 @@ const ServicosView = () => {
   );
 };
 
-const CronogramaView = () => (
-  <div className="space-y-6">
-    <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm border border-blue-100">
-      Configure os horários padrão (janela de atendimento) em que o sistema permitirá agendamentos online.
-    </div>
-    <div className="space-y-4">
-      {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'].map((dia) => (
-        <div key={dia} className="flex items-center justify-between gap-4">
-          <Switch defaultChecked />
-          <div className="w-20 font-medium text-sm">{dia}</div>
-          <div className="flex items-center gap-2 flex-1">
-            <Select defaultValue="08">
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent><SelectItem value="08">08:00</SelectItem><SelectItem value="09">09:00</SelectItem></SelectContent>
-            </Select>
-            <span className="text-muted-foreground text-sm">até</span>
-            <Select defaultValue="18">
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent><SelectItem value="18">18:00</SelectItem><SelectItem value="19">19:00</SelectItem></SelectContent>
-            </Select>
-          </div>
-        </div>
-      ))}
-      <Separator />
-      {['Sábado', 'Domingo'].map((dia) => (
-        <div key={dia} className="flex items-center justify-between gap-4 opacity-50">
-          <Switch />
-          <div className="w-20 font-medium text-sm">{dia}</div>
-          <div className="flex items-center gap-2 flex-1">
-            <Input disabled placeholder="00:00" />
-            <span className="text-muted-foreground text-sm">até</span>
-            <Input disabled placeholder="00:00" />
-          </div>
-        </div>
-      ))}
-    </div>
-    <Button className="w-full mt-4">Salvar Horários</Button>
-  </div>
-);
 
 
 
@@ -278,12 +257,7 @@ const EquipeView = () => {
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
-  const ROLES = [
-    { value: 'comercial', label: 'Comercial' },
-    { value: 'atendente', label: 'Atendimento' },
-    { value: 'recepcao', label: 'Recepção' },
-    { value: 'financeiro', label: 'Financeiro' },
-  ];
+  const ROLES = getAllRoles();
 
   const loadTeam = async () => {
     try {
@@ -400,29 +374,27 @@ const EquipeView = () => {
 
   const getRoleBadge = (role: string) => {
     const colors: Record<string, string> = {
-      admin: 'bg-red-100 text-red-700 border-red-200',
-      comercial: 'bg-orange-100 text-orange-700 border-orange-200',
-      atendente: 'bg-blue-100 text-blue-700 border-blue-200',
-      recepcao: 'bg-violet-100 text-violet-700 border-violet-200',
-      financeiro: 'bg-green-100 text-green-700 border-green-200',
+      admin: 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900',
+      comercial: 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900',
+      atendente: 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900',
+      recepcao: 'bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-900',
+      financeiro: 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900',
     };
-    const labels: Record<string, string> = {
-      admin: 'Admin',
-      comercial: 'Comercial',
-      atendente: 'Atendimento',
-      recepcao: 'Recepção',
-      financeiro: 'Financeiro',
-    };
+    // Build labels from default + custom roles
+    const allLabels: Record<string, string> = {};
+    getAllRoles().forEach(r => { allLabels[r.value] = r.label; });
+    allLabels['admin'] = 'Admin';
+    
     return (
-      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${colors[role] || 'bg-zinc-100 text-zinc-600 border-zinc-200'}`}>
-        {labels[role] || role}
+      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${colors[role] || 'bg-primary/10 text-primary border-primary/20'}`}>
+        {allLabels[role] || role}
       </span>
     );
   };
 
   return (
     <div className="space-y-6">
-      <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm border border-blue-100 flex items-start gap-3">
+      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm border border-blue-100 dark:border-blue-900 flex items-start gap-3">
         <Users className="w-5 h-5 flex-shrink-0 mt-0.5" />
         <div>
           <strong className="block mb-0.5">Gestão de Equipe</strong>
@@ -438,7 +410,7 @@ const EquipeView = () => {
       </div>
       
       {isAdding && (
-        <div className="p-4 border rounded-lg bg-zinc-50/50 space-y-4 mb-4">
+        <div className="p-4 border rounded-lg bg-muted/50 space-y-4 mb-4">
           <h4 className="font-medium text-sm">Novo Funcionário</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -456,10 +428,10 @@ const EquipeView = () => {
             <div className="space-y-2">
               <Label>Cargo / Função</Label>
               <Select value={newMember.role} onValueChange={v => setNewMember({...newMember, role: v})}>
-                <SelectTrigger className="h-9 text-sm bg-white">
+                <SelectTrigger className="h-9 text-sm bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="item-aligned" className="z-[200]">
                   {ROLES.map(r => (
                     <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                   ))}
@@ -483,7 +455,7 @@ const EquipeView = () => {
         ) : team.map((u) => (
           <div key={u.id}>
             <div 
-              className={`flex justify-between items-center p-3 border rounded-lg hover:bg-zinc-50 transition-colors cursor-pointer ${selectedUserId === u.id ? 'border-primary bg-primary/5' : ''}`}
+              className={`flex justify-between items-center p-3 border rounded-lg hover:bg-muted transition-colors cursor-pointer ${selectedUserId === u.id ? 'border-primary bg-primary/5' : ''}`}
               onClick={() => handleSelectUser(u.id)}
             >
               <div className="flex items-center gap-3">
@@ -509,7 +481,7 @@ const EquipeView = () => {
 
             {/* Painel de Permissões */}
             {selectedUserId === u.id && (
-              <div className="mt-2 p-4 border rounded-lg bg-white space-y-4 animate-in slide-in-from-top-2 duration-200">
+              <div className="mt-2 p-4 border rounded-lg bg-background space-y-4 animate-in slide-in-from-top-2 duration-200">
                 <div className="flex justify-between items-center">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <Lock className="w-4 h-4 text-primary" />
@@ -535,7 +507,7 @@ const EquipeView = () => {
                       <div 
                         key={p.moduleId} 
                         className={`flex items-center justify-between p-2.5 border rounded-lg text-sm transition-colors ${
-                          p.hasAccess ? 'bg-green-50/50 border-green-100' : 'bg-zinc-50/50 border-zinc-100 opacity-60'
+                          p.hasAccess ? 'bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900' : 'bg-muted/50 border-muted opacity-60'
                         } ${p.canEdit === false ? 'opacity-40 pointer-events-none' : ''}`}
                       >
                         <div className="flex items-center gap-2">
@@ -560,39 +532,7 @@ const EquipeView = () => {
   );
 };
 
-const WebhookView = () => (
-  <div className="space-y-6">
-    <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm border border-amber-100 flex items-start gap-3">
-      <Lock className="w-5 h-5 flex-shrink-0 mt-0.5" />
-      <div>
-        <strong className="block mb-1">Atenção Desenvolvedor</strong> 
-        Webhooks permitem enviar dados em tempo real (JSON) para outras aplicações ou sistemas quando um evento interno ocorre no CRM.
-      </div>
-    </div>
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Endpoint URL para Disparo</Label>
-        <Input placeholder="https://sua-api.com.br/webhook" defaultValue="https://zapier.com/hooks/catch/123/456/" />
-      </div>
-      <div className="space-y-2">
-        <Label>Chave Secreta de Assinatura (Read Only)</Label>
-        <Input value="whsec_83jdh82jdn28xj2nd8238..." type="password" readOnly className="font-mono text-xs text-muted-foreground cursor-not-allowed bg-zinc-50" />
-      </div>
-      <Separator />
-      <div className="space-y-3">
-        <Label className="text-base font-semibold">Gatilhos de Eventos</Label>
-        <div className="space-y-3 p-4 border rounded-lg bg-zinc-50/30">
-          <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-sm font-medium">agendamento.criado</span><span className="text-xs text-muted-foreground">Dispara ao criar novo agendamento</span></div><Switch defaultChecked /></div>
-          <Separator />
-          <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-sm font-medium">agendamento.cancelado</span><span className="text-xs text-muted-foreground">Dispara no cancelamento</span></div><Switch defaultChecked /></div>
-          <Separator />
-          <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-sm font-medium">pagamento.aprovado</span><span className="text-xs text-muted-foreground">Quando checkout é aprovado</span></div><Switch /></div>
-        </div>
-      </div>
-      <Button className="w-full">Salvar Integração</Button>
-    </div>
-  </div>
-);
+
 
 const InfoNegocioView = () => {
   const { toast } = useToast();
@@ -660,7 +600,7 @@ const InfoNegocioView = () => {
 
   return (
     <div className="space-y-5">
-      <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm border border-blue-100 flex items-start gap-3">
+      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm border border-blue-100 dark:border-blue-900 flex items-start gap-3">
         <Building className="w-5 h-5 flex-shrink-0 mt-0.5" />
         <div>
           <strong className="block mb-0.5">Dados da Empresa</strong>
@@ -702,7 +642,7 @@ const InfoNegocioView = () => {
           onChange={e => setCompanyData({...companyData, plan: e.target.value})} 
           placeholder="Ex: Profissional, Básico" 
           disabled
-          className="bg-zinc-50 cursor-not-allowed"
+          className="bg-muted cursor-not-allowed"
         />
         <p className="text-xs text-muted-foreground">O plano é gerenciado pela plataforma.</p>
       </div>
@@ -714,27 +654,130 @@ const InfoNegocioView = () => {
   );
 };
 
-const GenericFallback = ({ name }: { name: string }) => (
-  <div className="text-center py-10 space-y-4">
-    <div className="w-16 h-16 rounded-full bg-secondary text-primary mx-auto flex items-center justify-center relative">
-      <SettingsIcon className="w-8 h-8 opacity-50" />
-      <div className="absolute top-0 right-0 w-4 h-4 bg-primary rounded-full animate-pulse border-2 border-white"></div>
-    </div>
-    <div>
-      <h3 className="font-semibold text-lg">Módulo {name}</h3>
-      <p className="text-sm text-muted-foreground max-w-[250px] mx-auto mt-2">
-        O painel detalhado de {name.toLowerCase()} está sendo disponibilizado nesta versão.
-      </p>
-    </div>
-  </div>
-);
+// -- CARGOS VIEW --
+const CargosView = () => {
+  const { toast } = useToast();
+  const [customRoles, setCustomRoles] = useState(getCustomRoles());
+  const [newRoleName, setNewRoleName] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
 
-// Map of components per setting generic string
+  const allRoles = [...DEFAULT_ROLES, ...customRoles];
+
+  const handleAddRole = () => {
+    const trimmed = newRoleName.trim();
+    if (!trimmed) {
+      toast({ title: 'Aviso', description: 'Digite o nome do cargo', variant: 'destructive' });
+      return;
+    }
+    const value = trimmed.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
+    if (allRoles.find(r => r.value === value)) {
+      toast({ title: 'Aviso', description: 'Esse cargo já existe', variant: 'destructive' });
+      return;
+    }
+    const updated = [...customRoles, { value, label: trimmed }];
+    setCustomRoles(updated);
+    saveCustomRoles(updated);
+    setNewRoleName('');
+    setIsAdding(false);
+    toast({ title: 'Cargo criado!', description: `"${trimmed}" agora está disponível na criação de funcionários.` });
+  };
+
+  const handleDeleteRole = (value: string) => {
+    const updated = customRoles.filter(r => r.value !== value);
+    setCustomRoles(updated);
+    saveCustomRoles(updated);
+    toast({ title: 'Removido', description: 'Cargo removido com sucesso.' });
+  };
+
+  const roleColors: Record<string, string> = {
+    comercial: 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900',
+    atendente: 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900',
+    recepcao: 'bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-900',
+    financeiro: 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900',
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm border border-blue-100 dark:border-blue-900 flex items-start gap-3">
+        <Tag className="w-5 h-5 flex-shrink-0 mt-0.5" />
+        <div>
+          <strong className="block mb-0.5">Cargos e Funções</strong>
+          Crie cargos personalizados para sua clínica. Eles aparecerão automaticamente no dropdown ao adicionar um novo funcionário na seção de Equipe.
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <h3 className="font-medium text-sm">Cargos Disponíveis ({allRoles.length})</h3>
+        <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+          <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : 'Novo Cargo'}
+        </Button>
+      </div>
+
+      {isAdding && (
+        <div className="p-4 border rounded-lg bg-muted/50 space-y-4">
+          <h4 className="font-medium text-sm">Novo Cargo</h4>
+          <div className="flex gap-3">
+            <Input 
+              value={newRoleName} 
+              onChange={e => setNewRoleName(e.target.value)} 
+              placeholder="Ex: Auxiliar, Dentista, Marketing..."
+              className="flex-1"
+              onKeyDown={e => e.key === 'Enter' && handleAddRole()}
+            />
+            <Button onClick={handleAddRole}>Adicionar</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {/* Default roles */}
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-2 mb-1">Cargos Padrão</p>
+        {DEFAULT_ROLES.map(role => (
+          <div key={role.value} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-3">
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${roleColors[role.value] || 'bg-muted text-muted-foreground border-border'}`}>
+                {role.label}
+              </span>
+              <span className="text-xs text-muted-foreground font-mono">{role.value}</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground italic">padrão</span>
+          </div>
+        ))}
+
+        {/* Custom roles */}
+        {customRoles.length > 0 && (
+          <>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-4 mb-1">Cargos Personalizados</p>
+            {customRoles.map(role => (
+              <div key={role.value} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 hover:border-primary/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/20">
+                    {role.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground font-mono">{role.value}</span>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleDeleteRole(role.value)}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 h-7 w-7 p-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Map of components per setting
 const ViewsMap: Record<string, React.FC<any>> = {
   'Serviços': ServicosView,
-  'Cronograma': CronogramaView,
   'Equipe': EquipeView,
-  'Webhook': WebhookView,
+  'Cargos': CargosView,
   'Meu Negócio': InfoNegocioView,
 };
 
@@ -748,17 +791,8 @@ const Settings = () => {
       icon: SettingsIcon,
       items: [
         { name: 'Serviços', description: 'Gerencie os serviços oferecidos' },
-        { name: 'Equipe', description: 'Gerencie membros da equipe' },
-        { name: 'Cronograma', description: 'Configure horários de funcionamento' },
-        { name: 'Calendário de agendamentos', description: 'Configurações do calendário' },
-      ]
-    },
-    {
-      title: 'Financeiro',
-      icon: DollarSign,
-      items: [
-        { name: 'Checkout', description: 'Configurações do processo de pagamento' },
-        { name: 'Recibos', description: 'Configurações de recibos e faturas' },
+        { name: 'Equipe', description: 'Gerencie membros da equipe e permissões' },
+        { name: 'Cargos', description: 'Gerencie os cargos e funções da equipe' },
       ]
     },
     {
@@ -768,39 +802,10 @@ const Settings = () => {
         { name: 'Meu Negócio', description: 'Informações e configurações da empresa' },
       ]
     },
-    {
-      title: 'Categorias',
-      icon: Package,
-      items: [
-        { name: 'Agendamento', description: 'Categorias de agendamentos' },
-        { name: 'Eventos', description: 'Tipos de eventos' },
-        { name: 'Categorias de Clientes', description: 'Segmentação de clientes' },
-      ]
-    },
-    {
-      title: 'Inventário',
-      icon: Package,
-      items: [
-        { name: 'Configurações', description: 'Configurações do inventário' },
-      ]
-    },
-    {
-      title: 'Configurações do sistema',
-      icon: Monitor,
-      items: [
-        { name: 'Notificações', description: 'Configurações de notificações' },
-        { name: 'Redes', description: 'Integrações com redes sociais' },
-        { name: 'Webhook', description: 'Configurações de webhooks' },
-      ]
-    }
   ];
 
-  const handleSaveQuick = () => {
-    toast({ title: 'Sucesso!', description: 'Opções rápidas atualizadas no servidor.' });
-  }
-
   // Define Active View safely
-  const ActiveView = selectedSetting ? (ViewsMap[selectedSetting.name] || GenericFallback) : null;
+  const ActiveView = selectedSetting ? (ViewsMap[selectedSetting.name] || null) : null;
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8 relative">
@@ -821,7 +826,7 @@ const Settings = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {settingsSections.map((section) => (
           <Card key={section.title} className="hover:shadow-sm transition-shadow">
-            <CardHeader className="pb-3 border-b bg-zinc-50/50">
+            <CardHeader className="pb-3 border-b bg-muted/50">
               <CardTitle className="flex items-center gap-2 text-base sm:text-md">
                 <section.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 {section.title}
@@ -854,49 +859,14 @@ const Settings = () => {
         ))}
       </div>
 
-      <Separator className="my-8" />
-
-      {/* Quick Settings Pinned */}
-      <div className="max-w-2xl">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <SettingsIcon className="w-5 h-5 text-muted-foreground" />
-          Ações Rápidas Populares
-        </h3>
-        <Card className="border-zinc-200">
-          <CardContent className="space-y-6 pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="notifications" className="text-sm">Emails Administrativos</Label>
-                    <div className="text-xs text-muted-foreground">Aviso ao criar novo agendamento</div>
-                  </div>
-                  <Switch id="notifications" defaultChecked />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="reminders" className="text-sm">Lembrete Automático</Label>
-                    <div className="text-xs text-muted-foreground">Dispara e-mail/SMS para cliente</div>
-                  </div>
-                  <Switch id="reminders" defaultChecked />
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t mt-4">
-              <Button variant="default" className="text-xs h-8" onClick={handleSaveQuick}>Gravar Ajustes</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* THE DRAWING SHEET CONFIG MENU (The Magic Drawer) */}
       <Sheet open={!!selectedSetting} onOpenChange={(open) => !open && setSelectedSetting(null)}>
-        <SheetContent className="w-[90vw] sm:max-w-md md:max-w-xl p-0 flex flex-col border-l shadow-2xl">
+        <SheetContent className="w-[90vw] sm:max-w-xl md:max-w-2xl p-0 flex flex-col border-l shadow-2xl max-h-screen">
           {selectedSetting && (
             <>
               {/* Sheet Header Custom */}
-              <div className="px-6 py-6 border-b bg-zinc-50/80 z-10 backdrop-blur pb-6 shrink-0">
+              <div className="px-6 py-6 border-b bg-muted/80 z-10 backdrop-blur pb-6 shrink-0">
                 <SheetHeader>
                   <SheetTitle className="text-2xl font-bold flex items-center gap-2">
                     {selectedSetting.name}
@@ -912,8 +882,8 @@ const Settings = () => {
                 {ActiveView && <ActiveView name={selectedSetting.name} />}
               </div>
 
-              {/* Universal Footer Action if applicable or just aesthetic spacer */}
-              <div className="p-4 bg-zinc-50 border-t mt-auto text-xs text-center text-muted-foreground shrink-0">
+              {/* Footer */}
+              <div className="p-4 bg-muted border-t mt-auto text-xs text-center text-muted-foreground shrink-0">
                 Módulo Auraia CRM v1.0.5 - Configurações protegidas.
               </div>
             </>
