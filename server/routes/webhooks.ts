@@ -68,7 +68,6 @@ router.post('/leads/:apiKey', async (req, res) => {
         name,
         email,
         phone,
-        city,
         value,
         origin,
         status: 'prospect_lead', // Status inicial do funil

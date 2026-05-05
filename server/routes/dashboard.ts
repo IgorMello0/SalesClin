@@ -165,9 +165,9 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       
     // Processamento dos Agrupamentos (Sub-Métricas)
     const metodos = {
-      boleto: {
-        gerados: faturamentoPorMetodo.filter(m => m.method === 'boleto').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
-        pagos: faturamentoPorMetodo.filter(m => m.method === 'boleto' && m.status === 'pago').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0)
+      transferencia: {
+        gerados: faturamentoPorMetodo.filter(m => m.method === 'transferencia').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
+        pagos: faturamentoPorMetodo.filter(m => m.method === 'transferencia' && m.status === 'pago').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0)
       },
       cartao: faturamentoPorMetodo.filter(m => m.method === 'cartao' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
       pix: faturamentoPorMetodo.filter(m => m.method === 'pix' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
