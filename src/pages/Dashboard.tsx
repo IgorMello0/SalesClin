@@ -269,7 +269,7 @@ const Dashboard = () => {
             {renderPercentBadge(getPercent(counters.comparada, targetsData.comparada))}
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Comparada</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Comparecida</p>
             <h3 className="stats-value">{counters.comparada}</h3>
           </div>
           <div className="mt-6 space-y-2">

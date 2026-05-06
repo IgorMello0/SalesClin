@@ -119,14 +119,14 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                     {method === 'cartao' ? 'Cartão de Crédito' : 
                      method === 'pix' ? 'PIX' : 
                      method === 'dinheiro' ? 'Dinheiro' : 
-                     method === 'boleto' ? 'Boleto' : method}
+                     method === 'transferencia' ? 'Boleto' : method}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cartao">Cartão de Crédito</SelectItem>
                   <SelectItem value="pix">PIX</SelectItem>
                   <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
+                  <SelectItem value="transferencia">Boleto</SelectItem>
                 </SelectContent>
               </Select>
             </div>
