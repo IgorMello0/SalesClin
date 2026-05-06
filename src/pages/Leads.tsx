@@ -208,7 +208,7 @@ const Leads = () => {
 
     try {
       const leadData = {
-        professionalId: Number(professional.id),
+        professional_id: Number(professional.id),
         name: formData.name,
         email: formData.email || null,
         phone: formData.phone || null,

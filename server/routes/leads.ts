@@ -73,7 +73,7 @@ router.get('/:id', auth(false), async (req, res) => {
 // Criar novo lead
 router.post('/', auth(), async (req, res) => {
   try {
-    const { professional_id, name, value, origin, status, avatar, phone, email, notes, responsible } = req.body
+    const { professional_id, name, value, origin, status, avatar, phone, email, notes, responsible, tags } = req.body
     
     if (!professional_id || !name) {
       return res.status(400).json(createErrorResponse('professional_id e name são obrigatórios', 400))
@@ -90,7 +90,8 @@ router.post('/', auth(), async (req, res) => {
         phone, 
         email, 
         notes, 
-        responsible 
+        responsible,
+        tags: tags || [] 
       }
     })
     
