@@ -9,6 +9,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { format, addMonths } from 'date-fns';
 
+interface Proposal {
+  id: number;
+  title: string;
+  value: number;
+  status: string;
+  createdAt: string;
+}
+
 interface ConfirmPaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -22,13 +30,55 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
   const [installmentsCount, setInstallmentsCount] = useState(1);
   const [installments, setInstallments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [selectedProposalId, setSelectedProposalId] = useState<string>('none');
+  const [loadingProposals, setLoadingProposals] = useState(false);
   const { toast } = useToast();
+
+  // Buscar propostas do lead quando o modal abre
+  useEffect(() => {
+    if (open && leadId) {
+      fetchProposals();
+    }
+    if (!open) {
+      setSelectedProposalId('none');
+      setProposals([]);
+    }
+  }, [open, leadId]);
+
+  const fetchProposals = async () => {
+    if (!leadId) return;
+    setLoadingProposals(true);
+    try {
+      const res = await leadsApi.getProposals(Number(leadId));
+      if (res.success && res.data) {
+        setProposals(res.data);
+        // Se tem apenas uma proposta pendente, selecionar automaticamente
+        const pending = res.data.filter((p: Proposal) => p.status === 'pending');
+        if (pending.length === 1) {
+          setSelectedProposalId(pending[0].id.toString());
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao buscar propostas:', e);
+    } finally {
+      setLoadingProposals(false);
+    }
+  };
 
   useEffect(() => {
     if (open) {
-      generateInstallments(method, installmentsCount, leadValue);
+      // Se selecionou uma proposta, usar o valor dela
+      const selectedProposal = proposals.find(p => p.id.toString() === selectedProposalId);
+      const valueToUse = selectedProposal ? Number(selectedProposal.value) : leadValue;
+      generateInstallments(method, installmentsCount, valueToUse);
     }
-  }, [open, method, installmentsCount, leadValue]);
+  }, [open, method, installmentsCount, leadValue, selectedProposalId, proposals]);
+
+  const getActiveValue = () => {
+    const selectedProposal = proposals.find(p => p.id.toString() === selectedProposalId);
+    return selectedProposal ? Number(selectedProposal.value) : leadValue;
+  };
 
   const generateInstallments = (currentMethod: string, count: number, totalValue: number) => {
     const valuePerInstallment = totalValue / count;
@@ -55,13 +105,15 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
 
   const handleSubmit = async () => {
     if (!leadId) return;
+
+    const activeValue = getActiveValue();
     
     // Validate
     const totalInput = installments.reduce((acc, curr) => acc + Number(curr.amount), 0);
-    if (Math.abs(totalInput - leadValue) > 0.1) {
+    if (Math.abs(totalInput - activeValue) > 0.1) {
       toast({
         title: "Valores divergentes",
-        description: `A soma das parcelas (R$ ${totalInput.toFixed(2)}) não bate com o valor do Lead (R$ ${leadValue.toFixed(2)}).`,
+        description: `A soma das parcelas (R$ ${totalInput.toFixed(2)}) não bate com o valor (R$ ${activeValue.toFixed(2)}).`,
         variant: "destructive"
       });
       return;
@@ -70,6 +122,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
     setLoading(true);
     try {
       const payload = {
+        proposalId: selectedProposalId !== 'none' ? Number(selectedProposalId) : null,
         payments: installments.map(i => ({
           amount: Number(i.amount),
           date: new Date(i.date).toISOString(),
@@ -83,7 +136,9 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
       if (res.success) {
         toast({
           title: "Pagamento Confirmado! 💰",
-          description: "Os dados foram enviados para o dossiê do cliente.",
+          description: selectedProposalId !== 'none' 
+            ? "Pagamento registrado e proposta marcada como aceita." 
+            : "Os dados foram enviados para o dossiê do cliente.",
         });
         onSuccess();
         onOpenChange(false);
@@ -97,6 +152,8 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
     }
   };
 
+  const activeValue = getActiveValue();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-white border-0 shadow-2xl rounded-3xl p-0 overflow-hidden">
@@ -106,10 +163,52 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
             <span className="material-symbols-outlined text-emerald-400">payments</span>
             Confirmar Recebimento
           </DialogTitle>
-          <p className="text-emerald-100/70 text-sm mt-1 relative z-10">Defina a forma de pagamento e as parcelas para o valor de R$ {leadValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.</p>
+          <p className="text-emerald-100/70 text-sm mt-1 relative z-10">Defina a forma de pagamento e as parcelas para o valor de R$ {activeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.</p>
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Seletor de Proposta */}
+          {proposals.length > 0 && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Proposta Vinculada</Label>
+              <Select value={selectedProposalId} onValueChange={setSelectedProposalId}>
+                <SelectTrigger className="h-11 rounded-xl border-orange-200 bg-orange-50/50">
+                  <SelectValue placeholder="Selecione uma proposta...">
+                    {selectedProposalId === 'none' 
+                      ? 'Nenhuma proposta (usar valor do lead)' 
+                      : (() => {
+                          const p = proposals.find(p => p.id.toString() === selectedProposalId);
+                          return p ? `${p.title} — R$ ${Number(p.value).toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : '';
+                        })()
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma proposta (usar valor do lead)</SelectItem>
+                  {proposals.map(p => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block w-2 h-2 rounded-full ${p.status === 'pending' ? 'bg-orange-400' : p.status === 'accepted' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                        <span>{p.title}</span>
+                        <span className="text-slate-400">—</span>
+                        <span className="font-semibold">R$ {Number(p.value).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${p.status === 'pending' ? 'bg-orange-100 text-orange-600' : p.status === 'accepted' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                          {p.status === 'pending' ? 'Pendente' : p.status === 'accepted' ? 'Aceita' : 'Rejeitada'}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedProposalId !== 'none' && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                  Esta proposta será marcada como <strong>Aceita</strong> ao confirmar o pagamento.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Forma de Pagamento</Label>
@@ -201,7 +300,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
 
           <div className="flex justify-between items-center pt-4 border-t border-slate-100">
             <div className="text-sm font-medium text-slate-500">
-              Total das parcelas: <span className={Math.abs(installments.reduce((acc, curr) => acc + Number(curr.amount), 0) - leadValue) > 0.1 ? "text-red-500 font-bold" : "text-emerald-500 font-bold"}>
+              Total das parcelas: <span className={Math.abs(installments.reduce((acc, curr) => acc + Number(curr.amount), 0) - activeValue) > 0.1 ? "text-red-500 font-bold" : "text-emerald-500 font-bold"}>
                 R$ {installments.reduce((acc, curr) => acc + Number(curr.amount), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
               </span>
             </div>

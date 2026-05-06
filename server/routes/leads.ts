@@ -272,7 +272,7 @@ router.put('/:id', auth(), async (req, res) => {
 router.post('/:id/confirm-payment', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { payments } = req.body // Array of { amount, date, method, status }
+    const { payments, proposalId } = req.body // Array of { amount, date, method, status } + optional proposalId
 
     const lead = await prisma.lead.findUnique({ where: { id } })
     if (!lead) return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
@@ -310,11 +310,19 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
           professionalId: lead.professionalId,
           amount: p.amount,
           date: new Date(p.date),
-          method: p.method, // 'cartao', 'pix', 'boleto', 'dinheiro'
+          method: p.method, // 'cartao', 'pix', 'transferencia', 'dinheiro'
           status: p.status || 'pago'
         }
       })
       paymentRecords.push(payment)
+    }
+
+    // Se uma proposta foi vinculada, marcar como aceita
+    if (proposalId) {
+      await prisma.proposal.update({
+        where: { id: Number(proposalId) },
+        data: { status: 'accepted' }
+      })
     }
 
     // Atualiza status do Lead para pago e move para o funil pós-venda ou similar se quiser
