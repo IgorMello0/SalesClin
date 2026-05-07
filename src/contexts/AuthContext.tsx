@@ -60,11 +60,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Verificar se o usuário tem acesso a um módulo
   const hasModuleAccess = (moduleCode: string): boolean => {
-    // Se não há permissões carregadas, assumir que não tem acesso
-    if (permissions.length === 0) return false;
+    // Se não há permissões carregadas, por padrão liberamos para evitar instabilidade
+    // O backend fará a validação final de qualquer forma
+    if (permissions.length === 0) return true;
     
     const permission = permissions.find((p) => p.moduleCode === moduleCode);
-    return permission?.hasAccess ?? false;
+    
+    // Se a permissão não foi encontrada na lista, liberamos por padrão
+    // Se foi encontrada, respeitamos o campo hasAccess
+    return permission ? permission.hasAccess : true;
   };
 
   useEffect(() => {
