@@ -11,14 +11,26 @@ router.get('/', auth(false), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     const { search, status, professionalId } = req.query as any
-    const profId = professionalId || req.user?.id
+    let profId: number | undefined;
 
-    const where: any = {}
-    if (profId) {
-      where.professionalId = Number(profId)
-    } else {
-      return res.json(createSuccessResponse([], { page, pageSize, total: 0 }))
+    if (req.user?.type === 'profissional') {
+      profId = req.user.id;
+    } else if (req.user?.type === 'usuario') {
+      // Buscar o dono da empresa do usuário
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: req.user.companyId! },
+        select: { ownerId: true }
+      });
+      profId = empresa?.ownerId || undefined;
+    } else if (professionalId) {
+      profId = Number(professionalId);
     }
+
+    if (!profId) {
+      return res.json(createSuccessResponse([], { page, pageSize, total: 0 }));
+    }
+
+    const where: any = { professionalId: profId };
 
     if (search) {
       where.OR = [
@@ -73,15 +85,34 @@ router.get('/:id', auth(false), async (req, res) => {
 // Criar novo lead
 router.post('/', auth(), async (req, res) => {
   try {
-    const { professional_id, name, value, origin, status, avatar, phone, email, notes, responsible, tags } = req.body
+    const { name, value, origin, status, avatar, phone, email, notes, responsible, tags } = req.body
     
-    if (!professional_id || !name) {
-      return res.status(400).json(createErrorResponse('professional_id e name são obrigatórios', 400))
+    if (!name) {
+      return res.status(400).json(createErrorResponse('O nome é obrigatório', 400))
+    }
+
+    let professionalId: number;
+
+    if (req.user?.type === 'profissional') {
+      professionalId = req.user.id;
+    } else if (req.user?.type === 'usuario') {
+      // Buscar o dono da empresa do usuário
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: req.user.companyId! },
+        select: { ownerId: true }
+      });
+
+      if (!empresa || !empresa.ownerId) {
+        return res.status(400).json(createErrorResponse('Empresa ou Profissional responsável não encontrado', 400));
+      }
+      professionalId = empresa.ownerId;
+    } else {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
     }
     
     const created = await prisma.lead.create({
       data: { 
-        professionalId: Number(professional_id), 
+        professionalId, 
         name, 
         value: Number(value) || 0, 
         origin, 
@@ -95,9 +126,7 @@ router.post('/', auth(), async (req, res) => {
       }
     })
     
-    if (req.user?.type === 'profissional') {
-      logAudit(req.user.id, 'CRIAR_LEAD', 'Lead', created.id)
-    }
+    logAudit(req.user.id, 'CRIAR_LEAD', 'Lead', created.id)
     
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {

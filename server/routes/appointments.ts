@@ -9,8 +9,26 @@ export const router = Router()
 router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
   const { professionalId, clientId, status } = req.query as any
-  const where: any = {}
-  if (professionalId) where.professionalId = Number(professionalId)
+  let profId: number | undefined;
+
+  if (req.user?.type === 'profissional') {
+    profId = req.user.id;
+  } else if (req.user?.type === 'usuario') {
+    // Buscar o dono da empresa do usuário
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: req.user.companyId! },
+      select: { ownerId: true }
+    });
+    profId = empresa?.ownerId || undefined;
+  } else if (professionalId) {
+    profId = Number(professionalId);
+  }
+
+  if (!profId) {
+    return res.json(createSuccessResponse([], { page, pageSize, total: 0 }));
+  }
+
+  const where: any = { professionalId: profId };
   if (clientId) where.clientId = Number(clientId)
   if (status) where.status = status
 
@@ -130,79 +148,123 @@ router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) 
 })
 
 router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
-  const { professionalId, clientId, leadId, tags, serviceId, startTime, endTime, status, notes } = req.body
-  
-  // Overbooking Validation
-  const conflicting = await prisma.appointment.findFirst({
-    where: {
-      professionalId,
-      status: { not: 'cancelado' },
-      AND: [
-        { startTime: { lt: new Date(endTime) } },
-        { endTime: { gt: new Date(startTime) } }
-      ]
-    }
-  });
+  try {
+    const { clientId, leadId, tags, serviceId, startTime, endTime, status, notes } = req.body
+    
+    let professionalId: number;
 
-  if (conflicting) {
-    return res.status(409).json(createErrorResponse('Este horário já está ocupado para este profissional.', 409));
-  }
-
-  // Update tags if provided
-  if (tags && Array.isArray(tags)) {
-    if (leadId) {
-      await prisma.lead.update({ where: { id: Number(leadId) }, data: { tags } });
-    } else if (clientId) {
-      await prisma.client.update({ where: { id: Number(clientId) }, data: { tags } });
+    if (req.user?.type === 'profissional') {
+      professionalId = req.user.id;
+    } else if (req.user?.type === 'usuario') {
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: req.user.companyId! },
+        select: { ownerId: true }
+      });
+      if (!empresa || !empresa.ownerId) {
+        return res.status(400).json(createErrorResponse('Empresa ou Profissional responsável não encontrado', 400));
+      }
+      professionalId = empresa.ownerId;
+    } else {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
     }
-  }
 
-  const created = await prisma.appointment.create({
-    data: { 
-      professionalId, 
-      clientId: clientId ? Number(clientId) : null, 
-      leadId: leadId ? Number(leadId) : null,
-      serviceId: serviceId ? Number(serviceId) : null, 
-      startTime, 
-      endTime, 
-      status, 
-      notes 
+    // Overbooking Validation
+    const conflicting = await prisma.appointment.findFirst({
+      where: {
+        professionalId,
+        status: { not: 'cancelado' },
+        AND: [
+          { startTime: { lt: new Date(endTime) } },
+          { endTime: { gt: new Date(startTime) } }
+        ]
+      }
+    });
+
+    if (conflicting) {
+      return res.status(409).json(createErrorResponse('Este horário já está ocupado para este profissional.', 409));
     }
-  })
-  
-  if (req.user?.type === 'profissional') {
+
+    // Update tags if provided
+    if (tags && Array.isArray(tags)) {
+      if (leadId) {
+        await prisma.lead.update({ where: { id: Number(leadId) }, data: { tags } });
+      } else if (clientId) {
+        await prisma.client.update({ where: { id: Number(clientId) }, data: { tags } });
+      }
+    }
+
+    const created = await prisma.appointment.create({
+      data: { 
+        professionalId, 
+        clientId: clientId ? Number(clientId) : null, 
+        leadId: leadId ? Number(leadId) : null,
+        serviceId: serviceId ? Number(serviceId) : null, 
+        startTime: new Date(startTime), 
+        endTime: new Date(endTime), 
+        status: status || 'agendado', 
+        notes 
+      }
+    })
+    
     logAudit(req.user.id, 'CRIAR_AGENDAMENTO', 'Appointment', created.id)
+    
+    res.status(201).json(createSuccessResponse(created))
+  } catch (error: any) {
+    console.error('[Appointments] Erro ao criar agendamento:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao criar agendamento', 500))
   }
-  
-  res.status(201).json(createSuccessResponse(created))
 })
 
 router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
-  const id = Number(req.params.id)
-  const { professionalId, clientId, serviceId, startTime, endTime, status, notes } = req.body
+  try {
+    const id = Number(req.params.id)
+    const { clientId, serviceId, startTime, endTime, status, notes } = req.body
 
-  // Overbooking Validation
-  const conflicting = await prisma.appointment.findFirst({
-    where: {
-      professionalId,
-      id: { not: id },
-      status: { not: 'cancelado' },
-      AND: [
-        { startTime: { lt: new Date(endTime) } },
-        { endTime: { gt: new Date(startTime) } }
-      ]
+    const current = await prisma.appointment.findUnique({ where: { id } });
+    if (!current) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404));
+
+    // Verificar se o usuário tem permissão sobre este profissional
+    let canEdit = false;
+    if (req.user?.type === 'profissional' && current.professionalId === req.user.id) {
+      canEdit = true;
+    } else if (req.user?.type === 'usuario') {
+      const empresa = await prisma.empresa.findUnique({ where: { id: req.user.companyId! } });
+      if (empresa?.ownerId === current.professionalId) {
+        canEdit = true;
+      }
     }
-  });
 
-  if (conflicting) {
-    return res.status(409).json(createErrorResponse('Este horário já está ocupado para este profissional.', 409));
-  }
+    if (!canEdit) return res.status(403).json(createErrorResponse('Acesso negado', 403));
 
-  const updated = await prisma.appointment.update({
-    where: { id },
-    data: { professionalId, clientId, serviceId, startTime, endTime, status, notes },
-    include: { lead: true }
-  })
+    // Overbooking Validation
+    const conflicting = await prisma.appointment.findFirst({
+      where: {
+        professionalId: current.professionalId,
+        id: { not: id },
+        status: { not: 'cancelado' },
+        AND: [
+          { startTime: { lt: new Date(endTime) } },
+          { endTime: { gt: new Date(startTime) } }
+        ]
+      }
+    });
+
+    if (conflicting) {
+      return res.status(409).json(createErrorResponse('Este horário já está ocupado.', 409));
+    }
+
+    const updated = await prisma.appointment.update({
+      where: { id },
+      data: { 
+        clientId: clientId ? Number(clientId) : undefined, 
+        serviceId: serviceId ? Number(serviceId) : undefined, 
+        startTime: startTime ? new Date(startTime) : undefined, 
+        endTime: endTime ? new Date(endTime) : undefined, 
+        status, 
+        notes 
+      },
+      include: { lead: true }
+    })
   
   if (req.user?.type === 'profissional') {
     logAudit(req.user.id, 'ATUALIZAR_AGENDAMENTO', 'Appointment', id)
@@ -223,7 +285,11 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     });
   }
   
-  res.json(createSuccessResponse(updated))
+    res.json(createSuccessResponse(updated))
+  } catch (error: any) {
+    console.error('[Appointments] Erro ao atualizar agendamento:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar agendamento', 500))
+  }
 })
 
 router.delete('/:id', auth(), requireModule('agendamentos'), async (req, res) => {

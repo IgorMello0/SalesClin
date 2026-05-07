@@ -116,11 +116,11 @@ export function AppTopNavbar() {
   }, [mobileMenuOpen]);
 
   // User initials
-  const initials = professional?.nome
-    ? professional.nome.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+  const initials = professional?.name
+    ? professional.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
     : 'U';
 
-  const roleName = professional?.role === 'admin' ? 'ADMIN' : 'PROFISSIONAL';
+  const roleName = professional?.role === 'admin' ? 'ADMIN' : (professional?.role === 'profissional' ? 'PROFISSIONAL' : (professional?.role?.toUpperCase() || 'COLABORADOR'));
   const isProfileActive = location.pathname === '/profile' || location.pathname === '/settings';
 
   return (
@@ -227,7 +227,7 @@ export function AppTopNavbar() {
                 {/* User info header */}
                 <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100">
                   <span className="text-[10px] sm:text-[11px] font-bold text-primary/60 uppercase tracking-wider">{roleName}</span>
-                  <p className="text-sm sm:text-base font-bold text-slate-900 font-headline mt-0.5">{professional?.nome || 'Usuário'}</p>
+                  <p className="text-sm sm:text-base font-bold text-slate-900 font-headline mt-0.5">{professional?.name || 'Usuário'}</p>
                 </div>
 
                 {/* Menu items */}

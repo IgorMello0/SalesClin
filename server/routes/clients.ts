@@ -11,27 +11,24 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     const { search } = req.query as any
 
-    const where: any = {}
+    let profId: number | undefined;
 
-    let companyId = req.user?.companyId;
-
-    if (req.user?.type === 'profissional' && !companyId) {
-      const prof = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-        select: { companyId: true }
+    if (req.user?.type === 'profissional') {
+      profId = req.user.id;
+    } else if (req.user?.type === 'usuario') {
+      // Buscar o dono da empresa do usuário
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: req.user.companyId! },
+        select: { ownerId: true }
       });
-      companyId = prof?.companyId || undefined;
+      profId = empresa?.ownerId || undefined;
     }
 
-    if (companyId) {
-      const companyProfessionals = await prisma.professional.findMany({
-        where: { companyId },
-        select: { id: true }
-      });
-      where.professionalId = { in: companyProfessionals.map(p => p.id) };
-    } else if (req.user?.id) {
-      where.professionalId = req.user.id;
+    if (!profId) {
+      return res.json(createSuccessResponse([], { page, pageSize, total: 0 }));
     }
+
+    const where: any = { professionalId: profId };
 
 
     if (search) {
@@ -43,7 +40,7 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
     
     // TEMPORARY DEBUG:
     if (req.query.debug === 'true') {
-      return res.json({ success: true, debug: { user: req.user, where, companyId } });
+      return res.json({ success: true, debug: { user: req.user, where } });
     }
 
     const [items, total] = await Promise.all([
@@ -120,19 +117,35 @@ router.get('/:id', auth(false), async (req, res) => {
 
 router.post('/', auth(), requireModule('clientes'), async (req, res) => {
   try {
-    const { professionalId, name, email, phone, dateOfBirth, document, notes } = req.body
+    const { name, email, phone, dateOfBirth, document, notes } = req.body
     
-    if (!professionalId || !name) {
-      return res.status(400).json(createErrorResponse('professionalId e name são obrigatórios', 400))
+    if (!name) {
+      return res.status(400).json(createErrorResponse('O nome é obrigatório', 400))
+    }
+
+    let professionalId: number;
+
+    if (req.user?.type === 'profissional') {
+      professionalId = req.user.id;
+    } else if (req.user?.type === 'usuario') {
+      // Buscar o dono da empresa do usuário
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: req.user.companyId! },
+        select: { ownerId: true }
+      });
+      if (!empresa || !empresa.ownerId) {
+        return res.status(400).json(createErrorResponse('Empresa ou Profissional responsável não encontrado', 400));
+      }
+      professionalId = empresa.ownerId;
+    } else {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
     }
     
     const created = await prisma.client.create({
       data: { professionalId, name, email, phone, dateOfBirth, document, notes }
     })
     
-    if (req.user?.type === 'profissional') {
-      logAudit(req.user.id, 'CRIAR_CLIENTE', 'Client', created.id)
-    }
+    logAudit(req.user.id, 'CRIAR_CLIENTE', 'Client', created.id)
     
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {

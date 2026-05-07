@@ -7,12 +7,17 @@ export const router = Router()
 
 router.get('/', auth(), requireModule('conversas'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
-  const { companyId, agentId, clientId, professionalId } = req.query as any
-  const where: any = {}
-  if (companyId) where.companyId = Number(companyId)
+  const { agentId, clientId } = req.query as any
+  
+  let companyId = req.user?.companyId;
+
+  if (!companyId) {
+    return res.json(createSuccessResponse([], { page, pageSize, total: 0 }));
+  }
+
+  const where: any = { companyId };
   if (agentId) where.agentId = Number(agentId)
   if (clientId) where.clientId = Number(clientId)
-  if (professionalId) where.professionalId = Number(professionalId)
 
   const [items, total] = await Promise.all([
     prisma.conversa.findMany({
@@ -38,9 +43,44 @@ router.get('/:id', auth(), requireModule('conversas'), async (req, res) => {
 })
 
 router.post('/', auth(), requireModule('conversas'), async (req, res) => {
-  const { companyId, agentId, clientId, professionalId, app, channel, startedAt } = req.body
-  const created = await prisma.conversa.create({ data: { companyId, agentId, clientId, professionalId, app, channel, startedAt } })
-  res.status(201).json(createSuccessResponse(created))
+  try {
+    const { agentId, clientId, app, channel, startedAt } = req.body
+    
+    let companyId = req.user?.companyId;
+    if (!companyId) return res.status(400).json(createErrorResponse('Empresa não identificada', 400));
+
+    let professionalId: number;
+
+    if (req.user?.type === 'profissional') {
+      professionalId = req.user.id;
+    } else if (req.user?.type === 'usuario') {
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: companyId },
+        select: { ownerId: true }
+      });
+      if (!empresa || !empresa.ownerId) {
+        return res.status(400).json(createErrorResponse('Profissional responsável não encontrado', 400));
+      }
+      professionalId = empresa.ownerId;
+    } else {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
+    const created = await prisma.conversa.create({ 
+      data: { 
+        companyId, 
+        agentId: agentId ? Number(agentId) : null, 
+        clientId: clientId ? Number(clientId) : null, 
+        professionalId, 
+        app, 
+        channel, 
+        startedAt: startedAt ? new Date(startedAt) : new Date() 
+      } 
+    })
+    res.status(201).json(createSuccessResponse(created))
+  } catch (error: any) {
+    res.status(400).json(createErrorResponse(error.message || 'Erro ao criar conversa', 400))
+  }
 })
 
 router.put('/:id', auth(), async (req, res) => {

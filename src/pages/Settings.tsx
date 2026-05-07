@@ -26,53 +26,40 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi } from '@/lib/api';
 
-// -- CARGOS HELPERS --
-const DEFAULT_ROLES = [
-  { value: 'comercial', label: 'Comercial' },
-  { value: 'atendente', label: 'Atendimento' },
-  { value: 'recepcao', label: 'Recepção' },
-  { value: 'financeiro', label: 'Financeiro' },
-];
+// -- CARGOS HELPERS REMOVIDOS (Agora vêm do banco) --
 
 // -- COMPONENTES DE CONFIGURAÇÃO --
 
 const ServicosView = () => {
-  const { professional } = useAuth();
+  const { professional: authUser } = useAuth();
   const { toast } = useToast();
   const [services, setServices] = useState<any[]>([]);
-  const [team, setTeam] = useState<any[]>([]);
-  const [selectedProfId, setSelectedProfId] = useState<string>(professional?.id?.toString() || '');
+  const [targetProfId, setTargetProfId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newService, setNewService] = useState({ name: '', price: '', durationMinutes: '30' });
 
-  const loadTeam = async () => {
+  const loadTargetProfessional = async () => {
     try {
-      const res = await professionalsApi.getAll({ pageSize: 50 });
-      if (res.success && res.data) {
-        let teamData = res.data;
-        // Use loose equality (==) to handle string vs number ID mismatches
-        // Also check email as a fallback if available
-        const isAlreadyInList = teamData.find((t: any) => 
-          t.id == professional?.id || 
-          (t.email && professional?.email && t.email === professional.email)
-        );
-        
-        if (!isAlreadyInList && professional) {
-          teamData = [professional, ...teamData];
+      if (authUser?.role === 'profissional') {
+        setTargetProfId(Number(authUser.id));
+      } else {
+        // Para admins ou usuários de equipe, buscamos o profissional dono da clínica
+        const res = await professionalsApi.getAll({ pageSize: 1 });
+        if (res.success && res.data && res.data.length > 0) {
+          // Sempre pegamos o primeiro (dono) para gerenciar serviços da clínica
+          setTargetProfId(Number(res.data[0].id));
         }
-        setTeam(teamData);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const loadServices = async (profId: string) => {
-    if (!profId) return;
+  const loadServices = async (profId: number) => {
     try {
       setLoading(true);
-      const res = await catalogsApi.getAll({ professionalId: Number(profId) });
+      const res = await catalogsApi.getAll({ professionalId: profId });
       setServices(res.data || []);
     } catch (e) {
       toast({ title: 'Erro', description: 'Não foi possível carregar serviços', variant: 'destructive' });
@@ -82,23 +69,23 @@ const ServicosView = () => {
   };
 
   useEffect(() => {
-    loadTeam();
+    loadTargetProfessional();
   }, []);
 
   useEffect(() => {
-    if (selectedProfId) {
-      loadServices(selectedProfId);
+    if (targetProfId) {
+      loadServices(targetProfId);
     }
-  }, [selectedProfId]);
+  }, [targetProfId]);
 
   const handleSave = async () => {
-    if (!newService.name || !newService.price) {
+    if (!newService.name || !newService.price || !targetProfId) {
       toast({ title: 'Aviso', description: 'Preencha nome e preço', variant: 'destructive' });
       return;
     }
     try {
       await catalogsApi.create({
-        professionalId: Number(selectedProfId),
+        professionalId: targetProfId,
         name: newService.name,
         price: parseFloat(newService.price.replace(',', '.')),
         durationMinutes: parseInt(newService.durationMinutes) || 30,
@@ -107,7 +94,7 @@ const ServicosView = () => {
       toast({ title: 'Sucesso', description: 'Serviço adicionado' });
       setIsAdding(false);
       setNewService({ name: '', price: '', durationMinutes: '30' });
-      loadServices(selectedProfId);
+      loadServices(targetProfId);
     } catch (e) {
       toast({ title: 'Erro', description: 'Falha ao salvar', variant: 'destructive' });
     }
@@ -117,7 +104,7 @@ const ServicosView = () => {
     try {
       await catalogsApi.delete(id);
       toast({ title: 'Sucesso', description: 'Serviço removido' });
-      loadServices(selectedProfId);
+      if (targetProfId) loadServices(targetProfId);
     } catch (e) {
       toast({ title: 'Erro', description: 'Falha ao remover', variant: 'destructive' });
     }
@@ -125,34 +112,6 @@ const ServicosView = () => {
 
   return (
     <div className="space-y-6">
-      {/* Team Member Selector */}
-      {team.length > 1 && (
-        <div className="p-4 border rounded-lg bg-muted/50 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h4 className="font-medium text-sm">Profissional / Membro</h4>
-            <p className="text-xs text-muted-foreground">Selecione de quem é esta tabela de preços.</p>
-          </div>
-          <Select value={selectedProfId} onValueChange={setSelectedProfId}>
-            <SelectTrigger className="w-[200px] h-9 text-sm bg-background">
-              <SelectValue placeholder="Selecione o membro...">
-                {(() => {
-                  const member = team.find(m => m.id.toString() === selectedProfId);
-                  if (!member) return undefined;
-                  const isYou = member.id == professional?.id || (member.email && member.email === professional?.email);
-                  return `${member.name || member.nome} ${isYou ? '(Você)' : ''}`;
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {team.map(member => (
-                <SelectItem key={member.id} value={member.id.toString()}>
-                  {member.name || member.nome} {(member.id == professional?.id || (member.email && member.email === professional?.email)) ? '(Você)' : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
 
       <div className="flex justify-between items-center">
         <h3 className="font-medium text-sm">Serviços Ativos ({services.length})</h3>
@@ -223,40 +182,31 @@ const ServicosView = () => {
   );
 };
 
-
-
-
 const EquipeView = () => {
   const { toast } = useToast();
   const { professional } = useAuth();
   const [team, setTeam] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newMember, setNewMember] = useState({ name: '', email: '', password: '', role: 'atendente' });
+  const [newMember, setNewMember] = useState({ name: '', email: '', password: '', roleId: '' });
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
-
-  const [customRoles, setCustomRoles] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
 
   const loadRoles = async () => {
     try {
       const res = await rolesApi.getAll();
-      if (res.success) setCustomRoles(res.data || []);
+      if (res.success) setRoles(res.data || []);
     } catch (e) {
       console.error('Erro ao carregar cargos:', e);
     }
   };
 
-  useEffect(() => {
-    loadRoles();
-  }, []);
-
-  const allRoles = [...DEFAULT_ROLES, ...customRoles];
-
   const loadTeam = async () => {
     try {
+      setLoading(true);
       const res = await usuariosApi.getAll({ pageSize: 50 });
       if (res.success && res.data) {
         setTeam(res.data);
@@ -270,16 +220,12 @@ const EquipeView = () => {
 
   useEffect(() => {
     loadTeam();
+    loadRoles();
   }, []);
 
   const handleAddMember = async () => {
     if (!newMember.name || !newMember.email || !newMember.password) {
       toast({ title: 'Atenção', description: 'Preencha nome, email e senha.', variant: 'destructive' });
-      return;
-    }
-
-    if (newMember.password.length < 6) {
-      toast({ title: 'Atenção', description: 'A senha deve ter pelo menos 6 caracteres.', variant: 'destructive' });
       return;
     }
     
@@ -288,13 +234,13 @@ const EquipeView = () => {
         name: newMember.name,
         email: newMember.email,
         password: newMember.password,
-        role: newMember.role,
+        roleId: newMember.roleId ? Number(newMember.roleId) : null,
         isActive: true,
       });
       if (res.success) {
         toast({ title: 'Sucesso', description: `${newMember.name} adicionado(a) à equipe!` });
         setIsAdding(false);
-        setNewMember({ name: '', email: '', password: '', role: 'atendente' });
+        setNewMember({ name: '', email: '', password: '', roleId: '' });
         loadTeam();
       } else {
         throw new Error(res.error?.message || 'Erro ao adicionar');
@@ -311,8 +257,6 @@ const EquipeView = () => {
         toast({ title: 'Sucesso', description: 'Membro removido da equipe.' });
         if (selectedUserId === id) setSelectedUserId(null);
         loadTeam();
-      } else {
-        throw new Error(res.error?.message || 'Erro ao remover');
       }
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
@@ -333,13 +277,38 @@ const EquipeView = () => {
     }
   };
 
-  const handleSelectUser = (userId: number) => {
-    if (selectedUserId === userId) {
+  const [editingMember, setEditingMember] = useState<any>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const handleSelectUser = (user: any) => {
+    if (selectedUserId === user.id) {
       setSelectedUserId(null);
+      setEditingMember(null);
       return;
     }
-    setSelectedUserId(userId);
-    loadUserPermissions(userId);
+    setSelectedUserId(user.id);
+    setEditingMember({ ...user, roleId: user.roleId?.toString() || '' });
+    loadUserPermissions(user.id);
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!editingMember) return;
+    setSavingProfile(true);
+    try {
+      const res = await usuariosApi.update(editingMember.id, {
+        name: editingMember.name,
+        email: editingMember.email,
+        roleId: editingMember.roleId ? Number(editingMember.roleId) : null,
+      });
+      if (res.success) {
+        toast({ title: 'Sucesso', description: 'Perfil atualizado!' });
+        loadTeam();
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleTogglePermission = (moduleId: number) => {
@@ -357,9 +326,7 @@ const EquipeView = () => {
         userPermissions.map(p => ({ moduleId: p.moduleId, hasAccess: p.hasAccess }))
       );
       if (res.success) {
-        toast({ title: 'Salvo!', description: 'Permissões atualizadas com sucesso.' });
-      } else {
-        throw new Error(res.error?.message || 'Erro ao salvar');
+        toast({ title: 'Salvo!', description: 'Permissões individuais atualizadas.' });
       }
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
@@ -368,22 +335,15 @@ const EquipeView = () => {
     }
   };
 
-  const getRoleBadge = (role: string) => {
+  const getRoleBadge = (roleName?: string) => {
     const colors: Record<string, string> = {
       admin: 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900',
       comercial: 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900',
-      atendente: 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900',
-      recepcao: 'bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-900',
-      financeiro: 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900',
     };
-    // Build labels from default + custom roles
-    const allLabels: Record<string, string> = {};
-    allRoles.forEach(r => { allLabels[r.value] = r.label || r.name; });
-    allLabels['admin'] = 'Admin';
     
     return (
-      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${colors[role] || 'bg-primary/10 text-primary border-primary/20'}`}>
-        {allLabels[role] || role}
+      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${colors[roleName?.toLowerCase() || ''] || 'bg-primary/10 text-primary border-primary/20'}`}>
+        {roleName || 'Sem Cargo'}
       </span>
     );
   };
@@ -423,13 +383,13 @@ const EquipeView = () => {
             </div>
             <div className="space-y-2">
               <Label>Cargo / Função</Label>
-              <Select value={newMember.role} onValueChange={v => setNewMember({...newMember, role: v})}>
+              <Select value={newMember.roleId} onValueChange={v => setNewMember({...newMember, roleId: v})}>
                 <SelectTrigger className="h-9 text-sm bg-background">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione um cargo..." />
                 </SelectTrigger>
                 <SelectContent position="item-aligned" className="z-[200]">
-                  {allRoles.map(r => (
-                    <SelectItem key={r.value} value={r.value}>{r.label || r.name}</SelectItem>
+                  {roles.map(r => (
+                    <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -446,13 +406,13 @@ const EquipeView = () => {
           <div className="text-sm text-center py-4 text-muted-foreground">Carregando equipe...</div>
         ) : team.length === 0 ? (
           <div className="text-sm text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-            Nenhum funcionário cadastrado. Clique em "Novo Funcionário" para adicionar.
+            Nenhum funcionário cadastrado.
           </div>
         ) : team.map((u) => (
           <div key={u.id}>
             <div 
               className={`flex justify-between items-center p-3 border rounded-lg hover:bg-muted transition-colors cursor-pointer ${selectedUserId === u.id ? 'border-primary bg-primary/5' : ''}`}
-              onClick={() => handleSelectUser(u.id)}
+              onClick={() => handleSelectUser(u)}
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs uppercase">
@@ -464,7 +424,7 @@ const EquipeView = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {getRoleBadge(u.role)}
+                {getRoleBadge(u.role?.name)}
                 <Button 
                   variant="ghost" size="sm" 
                   onClick={(e) => { e.stopPropagation(); handleDeleteMember(u.id); }} 
@@ -475,50 +435,102 @@ const EquipeView = () => {
               </div>
             </div>
 
-            {/* Painel de Permissões */}
             {selectedUserId === u.id && (
-              <div className="mt-2 p-4 border rounded-lg bg-background space-y-4 animate-in slide-in-from-top-2 duration-200">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-primary" />
-                    Permissões de {u.name.split(' ')[0]}
-                  </h4>
-                  <Button 
-                    size="sm" 
-                    onClick={handleSavePermissions} 
-                    disabled={savingPermissions || loadingPermissions}
-                    className="h-7 text-xs px-4"
-                  >
-                    {savingPermissions ? 'Salvando...' : 'Salvar Permissões'}
-                  </Button>
+              <div className="mt-2 p-5 border rounded-lg bg-background space-y-6 animate-in slide-in-from-top-2 duration-200 shadow-inner">
+                {/* Editar Perfil */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Users className="w-4 h-4 text-primary" />
+                      Editar Perfil
+                    </h4>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={handleUpdateProfile} 
+                      disabled={savingProfile}
+                      className="h-7 text-xs px-4 border-primary text-primary hover:bg-primary hover:text-white"
+                    >
+                      {savingProfile ? 'Salvando...' : 'Atualizar Dados'}
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] uppercase text-muted-foreground font-bold">Nome</Label>
+                      <Input 
+                        value={editingMember?.name || ''} 
+                        onChange={e => setEditingMember({...editingMember, name: e.target.value})}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] uppercase text-muted-foreground font-bold">E-mail</Label>
+                      <Input 
+                        value={editingMember?.email || ''} 
+                        onChange={e => setEditingMember({...editingMember, email: e.target.value})}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label className="text-[11px] uppercase text-muted-foreground font-bold">Cargo</Label>
+                      <Select 
+                        value={editingMember?.roleId || ''} 
+                        onValueChange={v => setEditingMember({...editingMember, roleId: v})}
+                      >
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Selecione um cargo..." />
+                        </SelectTrigger>
+                        <SelectContent className="z-[250]">
+                          {roles.map(r => (
+                            <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
-                {loadingPermissions ? (
-                  <div className="text-sm text-center py-3 text-muted-foreground">Carregando permissões...</div>
-                ) : userPermissions.length === 0 ? (
-                  <div className="text-sm text-center py-3 text-muted-foreground">Nenhum módulo configurado no sistema.</div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {userPermissions.map(p => (
-                      <div 
-                        key={p.moduleId} 
-                        className={`flex items-center justify-between p-2.5 border rounded-lg text-sm transition-colors ${
-                          p.hasAccess ? 'bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900' : 'bg-muted/50 border-muted opacity-60'
-                        } ${p.canEdit === false ? 'opacity-40 pointer-events-none' : ''}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {p.moduleIcon && <span className="material-symbols-outlined text-base">{p.moduleIcon}</span>}
-                          <span className="font-medium text-xs">{p.moduleName}</span>
-                        </div>
-                        <Switch 
-                          checked={p.hasAccess} 
-                          onCheckedChange={() => handleTogglePermission(p.moduleId)}
-                          disabled={p.canEdit === false}
-                        />
-                      </div>
-                    ))}
+                <Separator />
+
+                {/* Permissões Override */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-primary" />
+                      Permissões Individuais (Override)
+                    </h4>
+                    <Button 
+                      size="sm" 
+                      onClick={handleSavePermissions} 
+                      disabled={savingPermissions || loadingPermissions}
+                      className="h-7 text-xs px-4"
+                    >
+                      {savingPermissions ? 'Salvando...' : 'Salvar Permissões'}
+                    </Button>
                   </div>
-                )}
+
+                  {loadingPermissions ? (
+                    <div className="text-sm text-center py-3 text-muted-foreground">Carregando permissões...</div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {userPermissions.map(p => (
+                        <div 
+                          key={p.moduleId} 
+                          className={`flex items-center justify-between p-2.5 border rounded-lg text-sm transition-colors ${
+                            p.hasAccess ? 'bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900' : 'bg-muted/50 border-muted opacity-60'
+                          }`}
+                        >
+                          <span className="font-medium text-xs">{p.moduleName}</span>
+                          <Switch 
+                            checked={p.hasAccess} 
+                            onCheckedChange={() => handleTogglePermission(p.moduleId)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -527,8 +539,6 @@ const EquipeView = () => {
     </div>
   );
 };
-
-
 
 const InfoNegocioView = () => {
   const { toast } = useToast();
@@ -650,19 +660,31 @@ const InfoNegocioView = () => {
   );
 };
 
-// -- CARGOS VIEW --
 const CargosView = () => {
   const { toast } = useToast();
-  const [customRoles, setCustomRoles] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [modules, setModules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRoleName, setNewRoleName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [rolePermissions, setRolePermissions] = useState<any[]>([]);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+
+  const loadModules = async () => {
+    try {
+      const res = await modulesApi.getAll();
+      if (res.success) setModules(res.data || []);
+    } catch (e) {
+      console.error('Erro ao carregar módulos:', e);
+    }
+  };
 
   const loadRoles = async () => {
     setLoading(true);
     try {
       const res = await rolesApi.getAll();
-      if (res.success) setCustomRoles(res.data || []);
+      if (res.success) setRoles(res.data || []);
     } catch (e) {
       toast({ title: 'Erro', description: 'Erro ao carregar cargos', variant: 'destructive' });
     } finally {
@@ -672,9 +694,8 @@ const CargosView = () => {
 
   useEffect(() => {
     loadRoles();
+    loadModules();
   }, []);
-
-  const allRoles = [...DEFAULT_ROLES, ...customRoles];
 
   const handleAddRole = async () => {
     const trimmed = newRoleName.trim();
@@ -684,13 +705,12 @@ const CargosView = () => {
     }
     const value = trimmed.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
     
-    if (allRoles.find(r => r.value === value)) {
-      toast({ title: 'Aviso', description: 'Esse cargo já existe', variant: 'destructive' });
-      return;
-    }
-
     try {
-      const res = await rolesApi.create({ name: trimmed, value });
+      const res = await rolesApi.create({ 
+        name: trimmed, 
+        value,
+        permissions: modules.map(m => ({ moduleId: m.id, hasAccess: true }))
+      });
       if (res.success) {
         toast({ title: 'Cargo criado!', description: `"${trimmed}" agora está salvo no banco de dados.` });
         setNewRoleName('');
@@ -704,6 +724,50 @@ const CargosView = () => {
     }
   };
 
+  const handleSelectRole = (role: any) => {
+    if (selectedRoleId === role.id) {
+      setSelectedRoleId(null);
+      return;
+    }
+    setSelectedRoleId(role.id);
+    
+    const currentPermissions = modules.map(m => {
+      const existing = role.permissions?.find((p: any) => p.moduleId === m.id);
+      return {
+        moduleId: m.id,
+        moduleName: m.name,
+        hasAccess: existing ? existing.hasAccess : true
+      };
+    });
+    setRolePermissions(currentPermissions);
+  };
+
+  const handleTogglePermission = (moduleId: number) => {
+    setRolePermissions(prev => prev.map(p => 
+      p.moduleId === moduleId ? { ...p, hasAccess: !p.hasAccess } : p
+    ));
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedRoleId) return;
+    setSavingPermissions(true);
+    try {
+      const role = roles.find(r => r.id === selectedRoleId);
+      const res = await rolesApi.update(selectedRoleId, {
+        name: role.name,
+        permissions: rolePermissions.map(p => ({ moduleId: p.moduleId, hasAccess: p.hasAccess }))
+      });
+      if (res.success) {
+        toast({ title: 'Salvo!', description: 'Permissões do cargo atualizadas.' });
+        loadRoles();
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
   const handleDeleteRole = async (id: number) => {
     try {
       const res = await rolesApi.delete(id);
@@ -712,15 +776,8 @@ const CargosView = () => {
         loadRoles();
       }
     } catch (e: any) {
-      toast({ title: 'Erro', description: 'Erro ao remover cargo', variant: 'destructive' });
+      toast({ title: 'Erro', description: e.message || 'Erro ao remover cargo', variant: 'destructive' });
     }
-  };
-
-  const roleColors: Record<string, string> = {
-    comercial: 'bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-300 border-orange-200 dark:border-orange-800',
-    atendente: 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-    recepcao: 'bg-violet-100 dark:bg-violet-900/30 text-violet-900 dark:text-violet-300 border-violet-200 dark:border-violet-800',
-    financeiro: 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-300 border-green-200 dark:border-green-800',
   };
 
   return (
@@ -729,12 +786,12 @@ const CargosView = () => {
         <Tag className="w-5 h-5 flex-shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
         <div className="leading-relaxed">
           <strong className="block mb-0.5 text-blue-900 dark:text-blue-100 font-bold">Cargos e Funções</strong>
-          Crie cargos personalizados para sua clínica. Eles aparecerão automaticamente no dropdown de Equipe.
+          Crie cargos personalizados e defina o que cada um pode acessar no sistema.
         </div>
       </div>
 
       <div className="flex justify-between items-center">
-        <h3 className="font-medium text-sm">Cargos Disponíveis ({allRoles.length})</h3>
+        <h3 className="font-medium text-sm">Cargos Disponíveis ({roles.length})</h3>
         <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
           <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : 'Novo Cargo'}
         </Button>
@@ -756,45 +813,72 @@ const CargosView = () => {
         </div>
       )}
 
-      <div className="space-y-2">
-        {/* Default roles */}
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-2 mb-1">Cargos Padrão</p>
-        {DEFAULT_ROLES.map(role => (
-          <div key={role.value} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-            <div className="flex items-center gap-3">
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${roleColors[role.value] || 'bg-muted text-muted-foreground border-border'}`}>
-                {role.label}
-              </span>
-              <span className="text-xs text-muted-foreground font-mono">{role.value}</span>
+      <div className="space-y-3">
+        {loading ? (
+          <div className="text-sm text-center py-4 text-muted-foreground">Carregando cargos...</div>
+        ) : roles.length === 0 ? (
+          <div className="text-sm text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+            Nenhum cargo cadastrado.
+          </div>
+        ) : roles.map(role => (
+          <div key={role.id}>
+            <div 
+              className={`flex items-center justify-between p-3 border rounded-lg bg-muted/30 hover:border-primary/30 transition-colors cursor-pointer ${selectedRoleId === role.id ? 'border-primary bg-primary/5' : ''}`}
+              onClick={() => handleSelectRole(role)}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/20">
+                  {role.name}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono">{role.value}</span>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
+                className="text-red-500 hover:text-red-600 hover:bg-red-50 h-7 w-7 p-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
             </div>
-            <span className="text-[10px] text-muted-foreground italic">padrão</span>
+
+            {selectedRoleId === role.id && (
+              <div className="mt-2 p-4 border rounded-lg bg-background space-y-4 animate-in slide-in-from-top-2">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-primary" />
+                    Módulos Liberados para "{role.name}"
+                  </h4>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSavePermissions} 
+                    disabled={savingPermissions}
+                    className="h-7 text-xs px-4"
+                  >
+                    {savingPermissions ? 'Salvando...' : 'Salvar Permissões'}
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {rolePermissions.map(p => (
+                    <div 
+                      key={p.moduleId} 
+                      className={`flex items-center justify-between p-2.5 border rounded-lg text-sm transition-colors ${
+                        p.hasAccess ? 'bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900' : 'bg-muted/50 border-muted opacity-60'
+                      }`}
+                    >
+                      <span className="font-medium text-xs">{p.moduleName}</span>
+                      <Switch 
+                        checked={p.hasAccess} 
+                        onCheckedChange={() => handleTogglePermission(p.moduleId)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
-
-        {/* Custom roles */}
-        {customRoles.length > 0 && (
-          <>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-4 mb-1">Cargos Personalizados</p>
-            {customRoles.map(role => (
-              <div key={role.value} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 hover:border-primary/30 transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/20">
-                    {role.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-mono">{role.value}</span>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleDeleteRole(role.id)}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 h-7 w-7 p-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            ))}
-          </>
-        )}
       </div>
     </div>
   );
@@ -812,14 +896,19 @@ const Settings = () => {
   const { toast } = useToast();
   const [selectedSetting, setSelectedSetting] = useState<{name: string, description: string} | null>(null);
 
+  const { professional: authUser } = useAuth();
+  const isOwner = authUser?.role === 'profissional' || authUser?.role === 'admin';
+
   const settingsSections = [
     {
       title: 'Configurações Gerais',
       icon: SettingsIcon,
       items: [
         { name: 'Serviços', description: 'Gerencie os serviços oferecidos' },
-        { name: 'Equipe', description: 'Gerencie membros da equipe e permissões' },
-        { name: 'Cargos', description: 'Gerencie os cargos e funções da equipe' },
+        ...(isOwner ? [
+          { name: 'Equipe', description: 'Gerencie membros da equipe e permissões' },
+          { name: 'Cargos', description: 'Gerencie os cargos e funções da equipe' },
+        ] : []),
       ]
     },
     {

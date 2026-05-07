@@ -277,7 +277,9 @@ export const goalsApi = {
 // Cargos
 export const rolesApi = {
   getAll: async () => apiRequest<Array<any>>('/roles'),
-  create: async (data: { name: string; value: string }) => apiRequest<any>('/roles', { method: 'POST', body: JSON.stringify(data) }),
+  getById: async (id: number) => apiRequest<any>(`/roles/${id}`),
+  create: async (data: { name: string; value: string; permissions?: any[] }) => apiRequest<any>('/roles', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: { name: string; permissions: any[] }) => apiRequest<any>(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<any>(`/roles/${id}`, { method: 'DELETE' }),
 }
 

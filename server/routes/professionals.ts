@@ -33,7 +33,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
     }
     
-    const token = jwt.sign({ id: professional.id, type: 'profissional' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+    const token = jwt.sign({ id: professional.id, companyId: professional.companyId, type: 'profissional' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
     console.log('[Login] Login bem-sucedido:', email)
     
     res.json(createSuccessResponse({ 
@@ -102,11 +102,15 @@ router.get('/', auth(false), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
   
   const where: any = {}
+  
   if (req.user?.type === 'profissional') {
     const currentProf = await prisma.professional.findUnique({ where: { id: req.user.id } })
     if (currentProf?.companyId) {
       where.companyId = currentProf.companyId
     }
+  } else if (req.user?.type === 'usuario') {
+    // Membros da equipe só veem os profissionais da sua própria empresa
+    where.companyId = req.user.companyId
   }
 
   const [items, total] = await Promise.all([

@@ -95,8 +95,35 @@ export function requireModule(moduleCode: string) {
 
         return next()
       } else if (req.user.type === 'usuario') {
-        // Buscar permissão do usuário
-        const permission = await prisma.userPermission.findUnique({
+        // Buscar o usuário com seu cargo e as permissões do cargo para este módulo
+        const userWithRole = await prisma.usuario.findUnique({
+          where: { id: req.user.id },
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  where: { moduleId: module.id }
+                }
+              }
+            }
+          }
+        })
+
+        if (!userWithRole) {
+          return res.status(403).json(createErrorResponse('Usuário não encontrado', 403))
+        }
+
+        // Se o usuário tem um cargo definido
+        if (userWithRole.role) {
+          const rolePermission = userWithRole.role.permissions[0]
+          // Se houver uma restrição explícita no cargo, bloqueia
+          if (rolePermission && !rolePermission.hasAccess) {
+            return res.status(403).json(createErrorResponse('Acesso negado a este módulo pelo seu cargo', 403))
+          }
+        }
+
+        // Além do cargo, mantemos a verificação de permissão individual como override (opcional)
+        const individualPermission = await prisma.userPermission.findUnique({
           where: {
             userId_moduleId: {
               userId: req.user.id,
@@ -105,9 +132,8 @@ export function requireModule(moduleCode: string) {
           },
         })
 
-        // Se não há permissão definida, por padrão tem acesso (liberando módulos)
-        if (permission && !permission.hasAccess) {
-          return res.status(403).json(createErrorResponse('Acesso negado a este módulo', 403))
+        if (individualPermission && !individualPermission.hasAccess) {
+          return res.status(403).json(createErrorResponse('Acesso negado a este módulo (bloqueio individual)', 403))
         }
 
         return next()

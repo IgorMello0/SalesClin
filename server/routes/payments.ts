@@ -8,8 +8,26 @@ export const router = Router()
 router.get('/', auth(false), requireModule('pagamentos'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
   const { professionalId, clientId, status } = req.query as any
-  const where: any = {}
-  if (professionalId) where.professionalId = Number(professionalId)
+  
+  let profId: number | undefined;
+
+  if (req.user?.type === 'profissional') {
+    profId = req.user.id;
+  } else if (req.user?.type === 'usuario') {
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: req.user.companyId! },
+      select: { ownerId: true }
+    });
+    profId = empresa?.ownerId || undefined;
+  } else if (professionalId) {
+    profId = Number(professionalId);
+  }
+
+  if (!profId) {
+    return res.json(createSuccessResponse([], { page, pageSize, total: 0 }));
+  }
+
+  const where: any = { professionalId: profId };
   if (clientId) where.clientId = Number(clientId)
   if (status) where.status = status
 
@@ -37,11 +55,43 @@ router.get('/:id', auth(false), requireModule('pagamentos'), async (req, res) =>
 })
 
 router.post('/', auth(), requireModule('pagamentos'), async (req, res) => {
-  const { appointmentId, clientId, professionalId, amount, method, status, referencePeriod, date } = req.body
-  const created = await prisma.payment.create({
-    data: { appointmentId, clientId, professionalId, amount, method, status, referencePeriod, date }
-  })
-  res.status(201).json(createSuccessResponse(created))
+  try {
+    const { appointmentId, clientId, amount, method, status, referencePeriod, date } = req.body
+    
+    let professionalId: number;
+
+    if (req.user?.type === 'profissional') {
+      professionalId = req.user.id;
+    } else if (req.user?.type === 'usuario') {
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: req.user.companyId! },
+        select: { ownerId: true }
+      });
+      if (!empresa || !empresa.ownerId) {
+        return res.status(400).json(createErrorResponse('Empresa ou Profissional responsável não encontrado', 400));
+      }
+      professionalId = empresa.ownerId;
+    } else {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
+    const created = await prisma.payment.create({
+      data: { 
+        appointmentId: appointmentId ? Number(appointmentId) : null, 
+        clientId: clientId ? Number(clientId) : null, 
+        professionalId, 
+        amount: Number(amount), 
+        method, 
+        status, 
+        referencePeriod, 
+        date: date ? new Date(date) : new Date() 
+      }
+    })
+    res.status(201).json(createSuccessResponse(created))
+  } catch (error: any) {
+    console.error('[Payments] Erro ao criar pagamento:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao criar pagamento', 500))
+  }
 })
 
 router.put('/:id', auth(), requireModule('pagamentos'), async (req, res) => {

@@ -126,6 +126,7 @@ model Professional {
   permissions     ProfessionalPermission[]
   leads           Lead[]
   goals           Goal[]
+  roles           Role[]
 
   @@map("professionals")
 }
@@ -473,13 +474,14 @@ model Usuario {
   name         String // Nome do usuário
   email        String   @unique
   passwordHash String   @map("password_hash") // Hash da senha do usuário
-  role         String? // Função do usuário (admin, atendente, suporte, etc.)
+  roleId       Int?     @map("role_id") // ID do cargo do usuário
   isActive     Boolean  @default(true) @map("is_active") // Indica se o usuário está ativo
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
   company                Empresa          @relation(fields: [companyId], references: [id])
+  role                   Role?            @relation(fields: [roleId], references: [id])
   permissions            UserPermission[]
   proposalsAsSalesperson Proposal[]       @relation("SalespersonProposals")
   proposalsAsSpecialist  Proposal[]       @relation("SpecialistProposals")
@@ -577,6 +579,7 @@ model Module {
   // Relacionamentos
   professionalPermissions ProfessionalPermission[]
   userPermissions         UserPermission[]
+  rolePermissions         RolePermission[]
 
   @@map("modules")
 }
@@ -635,15 +638,35 @@ model Goal {
 
 // Cargos customizados por empresa
 model Role {
-  id        Int      @id @default(autoincrement())
-  companyId Int      @map("company_id")
-  name      String   // Nome exibido (Ex: "Dentista")
-  value     String   // Valor simplificado (Ex: "dentista")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  companyId      Int      @map("company_id")
+  professionalId Int      @map("professional_id")
+  name           String // Nome exibido (Ex: "Dentista")
+  value          String // Valor simplificado (Ex: "dentista")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  company Empresa @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Empresa          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional Professional     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
+  usuarios     Usuario[]
 
   @@unique([companyId, value])
   @@map("roles")
+}
+
+// Permissões de acesso por Cargo
+model RolePermission {
+  id        Int      @id @default(autoincrement())
+  roleId    Int      @map("role_id")
+  moduleId  Int      @map("module_id")
+  hasAccess Boolean  @default(true) @map("has_access")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, moduleId])
+  @@map("role_permissions")
 }
