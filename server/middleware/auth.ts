@@ -71,8 +71,8 @@ export function requireModule(moduleCode: string) {
       })
 
       if (!module) {
-        console.error(`[Auth] Módulo "${moduleCode}" não encontrado`)
-        return res.status(500).json(createErrorResponse('Módulo não configurado', 500))
+        console.warn(`[Auth] Módulo "${moduleCode}" não encontrado no banco. Liberando acesso por padrão.`)
+        return next()
       }
 
       // Verificar permissão baseado no tipo de usuário
@@ -105,8 +105,8 @@ export function requireModule(moduleCode: string) {
           },
         })
 
-        // Usuários só têm acesso se houver permissão explícita
-        if (!permission || !permission.hasAccess) {
+        // Se não há permissão definida, por padrão tem acesso (liberando módulos)
+        if (permission && !permission.hasAccess) {
           return res.status(403).json(createErrorResponse('Acesso negado a este módulo', 403))
         }
 
