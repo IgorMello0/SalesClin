@@ -452,6 +452,8 @@ model Empresa {
   whatsapp  String?
   apiKey    String?  @map("api_key")
   plan      String? // Plano de assinatura da empresa
+  openHour  String   @default("08:00") @map("open_hour")
+  closeHour String   @default("20:00") @map("close_hour")
   isActive  Boolean  @default(true) @map("is_active") // Indica se a empresa está ativa
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

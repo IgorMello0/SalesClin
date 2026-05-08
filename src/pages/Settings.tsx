@@ -134,18 +134,15 @@ const ServicosView = () => {
                 <Input value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} placeholder="150,00" className="h-8 text-sm" type="number" />
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs">Duração Média</Label>
-                <Select value={newService.durationMinutes} onValueChange={v => setNewService({...newService, durationMinutes: v})}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue/></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 minutos</SelectItem>
-                    <SelectItem value="30">30 minutos</SelectItem>
-                    <SelectItem value="45">45 minutos</SelectItem>
-                    <SelectItem value="60">1 hora</SelectItem>
-                    <SelectItem value="90">1h 30min</SelectItem>
-                    <SelectItem value="120">2 horas</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">Duração Média (minutos)</Label>
+                <Input 
+                  type="number" 
+                  value={newService.durationMinutes} 
+                  onChange={e => setNewService({...newService, durationMinutes: e.target.value})} 
+                  placeholder="Ex: 45" 
+                  className="h-8 text-sm" 
+                  min="5"
+                />
               </div>
             </div>
             <Button size="sm" className="w-full mt-2" onClick={handleSave}>Salvar Serviço</Button>
@@ -550,6 +547,8 @@ const InfoNegocioView = () => {
     domain: '',
     whatsapp: '',
     plan: '',
+    openHour: '08:00',
+    closeHour: '20:00',
   });
 
   useEffect(() => {
@@ -566,6 +565,8 @@ const InfoNegocioView = () => {
           domain: res.data.domain || '',
           whatsapp: res.data.whatsapp || '',
           plan: res.data.plan || '',
+          openHour: res.data.openHour || '08:00',
+          closeHour: res.data.closeHour || '20:00',
         });
       }
     } catch (e) {
@@ -587,6 +588,8 @@ const InfoNegocioView = () => {
         domain: companyData.domain || null,
         whatsapp: companyData.whatsapp || null,
         plan: companyData.plan || null,
+        openHour: companyData.openHour,
+        closeHour: companyData.closeHour,
       });
       if (res.success) {
         toast({ title: 'Salvo!', description: 'Informações da empresa atualizadas.' });
@@ -639,6 +642,25 @@ const InfoNegocioView = () => {
           onChange={e => setCompanyData({...companyData, whatsapp: e.target.value})} 
           placeholder="(11) 99999-9999" 
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Horário de Abertura</Label>
+          <Input 
+            type="time"
+            value={companyData.openHour} 
+            onChange={e => setCompanyData({...companyData, openHour: e.target.value})} 
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Horário de Fechamento</Label>
+          <Input 
+            type="time"
+            value={companyData.closeHour} 
+            onChange={e => setCompanyData({...companyData, closeHour: e.target.value})} 
+          />
+        </div>
       </div>
 
       <div className="space-y-2">

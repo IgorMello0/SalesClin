@@ -82,14 +82,27 @@ router.get('/available-slots', auth(false), async (req, res) => {
     }
 
     const duration = Number(durationMinutes) || 60
-    // Horário de funcionamento: 08:00 – 20:00
-    const OPEN_HOUR = 8
-    const CLOSE_HOUR = 20
-    const SLOT_INTERVAL = 30 // minutos
+    const SLOT_INTERVAL = 15 // minutos
 
-    // Busca todos agendamentos do profissional no dia
-    const dayStart = new Date(`${date}T00:00:00.000Z`)
-    const dayEnd   = new Date(`${date}T23:59:59.999Z`)
+    // 1. Busca os horários da empresa
+    const prof = await prisma.professional.findUnique({
+      where: { id: Number(professionalId) },
+      include: { company: true }
+    })
+    
+    const openHourStr = prof?.company?.openHour || "08:00"
+    const closeHourStr = prof?.company?.closeHour || "20:00"
+
+    const [openH, openM] = openHourStr.split(':').map(Number)
+    const [closeH, closeM] = closeHourStr.split(':').map(Number)
+    
+    const startMinutes = openH * 60 + openM
+    const endMinutes = closeH * 60 + closeM
+    const totalMinutes = endMinutes - startMinutes
+
+    // Busca todos agendamentos do profissional no dia usando fuso de Brasília (UTC-3)
+    const dayStart = new Date(`${date}T00:00:00.000-03:00`)
+    const dayEnd   = new Date(`${date}T23:59:59.999-03:00`)
     const existingAppointments = await prisma.appointment.findMany({
       where: {
         professionalId: Number(professionalId),
@@ -101,16 +114,15 @@ router.get('/available-slots', auth(false), async (req, res) => {
 
     // Gera todos os slots possíveis
     const slots: string[] = []
-    const totalMinutes = (CLOSE_HOUR - OPEN_HOUR) * 60
-    const now = new Date()
+    const now = new Date() // Tempo UTC atual
 
     for (let m = 0; m <= totalMinutes - duration; m += SLOT_INTERVAL) {
-      const slotHour   = OPEN_HOUR + Math.floor(m / 60)
-      const slotMinute = m % 60
+      const currentMin = startMinutes + m
+      const slotHour   = Math.floor(currentMin / 60)
+      const slotMinute = currentMin % 60
       
-      // Cria o objeto de data para este slot específico
-      // Usamos o formato local para comparação com 'now'
-      const slotStart = new Date(`${date}T${String(slotHour).padStart(2,'0')}:${String(slotMinute).padStart(2,'0')}:00`)
+      // Cria o objeto de data para este slot específico forçando o fuso -03:00
+      const slotStart = new Date(`${date}T${String(slotHour).padStart(2,'0')}:${String(slotMinute).padStart(2,'0')}:00-03:00`)
       const slotEnd   = new Date(slotStart.getTime() + duration * 60000)
 
       // 1. Restrição de Passado: Não mostrar horários que já passaram se for hoje
@@ -122,7 +134,6 @@ router.get('/available-slots', auth(false), async (req, res) => {
       const hasConflict = existingAppointments.some(apt => {
         const aptStart = new Date(apt.startTime)
         const aptEnd   = new Date(apt.endTime)
-        // O slot de 90min conflita se ele começar antes do fim de outro E terminar depois do início de outro
         return slotStart < aptEnd && slotEnd > aptStart
       })
 

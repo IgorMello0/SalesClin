@@ -64,15 +64,15 @@ router.get('/:id', auth(), async (req, res) => {
 })
 
 router.post('/', auth(), async (req, res) => {
-  const { name, domain, whatsapp, apiKey, plan, isActive } = req.body
-  const created = await prisma.empresa.create({ data: { name, domain, whatsapp, apiKey, plan, isActive } })
+  const { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } = req.body
+  const created = await prisma.empresa.create({ data: { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } })
   res.status(201).json(createSuccessResponse(created))
 })
 
 router.put('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
-  const { name, domain, whatsapp, apiKey, plan, isActive } = req.body
-  const updated = await prisma.empresa.update({ where: { id }, data: { name, domain, whatsapp, apiKey, plan, isActive } })
+  const { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } = req.body
+  const updated = await prisma.empresa.update({ where: { id }, data: { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } })
   res.json(createSuccessResponse(updated))
 })
 

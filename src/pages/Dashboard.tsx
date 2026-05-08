@@ -220,21 +220,13 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">groups</span>
             </div>
-            {renderPercentBadge(getPercent(counters.leads, targetsData.leads))}
+            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Total de Leads</p>
             <h3 className="stats-value">{counters.leads}</h3>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {targetsData.leads.toLocaleString('pt-BR')}</span>
-              <span className={`font-bold ${getPercent(counters.leads, targetsData.leads) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.leads, targetsData.leads) >= 100 ? 'Meta Superada!' : `${getPercent(counters.leads, targetsData.leads)}% alcançado`}
-              </span>
-            </div>
-            {renderProgressBar(getPercent(counters.leads, targetsData.leads))}
-          </div>
+          
         </Card>
 
         {/* Card 2: Avaliação Agendada */}
@@ -243,21 +235,13 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">event_available</span>
             </div>
-            {renderPercentBadge(getPercent(counters.agendamentos, targetsData.agendamentos))}
+            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Agendada</p>
             <h3 className="stats-value">{counters.agendamentos}</h3>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {targetsData.agendamentos.toLocaleString('pt-BR')}</span>
-              <span className={`font-bold ${getPercent(counters.agendamentos, targetsData.agendamentos) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.agendamentos, targetsData.agendamentos) >= 100 ? 'Meta Superada!' : `${getPercent(counters.agendamentos, targetsData.agendamentos)}% alcançado`}
-              </span>
-            </div>
-            {renderProgressBar(getPercent(counters.agendamentos, targetsData.agendamentos))}
-          </div>
+          
         </Card>
 
         {/* Card 3: Avaliação Comparada */}
@@ -266,21 +250,13 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">how_to_reg</span>
             </div>
-            {renderPercentBadge(getPercent(counters.comparada, targetsData.comparada))}
+            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Comparecida</p>
             <h3 className="stats-value">{counters.comparada}</h3>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {targetsData.comparada.toLocaleString('pt-BR')}</span>
-              <span className={`font-bold ${getPercent(counters.comparada, targetsData.comparada) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.comparada, targetsData.comparada) >= 100 ? 'Meta Superada!' : `${getPercent(counters.comparada, targetsData.comparada)}% alcançado`}
-              </span>
-            </div>
-            {renderProgressBar(getPercent(counters.comparada, targetsData.comparada))}
-          </div>
+          
         </Card>
 
         {/* Card 4: Propostas */}
@@ -289,21 +265,13 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">rocket_launch</span>
             </div>
-            {renderPercentBadge(getPercent(counters.oportunidades, targetsData.oportunidades))}
+            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Propostas</p>
             <h3 className="stats-value">{counters.oportunidades}</h3>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {targetsData.oportunidades.toLocaleString('pt-BR')}</span>
-              <span className={`font-bold ${getPercent(counters.oportunidades, targetsData.oportunidades) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.oportunidades, targetsData.oportunidades) >= 100 ? 'Meta Superada!' : `${getPercent(counters.oportunidades, targetsData.oportunidades)}% alcançado`}
-              </span>
-            </div>
-            {renderProgressBar(getPercent(counters.oportunidades, targetsData.oportunidades))}
-          </div>
+          
         </Card>
       </div>
 
@@ -315,21 +283,13 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
             </div>
-            {renderPercentBadge(getPercent(counters.faturamento, targetsData.faturamento))}
+            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Faturamento Total</p>
             <h4 className="stats-value">{formatCurrency(counters.faturamento)}</h4>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {formatCurrency(targetsData.faturamento)}</span>
-              <span className={`font-bold ${getPercent(counters.faturamento, targetsData.faturamento) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.faturamento, targetsData.faturamento) >= 100 ? 'Meta Superada!' : `${getPercent(counters.faturamento, targetsData.faturamento)}% alcançado`}
-              </span>
-            </div>
-            {renderProgressBar(getPercent(counters.faturamento, targetsData.faturamento))}
-          </div>
+          
         </Card>
 
         {/* Card 6: Ticket (Orçado) */}
@@ -338,21 +298,13 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">calculate</span>
             </div>
-            {renderPercentBadge(getPercent(counters.ticketOrcado, targetsData.ticketOrcado))}
+            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Orçado)</p>
             <h4 className="stats-value">{formatCurrency(counters.ticketOrcado)}</h4>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {formatCurrency(targetsData.ticketOrcado)}</span>
-              <span className={`font-bold ${getPercent(counters.ticketOrcado, targetsData.ticketOrcado) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.ticketOrcado, targetsData.ticketOrcado) >= 100 ? 'Meta Superada!' : `${getPercent(counters.ticketOrcado, targetsData.ticketOrcado)}% alcançado`}
-              </span>
-            </div>
-            {renderProgressBar(getPercent(counters.ticketOrcado, targetsData.ticketOrcado))}
-          </div>
+          
         </Card>
 
         {/* Card 7: Ticket (Fechado) */}
@@ -361,21 +313,13 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">handshake</span>
             </div>
-            {renderPercentBadge(getPercent(counters.ticketFechado, targetsData.ticketFechado))}
+            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Fechado)</p>
             <h4 className="stats-value">{formatCurrency(counters.ticketFechado)}</h4>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Meta: {formatCurrency(targetsData.ticketFechado)}</span>
-              <span className={`font-bold ${getPercent(counters.ticketFechado, targetsData.ticketFechado) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(counters.ticketFechado, targetsData.ticketFechado) >= 100 ? 'Meta Superada!' : `${getPercent(counters.ticketFechado, targetsData.ticketFechado)}% alcançado`}
-              </span>
-            </div>
-            {renderProgressBar(getPercent(counters.ticketFechado, targetsData.ticketFechado))}
-          </div>
+          
         </Card>
 
         {/* Card 8: Taxa de Conversão */}
@@ -414,15 +358,7 @@ const Dashboard = () => {
               )}
             </div>
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-on-surface-variant">
-              <span>Alvo: {conversionMode === 'percent' ? `${targetsData.conversao}%` : '100%'}</span>
-              <span className={`font-bold ${getPercent(conversionMode === 'percent' ? counters.conversao : counters.conversaoFinanceira, conversionMode === 'percent' ? targetsData.conversao : 100) >= 100 ? 'text-secondary' : 'text-primary'}`}>
-                {getPercent(conversionMode === 'percent' ? counters.conversao : counters.conversaoFinanceira, conversionMode === 'percent' ? targetsData.conversao : 100)}% alcançado
-              </span>
-            </div>
-            {renderProgressBar(getPercent(conversionMode === 'percent' ? counters.conversao : counters.conversaoFinanceira, conversionMode === 'percent' ? targetsData.conversao : 100))}
-          </div>
+          
         </Card>
       </div>
 
