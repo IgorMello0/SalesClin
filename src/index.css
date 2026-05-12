@@ -89,6 +89,27 @@
   }
 }
 
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  opacity: 0;
+  animation: reveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.reveal-delay-1 { animation-delay: 0.1s; }
+.reveal-delay-2 { animation-delay: 0.2s; }
+.reveal-delay-3 { animation-delay: 0.3s; }
+.reveal-delay-4 { animation-delay: 0.4s; }
+
 @keyframes progressFill {
   from { width: 0; }
 }
@@ -390,4 +411,127 @@ h1, h2, h3, h4, h5, h6 {
   [data-radix-popper-content-wrapper] {
     z-index: 200 !important;
   }
+}
+/* ========================================
+   LANDING PAGE EFFECTS
+   ======================================== */
+
+@keyframes shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    120deg, 
+    #F97316 20%, 
+    #F97316 42%, 
+    rgba(255, 255, 255, 0.5) 50%, 
+    #F97316 58%, 
+    #F97316 80%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ========================================
+   ENTRANCE ANIMATIONS
+   ======================================== */
+
+@keyframes revealUpPro {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 100px, 0) scale(0.9) rotateX(10deg);
+    filter: blur(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1) rotateX(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes revealDashboardPro {
+  0% {
+    opacity: 0;
+    transform: translate3d(150px, 0, 0) rotateY(-25deg) scale(0.8) perspective(1000px);
+    filter: blur(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotateY(0) scale(1) perspective(1000px);
+    filter: blur(0);
+  }
+}
+
+.animate-reveal-up {
+  opacity: 0;
+  will-change: transform, opacity, filter;
+  animation: revealUpPro 1.2s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+}
+
+.animate-reveal-left {
+  opacity: 0;
+  will-change: transform, opacity, filter;
+  animation: revealDashboardPro 1.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 40px, 0);
+
+  will-change: transform, opacity;
+  transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), 
+              opacity 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+
+}
+
+.reveal.active {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+
+}
+
+@keyframes marquee-left {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes marquee-right {
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+.animate-marquee-left {
+  animation: marquee-left 60s linear infinite;
+}
+
+.animate-marquee-right {
+  animation: marquee-right 60s linear infinite;
+}
+
+.mask-fade-edges {
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
+.pause-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Blueprint Grid Patterns */
+.bg-grid-pattern {
+  background-size: 50px 50px;
+  background-image: 
+    linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+}
+
+.bg-grid-dark {
+  background-size: 60px 60px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
