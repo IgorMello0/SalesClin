@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import { Checkbox } from '@/components/ui/checkbox';
 
 import { 
   Settings as SettingsIcon, 
@@ -183,9 +183,10 @@ const EquipeView = () => {
   const { toast } = useToast();
   const { professional } = useAuth();
   const [team, setTeam] = useState<any[]>([]);
+  const [clinicas, setClinicas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newMember, setNewMember] = useState({ name: '', email: '', password: '', roleId: '' });
+  const [newMember, setNewMember] = useState({ name: '', email: '', password: '', roleId: '', companyIds: [] as number[] });
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
@@ -198,6 +199,15 @@ const EquipeView = () => {
       if (res.success) setRoles(res.data || []);
     } catch (e) {
       console.error('Erro ao carregar cargos:', e);
+    }
+  };
+
+  const loadClinicas = async () => {
+    try {
+      const res = await empresasApi.myCompanies();
+      if (res.success) setClinicas(res.data || []);
+    } catch (e) {
+      console.error('Erro ao carregar clínicas', e);
     }
   };
 
@@ -218,6 +228,7 @@ const EquipeView = () => {
   useEffect(() => {
     loadTeam();
     loadRoles();
+    loadClinicas();
   }, []);
 
   const handleAddMember = async () => {
@@ -233,11 +244,12 @@ const EquipeView = () => {
         password: newMember.password,
         roleId: newMember.roleId ? Number(newMember.roleId) : null,
         isActive: true,
+        companyIds: newMember.companyIds.length > 0 ? newMember.companyIds : undefined,
       });
       if (res.success) {
         toast({ title: 'Sucesso', description: `${newMember.name} adicionado(a) à equipe!` });
         setIsAdding(false);
-        setNewMember({ name: '', email: '', password: '', roleId: '' });
+        setNewMember({ name: '', email: '', password: '', roleId: '', companyIds: [] });
         loadTeam();
       } else {
         throw new Error(res.error?.message || 'Erro ao adicionar');
@@ -276,6 +288,8 @@ const EquipeView = () => {
 
   const [editingMember, setEditingMember] = useState<any>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const handleSelectUser = (user: any) => {
     if (selectedUserId === user.id) {
@@ -284,7 +298,17 @@ const EquipeView = () => {
       return;
     }
     setSelectedUserId(user.id);
-    setEditingMember({ ...user, roleId: user.roleId?.toString() || '' });
+    
+    // Configura o membro em edição com as clínicas que ele já possui acesso
+    const userCompanyIds = user.companyAccess && user.companyAccess.length > 0 
+      ? user.companyAccess.map((ca: any) => ca.companyId) 
+      : [user.companyId];
+
+    setEditingMember({ 
+      ...user, 
+      roleId: user.roleId?.toString() || '',
+      companyIds: userCompanyIds
+    });
     loadUserPermissions(user.id);
   };
 
@@ -296,6 +320,7 @@ const EquipeView = () => {
         name: editingMember.name,
         email: editingMember.email,
         roleId: editingMember.roleId ? Number(editingMember.roleId) : null,
+        companyIds: editingMember.companyIds
       });
       if (res.success) {
         toast({ title: 'Sucesso', description: 'Perfil atualizado!' });
@@ -305,6 +330,33 @@ const EquipeView = () => {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!editingMember || !resetPassword) {
+      toast({ title: 'Atenção', description: 'Digite a nova senha.', variant: 'destructive' });
+      return;
+    }
+    if (resetPassword.length < 6) {
+      toast({ title: 'Atenção', description: 'A senha deve ter pelo menos 6 caracteres.', variant: 'destructive' });
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const res = await usuariosApi.update(editingMember.id, {
+        name: editingMember.name,
+        email: editingMember.email,
+        password: resetPassword
+      });
+      if (res.success) {
+        toast({ title: 'Sucesso', description: 'Senha redefinida com sucesso!' });
+        setResetPassword('');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -382,7 +434,9 @@ const EquipeView = () => {
               <Label>Cargo / Função</Label>
               <Select value={newMember.roleId} onValueChange={v => setNewMember({...newMember, roleId: v})}>
                 <SelectTrigger className="h-9 text-sm bg-background">
-                  <SelectValue placeholder="Selecione um cargo..." />
+                  <SelectValue placeholder="Selecione um cargo...">
+                    {roles.find(r => r.id.toString() === newMember.roleId)?.name || 'Selecione um cargo...'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent position="item-aligned" className="z-[200]">
                   {roles.map(r => (
@@ -391,6 +445,31 @@ const EquipeView = () => {
                 </SelectContent>
               </Select>
             </div>
+            {clinicas.length > 0 && (
+              <div className="space-y-2 sm:col-span-2 mt-2">
+                <Label className="mb-2 block">Acesso às Clínicas (Multi-Tenancy)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border rounded-lg p-4 bg-background/50">
+                  {clinicas.map(c => (
+                    <div key={c.id} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`new-clinica-${c.id}`} 
+                        checked={newMember.companyIds.includes(c.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setNewMember({...newMember, companyIds: [...newMember.companyIds, c.id]});
+                          } else {
+                            setNewMember({...newMember, companyIds: newMember.companyIds.filter(id => id !== c.id)});
+                          }
+                        }}
+                      />
+                      <label htmlFor={`new-clinica-${c.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                        {c.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end pt-2">
             <Button onClick={handleAddMember}>Adicionar à Equipe</Button>
@@ -476,7 +555,9 @@ const EquipeView = () => {
                         onValueChange={v => setEditingMember({...editingMember, roleId: v})}
                       >
                         <SelectTrigger className="h-9 text-sm">
-                          <SelectValue placeholder="Selecione um cargo..." />
+                          <SelectValue placeholder="Selecione um cargo...">
+                            {roles.find(r => r.id.toString() === editingMember?.roleId)?.name || 'Selecione um cargo...'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="z-[250]">
                           {roles.map(r => (
@@ -485,6 +566,65 @@ const EquipeView = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    {clinicas.length > 0 && (
+                      <div className="space-y-2 sm:col-span-2 mt-4">
+                        <Label className="text-[11px] uppercase text-muted-foreground font-bold mb-2 block">Acesso às Clínicas (Multi-Tenancy)</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border rounded-lg p-4 bg-muted/20">
+                          {clinicas.map(c => (
+                            <div key={c.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`edit-clinica-${c.id}`} 
+                                checked={editingMember?.companyIds?.includes(c.id)}
+                                onCheckedChange={(checked) => {
+                                  const current = editingMember?.companyIds || [];
+                                  if (checked) {
+                                    setEditingMember({...editingMember, companyIds: [...current, c.id]});
+                                  } else {
+                                    setEditingMember({...editingMember, companyIds: current.filter((id: number) => id !== c.id)});
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`edit-clinica-${c.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                                {c.name}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Resetar Senha */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-orange-500" />
+                      Resetar Senha
+                    </h4>
+                  </div>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1 space-y-1.5">
+                      <Label className="text-[11px] uppercase text-muted-foreground font-bold">Nova Senha</Label>
+                      <Input
+                        type="password"
+                        value={resetPassword}
+                        onChange={e => setResetPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleResetPassword}
+                      disabled={savingPassword || !resetPassword}
+                      className="h-9 text-xs px-4 border-orange-400 text-orange-600 hover:bg-orange-500 hover:text-white"
+                    >
+                      {savingPassword ? 'Salvando...' : 'Resetar Senha'}
+                    </Button>
                   </div>
                 </div>
 
@@ -906,12 +1046,214 @@ const CargosView = () => {
   );
 };
 
+const ClinicasView = () => {
+  const { toast } = useToast();
+  const { switchCompany, professional } = useAuth();
+  const [clinicas, setClinicas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newClinica, setNewClinica] = useState({ name: '', domain: '', whatsapp: '' });
+  
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editData, setEditData] = useState({ name: '', domain: '', whatsapp: '', openHour: '08:00', closeHour: '20:00' });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const loadClinicas = async () => {
+    try {
+      setLoading(true);
+      const res = await empresasApi.myCompanies();
+      if (res.success && res.data) {
+        setClinicas(res.data);
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Erro ao carregar clínicas', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadClinicas();
+  }, []);
+
+  const handleCreate = async () => {
+    if (!newClinica.name) {
+      toast({ title: 'Atenção', description: 'Nome da clínica é obrigatório', variant: 'destructive' });
+      return;
+    }
+    try {
+      const res = await empresasApi.create({
+        name: newClinica.name,
+        domain: newClinica.domain,
+        whatsapp: newClinica.whatsapp,
+        isActive: true,
+      });
+      if (res.success) {
+        toast({ title: 'Sucesso', description: 'Clínica criada! A página será recarregada para atualizar seu acesso.' });
+        setIsAdding(false);
+        setNewClinica({ name: '', domain: '', whatsapp: '' });
+        loadClinicas();
+        
+        // Timeout para atualizar a página e o token JWT ler a nova clínica
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message || 'Erro ao criar', variant: 'destructive' });
+    }
+  };
+
+  const startEditing = (c: any) => {
+    setEditingId(c.id);
+    setEditData({
+      name: c.name || '',
+      domain: c.domain || '',
+      whatsapp: c.whatsapp || '',
+      openHour: c.openHour || '08:00',
+      closeHour: c.closeHour || '20:00'
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!editData.name) {
+      toast({ title: 'Atenção', description: 'O nome da empresa é obrigatório.', variant: 'destructive' });
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await empresasApi.update(editingId!, editData);
+      if (res.success) {
+        toast({ title: 'Salvo!', description: 'Informações da filial atualizadas.' });
+        setEditingId(null);
+        loadClinicas();
+      } else {
+        throw new Error(res.error?.message || 'Erro ao salvar');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      <div className="flex justify-between items-center bg-background border p-4 rounded-xl shadow-sm">
+        <div>
+          <h3 className="text-lg font-bold">Minhas Clínicas</h3>
+          <p className="text-sm text-muted-foreground">Gerencie as filiais da sua rede (Multi-Tenancy)</p>
+        </div>
+        <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"}>
+          {isAdding ? "Cancelar" : <><Plus className="w-4 h-4 mr-2" /> Nova Clínica</>}
+        </Button>
+      </div>
+
+      {isAdding && (
+        <Card className="border-primary/20 bg-primary/5 animate-in slide-in-from-top-2">
+          <CardContent className="pt-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nome da Clínica / Filial *</Label>
+                <Input value={newClinica.name} onChange={e => setNewClinica({...newClinica, name: e.target.value})} placeholder="Ex: Matriz, Filial Centro..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Domínio / Subdomínio</Label>
+                <Input value={newClinica.domain} onChange={e => setNewClinica({...newClinica, domain: e.target.value})} placeholder="Ex: centro.salesclin.com" />
+              </div>
+              <div className="space-y-2">
+                <Label>WhatsApp (Opcional)</Label>
+                <Input value={newClinica.whatsapp} onChange={e => setNewClinica({...newClinica, whatsapp: e.target.value})} placeholder="Ex: 11999999999" />
+              </div>
+            </div>
+            <Button onClick={handleCreate} className="w-full sm:w-auto">Criar Filial</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <div className="text-center py-4 text-muted-foreground">Carregando clínicas...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {clinicas.map((c) => (
+            <Card key={c.id} className={c.id === professional?.companyId ? "border-primary shadow-sm ring-1 ring-primary/20" : ""}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Building className="w-4 h-4 text-primary" />
+                    {c.name}
+                  </CardTitle>
+                  {c.id === professional?.companyId && (
+                    <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      Ativa
+                    </span>
+                  )}
+                </div>
+                <CardDescription>{c.domain || 'Sem domínio'}</CardDescription>
+              </CardHeader>
+              
+              {editingId === c.id ? (
+                <CardContent className="pt-2 pb-4 space-y-4 animate-in fade-in">
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Nome da Filial</Label>
+                      <Input value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})} className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Domínio / Site</Label>
+                      <Input value={editData.domain} onChange={e => setEditData({...editData, domain: e.target.value})} className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">WhatsApp</Label>
+                      <Input value={editData.whatsapp} onChange={e => setEditData({...editData, whatsapp: e.target.value})} className="h-8 text-sm" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Abertura</Label>
+                        <Input type="time" value={editData.openHour} onChange={e => setEditData({...editData, openHour: e.target.value})} className="h-8 text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Fechamento</Label>
+                        <Input type="time" value={editData.closeHour} onChange={e => setEditData({...editData, closeHour: e.target.value})} className="h-8 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2 border-t">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancelar</Button>
+                    <Button size="sm" disabled={savingEdit} onClick={handleUpdate}>
+                      {savingEdit ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                  </div>
+                </CardContent>
+              ) : (
+                <CardContent>
+                  <div className="text-xs text-muted-foreground mb-4">
+                    ID da Clínica: {c.id}
+                  </div>
+                  <div className="flex justify-between items-center mt-4">
+                    <Button variant="outline" size="sm" onClick={() => startEditing(c)} className="h-7 text-xs px-3">
+                      <SettingsIcon className="w-3.5 h-3.5 mr-1.5" /> Editar
+                    </Button>
+                    <span className="text-[10px] text-muted-foreground">
+                      Troque de clínica pelo Dashboard
+                    </span>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Map of components per setting
 const ViewsMap: Record<string, React.FC<any>> = {
   'Serviços': ServicosView,
   'Equipe': EquipeView,
   'Cargos': CargosView,
-  'Meu Negócio': InfoNegocioView,
+  'Minhas Clínicas': ClinicasView,
 };
 
 const Settings = () => {
@@ -934,10 +1276,12 @@ const Settings = () => {
       ]
     },
     {
-      title: 'Meu negócio',
+      title: 'Minhas Filiais',
       icon: Building,
       items: [
-        { name: 'Meu Negócio', description: 'Informações e configurações da empresa' },
+        ...(isOwner ? [
+          { name: 'Minhas Clínicas', description: 'Crie e gerencie sua rede de clínicas' },
+        ] : []),
       ]
     },
   ];

@@ -11,13 +11,26 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body as { email: string; password: string }
   const user = await prisma.usuario.findUnique({ 
     where: { email },
-    include: { company: true, role: true }
+    include: { company: true, role: true, companyAccess: { include: { company: true, role: true } } }
   })
   if (!user) return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
   const ok = await bcrypt.compare(password, user.passwordHash)
   if (!ok) return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
-  const token = jwt.sign({ id: user.id, role: user.role?.name, companyId: user.companyId, type: 'usuario' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
   
+  const availableCompanies = user.companyAccess.length > 0
+    ? user.companyAccess.map(ca => ({ id: ca.company.id, name: ca.company.name, role: ca.role?.name }))
+    : (user.company ? [{ id: user.company.id, name: user.company.name, role: user.role?.name }] : [])
+
+  const allowedCompanies = availableCompanies.map(c => c.id)
+
+  const token = jwt.sign({ 
+    id: user.id, 
+    role: user.role?.name, 
+    companyId: user.companyId, 
+    type: 'usuario',
+    allowedCompanies 
+  }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+
   // Retornar dados do usuário no mesmo formato que profissional
   res.json(createSuccessResponse({ 
     token,
@@ -29,7 +42,8 @@ router.post('/login', async (req, res) => {
       role: user.role?.name, // Nome do cargo para o frontend
       phone: '',
       companyId: user.companyId,
-      companyName: user.company?.name
+      companyName: user.company?.name,
+      companies: availableCompanies
     }
   }))
 })
@@ -41,25 +55,35 @@ router.get('/', auth(), async (req, res) => {
       return res.status(403).json(createErrorResponse('Acesso exclusivo ao profissional', 403))
     }
 
-    // Se for profissional, buscar empresa
+    // Buscar profissional com TODAS as empresas que ele possui
     const professional = await prisma.professional.findUnique({
       where: { id: req.user.id },
-      select: { companyId: true }
+      include: { ownedCompanies: true }
     })
 
     if (!professional || !professional.companyId) {
       return res.status(400).json(createErrorResponse('Profissional não possui empresa associada', 400))
     }
-    const companyId = professional.companyId;
 
-    if (!companyId) {
+    // Coletar todos os IDs de empresa que o profissional controla
+    const ownedCompanyIds = professional.ownedCompanies.map(c => c.id);
+    if (professional.companyId && !ownedCompanyIds.includes(professional.companyId)) {
+      ownedCompanyIds.push(professional.companyId);
+    }
+
+    if (ownedCompanyIds.length === 0) {
       return res.status(400).json(createErrorResponse('Empresa não encontrada', 400))
     }
 
     const { skip, take, page, pageSize } = parsePagination(req.query)
     
-    // Filtrar usuários pela empresa
-    const where = { companyId }
+    // Buscar usuários que pertencem diretamente OU que têm acesso via tabela ponte
+    const where = {
+      OR: [
+        { companyId: { in: ownedCompanyIds } },
+        { companyAccess: { some: { companyId: { in: ownedCompanyIds } } } }
+      ]
+    }
     
     const [items, total] = await Promise.all([
       prisma.usuario.findMany({ 
@@ -67,7 +91,7 @@ router.get('/', auth(), async (req, res) => {
         skip, 
         take, 
         orderBy: { id: 'desc' }, 
-        include: { company: true, role: true } 
+        include: { company: true, role: true, companyAccess: { include: { company: true } } } 
       }),
       prisma.usuario.count({ where })
     ])
@@ -99,9 +123,9 @@ router.post('/', auth(), async (req, res) => {
     
     const companyId = professional.companyId;
 
-    const { name, email, password, role, isActive } = req.body
+    const { name, email, password, role, isActive, companyIds } = req.body
     
-    console.log('[Usuarios] Dados recebidos:', { name, email, role, isActive })
+    console.log('[Usuarios] Dados recebidos:', { name, email, role, isActive, companyIds })
     
     // Validações
     if (!name || !email || !password) {
@@ -122,10 +146,16 @@ router.post('/', auth(), async (req, res) => {
     
     console.log('[Usuarios] Tentando criar usuário para empresa ID:', companyId)
     
+    // Definir clinica principal
+    let primaryCompanyId = companyId;
+    if (Array.isArray(companyIds) && companyIds.length > 0) {
+      primaryCompanyId = companyIds[0];
+    }
+
     // Usar o companyId do usuário criador
     const created = await prisma.usuario.create({ 
       data: { 
-        companyId,
+        companyId: primaryCompanyId,
         name, 
         email, 
         passwordHash, 
@@ -134,6 +164,30 @@ router.post('/', auth(), async (req, res) => {
       },
       include: { company: true, role: true }
     })
+    
+    // Criar o acesso inicial garantido na tabela ponte
+    if (Array.isArray(companyIds) && companyIds.length > 0) {
+      for (const cId of companyIds) {
+        await prisma.userCompanyAccess.create({
+          data: {
+            userId: created.id,
+            companyId: cId,
+            roleId: created.roleId,
+            isActive: true
+          }
+        });
+      }
+    } else {
+      // Se não vier array, cria pelo menos para a clinica ativa
+      await prisma.userCompanyAccess.create({
+        data: {
+          userId: created.id,
+          companyId: companyId,
+          roleId: created.roleId,
+          isActive: true
+        }
+      });
+    }
     
     console.log('[Usuarios] Usuário criado com sucesso:', created.id)
     res.status(201).json(createSuccessResponse(created))
@@ -154,25 +208,34 @@ router.put('/:id', auth(), async (req, res) => {
 
     const professional = await prisma.professional.findUnique({
       where: { id: req.user.id },
-      select: { companyId: true }
+      include: { ownedCompanies: true }
     })
 
-    if (!professional || !professional.companyId) {
-      return res.status(400).json(createErrorResponse('Profissional não possui empresa associada', 400))
+    if (!professional) {
+      return res.status(400).json(createErrorResponse('Profissional não encontrado', 400))
     }
-    const companyId = professional.companyId;
+    
+    const ownedCompanyIds = professional.ownedCompanies.map(c => c.id);
+    if (professional.companyId && !ownedCompanyIds.includes(professional.companyId)) {
+      ownedCompanyIds.push(professional.companyId);
+    }
 
-    // Verificar se o usuário pertence à mesma empresa
-    const usuario = await prisma.usuario.findUnique({ where: { id } })
+    // Verificar se o usuário existe
+    const usuario = await prisma.usuario.findUnique({ where: { id }, include: { companyAccess: true } })
     if (!usuario) {
       return res.status(404).json(createErrorResponse('Usuário não encontrado', 404))
     }
 
-    if (usuario.companyId !== companyId) {
-      return res.status(403).json(createErrorResponse('Você não pode editar usuários de outra empresa', 403))
+    // Só permite editar se o usuário tiver acesso a alguma clínica que o profissional seja dono
+    const userCompanyIds = usuario.companyAccess.map(ca => ca.companyId);
+    userCompanyIds.push(usuario.companyId!); // Garante que o legado é checado
+    
+    const hasSharedCompany = userCompanyIds.some(cId => ownedCompanyIds.includes(cId));
+    if (!hasSharedCompany) {
+      return res.status(403).json(createErrorResponse('Você não tem permissão para editar este usuário', 403))
     }
 
-    const { name, email, password, role, isActive } = req.body
+    const { name, email, password, role, isActive, companyIds } = req.body
     
     // Validações
     if (!name || !email) {
@@ -194,10 +257,35 @@ router.put('/:id', auth(), async (req, res) => {
     const data: any = { name, email, roleId: req.body.roleId, isActive }
     if (password) data.passwordHash = await bcrypt.hash(password, 10)
     
+    // Atualizar Múltiplas Clínicas
+    if (Array.isArray(companyIds)) {
+      // Filtra apenas as clínicas que o dono realmente controla (evita injeção)
+      const validCompanyIds = companyIds.filter(id => ownedCompanyIds.includes(id));
+      
+      if (validCompanyIds.length > 0) {
+        // Exclui acessos antigos apenas nas clínicas da rede desse dono
+        await prisma.userCompanyAccess.deleteMany({
+          where: { userId: id, companyId: { in: ownedCompanyIds } }
+        });
+        
+        // Insere os novos
+        for (const cId of validCompanyIds) {
+          await prisma.userCompanyAccess.create({
+            data: { userId: id, companyId: cId, roleId: req.body.roleId, isActive }
+          });
+        }
+        
+        // Atualiza a clínica principal se necessário
+        if (!validCompanyIds.includes(usuario.companyId!)) {
+          data.companyId = validCompanyIds[0];
+        }
+      }
+    }
+    
     const updated = await prisma.usuario.update({ 
       where: { id }, 
       data,
-      include: { company: true, role: true }
+      include: { company: true, role: true, companyAccess: true }
     })
     
     res.json(createSuccessResponse(updated))
