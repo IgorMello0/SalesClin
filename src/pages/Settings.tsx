@@ -19,11 +19,15 @@ import {
   Clock,
   Lock,
   Users,
-  Tag
+  Tag,
+  Monitor,
+  LayoutTemplate,
+  PanelLeft
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useLayout } from '@/contexts/LayoutContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi } from '@/lib/api';
 
 // -- CARGOS HELPERS REMOVIDOS (Agora vêm do banco) --
@@ -906,12 +910,65 @@ const CargosView = () => {
   );
 };
 
+const AparenciaView = () => {
+  const { layout, setLayout } = useLayout();
+  const { toast } = useToast();
+
+  const handleLayoutChange = (value: 'top' | 'side') => {
+    setLayout(value);
+    toast({ title: 'Sucesso', description: 'Preferência de layout atualizada.' });
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="p-4 bg-orange-500/10 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 rounded-2xl text-sm border border-orange-200/50 dark:border-orange-800/50 flex items-start gap-3 shadow-sm">
+        <Monitor className="w-5 h-5 flex-shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" />
+        <div className="leading-relaxed">
+          <strong className="block mb-0.5 text-orange-900 dark:text-orange-100 font-bold">Layout e Navegação</strong>
+          Escolha como prefere navegar pelo sistema. Essa preferência é salva no seu navegador.
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="font-medium text-sm">Posição do Menu</h3>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div 
+            onClick={() => handleLayoutChange('top')}
+            className={`p-4 border rounded-xl cursor-pointer transition-all ${layout === 'top' ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-md' : 'hover:border-primary/50 bg-background'}`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <LayoutTemplate className={`w-6 h-6 ${layout === 'top' ? 'text-primary' : 'text-muted-foreground'}`} />
+              {layout === 'top' && <div className="w-3 h-3 rounded-full bg-primary" />}
+            </div>
+            <div className="font-bold text-sm">Menu Superior</div>
+            <div className="text-xs text-muted-foreground mt-1">Navegação no topo da tela, ideal para foco no conteúdo.</div>
+          </div>
+
+          <div 
+            onClick={() => handleLayoutChange('side')}
+            className={`p-4 border rounded-xl cursor-pointer transition-all ${layout === 'side' ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-md' : 'hover:border-primary/50 bg-background'}`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <PanelLeft className={`w-6 h-6 ${layout === 'side' ? 'text-primary' : 'text-muted-foreground'}`} />
+              {layout === 'side' && <div className="w-3 h-3 rounded-full bg-primary" />}
+            </div>
+            <div className="font-bold text-sm">Menu Lateral</div>
+            <div className="text-xs text-muted-foreground mt-1">Navegação na lateral esquerda, estilo clássico de CRM.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Map of components per setting
 const ViewsMap: Record<string, React.FC<any>> = {
   'Serviços': ServicosView,
   'Equipe': EquipeView,
   'Cargos': CargosView,
   'Meu Negócio': InfoNegocioView,
+  'Aparência': AparenciaView,
 };
 
 const Settings = () => {
@@ -926,6 +983,7 @@ const Settings = () => {
       title: 'Configurações Gerais',
       icon: SettingsIcon,
       items: [
+        { name: 'Aparência', description: 'Ajuste o menu lateral ou superior' },
         { name: 'Serviços', description: 'Gerencie os serviços oferecidos' },
         ...(isOwner ? [
           { name: 'Equipe', description: 'Gerencie membros da equipe e permissões' },

@@ -1,13 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  useSidebar,
-} from '@/components/ui/sidebar';
+import { useLayout } from '@/contexts/LayoutContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useState, useEffect } from 'react';
 
 const menuItems = [
   {
@@ -68,11 +63,9 @@ const menuItems = [
 
 export function AppSidebar() {
   const { logout, hasModuleAccess, permissions } = useAuth();
-  const { state } = useSidebar();
+  const { isMobileSidebarOpen, setMobileSidebarOpen, isSidebarCollapsed, setSidebarCollapsed } = useLayout();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const isCollapsed = state === "collapsed";
 
   const filteredMenuItems = menuItems.filter((item) => {
     if (permissions.length === 0) return true;
@@ -84,92 +77,174 @@ export function AppSidebar() {
     navigate('/login');
   };
 
-  return (
-    <Sidebar collapsible="icon" className="border-r border-white/5 bg-primary text-primary-foreground transition-all duration-300">
-      <SidebarHeader className={cn("py-8 transition-all duration-300", isCollapsed ? "px-4" : "px-8")}>
-        <div className="flex items-center justify-center w-full min-h-[40px]">
-          {isCollapsed ? (
-             <div className="w-12 h-12 rounded-2xl bg-sky-500/20 flex items-center justify-center border border-sky-400/30 animate-in zoom-in duration-300 shadow-lg shadow-sky-500/10">
-                <span className="material-symbols-outlined text-primary-foreground text-3xl">rocket_launch</span>
-             </div>
-          ) : (
-            <img 
-              alt="SalesClin Logo" 
-              className="w-full h-auto object-contain max-w-[200px] animate-in fade-in zoom-in duration-300" 
-              src="/logo-oficial-v3.png" 
-            />
-          )}
-        </div>
-      </SidebarHeader>
-      
-      <SidebarContent className={cn("transition-all duration-300", isCollapsed ? "px-2" : "px-4")}>
-        <nav className="flex-1 space-y-2">
-          {filteredMenuItems.map((item) => (
-            <Link
-              key={item.title}
-              to={item.url}
-              title={isCollapsed ? item.title : ""}
-              className={cn(
-                "flex items-center gap-3 py-3 text-sm font-semibold tracking-wide font-headline transition-all rounded-xl overflow-hidden group/item",
-                isCollapsed ? "justify-center px-0 w-14 mx-auto" : "px-4",
-                location.pathname === item.url 
-                  ? 'bg-white/10 text-primary-foreground shadow-lg shadow-black/10 scale-[1.02]' 
-                  : 'text-primary-foreground/60 hover:bg-white/5 hover:text-primary-foreground'
-              )}
-            >
-              <span className={cn(
-                "material-symbols-outlined text-xl shrink-0 transition-transform duration-300",
-                isCollapsed ? "text-2xl" : "group-hover/item:scale-110"
-              )}>{item.icon}</span>
-              {!isCollapsed && <span className="truncate animate-in slide-in-from-left-2 duration-300">{item.title}</span>}
-            </Link>
-          ))}
-        </nav>
-      </SidebarContent>
-      
-      <SidebarFooter className={cn("pb-8 mt-auto transition-all duration-300", isCollapsed ? "px-2" : "px-4")}>
-        <div className="space-y-2">
+  // Prevent scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isMobileSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobileSidebarOpen]);
 
-          
-          <div className={cn("pt-3 border-t space-y-0.5 border-white/10 overflow-hidden", isCollapsed ? "flex flex-col items-center" : "")}>
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname, setMobileSidebarOpen]);
+
+  return (
+    <>
+      {/* Mobile Hamburger Header (Visible only on lg:hidden when layout is 'side') */}
+      <div className="lg:hidden sticky top-0 w-full z-40 bg-[#0B1525] border-b border-white/5 flex items-center px-4 h-14 sm:h-16">
+        <button 
+          onClick={() => setMobileSidebarOpen(true)}
+          className="flex items-center justify-center w-10 h-10 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors mr-2"
+        >
+          <span className="material-symbols-outlined text-2xl">menu</span>
+        </button>
+        <Link to="/dashboard" className="flex items-center">
+          <img
+            alt="SalesClin Logo"
+            className="h-8 w-auto object-contain"
+            src="/logo-oficial-v3.png"
+          />
+        </Link>
+      </div>
+
+      {/* Mobile Backdrop */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Container */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 bg-[#0B1525] text-white flex flex-col border-r border-white/5 transition-all duration-300 lg:relative lg:translate-x-0",
+        isMobileSidebarOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0",
+        !isMobileSidebarOpen && (isSidebarCollapsed ? "lg:w-20" : "lg:w-64")
+      )}>
+        
+        {/* Sidebar Header */}
+        <div className={cn(
+          "py-6 px-4 flex items-center shrink-0 transition-all duration-300 border-b border-white/5 mb-2",
+          isSidebarCollapsed && !isMobileSidebarOpen ? "flex-col gap-4 px-2" : "justify-between px-6"
+        )}>
+          {isSidebarCollapsed && !isMobileSidebarOpen ? (
+             <Link to="/dashboard" className="transition-transform hover:scale-110">
+               <img alt="S" className="h-8 w-8 object-contain" src="/favicon.png" onError={(e) => {
+                 (e.target as HTMLImageElement).src = "/logo-oficial-v3.png";
+                 (e.target as HTMLImageElement).className = "h-6 w-auto object-contain";
+               }} />
+             </Link>
+          ) : (
+            <Link to="/dashboard" className="flex-1">
+              <img 
+                alt="SalesClin Logo" 
+                className="h-8 w-auto object-contain max-w-[140px]" 
+                src="/logo-oficial-v3.png" 
+              />
+            </Link>
+          )}
+
+          {/* New Toggle Button inside header (Desktop only) */}
+          <button 
+            onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
+            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+            title={isSidebarCollapsed ? "Expandir Menu" : "Recolher Menu"}
+          >
+            <span className="material-symbols-outlined text-2xl">
+              {isSidebarCollapsed ? 'menu_open' : 'menu'}
+            </span>
+          </button>
+
+          {/* Close button for mobile */}
+          <button 
+            className="lg:hidden text-slate-400 hover:text-white p-2"
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        
+        <div className={cn(
+          "flex-1 overflow-y-auto scrollbar-hide py-2 space-y-1.5 transition-all",
+          isSidebarCollapsed && !isMobileSidebarOpen ? "px-2" : "px-4"
+        )}>
+          {filteredMenuItems.map((item) => {
+            const isActive = location.pathname === item.url || (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
+            const showOnlyIcons = isSidebarCollapsed && !isMobileSidebarOpen;
+
+            return (
+              <Link
+                key={item.title}
+                to={item.url}
+                className={cn(
+                  "flex items-center transition-all rounded-xl overflow-hidden group/item",
+                  showOnlyIcons ? "justify-center p-3" : "gap-3 px-4 py-3",
+                  isActive 
+                    ? 'bg-white/10 text-secondary shadow-lg shadow-black/10 scale-[1.02]' 
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                )}
+                title={showOnlyIcons ? item.title : undefined}
+              >
+                <span className={cn(
+                  "material-symbols-outlined shrink-0 transition-transform duration-300",
+                  showOnlyIcons ? "text-2xl" : "text-xl",
+                  isActive ? "text-secondary" : "group-hover/item:scale-110"
+                )}>{item.icon}</span>
+                {!showOnlyIcons && (
+                  <span className="truncate text-sm font-semibold tracking-wide font-headline">{item.title}</span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+        
+        <div className={cn(
+          "p-4 mt-auto shrink-0 border-t border-white/5 transition-all",
+          isSidebarCollapsed && !isMobileSidebarOpen ? "p-2" : "p-4"
+        )}>
+          <div className="space-y-0.5">
             <Link 
               to="/profile"
-              title={isCollapsed ? "Meu Perfil" : ""}
               className={cn(
-                "flex items-center gap-3 py-1.5 text-sm font-medium transition-all rounded-xl",
-                isCollapsed ? "justify-center w-14" : "px-4",
-                location.pathname === '/profile' ? 'bg-white/10 text-primary-foreground' : 'text-primary-foreground/60 hover:bg-white/5 hover:text-primary-foreground'
+                "flex items-center transition-all rounded-xl",
+                isSidebarCollapsed && !isMobileSidebarOpen ? "justify-center p-3" : "gap-3 px-4 py-2",
+                location.pathname === '/profile' ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
               )}
+              title={isSidebarCollapsed && !isMobileSidebarOpen ? "Meu Perfil" : undefined}
             >
               <span className="material-symbols-outlined text-xl shrink-0">account_circle</span>
-              {!isCollapsed && <span className="animate-in fade-in duration-300">Meu Perfil</span>}
+              {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm font-medium">Meu Perfil</span>}
             </Link>
             <Link 
               to="/settings"
-              title={isCollapsed ? "Configurações" : ""}
               className={cn(
-                "flex items-center gap-3 py-1.5 text-sm font-medium transition-all rounded-xl",
-                isCollapsed ? "justify-center w-14" : "px-4",
-                location.pathname === '/settings' ? 'bg-white/10 text-primary-foreground' : 'text-primary-foreground/60 hover:bg-white/5 hover:text-primary-foreground'
+                "flex items-center transition-all rounded-xl",
+                isSidebarCollapsed && !isMobileSidebarOpen ? "justify-center p-3" : "gap-3 px-4 py-2",
+                location.pathname === '/settings' ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
               )}
+              title={isSidebarCollapsed && !isMobileSidebarOpen ? "Configurações" : undefined}
             >
               <span className="material-symbols-outlined text-xl shrink-0">settings</span>
-              {!isCollapsed && <span className="animate-in fade-in duration-300">Configurações</span>}
+              {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm font-medium">Configurações</span>}
             </Link>
             <button 
               onClick={handleLogout}
-              title={isCollapsed ? "Sair" : ""}
               className={cn(
-                "flex items-center gap-3 py-3 text-sm font-medium hover:text-red-400 transition-all text-primary-foreground/60 hover:bg-red-500/10 rounded-xl text-left",
-                isCollapsed ? "justify-center w-14" : "px-4 w-full"
+                "flex items-center w-full transition-all text-slate-400 hover:bg-red-500/10 rounded-xl text-left hover:text-red-400",
+                isSidebarCollapsed && !isMobileSidebarOpen ? "justify-center p-3" : "gap-3 px-4 py-2"
               )}
+              title={isSidebarCollapsed && !isMobileSidebarOpen ? "Sair" : undefined}
             >
-              <span className="material-symbols-outlined text-xl shrink-0 font-bold">logout</span>
-              {!isCollapsed && <span className="animate-in fade-in duration-300">Sair</span>}
+              <span className="material-symbols-outlined text-xl shrink-0">logout</span>
+              {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm font-medium">Sair</span>}
             </button>
           </div>
         </div>
-      </SidebarFooter>
-    </Sidebar>
+      </aside>
+    </>
   );
 }
