@@ -28,6 +28,7 @@ import DentalTest from "./pages/DentalTest";
 import Leads from "./pages/Leads";
 import SalesFunnel from "./pages/SalesFunnel";
 import Goals from "./pages/Goals";
+import FAQ from "./pages/FAQ";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/faq" element={<FAQ />} />
                 <Route path="/" element={<AppLayout />}>
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="appointments" element={<Appointments />} />

@@ -44,6 +44,7 @@ router.post('/login', async (req, res) => {
         email: professional.email, 
         phone: professional.phone || '', 
         specialization: professional.specialization || '',
+        onboardingCompleted: professional.onboardingCompleted,
         company: professional.company ? {
           id: professional.company.id,
           name: professional.company.name
@@ -69,6 +70,44 @@ router.get('/me', auth(), async (req, res) => {
   } catch (error) {
     console.error('[Profile] Erro:', error)
     res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
+  }
+})
+
+// Completar o Onboarding
+router.post('/onboarding/complete', auth(), async (req, res) => {
+  try {
+    const { companyName, logoUrl, faturamentoMensal, quantidadeFuncionarios, quantidadeClinicas, canalAquisicao, objetivoCrm } = req.body;
+    
+    const onboardingData = {
+      faturamentoMensal,
+      quantidadeFuncionarios,
+      quantidadeClinicas,
+      canalAquisicao,
+      objetivoCrm
+    };
+
+    // Atualizar professional e empresa
+    const professional = await prisma.professional.update({
+      where: { id: req.user!.id },
+      data: { 
+        onboardingCompleted: true,
+        onboardingData,
+        ...(companyName && { companyName }),
+        ...(logoUrl && { logoUrl })
+      }
+    });
+
+    if (professional.companyId && companyName) {
+      await prisma.empresa.update({
+        where: { id: professional.companyId },
+        data: { name: companyName }
+      });
+    }
+
+    res.json(createSuccessResponse({ success: true }));
+  } catch (error) {
+    console.error('[Onboarding] Erro ao concluir:', error);
+    res.status(500).json(createErrorResponse('Erro ao concluir onboarding', 500));
   }
 })
 
@@ -227,6 +266,7 @@ router.post('/', async (req, res) => {
         email: created.email, 
         phone: created.phone || '', 
         specialization: created.specialization || '',
+        onboardingCompleted: created.onboardingCompleted,
         company: created.company ? {
           id: created.company.id,
           name: created.company.name

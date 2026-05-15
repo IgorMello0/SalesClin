@@ -106,7 +106,7 @@ export function AppSidebar() {
           <img
             alt="SalesClin Logo"
             className="h-8 w-auto object-contain"
-            src="/logo-oficial-v3.png"
+            src="/logo-site.png"
           />
         </Link>
       </div>
@@ -134,7 +134,7 @@ export function AppSidebar() {
           {isSidebarCollapsed && !isMobileSidebarOpen ? (
              <Link to="/dashboard" className="transition-transform hover:scale-110">
                <img alt="S" className="h-8 w-8 object-contain" src="/favicon.png" onError={(e) => {
-                 (e.target as HTMLImageElement).src = "/logo-oficial-v3.png";
+                 (e.target as HTMLImageElement).src = "/logo-site.png";
                  (e.target as HTMLImageElement).className = "h-6 w-auto object-contain";
                }} />
              </Link>
@@ -168,7 +168,7 @@ export function AppSidebar() {
           </button>
         </div>
         
-        <div className={cn(
+        <div id="tour-menu" className={cn(
           "flex-1 overflow-y-auto scrollbar-hide py-2 space-y-1.5 transition-all",
           isSidebarCollapsed && !isMobileSidebarOpen ? "px-2" : "px-4"
         )}>
@@ -202,7 +202,7 @@ export function AppSidebar() {
           })}
         </div>
         
-        <div className={cn(
+        <div id="tour-settings" className={cn(
           "p-4 mt-auto shrink-0 border-t border-white/5 transition-all",
           isSidebarCollapsed && !isMobileSidebarOpen ? "p-2" : "p-4"
         )}>

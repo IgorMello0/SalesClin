@@ -9,6 +9,7 @@ interface Professional {
   specialization: string;
   role?: string;
   photoUrl?: string;
+  onboardingCompleted?: boolean;
 }
 
 interface Permission {
@@ -27,6 +28,7 @@ interface AuthContextType {
   isLoading: boolean;
   loadPermissions: () => Promise<void>;
   updateProfilePhoto: (photoUrl: string) => void;
+  completeOnboarding: (data: any) => Promise<{success?: boolean}>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           specialization: data.specialization || data.role || 'Usuário',
           role: data.email === 'admin@admin.com' ? 'admin' : (profData ? 'profissional' : (data.role || 'usuario')),
           photoUrl: data.photoUrl || undefined,
+          onboardingCompleted: data.onboardingCompleted || false,
         };
         
         setProfessional(professionalData);
@@ -191,12 +194,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: profData.name,
           email: profData.email,
           phone: profData.phone || '',
-          specialization: profData.specialization || ''
+          specialization: profData.specialization || '',
+          role: 'profissional',
+          onboardingCompleted: profData.onboardingCompleted || false,
         };
         
         setProfessional(professionalData);
         localStorage.setItem('professional', JSON.stringify(professionalData));
         localStorage.setItem('token', token);
+        localStorage.setItem('userType', 'professional');
         
         // Carregar permissões do usuário logado
         await loadPermissions();
@@ -222,6 +228,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const completeOnboarding = async (data: any) => {
+    try {
+      const type = localStorage.getItem('userType');
+      const response = type === 'user' 
+        ? await usuariosApi.completeOnboarding(data)
+        : await professionalsApi.completeOnboarding(data);
+      
+      if (response.success) {
+        setProfessional(prev => {
+          if (!prev) return prev;
+          const updated = { ...prev, onboardingCompleted: true };
+          localStorage.setItem('professional', JSON.stringify(updated));
+          return updated;
+        });
+        return { success: true };
+      } else {
+        console.error('[Auth] Erro ao concluir onboarding:', response.error);
+        throw new Error(response.error?.message || 'Erro ao salvar onboarding');
+      }
+    } catch (error) {
+      console.error('[Auth] Erro ao concluir onboarding:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     setProfessional(null);
     setPermissions([]);
@@ -240,7 +271,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasModuleAccess,
       isLoading,
       loadPermissions,
-      updateProfilePhoto
+      updateProfilePhoto,
+      completeOnboarding
     }}>
       {children}
     </AuthContext.Provider>

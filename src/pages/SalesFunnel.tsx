@@ -42,6 +42,8 @@ import { ExportModal } from "@/components/ExportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, History, FileDown, Edit2, Check, X, Eye } from "lucide-react";
+import { useSectionTour } from '@/hooks/useSectionTour';
+import { TourPopover } from '@/components/onboarding/TourPopover';
 
 const safeFormatDate = (dateStr: any, formatStr: string = "dd/MM/yyyy") => {
   try {
@@ -708,8 +710,18 @@ const SalesFunnel = () => {
     }
   };
 
+  // Tour de primeira visita
+  const { tourActive, tourStep, tourSteps, tourHandleNext, tourHandlePrev, tourHandleClose } =
+    useSectionTour('comercial', [
+      { id: null, title: '💼 Comercial', description: 'Gerencie todos os seus leads e acompanhe cada etapa do funil até a venda. Arraste os cards entre as colunas para avançar o lead!', position: 'center' },
+      { id: '#comercial-novo-lead', title: '➕ Novo Lead', description: 'Cadastre um novo lead rapidamente. Preencha os dados básicos e ele entra automaticamente no início do funil.', position: 'bottom' },
+      { id: '#comercial-funis', title: '🔄 Funis de Venda', description: 'Alterne entre diferentes funis: Marketing, Comercial ou personalizados. Cada funil tem suas próprias etapas.', position: 'bottom' },
+      { id: '#comercial-board', title: '📦 Quadro Kanban', description: 'Cada coluna é uma etapa do funil. Arraste os cards de lead entre as colunas para avançar na jornada de venda.', position: 'center' },
+    ]);
+
   return (
     <div className="space-y-4 sm:space-y-8 pb-10 min-h-screen">
+      <TourPopover active={tourActive} step={tourStep} steps={tourSteps} onNext={tourHandleNext} onPrev={tourHandlePrev} onClose={tourHandleClose} />
       {/* Header & Funnel Switcher */}
       <div className="flex flex-col gap-4 sm:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
@@ -753,6 +765,7 @@ const SalesFunnel = () => {
           </DropdownMenu>
 
             <Button 
+              id="comercial-novo-lead"
               onClick={() => openAddLead()} 
               size="xl"
               variant="secondary"
@@ -765,7 +778,7 @@ const SalesFunnel = () => {
         </div>
 
         {/* Funnel Tabs — scrollable on mobile */}
-        <div className="flex overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+        <div id="comercial-funis" className="flex overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
           <div className="flex p-1 sm:p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-slate-200/50 w-fit">
             {FUNNELS.map((f) => (
               <button
@@ -789,7 +802,7 @@ const SalesFunnel = () => {
       </div>
 
       {/* Board */}
-      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-4 sm:px-4 scrollbar-hide snap-x snap-mandatory sm:snap-none">
+      <div id="comercial-board" className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-4 sm:px-4 scrollbar-hide snap-x snap-mandatory sm:snap-none">
         {activeStages.map((stage) => {
           const stageLeads = leads.filter(l => {
             // Regra de Roteamento: 

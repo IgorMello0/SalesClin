@@ -1,0 +1,571 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLayout } from '@/contexts/LayoutContext';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import {
+  Building2,
+  LayoutPanelLeft,
+  LayoutPanelTop,
+  CheckCircle2,
+  ChevronRight,
+  ChevronLeft,
+  Users,
+  TrendingUp,
+  MapPin,
+  Megaphone,
+  Target,
+  Sparkles,
+} from 'lucide-react';
+
+/* ─── Step indicator ─────────────────────────────────────── */
+const StepDot = ({ active, done }: { active: boolean; done: boolean }) => (
+  <div
+    className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+      done ? 'bg-secondary scale-100' : active ? 'bg-white scale-125 shadow-[0_0_0_3px_rgba(255,255,255,0.3)]' : 'bg-white/30'
+    }`}
+  />
+);
+
+/* ─── Shared label style ─────────────────────────────────── */
+const labelCls = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5';
+
+/* ─── Field wrapper ──────────────────────────────────────── */
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div>
+    <label className={labelCls}>{label}</label>
+    {children}
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════ */
+export const OnboardingWizard = () => {
+  const { professional, completeOnboarding } = useAuth();
+  const { layout, setLayout } = useLayout();
+
+  const [step, setStep] = useState(1);
+  const [companyName, setCompanyName] = useState(professional?.company?.name || '');
+  const [faturamento, setFaturamento] = useState('');
+  const [funcionarios, setFuncionarios] = useState('');
+  const [clinicas, setClinicas] = useState('');
+  const [canalAquisicao, setCanalAquisicao] = useState('');
+  const [objetivoCrm, setObjetivoCrm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isOwner = professional?.role === 'profissional' || professional?.role === 'admin';
+  const totalSteps = isOwner ? 4 : 2;
+
+  const handleNext = () => {
+    if (step < totalSteps) setStep(step + 1);
+    else handleComplete();
+  };
+
+  const handleComplete = async () => {
+    try {
+      setIsSubmitting(true);
+      localStorage.setItem('crm_needs_tour', 'true');
+      await completeOnboarding({
+        ...(isOwner
+          ? {
+              companyName,
+              faturamentoMensal: faturamento,
+              quantidadeFuncionarios: funcionarios,
+              quantidadeClinicas: clinicas,
+              canalAquisicao,
+              objetivoCrm,
+            }
+          : {}),
+      });
+      // Dispara o tour imediatamente sem precisar de F5
+      window.dispatchEvent(new Event('crm:start-tour'));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /* ─── Left-panel meta per step ─────────────────────────── */
+  const sideMeta: Record<number, { icon: React.ReactNode; title: string; desc: string }> = {
+    1: {
+      icon: <Building2 className="w-10 h-10" />,
+      title: 'Sua Clínica',
+      desc: 'Configure a identidade do seu negócio para personalizar toda a sua experiência.',
+    },
+    2: {
+      icon: <TrendingUp className="w-10 h-10" />,
+      title: 'Sobre o Negócio',
+      desc: 'Entender o seu contexto nos ajuda a sugerir as melhores configurações do CRM.',
+    },
+    3: {
+      icon: <LayoutPanelTop className="w-10 h-10" />,
+      title: 'Layout Ideal',
+      desc: 'Escolha como prefere navegar. Você pode mudar isso a qualquer momento.',
+    },
+    4: {
+      icon: <Sparkles className="w-10 h-10" />,
+      title: 'Tudo Pronto!',
+      desc: 'Seu ambiente está configurado. Vamos dar um tour rápido pelas funcionalidades.',
+    },
+  };
+
+  const effectiveStep = isOwner ? step : step + 1;
+  const sideKey = isOwner ? step : step === 1 ? 3 : 4;
+  const meta = sideMeta[sideKey] ?? sideMeta[1];
+
+  /* ─── Step content ─────────────────────────────────────── */
+  const renderStep = () => {
+    /* STEP 1 — Nome da Clínica (owners only) */
+    if (effectiveStep === 1) {
+      return (
+        <motion.div
+          key="s1"
+          initial={{ opacity: 0, x: 32 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -32 }}
+          transition={{ duration: 0.25 }}
+          className="w-full max-w-sm space-y-6"
+        >
+          <div>
+            <h2 className="text-2xl font-bold text-foreground font-headline mb-1">
+              Bem-vindo(a) ao SalesClin!
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Vamos começar pelo essencial — qual é o nome da sua clínica ou empresa?
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="company-name" className={labelCls}>
+              Nome da Clínica / Empresa
+            </label>
+            <input
+              id="company-name"
+              type="text"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="Ex: Clínica Sorriso"
+              className={
+                'w-full h-12 rounded-xl border border-border bg-background px-4 text-sm text-foreground ' +
+                'placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/60 ' +
+                'focus:border-accent transition-colors'
+              }
+            />
+          </div>
+        </motion.div>
+      );
+    }
+
+    /* STEP 2 — Dados do Negócio (owners only) */
+    if (effectiveStep === 2 && isOwner) {
+      return (
+        <motion.div
+          key="s2"
+          initial={{ opacity: 0, x: 32 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -32 }}
+          transition={{ duration: 0.25 }}
+          className="w-full max-w-lg space-y-6"
+        >
+          <div>
+            <h2 className="text-2xl font-bold text-foreground font-headline mb-1">
+              Sobre o seu Negócio
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Essas informações nos ajudam a personalizar sua experiência no CRM.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Média de Faturamento">
+              <CustomSelect
+                value={faturamento}
+                onChange={setFaturamento}
+                icon={<TrendingUp className="w-4 h-4" />}
+                options={[
+                  { value: 'Até 10k', label: 'Até R$ 10.000' },
+                  { value: '10k a 50k', label: 'R$ 10k a R$ 50k' },
+                  { value: '50k a 100k', label: 'R$ 50k a R$ 100k' },
+                  { value: '100k a 500k', label: 'R$ 100k a R$ 500k' },
+                  { value: 'Acima de 500k', label: 'Acima de R$ 500k' },
+                ]}
+              />
+            </Field>
+
+            <Field label="Quantidade de Funcionários">
+              <CustomSelect
+                value={funcionarios}
+                onChange={setFuncionarios}
+                icon={<Users className="w-4 h-4" />}
+                options={[
+                  { value: '1-5', label: '1 a 5' },
+                  { value: '6-15', label: '6 a 15' },
+                  { value: '16-50', label: '16 a 50' },
+                  { value: 'Mais de 50', label: 'Mais de 50' },
+                ]}
+              />
+            </Field>
+
+            <Field label="Clínicas / Unidades">
+              <CustomSelect
+                value={clinicas}
+                onChange={setClinicas}
+                icon={<MapPin className="w-4 h-4" />}
+                options={[
+                  { value: '1', label: '1 unidade' },
+                  { value: '2-3', label: '2 a 3' },
+                  { value: '4+', label: '4 ou mais' },
+                ]}
+              />
+            </Field>
+
+            <Field label="Principal Objetivo">
+              <CustomSelect
+                value={objetivoCrm}
+                onChange={setObjetivoCrm}
+                icon={<Target className="w-4 h-4" />}
+                options={[
+                  { value: 'Aumentar Vendas', label: 'Aumentar Vendas' },
+                  { value: 'Organizar Processos', label: 'Organizar Processos' },
+                  { value: 'Analisar Métricas', label: 'Analisar Métricas' },
+                  { value: 'Centralizar Atendimento', label: 'Centralizar Atendimento' },
+                ]}
+              />
+            </Field>
+
+            <Field label="Por onde nos conheceu?">
+              <div className="sm:col-span-2">
+                <CustomSelect
+                  value={canalAquisicao}
+                  onChange={setCanalAquisicao}
+                  icon={<Megaphone className="w-4 h-4" />}
+                  options={[
+                    { value: 'Instagram', label: 'Instagram' },
+                    { value: 'Google', label: 'Google' },
+                    { value: 'Youtube', label: 'YouTube' },
+                    { value: 'Indicação', label: 'Indicação de um amigo' },
+                    { value: 'Outro', label: 'Outro' },
+                  ]}
+                />
+              </div>
+            </Field>
+          </div>
+        </motion.div>
+      );
+    }
+
+    /* STEP 3 — Layout */
+    if (effectiveStep === (isOwner ? 3 : 2)) {
+      return (
+        <motion.div
+          key="s3"
+          initial={{ opacity: 0, x: 32 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -32 }}
+          transition={{ duration: 0.25 }}
+          className="w-full max-w-lg space-y-6"
+        >
+          <div>
+            <h2 className="text-2xl font-bold text-foreground font-headline mb-1">Escolha seu Layout</h2>
+            <p className="text-sm text-muted-foreground">
+              Como você prefere navegar pelo CRM? Você pode mudar isso depois.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Menu Superior */}
+            <button
+              type="button"
+              onClick={() => setLayout('top')}
+              className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-200 cursor-pointer group ${
+                layout === 'top'
+                  ? 'border-secondary bg-secondary/5 shadow-md shadow-secondary/10'
+                  : 'border-border bg-card hover:border-accent/50 hover:bg-muted/40'
+              }`}
+            >
+              {layout === 'top' && (
+                <span className="absolute top-3 right-3">
+                  <CheckCircle2 className="w-4 h-4 text-secondary" />
+                </span>
+              )}
+              {/* Preview top nav */}
+              <div className="w-full h-28 bg-muted rounded-lg mb-3 overflow-hidden border border-border">
+                <div className="w-full h-7 bg-primary flex items-center px-2 gap-2">
+                  <div className="w-8 h-1.5 bg-white/40 rounded-full" />
+                  <div className="ml-auto flex gap-1.5">
+                    <div className="w-6 h-1.5 bg-white/30 rounded-full" />
+                    <div className="w-6 h-1.5 bg-white/30 rounded-full" />
+                    <div className="w-6 h-1.5 bg-white/30 rounded-full" />
+                  </div>
+                </div>
+                <div className="p-2 space-y-1.5">
+                  <div className="h-3 w-3/4 bg-muted-foreground/20 rounded" />
+                  <div className="h-2 w-1/2 bg-muted-foreground/10 rounded" />
+                  <div className="grid grid-cols-3 gap-1 mt-2">
+                    <div className="h-6 bg-background rounded border border-border/50" />
+                    <div className="h-6 bg-background rounded border border-border/50" />
+                    <div className="h-6 bg-background rounded border border-border/50" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <LayoutPanelTop className="w-4 h-4 text-accent" />
+                Menu Superior
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Mais espaço horizontal, visão ampla.</p>
+            </button>
+
+            {/* Menu Lateral */}
+            <button
+              type="button"
+              onClick={() => setLayout('side')}
+              className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-200 cursor-pointer group ${
+                layout === 'side'
+                  ? 'border-secondary bg-secondary/5 shadow-md shadow-secondary/10'
+                  : 'border-border bg-card hover:border-accent/50 hover:bg-muted/40'
+              }`}
+            >
+              {layout === 'side' && (
+                <span className="absolute top-3 right-3">
+                  <CheckCircle2 className="w-4 h-4 text-secondary" />
+                </span>
+              )}
+              {/* Preview side nav */}
+              <div className="w-full h-28 bg-muted rounded-lg mb-3 overflow-hidden border border-border flex">
+                <div className="w-10 h-full bg-primary flex flex-col items-center pt-3 gap-2">
+                  <div className="w-5 h-5 rounded-full bg-white/30" />
+                  <div className="w-4 h-1.5 bg-white/20 rounded-full" />
+                  <div className="w-4 h-1.5 bg-white/20 rounded-full" />
+                  <div className="w-4 h-1.5 bg-white/20 rounded-full" />
+                </div>
+                <div className="flex-1 p-2 space-y-1.5">
+                  <div className="h-4 w-full bg-background rounded border border-border/50 flex justify-end items-center pr-1">
+                    <div className="w-3 h-3 rounded-full bg-muted-foreground/30" />
+                  </div>
+                  <div className="h-3 w-2/3 bg-muted-foreground/20 rounded" />
+                  <div className="grid grid-cols-2 gap-1 mt-1">
+                    <div className="h-5 bg-background rounded border border-border/50" />
+                    <div className="h-5 bg-background rounded border border-border/50" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <LayoutPanelLeft className="w-4 h-4 text-accent" />
+                Menu Lateral
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Estilo dashboard clássico.</p>
+            </button>
+          </div>
+        </motion.div>
+      );
+    }
+
+    /* STEP 4 — Conclusão */
+    if (effectiveStep === (isOwner ? 4 : 3)) {
+      return (
+        <motion.div
+          key="s4"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-sm space-y-6 text-center"
+        >
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center">
+              <CheckCircle2 className="w-10 h-10 text-secondary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-foreground font-headline mb-1">Tudo pronto! 🎉</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Seu ambiente está configurado com sucesso. Vamos iniciar um tour rápido para você conhecer as funcionalidades do SalesClin.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <div className="flex flex-col gap-2 w-full">
+              {[
+                'Dashboard de vendas e métricas',
+                'Funil de leads e pipeline',
+                'Agenda e agendamentos',
+                'Relatórios e metas',
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
+  };
+
+  /* ─── Progress calc ──────────────────────────────────────── */
+  const pct = Math.round((step / totalSteps) * 100);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex">
+      {/* ── Left side panel (navy) ── */}
+      <motion.aside
+        initial={{ x: -60, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="hidden lg:flex w-80 xl:w-96 flex-col justify-between bg-primary text-primary-foreground p-10 relative overflow-hidden"
+      >
+        {/* Dot grid pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        />
+        {/* Glow blobs */}
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], opacity: [0.15, 0.25, 0.15] }}
+          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -top-16 -left-16 w-72 h-72 bg-secondary rounded-full blur-3xl"
+        />
+        <div className="absolute -bottom-10 right-0 w-56 h-56 bg-white/5 rounded-full blur-2xl" />
+
+        {/* Logo */}
+        <div className="relative z-10 flex items-center gap-2">
+          <img src="/logo-oficial-v3.png" alt="SalesClin" className="h-8 object-contain brightness-0 invert" />
+        </div>
+
+        {/* Icon + title + desc (animated) */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center gap-5">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`meta-${step}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-4"
+            >
+              <div className="w-16 h-16 bg-white/10 ring-1 ring-white/20 rounded-2xl flex items-center justify-center shadow-lg shadow-black/20">
+                {meta.icon}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold font-headline">{meta.title}</h3>
+                <p className="text-sm text-primary-foreground/70 mt-1 leading-relaxed">{meta.desc}</p>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Step dots */}
+          <div className="flex items-center gap-2 mt-4">
+            {Array.from({ length: totalSteps }).map((_, i) => (
+              <StepDot key={i} active={step === i + 1} done={step > i + 1} />
+            ))}
+            <span className="ml-2 text-xs text-primary-foreground/50">
+              {step}/{totalSteps}
+            </span>
+          </div>
+
+          {/* Social proof card */}
+          <div className="mt-6 p-4 bg-white/8 ring-1 ring-white/10 rounded-2xl space-y-2 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-2">
+                {['bg-orange-400','bg-blue-400','bg-green-400'].map((c,i) => (
+                  <div key={i} className={`w-6 h-6 rounded-full ${c} ring-2 ring-primary`} />
+                ))}
+              </div>
+              <span className="text-xs font-semibold text-primary-foreground/80">+240 clínicas ativas</span>
+            </div>
+            <p className="text-xs text-primary-foreground/60 leading-relaxed italic">
+              "O SalesClin transformou nossa gestão de pacientes e duplicou nossas conversões."
+            </p>
+            <p className="text-xs text-secondary font-semibold">— Clínica Dr. Alves, SP</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="relative z-10 text-xs text-primary-foreground/40">
+          © 2026 SalesClin. Todos os direitos reservados.
+        </p>
+      </motion.aside>
+
+      {/* ── Right side (form) ── */}
+      <div
+        className="flex-1 flex flex-col bg-background overflow-y-auto relative"
+        style={{
+          backgroundImage: 'radial-gradient(circle, hsl(214 32% 91%) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+        }}
+      >
+        {/* Top bar: progress + step badge */}
+        <div className="relative z-10">
+          <div className="w-full h-1 bg-muted">
+            <motion.div
+              className="h-full bg-gradient-to-r from-secondary to-orange-400"
+              initial={{ width: `${((step - 1) / totalSteps) * 100}%` }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.35 }}
+            />
+          </div>
+          <div className="flex items-center justify-between px-8 pt-4 pb-1">
+            {/* Mobile logo */}
+            <div className="flex lg:hidden items-center gap-2">
+              <img src="/logo-oficial-v3.png" alt="SalesClin" className="h-7 object-contain" />
+            </div>
+            <div className="hidden lg:block" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/8 text-primary text-xs font-bold ring-1 ring-primary/15">
+              <span className="w-4 h-4 rounded-full bg-secondary text-white text-[10px] font-bold flex items-center justify-center">{step}</span>
+              Passo {step} de {totalSteps}
+            </span>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col justify-center items-center px-8 py-10 relative z-10">
+          <div className="w-full max-w-lg mx-auto">
+            <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
+          </div>
+        </div>
+
+        {/* Navigation buttons */}
+        <div className="pb-8 flex items-center gap-3 justify-center relative z-10">
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => setStep(step - 1)}
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1.5 h-11 px-5 rounded-xl border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 shadow-sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Anterior
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={isSubmitting || (isOwner && step === 1 && !companyName.trim())}
+            className={
+              'inline-flex items-center gap-2 h-11 px-8 rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-primary/25 ' +
+              'bg-primary text-primary-foreground hover:bg-primary-hover active:scale-[0.98] ' +
+              'disabled:opacity-50 disabled:pointer-events-none'
+            }
+          >
+            {isSubmitting ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                {step === totalSteps ? 'Iniciar Tour 🚀' : 'Próximo'}
+                {step !== totalSteps && <ChevronRight className="w-4 h-4" />}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

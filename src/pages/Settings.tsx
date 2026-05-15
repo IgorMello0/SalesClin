@@ -29,6 +29,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi } from '@/lib/api';
+import { useSectionTour } from '@/hooks/useSectionTour';
+import { TourPopover } from '@/components/onboarding/TourPopover';
 
 // -- CARGOS HELPERS REMOVIDOS (Agora vêm do banco) --
 
@@ -978,6 +980,13 @@ const Settings = () => {
   const { professional: authUser } = useAuth();
   const isOwner = authUser?.role === 'profissional' || authUser?.role === 'admin';
 
+  // Tour de primeira visita
+  const { tourActive, tourStep, tourSteps, tourHandleNext, tourHandlePrev, tourHandleClose } =
+    useSectionTour('settings', [
+      { id: null, title: '⚙️ Configurações', description: 'Aqui você personaliza tudo do seu CRM: serviços, equipe, layout e informações da clínica.', position: 'center' },
+      { id: '#settings-grid', title: '📋 Opções', description: 'Clique em qualquer item para configurar. Cada seção abre um painel lateral com as opções detalhadas.', position: 'bottom' },
+    ]);
+
   const settingsSections = [
     {
       title: 'Configurações Gerais',
@@ -1005,6 +1014,7 @@ const Settings = () => {
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8 relative">
+      <TourPopover active={tourActive} step={tourStep} steps={tourSteps} onNext={tourHandleNext} onPrev={tourHandlePrev} onClose={tourHandleClose} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
@@ -1019,7 +1029,7 @@ const Settings = () => {
       <Separator className="my-6" />
 
       {/* Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div id="settings-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {settingsSections.map((section) => (
           <Card key={section.title} className="hover:shadow-sm transition-shadow">
             <CardHeader className="pb-3 border-b bg-muted/50">

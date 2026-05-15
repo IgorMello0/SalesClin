@@ -28,10 +28,25 @@ router.post('/login', async (req, res) => {
       roleId: user.roleId,
       role: user.role?.name, // Nome do cargo para o frontend
       phone: '',
+      onboardingCompleted: user.onboardingCompleted,
       companyId: user.companyId,
       companyName: user.company?.name
     }
   }))
+})
+
+// Completar o Onboarding para Usuário
+router.post('/onboarding/complete', auth(), async (req, res) => {
+  try {
+    await prisma.usuario.update({
+      where: { id: req.user!.id },
+      data: { onboardingCompleted: true }
+    });
+    res.json(createSuccessResponse({ success: true }));
+  } catch (error) {
+    console.error('[Onboarding Usuario] Erro ao concluir:', error);
+    res.status(500).json(createErrorResponse('Erro ao concluir onboarding', 500));
+  }
 })
 
 router.get('/', auth(), async (req, res) => {

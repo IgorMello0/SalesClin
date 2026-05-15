@@ -105,6 +105,8 @@ model Professional {
   contractType   String?  @map("contract_type")
   bio            String?  @db.Text
   crm            String?
+  onboardingCompleted Boolean @default(false) @map("onboarding_completed")
+  onboardingData Json?    @map("onboarding_data")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -478,6 +480,7 @@ model Usuario {
   passwordHash String   @map("password_hash") // Hash da senha do usuário
   roleId       Int?     @map("role_id") // ID do cargo do usuário
   isActive     Boolean  @default(true) @map("is_active") // Indica se o usuário está ativo
+  onboardingCompleted Boolean @default(false) @map("onboarding_completed") // Status do onboarding
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
 import { AppTopNavbar } from '@/components/AppTopNavbar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { ProductTour } from '@/components/onboarding/ProductTour';
 
 const AppLayout = () => {
   const { professional, isLoading } = useAuth();
@@ -22,10 +24,13 @@ const AppLayout = () => {
   }
 
   const isFullScreen = location.pathname === '/conversations';
+  const showOnboarding = professional.onboardingCompleted !== true;
 
   if (layout === 'side') {
     return (
       <div className="min-h-screen flex flex-col lg:flex-row w-full bg-background font-body overflow-hidden">
+        {showOnboarding && <OnboardingWizard />}
+        <ProductTour />
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
           {/* Main content area */}
@@ -47,6 +52,8 @@ const AppLayout = () => {
 
   return (
     <div className="min-h-screen flex flex-col w-full bg-background font-body">
+      {showOnboarding && <OnboardingWizard />}
+      <ProductTour />
       {/* Top Navbar */}
       <AppTopNavbar />
 

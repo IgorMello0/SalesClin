@@ -109,6 +109,7 @@ export const professionalsApi = {
     apiRequest<{ token: string; professional: any }>('/profissionais/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   signup: async (data: { name: string; email: string; password: string; phone?: string; specialization?: string }) => 
     apiRequest<{ token: string; professional: any }>('/profissionais', { method: 'POST', body: JSON.stringify(data) }),
+  completeOnboarding: async (data: any) => apiRequest<any>('/profissionais/onboarding/complete', { method: 'POST', body: JSON.stringify(data) }),
   getMe: async () => apiRequest<any>('/profissionais/me'),
   updateMe: async (data: any) => apiRequest<any>('/profissionais/me', { method: 'PUT', body: JSON.stringify(data) }),
   getAll: async (params?: { page?: number; pageSize?: number; search?: string }) => {
@@ -162,6 +163,7 @@ export const usuariosApi = {
   getById: async (id: number) => apiRequest<any>(`/usuarios/${id}`),
   login: async (email: string, password: string) => 
     apiRequest<{ token: string }>('/usuarios/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  completeOnboarding: async (data: any) => apiRequest<any>('/usuarios/onboarding/complete', { method: 'POST', body: JSON.stringify(data) }),
   create: async (data: any) => apiRequest<any>('/usuarios', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) => apiRequest<any>(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/usuarios/${id}`, { method: 'DELETE' }),

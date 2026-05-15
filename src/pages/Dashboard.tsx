@@ -213,7 +213,7 @@ const Dashboard = () => {
       </div>
 
       {/* Primary Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+      <div id="tour-dashboard-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
         {/* Card 1: Total de Leads */}
         <Card className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">

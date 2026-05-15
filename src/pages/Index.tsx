@@ -68,7 +68,7 @@ const Index = () => {
             <div className="hidden md:flex items-center gap-10">
               <a href="#planos" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">Planos</a>
               <a href="#suporte" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">Suporte</a>
-              <a href="#faq" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">FAQ</a>
+              <Link to="/faq" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">FAQ</Link>
               <div className="h-4 w-[1px] bg-slate-200 mx-2" />
               <Link to="/login" className="group relative overflow-hidden bg-[#0F172A] text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-500 flex items-center gap-3 hover:scale-105 active:scale-95 shadow-[0_10px_20px_-10px_rgba(15,23,42,0.5)] hover:shadow-[0_0_40px_rgba(249,115,22,0.5)]">
                 <span className="absolute -inset-[1px] bg-[#F97316] translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 ease-out z-0" />
