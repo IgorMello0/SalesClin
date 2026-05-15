@@ -1052,7 +1052,7 @@ const CargosView = () => {
   );
 };
 
-<<<<<<< HEAD
+
 const ClinicasView = () => {
   const { toast } = useToast();
   const { switchCompany, professional } = useAuth();
@@ -1251,7 +1251,7 @@ const ClinicasView = () => {
           ))}
         </div>
       )}
-=======
+
 const AparenciaView = () => {
   const { layout, setLayout } = useLayout();
   const { toast } = useToast();
@@ -1300,7 +1300,7 @@ const AparenciaView = () => {
           </div>
         </div>
       </div>
->>>>>>> 7ad9b23cb04426babccb1d2d515036b0d621fa0f
+
     </div>
   );
 };
@@ -1310,12 +1310,9 @@ const ViewsMap: Record<string, React.FC<any>> = {
   'Serviços': ServicosView,
   'Equipe': EquipeView,
   'Cargos': CargosView,
-<<<<<<< HEAD
   'Minhas Clínicas': ClinicasView,
-=======
   'Meu Negócio': InfoNegocioView,
   'Aparência': AparenciaView,
->>>>>>> 7ad9b23cb04426babccb1d2d515036b0d621fa0f
 };
 
 const Settings = () => {
