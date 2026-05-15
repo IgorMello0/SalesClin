@@ -243,13 +243,8 @@ export function AppTopNavbar() {
           )}
 
           {/* Navigation Items — Desktop only */}
-<<<<<<< HEAD
-          <nav className="hidden lg:flex flex-1 justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide py-2">
-            {visibleMenuItems.map((item) => {
-=======
           <nav id="tour-menu" className="hidden lg:flex flex-1 justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide py-2">
-            {filteredMenuItems.map((item) => {
->>>>>>> 7ad9b23cb04426babccb1d2d515036b0d621fa0f
+            {visibleMenuItems.map((item) => {
               const isActive = location.pathname === item.url || 
                 (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
               
