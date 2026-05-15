@@ -4,8 +4,10 @@ import { Card } from '@/components/ui/card';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Dashboard = () => {
+  const { professional, switchCompany } = useAuth();
   const [filter, setFilter] = useState<'today' | '7days' | 'custom'>('custom');
   const [conversionMode, setConversionMode] = useState<'percent' | 'reais'>('percent');
   const [bottomActiveTab, setBottomActiveTab] = useState<'finance' | 'sales'>('finance');
@@ -152,42 +154,88 @@ const Dashboard = () => {
     }
   };
 
-  const targetsData = {
-    leads: 1500,
-    agendamentos: 2500,
-    comparada: 1000,
-    oportunidades: 1000,
-    faturamento: 850000,
-    ticketOrcado: 2000,
-    ticketFechado: 2200,
-    conversao: 25.0
-  };
-
-  const getPercent = (current: number, target: number) => {
-    if (target === 0) return 0;
-    return Math.round((current / target) * 100);
-  };
-
-  const renderPercentBadge = (percent: number) => {
-    return <span className="text-[11px] font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">{percent}%</span>;
-  };
-
-  const renderProgressBar = (percent: number) => {
-    const cappedPercent = Math.min(100, percent);
-    return (
-      <div className="w-full h-1.5 bg-primary/5 rounded-full overflow-hidden">
-        <div className="h-full bg-secondary rounded-full progress-bar-fill" style={{ width: `${cappedPercent}%` }}></div>
-      </div>
-    );
-  };
+  const hasMultipleClinics = professional?.companies && professional.companies.length > 1;
+  const activeCompany = professional?.companies?.find(c => c.id === professional?.companyId);
 
   return (
     <div className="relative space-y-10 pb-10 overflow-hidden">
+      {/* Clinic Context Switcher */}
+      {hasMultipleClinics && (
+        <div className="relative z-10 animate-in fade-in slide-in-from-top-2 duration-500">
+          <Card className="p-0 overflow-hidden border-primary/10">
+            <div className="flex items-stretch">
+              {/* Active clinic indicator */}
+              <div className="bg-gradient-to-b from-primary to-primary/80 px-4 sm:px-6 flex items-center justify-center shrink-0">
+                <div className="text-center">
+                  <span className="material-symbols-outlined text-2xl sm:text-3xl text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    storefront
+                  </span>
+                  <p className="text-[8px] sm:text-[9px] font-bold text-white/60 uppercase tracking-wider mt-0.5">Ativa</p>
+                </div>
+              </div>
+
+              {/* Clinics strip */}
+              <div className="flex-1 overflow-x-auto scrollbar-hide">
+                <div className="flex items-stretch min-w-max">
+                  {professional?.companies?.map((company) => {
+                    const isActive = company.id === professional?.companyId;
+                    return (
+                      <button
+                        key={company.id}
+                        onClick={() => !isActive && switchCompany(company.id)}
+                        disabled={isActive}
+                        className={cn(
+                          "flex items-center gap-3 px-4 sm:px-6 py-3 sm:py-4 transition-all text-left border-r border-border/50 last:border-r-0 min-w-[160px] sm:min-w-[200px]",
+                          isActive
+                            ? "bg-secondary/5 cursor-default"
+                            : "hover:bg-muted/80 cursor-pointer group"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 transition-all",
+                          isActive
+                            ? "bg-secondary/10 text-secondary shadow-sm"
+                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                        )}>
+                          <span className="material-symbols-outlined text-lg sm:text-xl" style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}>
+                            {isActive ? 'check_circle' : 'business'}
+                          </span>
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className={cn(
+                            "text-xs sm:text-sm font-bold truncate",
+                            isActive ? "text-secondary" : "text-foreground group-hover:text-primary"
+                          )}>
+                            {company.name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {isActive ? '● Contexto atual' : 'Clique para acessar'}
+                          </p>
+                        </div>
+                        {!isActive && (
+                          <span className="material-symbols-outlined text-sm text-muted-foreground/50 group-hover:text-primary/50 ml-auto shrink-0 transition-colors">
+                            arrow_forward
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:gap-6 relative z-10">
         <div>
           <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Dashboard de Vendas</h2>
-          <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Bem-vindo ao centro de comando SalesClin.</p>
+          <p className="text-on-surface-variant text-xs sm:text-sm mt-1">
+            {hasMultipleClinics && activeCompany
+              ? `Dados da clínica: ${activeCompany.name}`
+              : 'Bem-vindo ao centro de comando SalesClin.'}
+          </p>
         </div>
         <Card className="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5">
           <button 

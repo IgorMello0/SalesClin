@@ -27,7 +27,23 @@ export function auth(required = true) {
 
     try {
       const secret = process.env.JWT_SECRET || 'dev-secret'
-      const payload = jwt.verify(token, secret) as AuthUser
+      const payload = jwt.verify(token, secret) as AuthUser & { allowedCompanies?: number[] }
+      
+      // Se o frontend solicitar troca de contexto (clínica)
+      const targetCompanyId = req.headers['x-company-id']
+      if (targetCompanyId) {
+        const id = Number(targetCompanyId)
+        // Verifica se o usuário tem permissão para acessar esta clínica
+        if (payload.allowedCompanies && payload.allowedCompanies.includes(id)) {
+          payload.companyId = id
+        } else if (payload.type !== 'admin') {
+          // Bloqueia a troca se a clínica não estiver na lista (a menos que seja super admin)
+          return res.status(403).json(createErrorResponse('Acesso negado a esta clínica', 403))
+        } else {
+          payload.companyId = id
+        }
+      }
+      
       req.user = payload
       return next()
     } catch {

@@ -53,6 +53,35 @@ router.get('/', auth(), async (req, res) => {
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
 
+// Listar todas as clínicas do profissional logado
+router.get('/my-companies', auth(), async (req, res) => {
+  try {
+    if (req.user?.type !== 'profissional') {
+      return res.status(403).json(createErrorResponse('Apenas proprietários podem listar filiais', 403))
+    }
+
+    const professional = await prisma.professional.findUnique({
+      where: { id: req.user.id },
+      select: { companyId: true }
+    })
+
+    const empresas = await prisma.empresa.findMany({
+      where: { 
+        OR: [
+          { ownerId: req.user.id },
+          { id: professional?.companyId || -1 }
+        ]
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+
+    res.json(createSuccessResponse(empresas))
+  } catch (error: any) {
+    console.error('[Empresas] Erro ao listar empresas:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar empresas', 500))
+  }
+})
+
 router.get('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
   const item = await prisma.empresa.findUnique({
@@ -63,10 +92,34 @@ router.get('/:id', auth(), async (req, res) => {
   res.json(createSuccessResponse(item))
 })
 
+
+
 router.post('/', auth(), async (req, res) => {
-  const { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } = req.body
-  const created = await prisma.empresa.create({ data: { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } })
-  res.status(201).json(createSuccessResponse(created))
+  try {
+    if (req.user?.type !== 'profissional') {
+      return res.status(403).json(createErrorResponse('Apenas proprietários podem criar clínicas', 403))
+    }
+
+    const { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } = req.body
+    
+    const created = await prisma.empresa.create({ 
+      data: { 
+        name, 
+        domain, 
+        whatsapp, 
+        apiKey, 
+        plan, 
+        isActive, 
+        openHour, 
+        closeHour,
+        ownerId: req.user.id // Vincula a empresa ao dono que está criando
+      } 
+    })
+    res.status(201).json(createSuccessResponse(created))
+  } catch (error: any) {
+    console.error('[Empresas] Erro ao criar empresa:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao criar clínica', 500))
+  }
 })
 
 router.put('/:id', auth(), async (req, res) => {

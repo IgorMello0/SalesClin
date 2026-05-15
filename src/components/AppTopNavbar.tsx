@@ -67,23 +67,54 @@ const menuItems = [
 ];
 
 export function AppTopNavbar() {
-  const { logout, hasModuleAccess, permissions, professional } = useAuth();
+  const { logout, hasModuleAccess, permissions, professional, switchCompany } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
+  const [blockedTooltip, setBlockedTooltip] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const companyMenuRef = useRef<HTMLDivElement>(null);
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const filteredMenuItems = menuItems.filter((item) => {
-    // Restringir módulos não liberados na v1 apenas para admin
-    const restrictedModules = ['Financeiro', 'Conversas', 'Catálogos', 'Contratos'];
-    if (restrictedModules.includes(item.title) && professional?.role !== 'admin') {
+  // Módulos restritos da v1 (ficam ocultos para não-admin)
+  const restrictedV1Modules = ['Financeiro', 'Conversas', 'Catálogos', 'Contratos'];
+
+  // Filtra módulos v1 restritos e módulos bloqueados por permissão
+  const visibleMenuItems = menuItems.filter((item) => {
+    // 1. Regra Legada V1 (módulos que não estão no sistema de permissões modular ainda)
+    if (restrictedV1Modules.includes(item.title) && professional?.role !== 'admin') {
       return false;
     }
-
-    if (permissions.length === 0) return true;
-    return hasModuleAccess(item.moduleCode);
+    
+    // 2. Módulos essenciais sempre visíveis (Dashboard e Agenda)
+    const essentialModules = ['dashboard', 'agendamentos'];
+    if (essentialModules.includes(item.moduleCode)) {
+      return true;
+    }
+    
+    // 3. Regra de Permissão Modular
+    // Se tivermos permissões carregadas, verificamos o acesso
+    if (permissions.length > 0) {
+      return hasModuleAccess(item.moduleCode);
+    }
+    
+    return true;
   });
+
+  // Verifica se um item está bloqueado por permissão (usado apenas em casos específicos se necessário)
+  const isModuleBlocked = (moduleCode: string): boolean => {
+    if (permissions.length === 0) return false;
+    return !hasModuleAccess(moduleCode);
+  };
+
+  // Mostra tooltip temporário ao clicar em módulo bloqueado
+  const showBlockedTooltip = (title: string) => {
+    if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    setBlockedTooltip(title);
+    tooltipTimerRef.current = setTimeout(() => setBlockedTooltip(null), 2500);
+  };
 
   const handleLogout = () => {
     logout();
@@ -99,6 +130,16 @@ export function AppTopNavbar() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
+
+  // Close company dropdown on outside click
+  useEffect(() => {
+    if (!companyMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (companyMenuRef.current && !companyMenuRef.current.contains(e.target as Node)) setCompanyMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [companyMenuOpen]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -147,9 +188,63 @@ export function AppTopNavbar() {
             />
           </Link>
 
+          {/* Context Switcher (Clinic Selector) */}
+          {professional?.companies && professional.companies.length > 0 && (
+            <div className="relative z-[100]" ref={companyMenuRef}>
+              <button 
+                onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
+                className="flex items-center gap-1.5 sm:gap-2 bg-white/5 hover:bg-white/10 px-2 sm:px-3 py-1.5 rounded-lg border border-white/10 transition-colors mr-2 sm:mr-4 max-w-[120px] sm:max-w-xs"
+              >
+                <div className="w-5 h-5 rounded bg-secondary/20 text-secondary flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[14px]">storefront</span>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-200 truncate">
+                  {professional.companies.find(c => c.id === professional.companyId)?.name || professional.companyName || 'Clínica'}
+                </span>
+                <span className="material-symbols-outlined text-[14px] sm:text-[16px] text-slate-400">
+                  expand_more
+                </span>
+              </button>
+              
+              {companyMenuOpen && (
+                <div className="absolute top-12 left-0 w-56 sm:w-64 bg-white rounded-xl shadow-2xl shadow-black/15 border border-slate-100 py-2 text-slate-700 animate-fade-in-up overflow-hidden z-[100]">
+                  <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mudar de Clínica</p>
+                    <p className="text-xs text-slate-600 font-medium">Selecione o contexto desejado</p>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto py-1">
+                    {professional.companies.map((company) => (
+                      <button
+                        key={company.id}
+                        onClick={() => {
+                          setCompanyMenuOpen(false);
+                          switchCompany(company.id);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors text-left",
+                          company.id === professional.companyId 
+                            ? "bg-primary/5 text-primary" 
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        )}
+                      >
+                        <span className="material-symbols-outlined text-[18px] opacity-70">
+                          {company.id === professional.companyId ? 'check_circle' : 'business'}
+                        </span>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="truncate">{company.name}</span>
+                          {company.role && <span className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">{company.role}</span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Navigation Items — Desktop only */}
           <nav className="hidden lg:flex flex-1 justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide py-2">
-            {filteredMenuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
               const isActive = location.pathname === item.url || 
                 (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
               
@@ -278,7 +373,7 @@ export function AppTopNavbar() {
           {/* Drawer */}
           <nav className="absolute top-14 left-0 right-0 bottom-0 bg-[#0B1525] overflow-y-auto animate-fade-in-up">
             <div className="p-4 space-y-1">
-              {filteredMenuItems.map((item) => {
+              {visibleMenuItems.map((item) => {
                 const isActive = location.pathname === item.url || 
                   (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
                 

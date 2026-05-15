@@ -10,9 +10,11 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
   const { skip, take, page, pageSize } = parsePagination(req.query)
   const { professionalId, clientId, status } = req.query as any
   let profId: number | undefined;
+  let companyId: number | undefined;
 
   if (req.user?.type === 'profissional') {
     profId = req.user.id;
+    companyId = req.user.companyId;
   } else if (req.user?.type === 'usuario') {
     // Buscar o dono da empresa do usuário
     const empresa = await prisma.empresa.findUnique({
@@ -20,8 +22,10 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
       select: { ownerId: true }
     });
     profId = empresa?.ownerId || undefined;
+    companyId = req.user.companyId;
   } else if (professionalId) {
     profId = Number(professionalId);
+    companyId = req.user?.companyId;
   }
 
   if (!profId) {
@@ -29,6 +33,9 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
   }
 
   const where: any = { professionalId: profId };
+  if (companyId) {
+    where.companyId = companyId;
+  }
   if (clientId) where.clientId = Number(clientId)
   if (status) where.status = status
 
@@ -207,6 +214,7 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
     const created = await prisma.appointment.create({
       data: { 
         professionalId, 
+        companyId: req.user.companyId,
         clientId: clientId ? Number(clientId) : null, 
         leadId: leadId ? Number(leadId) : null,
         serviceId: serviceId ? Number(serviceId) : null, 

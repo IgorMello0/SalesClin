@@ -42,14 +42,17 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     }
     
     // Condições Base Isoladas por Tenant e Data
-    const baseWhere = {
+    const baseWhere: any = {
       createdAt: { gte: startDate, lte: endDate },
       professionalId: { in: professionalIds }
     };
-    const appointmentWhere = {
+    if (companyId) baseWhere.companyId = companyId;
+
+    const appointmentWhere: any = {
       startTime: { gte: startDate, lte: endDate },
       professionalId: { in: professionalIds }
     };
+    if (companyId) appointmentWhere.companyId = companyId;
 
     // 3. Consultas em Paralelo para Performance
     const [
@@ -76,6 +79,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       prisma.lead.count({ 
         where: { 
           professionalId: { in: professionalIds },
+          ...(companyId && { companyId }),
           updatedAt: { gte: startDate, lte: endDate },
           status: { in: ['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
         } 
@@ -85,6 +89,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       prisma.lead.count({ 
         where: { 
           professionalId: { in: professionalIds },
+          ...(companyId && { companyId }),
           updatedAt: { gte: startDate, lte: endDate },
           status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
         } 
@@ -95,6 +100,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         _sum: { value: true },
         where: { 
           professionalId: { in: professionalIds },
+          ...(companyId && { companyId }),
           status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] }
         }
       }),
@@ -103,6 +109,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       prisma.lead.count({
         where: { 
           professionalId: { in: professionalIds },
+          ...(companyId && { companyId }),
           updatedAt: { gte: startDate, lte: endDate },
           status: { in: ['comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
         }
@@ -114,6 +121,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         _sum: { amount: true },
         where: { 
           professionalId: { in: professionalIds }, 
+          ...(companyId && { companyId }),
           date: { gte: startDate, lte: endDate }
         }
       }),
@@ -122,14 +130,20 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       prisma.lead.groupBy({
         by: ['status'],
         _count: { id: true },
-        where: { professionalId: { in: professionalIds } }
+        where: { 
+          professionalId: { in: professionalIds },
+          ...(companyId && { companyId })
+        }
       }),
 
       // 9. Leads por Origem (Total Histórico)
       prisma.lead.groupBy({
         by: ['origin'],
         _count: { id: true },
-        where: { professionalId: { in: professionalIds } }
+        where: { 
+          professionalId: { in: professionalIds },
+          ...(companyId && { companyId })
+        }
       })
     ]);
 

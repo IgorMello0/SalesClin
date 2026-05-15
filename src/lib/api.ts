@@ -20,10 +20,12 @@ async function apiRequest<T>(
 ): Promise<ApiResponse<T>> {
   const url = `${API_BASE_URL}${endpoint}`
   const token = localStorage.getItem('token')
+  const activeCompanyId = localStorage.getItem('activeCompanyId')
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeCompanyId && { 'X-Company-Id': activeCompanyId }),
     ...options.headers,
   }
 
@@ -260,13 +262,7 @@ export const permissionsApi = {
     apiRequest<Array<{ moduleCode: string; moduleName: string; hasAccess: boolean }>>('/permissions/my-permissions'),
 }
 
-// Empresas
-export const empresasApi = {
-  getMyCompany: async () => apiRequest<any>('/empresas/my-company'),
-  getById: async (id: number) => apiRequest<any>(`/empresas/${id}`),
-  update: async (id: number, data: any) => apiRequest<any>(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-}
-
+// -- Módulo de Empresas movido para o final do arquivo --
 // Metas
 export const goalsApi = {
   list: async (professionalId?: number) => apiRequest<any[]>(`/metas?professionalId=${professionalId || ''}`),
@@ -283,3 +279,40 @@ export const rolesApi = {
   delete: async (id: number) => apiRequest<any>(`/roles/${id}`, { method: 'DELETE' }),
 }
 
+// Empresas (Clínicas)
+export const empresasApi = {
+  getMyCompany: async () => apiRequest<any>('/empresas/my-company'),
+  myCompanies: async () => apiRequest<Array<any>>('/empresas/my-companies'),
+  myCompany: async () => apiRequest<any>('/empresas/my-company'),
+  getAll: async (params?: { page?: number; pageSize?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.append('page', params.page.toString())
+    if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+    return apiRequest<Array<any>>(`/empresas?${query.toString()}`)
+  },
+  getById: async (id: number) => apiRequest<any>(`/empresas/${id}`),
+  create: async (data: any) => apiRequest<any>('/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: any) => apiRequest<any>(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id: number) => apiRequest<{ id: number }>(`/empresas/${id}`, { method: 'DELETE' }),
+}
+
+// Configuração de Funis
+export const funnelConfigApi = {
+  getAll: async () => apiRequest<Array<any>>('/funnel-config'),
+  create: async (data: { code: string; label: string; icon?: string; order?: number }) =>
+    apiRequest<any>('/funnel-config', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: any) =>
+    apiRequest<any>(`/funnel-config/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id: number) =>
+    apiRequest<any>(`/funnel-config/${id}`, { method: 'DELETE' }),
+  addStage: async (funnelId: number, data: { code: string; label: string; color?: string; order?: number; isTransition?: boolean }) =>
+    apiRequest<any>(`/funnel-config/${funnelId}/stages`, { method: 'POST', body: JSON.stringify(data) }),
+  updateStage: async (stageId: number, data: any) =>
+    apiRequest<any>(`/funnel-config/stages/${stageId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteStage: async (stageId: number) =>
+    apiRequest<any>(`/funnel-config/stages/${stageId}`, { method: 'DELETE' }),
+  reorder: async (funnels: Array<{ id: number; order: number; stages?: Array<{ id: number; order: number }> }>) =>
+    apiRequest<any>('/funnel-config/reorder/batch', { method: 'PUT', body: JSON.stringify({ funnels }) }),
+  seedDefaults: async () =>
+    apiRequest<any>('/funnel-config/seed', { method: 'POST' }),
+}

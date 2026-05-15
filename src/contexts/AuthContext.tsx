@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { professionalsApi, permissionsApi, usuariosApi } from '@/lib/api';
 
+interface CompanyAccess {
+  id: number;
+  name: string;
+  role?: string;
+}
+
 interface Professional {
   id: string;
   name: string;
@@ -9,6 +15,9 @@ interface Professional {
   specialization: string;
   role?: string;
   photoUrl?: string;
+  companyId?: number;
+  companyName?: string;
+  companies?: CompanyAccess[];
 }
 
 interface Permission {
@@ -27,6 +36,7 @@ interface AuthContextType {
   isLoading: boolean;
   loadPermissions: () => Promise<void>;
   updateProfilePhoto: (photoUrl: string) => void;
+  switchCompany: (companyId: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,6 +66,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('professional', JSON.stringify(updated));
       return updated;
     });
+  };
+
+  const switchCompany = (companyId: number) => {
+    if (!professional || !professional.companies) return;
+    
+    const selectedCompany = professional.companies.find(c => c.id === companyId);
+    if (!selectedCompany) return;
+
+    const updated = {
+      ...professional,
+      companyId: selectedCompany.id,
+      companyName: selectedCompany.name
+    };
+
+    setProfessional(updated);
+    localStorage.setItem('professional', JSON.stringify(updated));
+    localStorage.setItem('activeCompanyId', String(selectedCompany.id));
+    
+    // Recarrega as permissões e a página para isolar os dados
+    window.location.href = '/dashboard';
   };
 
   // Verificar se o usuário tem acesso a um módulo
@@ -240,7 +270,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasModuleAccess,
       isLoading,
       loadPermissions,
-      updateProfilePhoto
+      updateProfilePhoto,
+      switchCompany
     }}>
       {children}
     </AuthContext.Provider>

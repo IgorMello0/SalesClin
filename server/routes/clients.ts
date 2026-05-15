@@ -12,9 +12,11 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
     const { search } = req.query as any
 
     let profId: number | undefined;
+    let companyId: number | undefined;
 
     if (req.user?.type === 'profissional') {
       profId = req.user.id;
+      companyId = req.user.companyId;
     } else if (req.user?.type === 'usuario') {
       // Buscar o dono da empresa do usuário
       const empresa = await prisma.empresa.findUnique({
@@ -22,6 +24,7 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
         select: { ownerId: true }
       });
       profId = empresa?.ownerId || undefined;
+      companyId = req.user.companyId;
     }
 
     if (!profId) {
@@ -29,6 +32,9 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
     }
 
     const where: any = { professionalId: profId };
+    if (companyId) {
+      where.companyId = companyId;
+    }
 
 
     if (search) {
@@ -142,7 +148,7 @@ router.post('/', auth(), requireModule('clientes'), async (req, res) => {
     }
     
     const created = await prisma.client.create({
-      data: { professionalId, name, email, phone, dateOfBirth, document, notes }
+      data: { professionalId, companyId: req.user.companyId, name, email, phone, dateOfBirth, document, notes }
     })
     
     logAudit(req.user.id, 'CRIAR_CLIENTE', 'Client', created.id)

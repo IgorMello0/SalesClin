@@ -20,7 +20,7 @@ router.post('/login', async (req, res) => {
     
     const professional = await prisma.professional.findUnique({ 
       where: { email },
-      include: { company: true }
+      include: { company: true, ownedCompanies: true }
     })
     if (!professional) {
       console.log('[Login] Profissional não encontrado:', email)
@@ -33,9 +33,21 @@ router.post('/login', async (req, res) => {
       return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
     }
     
-    const token = jwt.sign({ id: professional.id, companyId: professional.companyId, type: 'profissional' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
-    console.log('[Login] Login bem-sucedido:', email)
+    const availableCompanies = professional.ownedCompanies.length > 0 
+      ? professional.ownedCompanies.map(c => ({ id: c.id, name: c.name }))
+      : (professional.company ? [{ id: professional.company.id, name: professional.company.name }] : [])
+
+    const allowedCompanies = availableCompanies.map(c => c.id)
+
+    const token = jwt.sign({ 
+      id: professional.id, 
+      companyId: professional.companyId, 
+      type: 'profissional',
+      allowedCompanies 
+    }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
     
+    console.log('[Login] Login bem-sucedido:', email)
+
     res.json(createSuccessResponse({ 
       token, 
       professional: { 
@@ -47,7 +59,8 @@ router.post('/login', async (req, res) => {
         company: professional.company ? {
           id: professional.company.id,
           name: professional.company.name
-        } : null
+        } : null,
+        companies: availableCompanies
       } 
     }))
   } catch (error) {

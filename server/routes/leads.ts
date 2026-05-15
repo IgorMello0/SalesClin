@@ -12,9 +12,11 @@ router.get('/', auth(false), async (req, res) => {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     const { search, status, professionalId } = req.query as any
     let profId: number | undefined;
+    let companyId: number | undefined;
 
     if (req.user?.type === 'profissional') {
       profId = req.user.id;
+      companyId = req.user.companyId;
     } else if (req.user?.type === 'usuario') {
       // Buscar o dono da empresa do usuário
       const empresa = await prisma.empresa.findUnique({
@@ -22,8 +24,10 @@ router.get('/', auth(false), async (req, res) => {
         select: { ownerId: true }
       });
       profId = empresa?.ownerId || undefined;
+      companyId = req.user.companyId;
     } else if (professionalId) {
       profId = Number(professionalId);
+      companyId = req.user?.companyId;
     }
 
     if (!profId) {
@@ -31,6 +35,9 @@ router.get('/', auth(false), async (req, res) => {
     }
 
     const where: any = { professionalId: profId };
+    if (companyId) {
+      where.companyId = companyId;
+    }
 
     if (search) {
       where.OR = [
@@ -113,6 +120,7 @@ router.post('/', auth(), async (req, res) => {
     const created = await prisma.lead.create({
       data: { 
         professionalId, 
+        companyId: req.user.companyId,
         name, 
         value: Number(value) || 0, 
         origin, 
@@ -131,6 +139,9 @@ router.post('/', auth(), async (req, res) => {
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {
     console.error('[Leads] Erro ao criar lead:', error)
+    if (error.code === 'P2002') {
+      return res.status(400).json(createErrorResponse('Já existe um lead com este número de telefone nesta clínica.', 400))
+    }
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar lead', 500))
   }
 })
@@ -248,6 +259,7 @@ router.put('/:id', auth(), async (req, res) => {
       const newClient = await prisma.client.create({
         data: {
           professionalId: currentLead.professionalId,
+          companyId: currentLead.companyId,
           name: currentLead.name,
           email: currentLead.email || null,
           phone: currentLead.phone || null,
@@ -313,6 +325,7 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
       const newClient = await prisma.client.create({
         data: {
           professionalId: lead.professionalId,
+          companyId: lead.companyId,
           name: lead.name,
           email: lead.email,
           phone: lead.phone,

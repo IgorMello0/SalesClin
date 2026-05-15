@@ -10,17 +10,21 @@ router.get('/', auth(false), requireModule('pagamentos'), async (req, res) => {
   const { professionalId, clientId, status } = req.query as any
   
   let profId: number | undefined;
+  let companyId: number | undefined;
 
   if (req.user?.type === 'profissional') {
     profId = req.user.id;
+    companyId = req.user.companyId;
   } else if (req.user?.type === 'usuario') {
     const empresa = await prisma.empresa.findUnique({
       where: { id: req.user.companyId! },
       select: { ownerId: true }
     });
     profId = empresa?.ownerId || undefined;
+    companyId = req.user.companyId;
   } else if (professionalId) {
     profId = Number(professionalId);
+    companyId = req.user?.companyId;
   }
 
   if (!profId) {
@@ -28,6 +32,9 @@ router.get('/', auth(false), requireModule('pagamentos'), async (req, res) => {
   }
 
   const where: any = { professionalId: profId };
+  if (companyId) {
+    where.companyId = companyId;
+  }
   if (clientId) where.clientId = Number(clientId)
   if (status) where.status = status
 
@@ -80,6 +87,7 @@ router.post('/', auth(), requireModule('pagamentos'), async (req, res) => {
         appointmentId: appointmentId ? Number(appointmentId) : null, 
         clientId: clientId ? Number(clientId) : null, 
         professionalId, 
+        companyId: req.user.companyId,
         amount: Number(amount), 
         method, 
         status, 

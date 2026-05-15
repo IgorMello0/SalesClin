@@ -61,17 +61,51 @@ router.post('/leads/:apiKey', async (req, res) => {
     // Extrair outros campos em observações
     const observations = JSON.stringify(data, null, 2);
 
-    // 4. Criação do Lead
+    // 4. Verificar se já existe um Lead com este telefone NESTA EMPRESA
+    const existingLead = await prisma.lead.findFirst({
+      where: { 
+        phone: phone ? String(phone) : undefined,
+        companyId: empresa.id
+      }
+    });
+    
+    if (existingLead) {
+      console.log(`[Webhooks] Lead duplicado detectado (#${existingLead.id}). Atualizando...`);
+      
+      // Atualizar o lead existente e adicionar atividade
+      const updatedLead = await prisma.lead.update({
+        where: { id: existingLead.id },
+        data: {
+          notes: existingLead.notes ? `${existingLead.notes}\n\n[Novo Contato]: ${observations}` : observations,
+          activities: {
+            create: {
+              type: 'sistema',
+              content: `Novo contato recebido via webhook (${origin}). Dados atualizados.`,
+              createdBy: 'Sistema'
+            }
+          }
+        }
+      });
+      
+      return res.json(createSuccessResponse({ 
+        message: 'Lead já existente atualizado com sucesso!',
+        leadId: updatedLead.id,
+        isDuplicate: true
+      }));
+    }
+    
+    // 5. Criação do Lead (Caso não exista)
     const newLead = await prisma.lead.create({
       data: {
         professionalId: professional.id,
+        companyId: empresa.id,
         name,
         email,
         phone,
         value,
         origin,
         status: 'prospect_lead', // Status inicial do funil
-        observations,
+        notes: observations,
         isScheduled: false
       }
     });

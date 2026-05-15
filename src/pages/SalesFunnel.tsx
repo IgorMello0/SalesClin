@@ -41,7 +41,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ExportModal } from "@/components/ExportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, History, FileDown, Edit2, Check, X, Eye } from "lucide-react";
+import { FileText, History, FileDown, Edit2, Check, X, Eye, Plus } from "lucide-react";
+import { FunnelBoard } from '@/components/funnel/FunnelBoard';
+import { ProposalDialog } from '@/components/funnel/ProposalDialog';
+import { FunnelSettingsDialog } from '@/components/funnel/FunnelSettingsDialog';
+import { FUNNELS, STAGES, QUICK_STATUSES, ORIGIN_OPTIONS } from '@/config/funnelConfig';
 
 const safeFormatDate = (dateStr: any, formatStr: string = "dd/MM/yyyy") => {
   try {
@@ -95,51 +99,6 @@ interface Lead {
 
 const initialLeads: Lead[] = [];
 
-const FUNNELS = [
-  { id: 'prospecting', label: 'Prospecção', icon: 'person_search' },
-  { id: 'commercial', label: 'Comercial', icon: 'handshake' },
-  { id: 'sales', label: 'Vendas', icon: 'payments' },
-];
-
-const STAGES = {
-  prospecting: [
-    { id: 'prospect_lead', label: 'Novos Leads', color: 'bg-blue-500' },
-    { id: 'prospect_qualified', label: 'Qualificados', color: 'bg-indigo-500' },
-    { id: 'prospect_scheduled', label: 'Agendados', color: 'bg-violet-500' },
-    { id: 'prospect_attended', label: 'Compareceu', color: 'bg-emerald-500', isTransition: true },
-  ],
-  commercial: [
-    { id: 'comercial_consult', label: 'Consulta Feita', color: 'bg-emerald-500', isLinked: true },
-    { id: 'comercial_proposal', label: 'Proposta', color: 'bg-orange-500' },
-    { id: 'comercial_follow', label: 'Follow-up', color: 'bg-amber-500' },
-    { id: 'comercial_closed', label: 'Fechado', color: 'bg-green-600' },
-  ],
-  sales: [
-    { id: 'sales_payment', label: 'Pagamento', color: 'bg-cyan-500' },
-    { id: 'sales_contract', label: 'Contrato', color: 'bg-blue-600' },
-    { id: 'sales_post', label: 'Pós-Venda', color: 'bg-purple-500' },
-  ]
-};
-
-const QUICK_STATUSES = [
-  { id: 'aguardando', label: 'Aguardando', color: 'bg-slate-100 text-slate-600 border-slate-200' },
-  { id: 'ligar_tarde', label: 'Ligar mais tarde', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { id: 'retorna_amanha', label: 'Retorna amanhã', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { id: 'nao_respondeu', label: 'Não respondeu', color: 'bg-red-100 text-red-700 border-red-200' },
-  { id: 'negociacao', label: 'Em negociação', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-];
-
-const ORIGIN_OPTIONS = [
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'indicação', label: 'Indicação' },
-  { value: 'meta ads', label: 'Meta Ads' },
-  { value: 'google', label: 'Google' },
-  { value: 'influencer', label: 'Influencer' },
-  { value: 'whatsapp', label: 'Whatsapp' },
-  { value: 'site', label: 'Site' },
-  { value: 'outro', label: 'Outro' },
-];
-
 const SalesFunnel = () => {
   const { professional } = useAuth();
   const [activeFunnel, setActiveFunnel] = useState('prospecting');
@@ -151,6 +110,9 @@ const SalesFunnel = () => {
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConfiguringFunnels, setIsConfiguringFunnels] = useState(false);
+  const [dynamicFunnels, setDynamicFunnels] = useState<any[]>([]);
+  const [isLoadingFunnels, setIsLoadingFunnels] = useState(true);
 
   // Multi-select & Export State
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -167,25 +129,8 @@ const SalesFunnel = () => {
   const [services, setServices] = useState<any[]>([]);
   const { toast } = useToast();
 
-  // Proposal state
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
   const [proposalLeadId, setProposalLeadId] = useState<string | null>(null);
-  const [proposalData, setProposalData] = useState({
-    title: '',
-    value: '',
-    validUntil: '',
-    salesperson: '',
-    specialist: '',
-    treatment: '',
-    observations: '',
-    tags: [] as string[],
-    justification: '',
-    justificationType: '' as 'desconto' | 'remocao' | ''
-  });
-  const [allProfessionals, setAllProfessionals] = useState<any[]>([]);
-  const [specialists, setSpecialists] = useState<any[]>([]);
-  const [showJustification, setShowJustification] = useState(false);
-  const [removedTags, setRemovedTags] = useState<string[]>([]);
 
   // Payment Confirmation State
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
@@ -215,7 +160,18 @@ const SalesFunnel = () => {
     window.location.href = `whatsapp://send?phone=${finalPhone}`;
   };
 
-  const activeStages = useMemo(() => STAGES[activeFunnel as keyof typeof STAGES], [activeFunnel]);
+  const funnelList = useMemo(() => {
+    if (dynamicFunnels.length > 0) return dynamicFunnels;
+    return FUNNELS.map(f => ({ ...f, code: f.id })); // Garantir consistência entre id e code
+  }, [dynamicFunnels]);
+
+  const activeStages = useMemo(() => {
+    if (dynamicFunnels.length > 0) {
+      const funnel = dynamicFunnels.find(f => f.code === activeFunnel || f.id === activeFunnel);
+      return funnel?.stages || [];
+    }
+    return STAGES[activeFunnel as keyof typeof STAGES] || [];
+  }, [activeFunnel, dynamicFunnels]);
 
   useEffect(() => {
     if (selectedLead) {
@@ -251,7 +207,7 @@ const SalesFunnel = () => {
           ...l,
           id: l.id.toString(),
           isScheduled: l.isScheduled || l.is_scheduled, // Handle both just in case
-          lastUpdate: 'Recent',
+          lastUpdate: safeFormatDate(l.updatedAt || l.createdAt, "dd/MM/yy 'às' HH:mm"),
           activities: (l.activities || []).map((a: any) => {
             const isNote = a.type === 'nota' || a.type === 'task';
             const isProposal = a.type === 'proposta' || a.type === 'proposal';
@@ -277,6 +233,25 @@ const SalesFunnel = () => {
     }
   };
 
+  const loadFunnelConfigs = async () => {
+    setIsLoadingFunnels(true);
+    try {
+      const { funnelConfigApi } = await import('@/lib/api');
+      const res = await funnelConfigApi.getAll();
+      if (res.success && res.data && res.data.length > 0) {
+        setDynamicFunnels(res.data);
+        // Se o funil ativo atual não existe mais nos novos dados, reseta para o primeiro
+        if (!res.data.find((f: any) => f.code === activeFunnel)) {
+          setActiveFunnel(res.data[0].code);
+        }
+      }
+    } catch (e) {
+      console.error("Error loading funnel configs:", e);
+    } finally {
+      setIsLoadingFunnels(false);
+    }
+  };
+
   const loadServices = async () => {
     if (!professional?.id) return;
     try {
@@ -288,54 +263,13 @@ const SalesFunnel = () => {
     }
   };
 
-  const loadProfessionals = async () => {
-    try {
-      const { professionalsApi } = await import('@/lib/api');
-      const res = await professionalsApi.getAll();
-      if (res.success) setAllProfessionals(res.data || []);
-    } catch (e) {
-      console.error("Error loading professionals:", e);
-    }
-  };
-
-  const loadUsuarios = async () => {
-    try {
-      const { usuariosApi } = await import('@/lib/api');
-      const res = await usuariosApi.getAll();
-      if (res.success && res.data) {
-        const medics = res.data.filter((u: any) => {
-          const role = (u.role || '').toLowerCase();
-          return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
-        });
-        setSpecialists(medics);
-      }
-    } catch (e) {
-      console.error("Error loading usuarios:", e);
-    }
-  };
-
   useEffect(() => {
     if (professional) {
       loadLeads();
       loadServices();
-      loadProfessionals();
-      loadUsuarios();
+      loadFunnelConfigs();
     }
   }, [professional]);
-
-  const formatCurrency = (value: string) => {
-    const numeric = value.replace(/\D/g, '');
-    if (!numeric) return '';
-    const val = Number(numeric) / 100;
-    return val.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
-  };
-
-  const parseCurrency = (value: string) => {
-    return Number(value.replace(/\D/g, '')) / 100;
-  };
 
   const handleScheduleAppointment = async (lead: Lead) => {
     const lastAppt = lead.appointments && lead.appointments[0];
@@ -410,7 +344,7 @@ const SalesFunnel = () => {
 
     setLeads(prev => prev.map(lead => {
       if (lead.id === leadId) {
-        return { ...lead, status: finalStatus, lastUpdate: 'Just now' };
+        return { ...lead, status: finalStatus, lastUpdate: 'Agora mesmo' };
       }
       return lead;
     }));
@@ -533,130 +467,7 @@ const SalesFunnel = () => {
     }
   };
 
-  const handleSaveProposal = async () => {
-    if (!proposalLeadId) return;
 
-    const lead = leads.find(l => l.id === proposalLeadId);
-    if (!lead) return;
-
-    const newValue = parseCurrency(proposalData.value);
-    const isLowerValue = newValue < lead.value;
-    
-    if (isLowerValue && !proposalData.justification) {
-      setShowJustification(true);
-      toast({ title: "Justificativa Obrigatória", description: "O valor é menor que o atual. Por favor, informe o motivo.", variant: "destructive" });
-      return;
-    }
-
-    const discountApplied = isLowerValue && proposalData.justificationType === 'desconto';
-    
-    // Se houve remoção de tags, preparar proposta de remarketing
-    let remarketingData = null;
-    if (isLowerValue && proposalData.justificationType === 'remocao' && removedTags.length > 0) {
-      remarketingData = {
-        tags: removedTags,
-        date: new Date().toISOString(),
-        originalValue: lead.value
-      };
-    }
-
-    const newActivity: Activity = {
-      id: Math.random().toString(),
-      type: 'proposal',
-      user: professional?.name || 'Vendedor',
-      action: 'gerou uma proposta comercial',
-      content: `${proposalData.treatment} - Valor: ${newValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
-      date: safeFormatDate(new Date(), "dd/MM/yy 'às' HH:mm"),
-      icon: 'description',
-      color: 'bg-orange-500'
-    };
-
-    if (remarketingData) {
-      const remarketingActivity: Activity = {
-        id: Math.random().toString(),
-        type: 'system',
-        user: 'Sistema',
-        action: 'arquivou itens para remarketing',
-        content: `Itens removidos: ${removedTags.join(', ')}`,
-        date: safeFormatDate(new Date(), "dd/MM/yy 'às' HH:mm"),
-        icon: 'campaign',
-        color: 'bg-blue-400'
-      };
-      lead.activities.push(remarketingActivity);
-    }
-
-    // Persist in DB
-    try {
-      // 1. Salvar a Proposta Oficial no banco
-      const proposalRes = await leadsApi.addProposal(Number(proposalLeadId), {
-        title: proposalData.title || `Proposta para ${lead.name}`,
-        value: newValue,
-        validUntil: proposalData.validUntil || new Date().toISOString(),
-        salespersonId: proposalData.salesperson,
-        specialistId: proposalData.specialist,
-        tags: proposalData.tags,
-        justification: proposalData.justification,
-        discountApplied: discountApplied
-      });
-
-      // 2. Salvar Atividade correspondente (Proposta gerada)
-      await leadsApi.addActivity(Number(proposalLeadId), {
-        type: 'proposta',
-        content: `${proposalData.treatment || proposalData.title} - Valor: ${newValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
-        createdBy: professional?.name || 'Vendedor'
-      });
-
-      // 3. Se houve remarketing, salvar como atividade
-      if (remarketingData) {
-        await leadsApi.addActivity(Number(proposalLeadId), {
-          type: 'sistema',
-          content: `Itens removidos da proposta: ${removedTags.join(', ')}`,
-          createdBy: 'Sistema'
-        });
-      }
-
-      // 4. Atualizar os dados principais do Lead
-      const updateData: any = {
-        status: 'comercial_proposal',
-        value: newValue,
-        tags: proposalData.tags,
-        justification: proposalData.justification || undefined,
-        discountApplied: discountApplied
-      };
-
-      if (remarketingData) {
-        const existingRemarketing = (lead as any).remarketingProposals || [];
-        updateData.remarketingProposals = [...existingRemarketing, remarketingData];
-      }
-
-      await leadsApi.update(Number(proposalLeadId), updateData);
-      
-      toast({ title: "Proposta Salva e Lead Atualizado!" });
-      loadLeads();
-      setIsCreatingProposal(false);
-      setProposalLeadId(null);
-    } catch (e) {
-      toast({ title: 'Erro ao salvar proposta', variant: 'destructive' });
-    }
-
-
-    setIsCreatingProposal(false);
-    setShowJustification(false);
-    setProposalLeadId(null);
-    setProposalData({
-      title: '',
-      value: '',
-      validUntil: '',
-      salesperson: '',
-      specialist: '',
-      treatment: '',
-      observations: '',
-      tags: [],
-      justification: '',
-      justificationType: ''
-    });
-    setRemovedTags([]);
-  };
 
   const handleUpdateOrigin = async () => {
     if (!selectedLead) return;
@@ -712,54 +523,69 @@ const SalesFunnel = () => {
     <div className="space-y-4 sm:space-y-8 pb-10 min-h-screen">
       {/* Header & Funnel Switcher */}
       <div className="flex flex-col gap-4 sm:gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 min-h-[64px]">
+          <div className="flex flex-col justify-center">
             <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Comercial</h2>
             <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Gerencie seus leads e funis de vendas.</p>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4">
-            <DropdownMenu>
-          
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost"
-                className="h-10 w-10 sm:h-12 sm:w-12 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                <span className="material-symbols-outlined text-xl sm:text-2xl">settings</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-xl border-slate-100">
-              <DropdownMenuItem 
-                onClick={() => {
-                  setIsMultiSelectMode(!isMultiSelectMode);
-                  if (isMultiSelectMode) setSelectedLeadIds([]);
-                }} 
-                className="cursor-pointer rounded-xl font-medium py-2.5"
-              >
-                <span className="material-symbols-outlined mr-3 text-[18px] text-slate-500">
-                  {isMultiSelectMode ? 'close' : 'checklist'}
-                </span>
-                {isMultiSelectMode ? 'Cancelar Seleção' : 'Selecionar Vários'}
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setIsExportModalOpen(true)} 
-                className="cursor-pointer rounded-xl font-medium py-2.5 text-primary"
-              >
-                <span className="material-symbols-outlined mr-3 text-[18px] text-primary">download</span>
-                Exportar Dados
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2 sm:gap-4 h-12">
+            <div className="flex-shrink-0">
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost"
+                    className="h-10 w-10 sm:h-12 sm:w-12 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-xl sm:text-2xl">settings</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  side="bottom" 
+                  align="end" 
+                  sideOffset={12} 
+                  alignOffset={0}
+                  className="w-56 p-2 rounded-2xl shadow-xl border-slate-100 bg-white z-[100]"
+                >
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setIsMultiSelectMode(!isMultiSelectMode);
+                      if (isMultiSelectMode) setSelectedLeadIds([]);
+                    }} 
+                    className="cursor-pointer rounded-xl font-medium py-2.5"
+                  >
+                    <span className="material-symbols-outlined mr-3 text-[18px] text-slate-500">
+                      {isMultiSelectMode ? 'close' : 'checklist'}
+                    </span>
+                    {isMultiSelectMode ? 'Cancelar Seleção' : 'Selecionar Vários'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setIsExportModalOpen(true)} 
+                    className="cursor-pointer rounded-xl font-medium py-2.5 text-primary"
+                  >
+                    <span className="material-symbols-outlined mr-3 text-[18px] text-primary">download</span>
+                    Exportar Dados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setIsConfiguringFunnels(true)} 
+                    className="cursor-pointer rounded-xl font-medium py-2.5"
+                  >
+                    <span className="material-symbols-outlined mr-3 text-[18px] text-slate-500">dashboard_customize</span>
+                    Configurar Funis e Etapas
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             <Button 
               onClick={() => openAddLead()} 
               size="xl"
               variant="secondary"
-              className="h-10 sm:h-12 px-3 sm:px-6 font-bold gap-1 sm:gap-2 shadow-lg shadow-secondary/20 text-sm"
+              className="h-10 sm:h-12 px-3 sm:px-6 font-bold gap-1 sm:gap-2 shadow-lg shadow-secondary/20 text-sm flex-shrink-0"
             >
-              <span className="material-symbols-outlined text-lg">add</span>
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="hidden sm:inline">Novo Lead</span>
+              <span className="sm:hidden">Novo</span>
             </Button>
           </div>
         </div>
@@ -767,18 +593,18 @@ const SalesFunnel = () => {
         {/* Funnel Tabs — scrollable on mobile */}
         <div className="flex overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
           <div className="flex p-1 sm:p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-slate-200/50 w-fit">
-            {FUNNELS.map((f) => (
+            {funnelList.map((f) => (
               <button
-                key={f.id}
-                onClick={() => setActiveFunnel(f.id)}
+                key={f.id || f.code}
+                onClick={() => setActiveFunnel(f.code || f.id)}
                 className={cn(
                   "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 whitespace-nowrap",
-                  activeFunnel === f.id 
+                  activeFunnel === (f.code || f.id)
                     ? "bg-white text-primary shadow-sm" 
                     : "text-slate-400 hover:text-primary hover:bg-white/50"
                 )}
               >
-                <span className={cn("material-symbols-outlined text-base sm:text-lg", activeFunnel === f.id ? "text-secondary" : "")}>
+                <span className={cn("material-symbols-outlined text-base sm:text-lg", activeFunnel === (f.code || f.id) ? "text-secondary" : "")}>
                   {f.icon}
                 </span>
                 {f.label}
@@ -789,281 +615,43 @@ const SalesFunnel = () => {
       </div>
 
       {/* Board */}
-      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-4 sm:px-4 scrollbar-hide snap-x snap-mandatory sm:snap-none">
-        {activeStages.map((stage) => {
-          const stageLeads = leads.filter(l => {
-            // Regra de Roteamento: 
-            // - Mostrar se NÃO estiver pago
-            const isOperational = !l.isPaid;
-            if (!isOperational) return false;
-
-            return l.status === stage.id;
-          });
-          
-          const isOver = dropTargetStage === stage.id;
-          
-          return (
-            <div 
-              key={stage.id} 
-              className="flex-shrink-0 w-[280px] sm:w-72 flex flex-col gap-3 snap-center"
-              onDragOver={(e) => handleDragOver(e, stage.id)}
-              onDrop={(e) => handleDrop(e, stage.id)}
-              onDragLeave={() => setDropTargetStage(null)}
-            >
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", stage.color)}></div>
-                  <h3 className="font-bold text-primary text-sm uppercase tracking-wider">{stage.label}</h3>
-                  <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    {stageLeads.length}
-                  </span>
-                </div>
-                <button 
-                  onClick={() => openAddLead(stage.id)}
-                  className="text-slate-300 hover:text-primary transition-colors btn-hover"
-                >
-                  <span className="material-symbols-outlined text-lg">add_circle</span>
-                </button>
-              </div>
-
-              <div className={cn(
-                "flex-1 min-h-[500px] rounded-2xl p-2.5 space-y-2 transition-all duration-200",
-                "bg-slate-50/50 border border-slate-100/50",
-                isOver && "bg-slate-100/80 border-secondary/30 scale-[1.01]"
-              )}>
-                {stageLeads.map((lead) => (
-                  <div 
-                    key={lead.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, lead.id)}
-                    onClick={() => setSelectedLead(lead)}
-                    className={cn(
-                      "premium-card p-3 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
-                      draggedLeadId === lead.id && "opacity-40 grayscale-[0.5]"
-                    )}
-                  >
-                    {/* Card Content */}
-
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        {isMultiSelectMode && (
-                          <div onClick={(e) => e.stopPropagation()} className="animate-in zoom-in-95 duration-200">
-                            <Checkbox 
-                              checked={selectedLeadIds.includes(lead.id)} 
-                              onCheckedChange={() => toggleLeadSelection(lead.id)}
-                              className="border-slate-300 data-[state=checked]:bg-secondary data-[state=checked]:border-secondary"
-                            />
-                          </div>
-                        )}
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary border border-primary/5">
-                          {lead.avatar}
-                        </div>
-                        <div>
-                          <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors flex items-center break-words">{lead.name}</h4>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="material-symbols-outlined text-[12px] text-emerald-500">chat</span>
-                            <p className="text-[10px] text-slate-500 font-bold tracking-tight">{lead.phone}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openWhatsApp(lead.phone);
-                          }}
-                          className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                          title="Abrir no WhatsApp"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                          </svg>
-                        </button>
-                        <button className="text-slate-300 group-hover:text-slate-400 transition-colors">
-                          <span className="material-symbols-outlined text-base">more_vert</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start justify-between mt-2 pt-1.5 border-t border-slate-100">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs font-bold text-primary">
-                          {lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </div>
-                        {activeFunnel === 'prospecting' && (
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button className={cn(
-                                  "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors border text-left",
-                                  lead.subStatus ? QUICK_STATUSES.find(s => s.id === lead.subStatus)?.color : QUICK_STATUSES[0].color
-                                )}>
-                                  {lead.subStatus ? QUICK_STATUSES.find(s => s.id === lead.subStatus)?.label : 'Status (Nenhum)'}
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-48 rounded-xl p-2 bg-white shadow-xl border-slate-100">
-                                {QUICK_STATUSES.map(status => (
-                                  <DropdownMenuItem 
-                                    key={status.id}
-                                    onClick={() => handleSubStatusChange(lead.id, status.id)}
-                                    className={cn("text-xs font-bold cursor-pointer rounded-lg mb-1 last:mb-0", status.color)}
-                                  >
-                                    {status.label}
-                                  </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuItem 
-                                  onClick={() => handleSubStatusChange(lead.id, null)}
-                                  className="text-xs font-bold text-slate-400 cursor-pointer rounded-lg"
-                                >
-                                  Limpar Status
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">
-                        <span className="material-symbols-outlined text-[10px]">schedule</span>
-                        {lead.lastUpdate}
-                      </div>
-                    </div>
-
-                    {/* Stage specific acts */}
-                    <div className="flex flex-col gap-1 mt-2 pt-1.5 border-t border-slate-100">
-                      {stage.id === 'prospect_scheduled' && (
-                        lead.isScheduled ? (() => {
-                          const lastAppt = lead.appointments && lead.appointments[0];
-                          const apptStatus = lastAppt?.status || 'agendado';
-                          
-                          switch(apptStatus) {
-                            case 'concluido':
-                              return (
-                                <div className="w-full py-1.5 bg-sky-50 text-sky-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-sky-100">
-                                  Compareceu
-                                  <span className="material-symbols-outlined text-xs">check_circle</span>
-                                </div>
-                              );
-                            case 'cancelado':
-                              return (
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
-                                  className="w-full py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100"
-                                >
-                                  Faltou / Reagendar
-                                  <span className="material-symbols-outlined text-xs">event_busy</span>
-                                </button>
-                              );
-                            case 'confirmado':
-                              return (
-                                <div className="w-full py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-100">
-                                  Confirmado
-                                  <span className="material-symbols-outlined text-xs">verified</span>
-                                </div>
-                              );
-                            default:
-                              return (
-                                <div className="w-full py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-amber-100">
-                                  Agendado
-                                  <span className="material-symbols-outlined text-xs">schedule</span>
-                                </div>
-                              );
-                          }
-                        })() : (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
-                            disabled={isProcessingSchedule}
-                            className="w-full py-1.5 bg-violet-100 hover:bg-violet-600 text-violet-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-violet-200"
-                          >
-                            {isProcessingSchedule && currentSchedulingLeadId === lead.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <>
-                                Agendar agora
-                                <span className="material-symbols-outlined text-xs">calendar_today</span>
-                              </>
-                            )}
-                          </button>
-                        )
-                      )}
-
-
-                      {stage.id === 'comercial_consult' && (
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setProposalLeadId(lead.id);
-                            setIsCreatingProposal(true);
-                            setProposalData(prev => ({ 
-                              ...prev, 
-                              salesperson: professional?.name || '',
-                              value: lead.value > 0 ? formatCurrency((lead.value * 100).toString()) : '',
-                              tags: lead.tags || []
-                            }));
-                          }}
-                          className="w-full py-2 bg-orange-100 hover:bg-orange-500 text-orange-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-orange-200"
-                        >
-                          Gerar Proposta
-                          <span className="material-symbols-outlined text-xs">description</span>
-                        </button>
-                      )}
-
-                      {stage.id === 'comercial_closed' && (
-                        <div className="flex flex-col gap-1.5">
-                          <div className="w-full py-2 bg-green-50 text-green-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200">
-                            <span className="material-symbols-outlined text-xs">how_to_reg</span>
-                            Cliente Ativo
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              moveLead(lead.id, 'sales_payment');
-                              setActiveFunnel('sales');
-                            }}
-                            className="w-full py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-primary/20"
-                          >
-                            <span className="material-symbols-outlined text-xs">payments</span>
-                            Iniciar Pagamento
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setClosedLeadToSchedule(lead);
-                              setIsSchedulingClosed(true);
-                            }}
-                            className="w-full py-2 bg-indigo-100 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-indigo-200"
-                          >
-                            <span className="material-symbols-outlined text-xs">calendar_add_on</span>
-                            Agendar Agora
-                          </button>
-                        </div>
-                      )}
-
-                      {stage.id === 'sales_payment' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleConfirmPayment(lead);
-                          }}
-                          className="w-full py-2 bg-cyan-100 hover:bg-cyan-600 text-cyan-700 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-cyan-200 animate-pulse-subtle"
-                        >
-                          <span className="material-symbols-outlined text-xs">check_circle</span>
-                          Confirmar Recebimento
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {stageLeads.length === 0 && (
-                  <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-200/50 rounded-xl bg-white/30">
-                    <p className="text-slate-300 text-xs font-medium italic">Arraste um lead para aqui</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <FunnelBoard 
+        stages={activeStages}
+        leads={leads}
+        onAddLead={openAddLead}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onDragLeave={() => setDropTargetStage(null)}
+        dropTargetStage={dropTargetStage}
+        isMultiSelectMode={isMultiSelectMode}
+        selectedLeadIds={selectedLeadIds}
+        onToggleLeadSelection={toggleLeadSelection}
+        onSelectLead={setSelectedLead}
+        onDragStart={handleDragStart}
+        draggedLeadId={draggedLeadId}
+        activeFunnel={activeFunnel}
+        onOpenWhatsApp={openWhatsApp}
+        onSubStatusChange={handleSubStatusChange}
+        onScheduleAppointment={handleScheduleAppointment}
+        onOpenProposal={(id) => {
+          setProposalLeadId(id);
+          setIsCreatingProposal(true);
+        }}
+        onOpenPayment={(lead) => {
+          setPaymentLead({ id: lead.id, value: lead.value });
+          setIsConfirmingPayment(true);
+        }}
+        onMoveLead={moveLead}
+        onScheduleClosed={(lead) => {
+          setClosedLeadToSchedule(lead);
+          setIsSchedulingClosed(true);
+        }}
+        onSetActiveFunnel={setActiveFunnel}
+        isProcessingSchedule={isProcessingSchedule}
+        currentSchedulingLeadId={currentSchedulingLeadId}
+        professionalName={professional?.name}
+        quickStatuses={QUICK_STATUSES}
+      />
 
       {/* Add Lead Dialog */}
       <Dialog open={isAddingLead} onOpenChange={setIsAddingLead}>
@@ -1500,190 +1088,15 @@ const SalesFunnel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Create Proposal Dialog */}
-      <Dialog open={isCreatingProposal} onOpenChange={setIsCreatingProposal}>
-        <DialogContent className="sm:max-w-[750px] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 shadow-2xl">
-          <div className="p-4 sm:p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100">
-            <h3 className="text-lg sm:text-2xl font-extrabold text-primary font-headline tracking-tight">Criação de Proposta Comercial</h3>
-            <p className="text-slate-500 text-xs sm:text-sm mt-1">Defina os termos do tratamento e valores para o paciente.</p>
-          </div>
-
-          <div className="p-4 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Título da Proposta</Label>
-                <Input 
-                  value={proposalData.title}
-                  onChange={(e) => setProposalData({...proposalData, title: e.target.value})}
-                  placeholder="Ex: Reabilitação Oral Completa" 
-                  className="rounded-xl border-slate-200"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Total</Label>
-                  <Input 
-                    value={proposalData.value}
-                    onChange={(e) => setProposalData({...proposalData, value: formatCurrency(e.target.value)})}
-                    placeholder="R$ 0,00" 
-                    className="rounded-xl border-slate-200"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Válido Até</Label>
-                  <Input 
-                    type="date"
-                    value={proposalData.validUntil}
-                    onChange={(e) => setProposalData({...proposalData, validUntil: e.target.value})}
-                    className="rounded-xl border-slate-200"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Vendedor / Consultor</Label>
-                <Select 
-                  value={proposalData.salesperson}
-                  onValueChange={(v) => setProposalData({...proposalData, salesperson: v})}
-                >
-                  <SelectTrigger className="rounded-xl border-slate-200">
-                    <SelectValue placeholder="Selecione o consultor">
-                      {allProfessionals.find(p => p.id.toString() === proposalData.salesperson)?.name}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allProfessionals.map(p => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {showJustification && (
-                <div className="space-y-4 p-4 bg-orange-50 rounded-2xl border border-orange-100 animate-in fade-in slide-in-from-top-2">
-                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Motivo do Valor Menor</Label>
-                    <Select 
-                      value={proposalData.justificationType}
-                      onValueChange={(v: any) => setProposalData({...proposalData, justificationType: v})}
-                    >
-                      <SelectTrigger className="rounded-xl border-orange-200 bg-white">
-                        <SelectValue placeholder="Selecione o motivo">
-                          {proposalData.justificationType === 'desconto' ? 'Desconto Financeiro' : 
-                           proposalData.justificationType === 'remocao' ? 'Remoção de Procedimentos' : ''}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="desconto">Desconto Financeiro</SelectItem>
-                        <SelectItem value="remocao">Remoção de Procedimentos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Justificativa Detalhada</Label>
-                    <Textarea 
-                      value={proposalData.justification}
-                      onChange={(e) => setProposalData({...proposalData, justification: e.target.value})}
-                      placeholder="Explique o motivo do valor reduzido..."
-                      className="rounded-xl border-orange-200 bg-white min-h-[80px]"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Profissional Especialista</Label>
-                <Select onValueChange={(v) => setProposalData({...proposalData, specialist: v})}>
-                  <SelectTrigger className="rounded-xl border-slate-200">
-                    <SelectValue placeholder="Selecione o especialista" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {specialists.length > 0 ? specialists.map(p => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                    )) : (
-                      <SelectItem value="none" disabled>Nenhum especialista encontrado</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tags da Proposta (Serviços)</Label>
-                <div className="flex flex-wrap gap-2 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 min-h-[60px] content-start">
-                  {services.map((service) => {
-                    const isSelected = proposalData.tags.includes(service.name);
-                    return (
-                      <button
-                        key={service.id}
-                        onClick={() => {
-                          const isRemoving = isSelected;
-                          if (isRemoving) {
-                            setRemovedTags(prev => [...prev, service.name]);
-                          } else {
-                            setRemovedTags(prev => prev.filter(t => t !== service.name));
-                          }
-
-                          const newTags = isSelected
-                            ? proposalData.tags.filter(t => t !== service.name)
-                            : [...proposalData.tags, service.name];
-                          setProposalData({ ...proposalData, tags: newTags });
-                        }}
-                        className={cn(
-                          "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 border",
-                          isSelected
-                            ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
-                            : "bg-white text-slate-400 border-slate-200 hover:border-primary/30 hover:text-primary hover:bg-white shadow-sm"
-                        )}
-                      >
-                        {service.name}
-                      </button>
-                    );
-                  })}
-                  {services.length === 0 && (
-                    <div className="w-full flex items-center justify-center py-2">
-                      <span className="text-[10px] text-slate-400 font-medium italic">Nenhum serviço disponível</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tratamento Proposto</Label>
-                <Textarea 
-                  value={proposalData.treatment}
-                  onChange={(e) => setProposalData({...proposalData, treatment: e.target.value})}
-                  placeholder="Descreva o tratamento agendado..." 
-                  className="rounded-xl border-slate-200 min-h-[100px]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Observações Internas</Label>
-                <Textarea 
-                  value={proposalData.observations}
-                  onChange={(e) => setProposalData({...proposalData, observations: e.target.value})}
-                  placeholder="Notas adicionais para a equipe..." 
-                  className="rounded-xl border-slate-200 min-h-[60px]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="p-8 bg-slate-50/50 border-t border-slate-100">
-            <Button variant="ghost" onClick={() => setIsCreatingProposal(false)} className="rounded-xl">Cancelar</Button>
-            <Button 
-              onClick={handleSaveProposal}
-              variant="secondary"
-              className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20"
-            >
-              Gerar e Salvar Proposta
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Proposal Dialog */}
+      <ProposalDialog 
+        open={isCreatingProposal}
+        onOpenChange={setIsCreatingProposal}
+        lead={leads.find(l => l.id === proposalLeadId)}
+        professional={professional}
+        services={services}
+        onSuccess={loadLeads}
+      />
       {/* Appointment Modal */}
       <NewAppointmentModal
         open={isScheduling}
@@ -1754,6 +1167,15 @@ const SalesFunnel = () => {
           name: "SalesClin CRM",
           address: "Av. Paulista, 1000 - São Paulo, SP",
           phone: "(11) 99999-9999"
+        }}
+      />
+
+      <FunnelSettingsDialog 
+        open={isConfiguringFunnels}
+        onOpenChange={setIsConfiguringFunnels}
+        onSaved={() => {
+          loadFunnelConfigs();
+          loadLeads();
         }}
       />
     </div>
