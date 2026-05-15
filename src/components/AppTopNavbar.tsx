@@ -184,7 +184,7 @@ export function AppTopNavbar() {
             <img
               alt="SalesClin Logo"
               className="h-8 sm:h-10 w-auto object-contain"
-              src="/logo-oficial-v3.png"
+              src="/logo-site.png"
             />
           </Link>
 
@@ -243,8 +243,13 @@ export function AppTopNavbar() {
           )}
 
           {/* Navigation Items — Desktop only */}
+<<<<<<< HEAD
           <nav className="hidden lg:flex flex-1 justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide py-2">
             {visibleMenuItems.map((item) => {
+=======
+          <nav id="tour-menu" className="hidden lg:flex flex-1 justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide py-2">
+            {filteredMenuItems.map((item) => {
+>>>>>>> 7ad9b23cb04426babccb1d2d515036b0d621fa0f
               const isActive = location.pathname === item.url || 
                 (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
               
@@ -291,6 +296,7 @@ export function AppTopNavbar() {
 
             {/* Avatar */}
             <button
+              id="tour-settings"
               onClick={() => setMenuOpen(!menuOpen)}
               className={cn(
                 "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-[12px] sm:text-[13px] font-bold transition-all cursor-pointer shadow-sm overflow-hidden",

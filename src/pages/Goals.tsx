@@ -6,6 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useAuth } from '@/contexts/AuthContext';
 import { goalsApi } from '@/lib/api';
+import { useSectionTour } from '@/hooks/useSectionTour';
+import { TourPopover } from '@/components/onboarding/TourPopover';
 
 const Goals = () => {
   const [revenueTarget, setRevenueTarget] = useState(150000);
@@ -14,12 +16,19 @@ const Goals = () => {
   const [showupRate, setShowupRate] = useState(60);
   const [closingRate, setClosingRate] = useState(45);
 
-  const [results, setResults] = useState({
-    sales: 0, showups: 0, appointments: 0, leads: 0
-  });
+  const [results, setResults] = useState({ sales: 0, showups: 0, appointments: 0, leads: 0 });
   const [savedPlans, setSavedPlans] = useState<any[]>([]);
   const { toast } = useToast();
   const { professional } = useAuth();
+
+  // Tour de primeira visita
+  const { tourActive, tourStep, tourSteps, tourHandleNext, tourHandlePrev, tourHandleClose } =
+    useSectionTour('goals', [
+      { id: null, title: '🎯 Engenharia de Metas', description: 'Configure suas taxas de conversão e o sistema calcula automaticamente quantos leads você precisa para bater a meta.', position: 'center' },
+      { id: '#goals-params', title: '⚙️ Parâmetros', description: 'Defina o faturamento desejado, ticket médio e as taxas de cada etapa do funil.', position: 'right' },
+      { id: '#goals-results', title: '📊 Resultados', description: 'Veja em tempo real quantos leads, agendamentos e presenças são necessários para atingir sua meta.', position: 'bottom' },
+      { id: '#goals-save', title: '💾 Salvar Plano', description: 'Salve diferentes cenários e compare estratégias a qualquer momento.', position: 'top' },
+    ]);
 
   useEffect(() => {
     const salesNeeded = avgTicket > 0 ? Math.ceil(revenueTarget / avgTicket) : 0;
@@ -148,6 +157,7 @@ const Goals = () => {
 
   return (
     <div className="relative space-y-10 pb-10 overflow-hidden">
+      <TourPopover active={tourActive} step={tourStep} steps={tourSteps} onNext={tourHandleNext} onPrev={tourHandlePrev} onClose={tourHandleClose} />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:gap-6 relative z-10">
         <div>
@@ -179,7 +189,7 @@ const Goals = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start relative z-10">
 
         {/* Left: Parameters Panel */}
-        <div className="lg:col-span-4">
+        <div id="goals-params" className="lg:col-span-4">
           <Card className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 text-accent rounded-lg">
@@ -252,7 +262,7 @@ const Goals = () => {
         <div className="lg:col-span-8 space-y-6">
 
           {/* Result cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div id="goals-results" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {resultCards.map((card) => (
               <Card key={card.label} className="p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -321,6 +331,7 @@ const Goals = () => {
               </div>
 
               <Button
+                id="goals-save"
                 variant="secondary"
                 size="xl"
                 className="shadow-lg shadow-secondary/20 font-bold"

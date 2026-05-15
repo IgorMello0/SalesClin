@@ -14,7 +14,9 @@ import {
   BarChart,
   ChevronLeft,
   ChevronRight,
-  Check
+  Check,
+  Instagram,
+  MessageCircle
 } from 'lucide-react';
 
 const Index = () => {
@@ -66,7 +68,7 @@ const Index = () => {
             <div className="hidden md:flex items-center gap-10">
               <a href="#planos" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">Planos</a>
               <a href="#suporte" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">Suporte</a>
-              <a href="#faq" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">FAQ</a>
+              <Link to="/faq" className="text-sm font-semibold text-[#0F172A]/70 hover:text-[#0F172A] transition-colors">FAQ</Link>
               <div className="h-4 w-[1px] bg-slate-200 mx-2" />
               <Link to="/login" className="group relative overflow-hidden bg-[#0F172A] text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-500 flex items-center gap-3 hover:scale-105 active:scale-95 shadow-[0_10px_20px_-10px_rgba(15,23,42,0.5)] hover:shadow-[0_0_40px_rgba(249,115,22,0.5)]">
                 <span className="absolute -inset-[1px] bg-[#F97316] translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 ease-out z-0" />
@@ -454,29 +456,29 @@ const Index = () => {
       </section>
 
       {/* FOOTER — COMPREHENSIVE EDITORIAL */}
-      <footer className="py-32 bg-white border-t border-slate-100 relative overflow-hidden">
+      <footer className="py-8 bg-white border-t border-slate-100 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-8 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-16 mb-24">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-4">
             {/* Column 1: Brand */}
-            <div className="space-y-8">
+            <div className="space-y-4">
               <img src="/logo-site.png" alt="SalesClin" className="h-8 w-auto opacity-90" />
               <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-xs">
                 A infraestrutura comercial definitiva para clínicas de alto ticket. Transformamos leads em faturamento com inteligência e precisão.
               </p>
               <div className="flex gap-4">
-                {/* Social Placeholders */}
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316] transition-all cursor-pointer">
-                    <div className="w-3 h-3 bg-current rounded-full" />
-                  </div>
-                ))}
+                <a href="#" className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316] transition-all cursor-pointer">
+                  <Instagram size={14} />
+                </a>
+                <a href="#" className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316] transition-all cursor-pointer">
+                  <MessageCircle size={14} />
+                </a>
               </div>
             </div>
 
             {/* Column 2: Produto */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">Produto</h4>
-              <ul className="space-y-4">
+              <ul className="space-y-2">
                 {["Funcionalidades", "Simulador de Metas", "Planos e Preços", "Integrações"].map((item, i) => (
                   <li key={i}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>
                 ))}
@@ -484,9 +486,9 @@ const Index = () => {
             </div>
 
             {/* Column 3: Suporte */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">Suporte</h4>
-              <ul className="space-y-4">
+              <ul className="space-y-2">
                 {["Central de Ajuda", "FAQ", "Falar com Consultor", "Comunidade"].map((item, i) => (
                   <li key={i}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>
                 ))}
@@ -494,9 +496,9 @@ const Index = () => {
             </div>
 
             {/* Column 4: Legal */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">Legal</h4>
-              <ul className="space-y-4">
+              <ul className="space-y-2">
                 {["Termos de Uso", "Privacidade", "Cookies", "Segurança"].map((item, i) => (
                   <li key={i}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>
                 ))}
@@ -504,12 +506,9 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="pt-12 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="pt-6 border-t border-slate-50 flex flex-col md:flex-row items-center justify-center">
             <div className="text-[10px] font-black text-[#64748B] uppercase tracking-[0.3em]">
-              © 2024 SalesClin · CRM Especializado em Alto Ticket
-            </div>
-            <div className="flex items-center gap-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest">
-              Developed with <Zap size={10} className="text-[#F97316]" /> Precision
+              © 2026 SalesClin · CRM Especializado em Alto Ticket
             </div>
           </div>
         </div>
