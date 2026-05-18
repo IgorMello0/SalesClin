@@ -184,7 +184,7 @@ export function AppTopNavbar() {
             <img
               alt="SalesClin Logo"
               className="h-8 sm:h-10 w-auto object-contain"
-              src="/logo-site.png"
+              src="/logo-oficial-v3.png"
             />
           </Link>
 
