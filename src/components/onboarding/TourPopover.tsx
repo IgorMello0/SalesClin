@@ -94,7 +94,7 @@ export const TourPopover: React.FC<TourPopoverProps> = ({
     <>
       {/* Backdrop — rendered in body, escapes all transform contexts */}
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 9999, backdropFilter: 'blur(3px)', background: 'rgba(255,255,255,0.04)' }}
+        style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.45)' }}
         onClick={onClose}
       />
 
@@ -183,7 +183,7 @@ export const TourPopover: React.FC<TourPopoverProps> = ({
           position: relative;
           z-index: 10001 !important;
           border-radius: 8px;
-          box-shadow: 0 0 0 4px hsl(25 95% 53% / 0.5), 0 0 0 8px hsl(25 95% 53% / 0.15) !important;
+          box-shadow: 0 0 0 3px hsl(25 95% 53%) !important;
           transition: box-shadow 0.3s ease;
         }
       `}</style>
