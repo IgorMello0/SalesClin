@@ -75,26 +75,57 @@ export const TourPopover: React.FC<TourPopoverProps> = ({
   active, step, steps, onNext, onPrev, onClose,
 }) => {
   const [pos, setPos] = useState<PosResult>({ top: 0, left: 0, translateX: '-50%', translateY: '-50%' });
+  const [rect, setRect] = useState<DOMRect | null>(null);
   const current = steps[step];
 
   useEffect(() => {
     if (!active || !current) return;
     const el = current.id ? document.querySelector<HTMLElement>(current.id) : null;
-    setPos(calcPos(el, current.position ?? 'center'));
+
+    const update = () => {
+      setPos(calcPos(el, current.position ?? 'center'));
+      if (el) {
+        setRect(el.getBoundingClientRect());
+      } else {
+        setRect(null);
+      }
+    };
+
+    update();
+
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
 
     document.querySelectorAll('.tour-highlight').forEach((e) => e.classList.remove('tour-highlight'));
     if (el) el.classList.add('tour-highlight');
+
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
   }, [active, step, current]);
 
   if (!active || !current) return null;
 
   const { translateX = '0%', translateY = '0%', ...coords } = pos;
 
+  const pad = 6;
+  const clipPath = rect
+    ? `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, ${rect.left - pad}px ${rect.top - pad}px, ${rect.right + pad}px ${rect.top - pad}px, ${rect.right + pad}px ${rect.bottom + pad}px, ${rect.left - pad}px ${rect.bottom + pad}px, ${rect.left - pad}px ${rect.top - pad}px)`
+    : undefined;
+
   const popover = (
     <>
       {/* Backdrop — rendered in body, escapes all transform contexts */}
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.45)' }}
+        style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          zIndex: 9999, 
+          backdropFilter: 'blur(3px)', 
+          background: 'rgba(15, 23, 42, 0.45)',
+          clipPath
+        }}
         onClick={onClose}
       />
 
