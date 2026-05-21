@@ -1251,6 +1251,9 @@ const ClinicasView = () => {
           ))}
         </div>
       )}
+    </div>
+  );
+};
 
 const AparenciaView = () => {
   const { layout, setLayout } = useLayout();

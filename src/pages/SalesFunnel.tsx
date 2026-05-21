@@ -10,6 +10,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -120,6 +128,12 @@ const SalesFunnel = () => {
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [filterOrigin, setFilterOrigin] = useState<string>('todos');
+  const [filterMenuMode, setFilterMenuMode] = useState<'main' | 'origin'>('main');
+  const [filterSearchQuery, setFilterSearchQuery] = useState('');
 
   // Appointment scheduling state
   const [isScheduling, setIsScheduling] = useState(false);
@@ -170,10 +184,42 @@ const SalesFunnel = () => {
   const activeStages = useMemo(() => {
     if (dynamicFunnels.length > 0) {
       const funnel = dynamicFunnels.find(f => f.code === activeFunnel || f.id === activeFunnel);
-      return funnel?.stages || [];
+      // Normalize stages: use 'code' as 'id' so lead.status matching works
+      return (funnel?.stages || []).map((s: any) => ({
+        ...s,
+        id: s.code, // lead.status is the code string, not the numeric DB id
+      }));
     }
     return STAGES[activeFunnel as keyof typeof STAGES] || [];
   }, [activeFunnel, dynamicFunnels]);
+
+  const filteredAndSortedLeads = useMemo(() => {
+    let result = [...leads];
+
+    // Filter by search term
+    if (searchTerm.trim() !== '') {
+      const query = searchTerm.toLowerCase();
+      result = result.filter(lead => 
+        lead.name.toLowerCase().includes(query) || 
+        (lead.phone && lead.phone.toLowerCase().includes(query)) ||
+        (lead.email && lead.email.toLowerCase().includes(query))
+      );
+    }
+
+    // Filter by origin
+    if (filterOrigin !== 'todos') {
+      result = result.filter(lead => lead.origin && lead.origin.toLowerCase() === filterOrigin.toLowerCase());
+    }
+
+    // Sort leads
+    result.sort((a: any, b: any) => {
+      const dateA = new Date(a.rawDate || a.updatedAt || a.createdAt || 0).getTime();
+      const dateB = new Date(b.rawDate || b.updatedAt || b.createdAt || 0).getTime();
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
+    return result;
+  }, [leads, searchTerm, filterOrigin, sortOrder]);
 
   useEffect(() => {
     if (selectedLead) {
@@ -209,6 +255,7 @@ const SalesFunnel = () => {
           ...l,
           id: l.id.toString(),
           isScheduled: l.isScheduled || l.is_scheduled, // Handle both just in case
+          rawDate: l.updatedAt || l.createdAt,
           lastUpdate: safeFormatDate(l.updatedAt || l.createdAt, "dd/MM/yy 'às' HH:mm"),
           activities: (l.activities || []).map((a: any) => {
             const isNote = a.type === 'nota' || a.type === 'task';
@@ -521,6 +568,28 @@ const SalesFunnel = () => {
     }
   };
 
+  const handleDeleteSelectedLeads = async () => {
+    if (selectedLeadIds.length === 0) return;
+    const count = selectedLeadIds.length;
+    const confirmed = window.confirm(`Tem certeza que deseja excluir ${count} lead${count > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    try {
+      let successCount = 0;
+      for (const leadId of selectedLeadIds) {
+        const res = await leadsApi.delete(Number(leadId));
+        if (res.success) successCount++;
+      }
+      toast({ title: `${successCount} lead${successCount > 1 ? 's' : ''} excluído${successCount > 1 ? 's' : ''}!` });
+      setSelectedLeadIds([]);
+      setIsMultiSelectMode(false);
+      loadLeads();
+    } catch (error) {
+      console.error('Error deleting leads:', error);
+      toast({ title: 'Erro ao excluir leads', variant: 'destructive' });
+    }
+  };
+
   // Tour de primeira visita
   const { tourActive, tourStep, tourSteps, tourHandleNext, tourHandlePrev, tourHandleClose } =
     useSectionTour('comercial', [
@@ -535,58 +604,365 @@ const SalesFunnel = () => {
       <TourPopover active={tourActive} step={tourStep} steps={tourSteps} onNext={tourHandleNext} onPrev={tourHandlePrev} onClose={tourHandleClose} />
       {/* Header & Funnel Switcher */}
       <div className="flex flex-col gap-4 sm:gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 min-h-[64px]">
-          <div className="flex flex-col justify-center">
-            <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Comercial</h2>
-            <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Gerencie seus leads e funis de vendas.</p>
+        <div className="min-h-[64px] flex flex-col justify-center">
+          <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Comercial</h2>
+          <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Gerencie seus leads e funis de vendas.</p>
+        </div>
+
+        {/* Row container for Tabs and Actions */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100/50 pb-4">
+          {/* Funnel Tabs — scrollable on mobile */}
+          <div id="comercial-funis" className="flex overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="flex p-1 sm:p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-slate-200/50 w-fit">
+              {funnelList.map((f) => (
+                <button
+                  key={f.id || f.code}
+                  onClick={() => setActiveFunnel(f.code || f.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 whitespace-nowrap",
+                    activeFunnel === (f.code || f.id)
+                      ? "bg-white text-primary shadow-sm" 
+                      : "text-slate-400 hover:text-primary hover:bg-white/50"
+                  )}
+                >
+                  <span className={cn("material-symbols-outlined text-base sm:text-lg", activeFunnel === (f.code || f.id) ? "text-secondary" : "")}>
+                    {f.icon}
+                  </span>
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
-          
-          <div className="flex items-center gap-2 sm:gap-4 h-12">
-            <div className="flex-shrink-0">
+
+          <div className="flex items-center gap-1.5 sm:gap-2.5 h-12">
+            {/* 1. Buscar (Search) */}
+            {isSearchExpanded ? (
+              <div className="relative flex items-center bg-slate-100 rounded-full px-3 py-1.5 border border-slate-200/50 w-36 sm:w-56 transition-all duration-300 animate-in fade-in slide-in-from-right-3">
+                <span className="material-symbols-outlined text-slate-400 text-lg mr-1.5">search</span>
+                <input 
+                  type="text"
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)} 
+                  placeholder="Buscar lead..." 
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none w-full placeholder-slate-400"
+                />
+                <button 
+                  onClick={() => { 
+                    setIsSearchExpanded(false); 
+                    setSearchTerm(''); 
+                  }} 
+                  className="text-slate-400 hover:text-slate-600 flex items-center"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                </button>
+              </div>
+            ) : (
+              <Button 
+                variant="ghost"
+                onClick={() => setIsSearchExpanded(true)}
+                className="h-10 w-10 sm:h-11 sm:w-11 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                title="Buscar leads"
+              >
+                <span className="material-symbols-outlined text-xl sm:text-[22px]">search</span>
+              </Button>
+            )}
+
+            {/* 2. Filtrar (Filter) */}
+            <div className="relative">
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost"
-                    className="h-10 w-10 sm:h-12 sm:w-12 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    className={cn(
+                      "h-10 w-10 sm:h-11 sm:w-11 p-0 rounded-full flex items-center justify-center transition-colors",
+                      filterOrigin !== 'todos' ? "text-secondary bg-orange-50 hover:bg-orange-100" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    )}
+                    onClick={() => {
+                      setFilterMenuMode('main');
+                      setFilterSearchQuery('');
+                    }}
+                    title="Filtrar por origem"
                   >
-                    <span className="material-symbols-outlined text-xl sm:text-2xl">settings</span>
+                    <span className="material-symbols-outlined text-xl sm:text-[22px]">filter_list</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
-                  side="bottom" 
-                  align="end" 
-                  sideOffset={12} 
-                  alignOffset={0}
-                  className="w-56 p-2 rounded-2xl shadow-xl border-slate-100 bg-white z-[100]"
+                  className="absolute left-0 top-full mt-1.5 w-64 p-1.5 rounded-2xl shadow-xl border border-slate-200/50 bg-white/95 backdrop-blur-md z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
                 >
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setIsMultiSelectMode(!isMultiSelectMode);
-                      if (isMultiSelectMode) setSelectedLeadIds([]);
-                    }} 
-                    className="cursor-pointer rounded-xl font-medium py-2.5"
-                  >
-                    <span className="material-symbols-outlined mr-3 text-[18px] text-slate-500">
-                      {isMultiSelectMode ? 'close' : 'checklist'}
-                    </span>
-                    {isMultiSelectMode ? 'Cancelar Seleção' : 'Selecionar Vários'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => setIsExportModalOpen(true)} 
-                    className="cursor-pointer rounded-xl font-medium py-2.5 text-primary"
-                  >
-                    <span className="material-symbols-outlined mr-3 text-[18px] text-primary">download</span>
-                    Exportar Dados
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => setIsConfiguringFunnels(true)} 
-                    className="cursor-pointer rounded-xl font-medium py-2.5"
-                  >
-                    <span className="material-symbols-outlined mr-3 text-[18px] text-slate-500">dashboard_customize</span>
-                    Configurar Funis e Etapas
-                  </DropdownMenuItem>
+                  {filterMenuMode === 'main' ? (
+                    <div className="space-y-1">
+                      {/* Search box */}
+                      <div className="p-2">
+                        <input
+                          type="text"
+                          value={filterSearchQuery}
+                          onChange={(e) => setFilterSearchQuery(e.target.value)}
+                          placeholder="Procurar uma propriedade..."
+                          className="w-full bg-slate-50 text-slate-800 border border-slate-200/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-secondary focus:border-secondary transition-all placeholder-slate-400 font-bold"
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Properties list */}
+                      <div className="px-1 space-y-0.5">
+                        {[
+                          { id: 'name', label: 'Nome', icon: 'title', display: 'Aa' },
+                          { id: 'phone', label: 'Telefone', icon: 'call' },
+                          { id: 'email', label: 'E-mail', icon: 'mail' },
+                          { id: 'origin', label: 'Origem', icon: 'sell' },
+                        ]
+                          .filter(p => p.label.toLowerCase().includes(filterSearchQuery.toLowerCase()))
+                          .map((prop) => (
+                            <button
+                              key={prop.id}
+                              type="button"
+                              onClick={() => {
+                                if (prop.id === 'origin') {
+                                  setFilterMenuMode('origin');
+                                  setFilterSearchQuery('');
+                                } else {
+                                  setIsSearchExpanded(true);
+                                  setFilterSearchQuery('');
+                                }
+                              }}
+                              className="w-full text-left rounded-xl py-2 px-3 flex items-center gap-3 hover:bg-slate-50 transition-colors text-xs text-slate-700 hover:text-secondary font-bold group"
+                            >
+                              <div className="w-5 h-5 flex items-center justify-center shrink-0 text-slate-400 group-hover:text-secondary transition-colors">
+                                {prop.display ? (
+                                  <span className="text-[11px] font-black tracking-tighter leading-none">{prop.display}</span>
+                                ) : (
+                                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{prop.icon}</span>
+                                )}
+                              </div>
+                              <span className="flex-1 truncate">{prop.label}</span>
+                              {prop.id === 'origin' && (
+                                <span className="material-symbols-outlined text-slate-400 group-hover:text-secondary transition-colors" style={{ fontSize: '16px' }}>chevron_right</span>
+                              )}
+                            </button>
+                          ))}
+                      </div>
+
+                      <div className="h-px bg-slate-100 my-1.5" />
+
+                      <div className="px-1">
+                        <button 
+                          type="button"
+                          className="w-full text-left rounded-xl py-2 px-3 flex items-center gap-3 hover:bg-red-50/50 transition-colors text-xs text-slate-500 hover:text-red-500 font-bold group"
+                          onClick={() => {
+                            setFilterOrigin('todos');
+                            setSearchTerm('');
+                          }}
+                        >
+                          <span className="material-symbols-outlined text-slate-400 group-hover:text-red-500 transition-colors" style={{ fontSize: '18px' }}>delete</span>
+                          Limpar Filtros
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {/* Back button */}
+                      <div className="px-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterMenuMode('main');
+                            setFilterSearchQuery('');
+                          }}
+                          className="w-full text-left rounded-xl py-1.5 px-2 flex items-center gap-2 hover:bg-slate-50 transition-colors text-[10px] uppercase font-black tracking-wider text-slate-400 hover:text-secondary"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chevron_left</span>
+                          Voltar
+                        </button>
+                      </div>
+
+                      {/* Search box for origin */}
+                      <div className="p-2">
+                        <input
+                          type="text"
+                          value={filterSearchQuery}
+                          onChange={(e) => setFilterSearchQuery(e.target.value)}
+                          placeholder="Procurar origem..."
+                          className="w-full bg-slate-50 text-slate-800 border border-slate-200/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-secondary focus:border-secondary transition-all placeholder-slate-400 font-bold"
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Origin sub-items list */}
+                      <div className="px-1 space-y-0.5 max-h-48 overflow-y-auto scrollbar-hide">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterOrigin('todos');
+                            setFilterMenuMode('main');
+                          }}
+                          className={cn(
+                            "w-full text-left rounded-xl py-2 px-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs font-bold",
+                            filterOrigin === 'todos' ? "text-secondary bg-orange-50/50" : "text-slate-700 hover:text-secondary"
+                          )}
+                        >
+                          <span className="truncate font-bold">Todos</span>
+                          {filterOrigin === 'todos' && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
+                        </button>
+                        {ORIGIN_OPTIONS
+                          .filter(opt => opt.label.toLowerCase().includes(filterSearchQuery.toLowerCase()))
+                          .map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                setFilterOrigin(opt.value);
+                                setFilterMenuMode('main');
+                              }}
+                              className={cn(
+                                "w-full text-left rounded-xl py-2 px-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs font-bold",
+                                filterOrigin === opt.value ? "text-secondary bg-orange-50/50" : "text-slate-700 hover:text-secondary"
+                              )}
+                            >
+                              <span className="truncate font-bold">{opt.label}</span>
+                              {filterOrigin === opt.value && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
+
+            {/* 3. Ordenar (Sort) */}
+            <div className="relative">
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost"
+                    className={cn(
+                      "h-10 w-10 sm:h-11 sm:w-11 p-0 rounded-full flex items-center justify-center transition-colors",
+                      sortOrder !== 'newest' ? "text-secondary bg-orange-50 hover:bg-orange-100" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    )}
+                    title="Ordenar leads"
+                  >
+                    <span className="material-symbols-outlined text-xl sm:text-[22px]">swap_vert</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  className="absolute left-0 top-full mt-1.5 w-44 p-1.5 rounded-2xl shadow-xl border border-slate-200/50 bg-white/95 backdrop-blur-md z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
+                >
+                  <div className="px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Ordenar por data</div>
+                  <button 
+                    type="button"
+                    onClick={() => setSortOrder('newest')} 
+                    className={cn(
+                      "w-full text-left rounded-xl py-2 px-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs font-bold",
+                      sortOrder === 'newest' ? "text-secondary bg-orange-50/50" : "text-slate-700 hover:text-secondary"
+                    )}
+                  >
+                    <span className="font-bold">Mais Novos</span>
+                    {sortOrder === 'newest' && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setSortOrder('oldest')} 
+                    className={cn(
+                      "w-full text-left rounded-xl py-2 px-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs font-bold",
+                      sortOrder === 'oldest' ? "text-secondary bg-orange-50/50" : "text-slate-700 hover:text-secondary"
+                    )}
+                  >
+                    <span className="font-bold">Mais Antigos</span>
+                    {sortOrder === 'oldest' && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
+                  </button>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* 4. Seleção Múltipla */}
+            <Button 
+              variant="ghost"
+              onClick={() => {
+                setIsMultiSelectMode(!isMultiSelectMode);
+                if (isMultiSelectMode) setSelectedLeadIds([]);
+              }}
+              className={cn(
+                "h-10 w-10 sm:h-11 sm:w-11 p-0 rounded-full flex items-center justify-center transition-colors",
+                isMultiSelectMode ? "text-secondary bg-orange-50 hover:bg-orange-100" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              )}
+              title={isMultiSelectMode ? "Desativar seleção múltipla" : "Ativar seleção múltipla"}
+            >
+              <span className="material-symbols-outlined text-xl sm:text-[22px]">{isMultiSelectMode ? 'close' : 'checklist'}</span>
+            </Button>
+
+            {/* 5. Configurações (Sheet) */}
+            <div className="flex-shrink-0">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button 
+                    variant="ghost"
+                    className="h-10 w-10 sm:h-11 sm:w-11 p-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    title="Configurações do funil"
+                  >
+                    <span className="material-symbols-outlined text-xl sm:text-[22px]">tune</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent 
+                  side="right"
+                  className="w-full sm:max-w-md p-6 bg-white border-l border-slate-100 flex flex-col justify-between"
+                >
+                  <div className="space-y-6">
+                    {/* Header */}
+                    <div className="space-y-2 mt-4">
+                      <div className="flex items-center gap-2 text-primary">
+                        <span className="material-symbols-outlined text-3xl text-secondary">tune</span>
+                        <h3 className="text-xl font-extrabold font-headline tracking-tight">Opções do Funil</h3>
+                      </div>
+                      <p className="text-slate-500 text-xs sm:text-sm font-medium">
+                        Gerencie visualização, exportação de dados e etapas do pipeline comercial.
+                      </p>
+                    </div>
+
+                    <div className="h-px bg-slate-100 w-full" />
+
+                    {/* Actions List */}
+                    <div className="space-y-3">
+                      {/* Action 1: Exportar Dados */}
+                      <button
+                        onClick={() => setIsExportModalOpen(true)}
+                        className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-orange-50/30 hover:border-orange-100 transition-all duration-300 flex items-start gap-4 group active:scale-[0.99]"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 group-hover:bg-orange-100 group-hover:text-secondary flex items-center justify-center shrink-0 transition-colors">
+                          <span className="material-symbols-outlined text-xl">download</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-primary group-hover:text-secondary transition-colors">Exportar Leads</h4>
+                            <span className="material-symbols-outlined text-slate-400 group-hover:text-secondary transition-colors font-bold">chevron_right</span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium mt-1">
+                            Exporte a lista completa de leads em formato CSV ou planilha Excel.
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* Action 3: Configurar Funis e Etapas */}
+                      <button
+                        onClick={() => setIsConfiguringFunnels(true)}
+                        className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-200/80 transition-all duration-300 flex items-start gap-4 group active:scale-[0.99]"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 group-hover:bg-slate-200/80 flex items-center justify-center shrink-0 transition-colors">
+                          <span className="material-symbols-outlined text-xl">dashboard_customize</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-primary group-hover:text-secondary transition-colors">Personalizar Pipelines</h4>
+                            <span className="material-symbols-outlined text-slate-400 group-hover:text-secondary transition-colors font-bold">chevron_right</span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium mt-1">
+                            Adicione, ordene ou alterne entre diferentes funis de vendas.
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
 
             <Button 
@@ -600,38 +976,35 @@ const SalesFunnel = () => {
               <span className="hidden sm:inline">Novo Lead</span>
               <span className="sm:hidden">Novo</span>
             </Button>
-          </div>
-        </div>
 
-        {/* Funnel Tabs — scrollable on mobile */}
-        <div id="comercial-funis" className="flex overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
-          <div className="flex p-1 sm:p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-slate-200/50 w-fit">
-            {funnelList.map((f) => (
-              <button
-                key={f.id || f.code}
-                onClick={() => setActiveFunnel(f.code || f.id)}
+            {/* Lixeira vermelha — aparece quando seleção múltipla está ativa */}
+            {isMultiSelectMode && (
+              <Button
+                onClick={handleDeleteSelectedLeads}
+                disabled={selectedLeadIds.length === 0}
+                variant="ghost"
                 className={cn(
-                  "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 whitespace-nowrap",
-                  activeFunnel === (f.code || f.id)
-                    ? "bg-white text-primary shadow-sm" 
-                    : "text-slate-400 hover:text-primary hover:bg-white/50"
+                  "h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-bold gap-1.5 text-sm flex-shrink-0 transition-all duration-200",
+                  selectedLeadIds.length > 0
+                    ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20"
+                    : "bg-red-50 text-red-300 cursor-not-allowed"
                 )}
+                title={selectedLeadIds.length > 0 ? `Excluir ${selectedLeadIds.length} lead(s)` : "Selecione leads para excluir"}
               >
-                <span className={cn("material-symbols-outlined text-base sm:text-lg", activeFunnel === (f.code || f.id) ? "text-secondary" : "")}>
-                  {f.icon}
-                </span>
-                {f.label}
-              </button>
-            ))}
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete</span>
+                {selectedLeadIds.length > 0 && (
+                  <span className="hidden sm:inline">{selectedLeadIds.length}</span>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Board */}
-<<<<<<< HEAD
       <FunnelBoard 
         stages={activeStages}
-        leads={leads}
+        leads={filteredAndSortedLeads}
         onAddLead={openAddLead}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -666,283 +1039,6 @@ const SalesFunnel = () => {
         professionalName={professional?.name}
         quickStatuses={QUICK_STATUSES}
       />
-=======
-      <div id="comercial-board" className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-4 sm:px-4 scrollbar-hide snap-x snap-mandatory sm:snap-none">
-        {activeStages.map((stage) => {
-          const stageLeads = leads.filter(l => {
-            // Regra de Roteamento: 
-            // - Mostrar se NÃO estiver pago
-            const isOperational = !l.isPaid;
-            if (!isOperational) return false;
-
-            return l.status === stage.id;
-          });
-          
-          const isOver = dropTargetStage === stage.id;
-          
-          return (
-            <div 
-              key={stage.id} 
-              className="flex-shrink-0 w-[280px] sm:w-72 flex flex-col gap-3 snap-center"
-              onDragOver={(e) => handleDragOver(e, stage.id)}
-              onDrop={(e) => handleDrop(e, stage.id)}
-              onDragLeave={() => setDropTargetStage(null)}
-            >
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", stage.color)}></div>
-                  <h3 className="font-bold text-primary text-sm uppercase tracking-wider">{stage.label}</h3>
-                  <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    {stageLeads.length}
-                  </span>
-                </div>
-                <button 
-                  onClick={() => openAddLead(stage.id)}
-                  className="text-slate-300 hover:text-primary transition-colors btn-hover"
-                >
-                  <span className="material-symbols-outlined text-lg">add_circle</span>
-                </button>
-              </div>
-
-              <div className={cn(
-                "flex-1 min-h-[500px] rounded-2xl p-2.5 space-y-2 transition-all duration-200",
-                "bg-slate-50/50 border border-slate-100/50",
-                isOver && "bg-slate-100/80 border-secondary/30 scale-[1.01]"
-              )}>
-                {stageLeads.map((lead) => (
-                  <div 
-                    key={lead.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, lead.id)}
-                    onClick={() => setSelectedLead(lead)}
-                    className={cn(
-                      "premium-card p-3 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
-                      draggedLeadId === lead.id && "opacity-40 grayscale-[0.5]"
-                    )}
-                  >
-                    {/* Card Content */}
-
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        {isMultiSelectMode && (
-                          <div onClick={(e) => e.stopPropagation()} className="animate-in zoom-in-95 duration-200">
-                            <Checkbox 
-                              checked={selectedLeadIds.includes(lead.id)} 
-                              onCheckedChange={() => toggleLeadSelection(lead.id)}
-                              className="border-slate-300 data-[state=checked]:bg-secondary data-[state=checked]:border-secondary"
-                            />
-                          </div>
-                        )}
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary border border-primary/5">
-                          {lead.avatar}
-                        </div>
-                        <div>
-                          <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors flex items-center break-words">{lead.name}</h4>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="material-symbols-outlined text-[12px] text-emerald-500">chat</span>
-                            <p className="text-[10px] text-slate-500 font-bold tracking-tight">{lead.phone}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openWhatsApp(lead.phone);
-                          }}
-                          className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                          title="Abrir no WhatsApp"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                          </svg>
-                        </button>
-                        <button className="text-slate-300 group-hover:text-slate-400 transition-colors">
-                          <span className="material-symbols-outlined text-base">more_vert</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start justify-between mt-2 pt-1.5 border-t border-slate-100">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs font-bold text-primary">
-                          {lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </div>
-                        {activeFunnel === 'prospecting' && (
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button className={cn(
-                                  "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors border text-left",
-                                  lead.subStatus ? QUICK_STATUSES.find(s => s.id === lead.subStatus)?.color : QUICK_STATUSES[0].color
-                                )}>
-                                  {lead.subStatus ? QUICK_STATUSES.find(s => s.id === lead.subStatus)?.label : 'Status (Nenhum)'}
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-48 rounded-xl p-2 bg-white shadow-xl border-slate-100">
-                                {QUICK_STATUSES.map(status => (
-                                  <DropdownMenuItem 
-                                    key={status.id}
-                                    onClick={() => handleSubStatusChange(lead.id, status.id)}
-                                    className={cn("text-xs font-bold cursor-pointer rounded-lg mb-1 last:mb-0", status.color)}
-                                  >
-                                    {status.label}
-                                  </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuItem 
-                                  onClick={() => handleSubStatusChange(lead.id, null)}
-                                  className="text-xs font-bold text-slate-400 cursor-pointer rounded-lg"
-                                >
-                                  Limpar Status
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">
-                        <span className="material-symbols-outlined text-[10px]">schedule</span>
-                        {lead.lastUpdate}
-                      </div>
-                    </div>
-
-                    {/* Stage specific acts */}
-                    <div className="flex flex-col gap-1 mt-2 pt-1.5 border-t border-slate-100">
-                      {stage.id === 'prospect_scheduled' && (
-                        lead.isScheduled ? (() => {
-                          const lastAppt = lead.appointments && lead.appointments[0];
-                          const apptStatus = lastAppt?.status || 'agendado';
-                          
-                          switch(apptStatus) {
-                            case 'concluido':
-                              return (
-                                <div className="w-full py-1.5 bg-sky-50 text-sky-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-sky-100">
-                                  Compareceu
-                                  <span className="material-symbols-outlined text-xs">check_circle</span>
-                                </div>
-                              );
-                            case 'cancelado':
-                              return (
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
-                                  className="w-full py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100"
-                                >
-                                  Faltou / Reagendar
-                                  <span className="material-symbols-outlined text-xs">event_busy</span>
-                                </button>
-                              );
-                            case 'confirmado':
-                              return (
-                                <div className="w-full py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-100">
-                                  Confirmado
-                                  <span className="material-symbols-outlined text-xs">verified</span>
-                                </div>
-                              );
-                            default:
-                              return (
-                                <div className="w-full py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-amber-100">
-                                  Agendado
-                                  <span className="material-symbols-outlined text-xs">schedule</span>
-                                </div>
-                              );
-                          }
-                        })() : (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleScheduleAppointment(lead); }}
-                            disabled={isProcessingSchedule}
-                            className="w-full py-1.5 bg-violet-100 hover:bg-violet-600 text-violet-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-violet-200"
-                          >
-                            {isProcessingSchedule && currentSchedulingLeadId === lead.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <>
-                                Agendar agora
-                                <span className="material-symbols-outlined text-xs">calendar_today</span>
-                              </>
-                            )}
-                          </button>
-                        )
-                      )}
-
-
-                      {stage.id === 'comercial_consult' && (
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setProposalLeadId(lead.id);
-                            setIsCreatingProposal(true);
-                            setProposalData(prev => ({ 
-                              ...prev, 
-                              salesperson: professional?.name || '',
-                              value: lead.value > 0 ? formatCurrency((lead.value * 100).toString()) : '',
-                              tags: lead.tags || []
-                            }));
-                          }}
-                          className="w-full py-2 bg-orange-100 hover:bg-orange-500 text-orange-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-orange-200"
-                        >
-                          Gerar Proposta
-                          <span className="material-symbols-outlined text-xs">description</span>
-                        </button>
-                      )}
-
-                      {stage.id === 'comercial_closed' && (
-                        <div className="flex flex-col gap-1.5">
-                          <div className="w-full py-2 bg-green-50 text-green-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200">
-                            <span className="material-symbols-outlined text-xs">how_to_reg</span>
-                            Cliente Ativo
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              moveLead(lead.id, 'sales_payment');
-                              setActiveFunnel('sales');
-                            }}
-                            className="w-full py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-primary/20"
-                          >
-                            <span className="material-symbols-outlined text-xs">payments</span>
-                            Iniciar Pagamento
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setClosedLeadToSchedule(lead);
-                              setIsSchedulingClosed(true);
-                            }}
-                            className="w-full py-2 bg-indigo-100 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-indigo-200"
-                          >
-                            <span className="material-symbols-outlined text-xs">calendar_add_on</span>
-                            Agendar Agora
-                          </button>
-                        </div>
-                      )}
-
-                      {stage.id === 'sales_payment' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleConfirmPayment(lead);
-                          }}
-                          className="w-full py-2 bg-cyan-100 hover:bg-cyan-600 text-cyan-700 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-cyan-200 animate-pulse-subtle"
-                        >
-                          <span className="material-symbols-outlined text-xs">check_circle</span>
-                          Confirmar Recebimento
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {stageLeads.length === 0 && (
-                  <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-200/50 rounded-xl bg-white/30">
-                    <p className="text-slate-300 text-xs font-medium italic">Arraste um lead para aqui</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
->>>>>>> 7ad9b23cb04426babccb1d2d515036b0d621fa0f
 
       {/* Add Lead Dialog */}
       <Dialog open={isAddingLead} onOpenChange={setIsAddingLead}>

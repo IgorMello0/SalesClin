@@ -7,7 +7,7 @@ const Avatar = ({ className, ref, ...props }: React.HTMLAttributes<HTMLSpanEleme
 Avatar.displayName = "Avatar"
 
 const AvatarImage = ({ className, src, alt, ref, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { ref?: React.Ref<HTMLImageElement> }) => (
-  <img ref={ref} src={src} alt={alt} className={cn("aspect-square h-full w-full", className)} {...props} />
+  <img ref={ref} src={src} alt={alt} className={cn("aspect-square h-full w-full object-cover", className)} {...props} />
 )
 AvatarImage.displayName = "AvatarImage"
 

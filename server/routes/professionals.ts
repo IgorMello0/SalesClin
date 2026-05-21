@@ -56,6 +56,7 @@ router.post('/login', async (req, res) => {
         email: professional.email, 
         phone: professional.phone || '', 
         specialization: professional.specialization || '',
+        photoUrl: professional.photoUrl || '',
         onboardingCompleted: professional.onboardingCompleted,
         company: professional.company ? {
           id: professional.company.id,
@@ -279,6 +280,7 @@ router.post('/', async (req, res) => {
         email: created.email, 
         phone: created.phone || '', 
         specialization: created.specialization || '',
+        photoUrl: created.photoUrl || '',
         onboardingCompleted: created.onboardingCompleted,
         company: created.company ? {
           id: created.company.id,

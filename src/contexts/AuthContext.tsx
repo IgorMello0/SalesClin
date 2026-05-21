@@ -36,7 +36,7 @@ interface AuthContextType {
   hasModuleAccess: (moduleCode: string) => boolean;
   isLoading: boolean;
   loadPermissions: () => Promise<void>;
-  updateProfilePhoto: (photoUrl: string) => void;
+  updateProfileData: (data: Partial<Professional>) => void;
   switchCompany: (companyId: number) => void;
   completeOnboarding: (data: any) => Promise<{success?: boolean}>;
 }
@@ -61,11 +61,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateProfilePhoto = (photoUrl: string) => {
+  // Carregar dados atualizados do profissional (incluindo foto)
+  const loadProfessionalProfile = async () => {
+    try {
+      const type = localStorage.getItem('userType');
+      if (type === 'professional') {
+        const response = await professionalsApi.getMe();
+        if (response.success && response.data) {
+          const d = response.data;
+          setProfessional(prev => {
+            if (!prev) return prev;
+            const updated = {
+              ...prev,
+              name: d.name,
+              phone: d.phone || '',
+              specialization: d.specialization || '',
+              photoUrl: d.photoUrl || undefined,
+            };
+            // Evitar QuotaExceededError limpando base64 do localStorage
+            const storageUpdated = { ...updated };
+            if (storageUpdated.photoUrl && storageUpdated.photoUrl.startsWith('data:')) {
+              storageUpdated.photoUrl = undefined;
+            }
+            localStorage.setItem('professional', JSON.stringify(storageUpdated));
+            return updated;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[Auth] Error loading professional profile:', error);
+    }
+  };
+
+  const updateProfileData = (data: Partial<Professional>) => {
     setProfessional(prev => {
       if (!prev) return prev;
-      const updated = { ...prev, photoUrl };
-      localStorage.setItem('professional', JSON.stringify(updated));
+      const updated = { ...prev, ...data };
+      
+      // Evitar QuotaExceededError limpando base64 do localStorage
+      const storageUpdated = { ...updated };
+      if (storageUpdated.photoUrl && storageUpdated.photoUrl.startsWith('data:')) {
+        storageUpdated.photoUrl = undefined;
+      }
+      
+      localStorage.setItem('professional', JSON.stringify(storageUpdated));
       return updated;
     });
   };
@@ -113,6 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfessional(JSON.parse(savedProfessional));
         // Carregar permissões do usuário logado
         loadPermissions();
+        // Carregar perfil atualizado (para manter foto em sincronia)
+        loadProfessionalProfile();
       } catch (error) {
         // Se houver erro ao parsear, limpar dados inválidos
         localStorage.removeItem('professional');
@@ -301,7 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasModuleAccess,
       isLoading,
       loadPermissions,
-      updateProfilePhoto,
+      updateProfileData,
       switchCompany,
       completeOnboarding
     }}>

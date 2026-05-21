@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { dashboardApi } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
@@ -8,7 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const Dashboard = () => {
   const { professional, switchCompany } = useAuth();
-  const [filter, setFilter] = useState<'today' | '7days' | 'custom'>('custom');
+  const [filter, setFilter] = useState<'today' | '7days' | '30days' | 'this_month' | 'custom'>('30days');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+  const [customEndDate, setCustomEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [showCustomRangeInputs, setShowCustomRangeInputs] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [conversionMode, setConversionMode] = useState<'percent' | 'reais'>('percent');
   const [bottomActiveTab, setBottomActiveTab] = useState<'finance' | 'sales'>('finance');
   const [counters, setCounters] = useState({
@@ -30,9 +35,9 @@ const Dashboard = () => {
     origem: [] as { origin: string, count: number }[]
   });
 
-  const fetchTargetData = useCallback(async (currentFilter: string) => {
+  const fetchTargetData = useCallback(async (currentFilter: string, start?: string, end?: string) => {
     try {
-      const response = await dashboardApi.getMetrics(currentFilter);
+      const response = await dashboardApi.getMetrics(currentFilter, start, end);
       if (response.success && response.data) {
         return response.data;
       }
@@ -90,8 +95,18 @@ const Dashboard = () => {
   }, [counters]);
 
   useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
-    fetchTargetData('custom').then(targets => {
+    fetchTargetData('30days').then(targets => {
       if (!mounted) return;
       const duration = 1000;
       const startTime = performance.now();
@@ -127,10 +142,10 @@ const Dashboard = () => {
     return () => { mounted = false; };
   }, [fetchTargetData]);
 
-  const handleFilterChange = async (newFilter: 'today' | '7days' | 'custom') => {
-    if (newFilter === filter) return;
+  const handleFilterChange = async (newFilter: 'today' | '7days' | '30days' | 'this_month' | 'custom', start?: string, end?: string) => {
+    if (newFilter === filter && newFilter !== 'custom') return;
     setFilter(newFilter);
-    const targets = await fetchTargetData(newFilter);
+    const targets = await fetchTargetData(newFilter, start, end);
     
     // Anima os contadores suavemente
     animationRef(targets);
@@ -143,15 +158,34 @@ const Dashboard = () => {
   const getDateDisplay = () => {
     const today = new Date();
     if (filter === 'today') {
-      return format(today, "dd MMM, yyyy", { locale: ptBR });
+      return format(today, "dd 'de' MMMM, yyyy", { locale: ptBR });
     } else if (filter === '7days') {
-      const sevenDaysAgo = subDays(today, 6);
-      return `${format(sevenDaysAgo, "dd MMM", { locale: ptBR })} - ${format(today, "dd MMM, yyyy", { locale: ptBR })}`;
-    } else {
+      const start = subDays(today, 6);
+      return `${format(start, "dd MMM", { locale: ptBR })} - ${format(today, "dd MMM, yyyy", { locale: ptBR })}`;
+    } else if (filter === '30days') {
+      const start = subDays(today, 29);
+      return `${format(start, "dd MMM", { locale: ptBR })} - ${format(today, "dd MMM, yyyy", { locale: ptBR })}`;
+    } else if (filter === 'this_month') {
       const start = startOfMonth(today);
       const end = endOfMonth(today);
       return `${format(start, "dd MMM", { locale: ptBR })} - ${format(end, "dd MMM, yyyy", { locale: ptBR })}`;
+    } else {
+      try {
+        const start = new Date(customStartDate + 'T00:00:00');
+        const end = new Date(customEndDate + 'T00:00:00');
+        return `${format(start, "dd/MM/yyyy")} - ${format(end, "dd/MM/yyyy")}`;
+      } catch (e) {
+        return 'Período Personalizado';
+      }
     }
+  };
+
+  const getFilterLabel = () => {
+    if (filter === 'today') return 'Hoje';
+    if (filter === '7days') return '7 dias';
+    if (filter === '30days') return '30 dias';
+    if (filter === 'this_month') return 'Este mês';
+    return 'Personalizado';
   };
 
   const hasMultipleClinics = professional?.companies && professional.companies.length > 1;
@@ -228,7 +262,7 @@ const Dashboard = () => {
       )}
 
       {/* Header Section */}
-      <div className="flex flex-col gap-4 sm:gap-6 relative z-10">
+      <div className="flex flex-col gap-4 sm:gap-6 relative z-30">
         <div>
           <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Dashboard de Vendas</h2>
           <p className="text-on-surface-variant text-xs sm:text-sm mt-1">
@@ -237,25 +271,91 @@ const Dashboard = () => {
               : 'Bem-vindo ao centro de comando SalesClin.'}
           </p>
         </div>
-        <Card className="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5">
+        
+        <Card className="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5 w-fit relative overflow-visible">
           <button 
-            onClick={() => handleFilterChange('today')}
+            onClick={() => {
+              handleFilterChange('today');
+              setDropdownOpen(false);
+            }}
             className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${filter === 'today' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
           >
             Hoje
           </button>
           <button 
-            onClick={() => handleFilterChange('7days')}
+            onClick={() => {
+              handleFilterChange('7days');
+              setDropdownOpen(false);
+            }}
             className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${filter === '7days' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
           >
-            Últimos 7 dias
+            7 dias
           </button>
-          <div 
-            onClick={() => handleFilterChange('custom')}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 cursor-pointer rounded-lg transition-all capitalize ${filter === 'custom' ? 'bg-primary/10 text-primary' : 'bg-primary/5 text-primary hover:bg-primary/10'}`}
+          <button 
+            onClick={() => {
+              handleFilterChange('30days');
+              setDropdownOpen(false);
+            }}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${filter === '30days' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
           >
-            <span className="material-symbols-outlined text-sm">calendar_today</span>
-            {getDateDisplay()}
+            30 dias
+          </button>
+          <button 
+            onClick={() => {
+              handleFilterChange('this_month');
+              setDropdownOpen(false);
+            }}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${filter === 'this_month' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-on-surface-variant hover:bg-muted'}`}
+          >
+            Este mês
+          </button>
+          
+          <div className="relative" ref={dropdownRef}>
+            <button 
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className={cn(
+                "px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 cursor-pointer rounded-lg transition-all select-none",
+                filter === 'custom' 
+                  ? "bg-primary/10 text-primary" 
+                  : "bg-primary/5 text-primary hover:bg-primary/10"
+              )}
+            >
+              <span className="material-symbols-outlined text-sm">menu</span>
+              <span>{filter === 'custom' ? getDateDisplay() : 'Personalizado'}</span>
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 sm:left-0 mt-2 w-64 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-2xl p-4 space-y-3 z-[150] animate-in fade-in zoom-in-95 duration-100">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Definir Período</div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Data Início</label>
+                  <input 
+                    type="date" 
+                    value={customStartDate} 
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-secondary font-headline"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Data Fim</label>
+                  <input 
+                    type="date" 
+                    value={customEndDate} 
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-secondary font-headline"
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    handleFilterChange('custom', customStartDate, customEndDate);
+                    setDropdownOpen(false);
+                  }}
+                  className="w-full bg-secondary hover:bg-secondary/90 text-primary font-bold text-xs py-2 rounded-lg font-headline transition-colors"
+                >
+                  Aplicar Período
+                </button>
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -515,9 +615,14 @@ const Dashboard = () => {
                 bg = 'bg-pink-50 dark:bg-pink-950/30';
               }
 
+              const isInstagram = item.origin?.toLowerCase().includes('instagram');
+
               return (
               <div key={item.origin} className="flex items-center gap-4 group cursor-default">
-                <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform overflow-hidden p-2 shadow-sm`}>
+                <div className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform overflow-hidden shadow-sm",
+                  isInstagram ? "bg-transparent p-0 shadow-none border border-slate-100" : `${bg} p-2`
+                )}>
                   <img src={icon} alt={item.origin} className="w-full h-full object-contain" />
                 </div>
                 <div className="flex-1">

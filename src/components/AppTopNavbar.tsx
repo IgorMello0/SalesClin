@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
+import { getImageUrl } from '@/lib/api';
 
 const menuItems = [
   {
@@ -184,7 +185,7 @@ export function AppTopNavbar() {
             <img
               alt="SalesClin Logo"
               className="h-8 sm:h-10 w-auto object-contain"
-              src="/logo-site.png"
+              src="/logo-oficial-v3.png"
             />
           </Link>
 
@@ -303,7 +304,7 @@ export function AppTopNavbar() {
             >
               {professional?.photoUrl ? (
                 <img 
-                  src={professional.photoUrl} 
+                  src={getImageUrl(professional.photoUrl)} 
                   alt="Foto do perfil" 
                   className="w-full h-full object-cover"
                 />

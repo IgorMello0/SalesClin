@@ -25,18 +25,22 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     }
 
     // 2. Configuração do Range de Datas
-    let startDate = new Date(2000, 0, 1);
+    let startDate = new Date();
     let endDate = new Date();
     
     if (filter === 'today') {
-      startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
     } else if (filter === '7days') {
-      startDate = new Date();
       startDate.setDate(startDate.getDate() - 7);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (filter === '30days') {
+      startDate.setDate(startDate.getDate() - 30);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (filter === 'custom' && req.query.startDate && req.query.endDate) {
+      startDate = new Date(req.query.startDate as string);
+      endDate = new Date(req.query.endDate as string);
     } else {
       // Custom / Mês Atual (fallback)
-      startDate = new Date();
       startDate.setDate(1);
       startDate.setHours(0, 0, 0, 0);
     }

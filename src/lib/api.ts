@@ -101,8 +101,12 @@ export const clientsApi = {
 
 // Dashboard
 export const dashboardApi = {
-  getMetrics: async (filter: string = 'custom') => 
-    apiRequest<any>(`/dashboard/metrics?filter=${filter}`),
+  getMetrics: async (filter: string = 'custom', startDate?: string, endDate?: string) => {
+    const query = new URLSearchParams({ filter })
+    if (startDate) query.append('startDate', startDate)
+    if (endDate) query.append('endDate', endDate)
+    return apiRequest<any>(`/dashboard/metrics?${query.toString()}`)
+  },
 }
 
 // Profissionais
@@ -317,4 +321,48 @@ export const funnelConfigApi = {
     apiRequest<any>('/funnel-config/reorder/batch', { method: 'PUT', body: JSON.stringify({ funnels }) }),
   seedDefaults: async () =>
     apiRequest<any>('/funnel-config/seed', { method: 'POST' }),
+}
+
+// Upload de Arquivos
+export const uploadApi = {
+  uploadImage: async (file: File): Promise<ApiResponse<{ url: string }>> => {
+    const token = localStorage.getItem('token')
+    const activeCompanyId = localStorage.getItem('activeCompanyId')
+    const url = `${API_BASE_URL}/upload`
+    
+    const formData = new FormData()
+    formData.append('image', file)
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+          ...(activeCompanyId && { 'X-Company-Id': activeCompanyId }),
+        },
+        body: formData
+      })
+      return await response.json()
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Erro ao fazer upload da imagem',
+          code: 0
+        }
+      }
+    }
+  }
+}
+
+// Resolver URLs de imagens locais/remotas/base64
+export const getImageUrl = (path: string | null | undefined): string => {
+  if (!path) return ''
+  if (path.startsWith('data:') || path.startsWith('blob:') || path.startsWith('http://') || path.startsWith('https://')) {
+    return path
+  }
+  const baseUrl = import.meta.env.VITE_API_URL 
+    ? import.meta.env.VITE_API_URL.replace('/api', '')
+    : (import.meta.env.PROD ? '' : 'http://localhost:4000')
+  return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`
 }

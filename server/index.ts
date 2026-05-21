@@ -31,8 +31,8 @@ dotenv.config()
 
 const app = express()
 app.use(cors())
-app.use(json({ limit: '2mb' }))
-app.use(urlencoded({ extended: true }))
+app.use(json({ limit: '20mb' }))
+app.use(urlencoded({ limit: '20mb', extended: true }))
 
 app.get('/api/health', (_req, res) => {
   res.json({ success: true, data: { status: 'ok' } })

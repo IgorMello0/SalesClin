@@ -8,10 +8,10 @@ import type { TourStep } from '@/hooks/useSectionTour';
 type Position = 'center' | 'bottom' | 'right' | 'top' | 'left';
 
 interface PosResult {
-  top?: number;
-  left?: number;
-  right?: number;
-  bottom?: number;
+  top?: string;
+  left?: string;
+  right?: string;
+  bottom?: string;
   translateX?: string;
   translateY?: string;
 }
@@ -26,8 +26,8 @@ function calcPos(el: HTMLElement | null, position: Position): PosResult {
   // No element OR explicitly centered
   if (!el || position === 'center') {
     return {
-      top: Math.round(VH / 2),
-      left: Math.round(VW / 2),
+      top: `${Math.round(VH / 2)}px`,
+      left: `${Math.round(VW / 2)}px`,
       translateX: '-50%',
       translateY: '-50%',
     };
@@ -37,26 +37,26 @@ function calcPos(el: HTMLElement | null, position: Position): PosResult {
 
   if (position === 'bottom') {
     return {
-      top: Math.min(r.bottom + GAP, VH - 260),
-      left: Math.min(Math.max(r.left, 8), VW - W - 8),
+      top: `${Math.min(r.bottom + GAP, VH - 260)}px`,
+      left: `${Math.min(Math.max(r.left, 8), VW - W - 8)}px`,
     };
   }
   if (position === 'right') {
     return {
-      top: Math.min(r.top, VH - 260),
-      left: Math.min(r.right + GAP, VW - W - 8),
+      top: `${Math.min(r.top, VH - 260)}px`,
+      left: `${Math.min(r.right + GAP, VW - W - 8)}px`,
     };
   }
   if (position === 'left') {
     return {
-      top: Math.min(r.top, VH - 260),
-      left: Math.max(r.left - W - GAP, 8),
+      top: `${Math.min(r.top, VH - 260)}px`,
+      left: `${Math.max(r.left - W - GAP, 8)}px`,
     };
   }
   // top
   return {
-    top: Math.max(r.top - 260 - GAP, 8),
-    left: Math.min(Math.max(r.left, 8), VW - W - 8),
+    top: `${Math.max(r.top - 260 - GAP, 8)}px`,
+    left: `${Math.min(Math.max(r.left, 8), VW - W - 8)}px`,
   };
 }
 
@@ -101,9 +101,9 @@ export const TourPopover: React.FC<TourPopoverProps> = ({
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.95, x: translateX, y: translateY }}
           animate={{ opacity: 1, scale: 1, x: translateX, y: translateY }}
-          exit={{ opacity: 0, scale: 0.92 }}
+          exit={{ opacity: 0, scale: 0.92, x: translateX, y: translateY }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
           style={{
             position: 'fixed',

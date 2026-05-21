@@ -37,12 +37,15 @@ export const ProductTour = () => {
 
   useEffect(() => {
     const startTour = () => {
+      console.log('ProductTour: crm:start-tour event received');
       setTimeout(() => { setStep(0); setActive(true); }, 600);
     };
     window.addEventListener('crm:start-tour', startTour);
 
+    console.log('ProductTour mounted. crm_needs_tour in localStorage:', localStorage.getItem('crm_needs_tour'));
     if (localStorage.getItem('crm_needs_tour') === 'true') {
       localStorage.removeItem('crm_needs_tour');
+      console.log('ProductTour: crm_needs_tour removed from localStorage');
       setTimeout(() => { setStep(0); setActive(true); }, 800);
     }
 
