@@ -297,6 +297,51 @@ async function resolveAudience(
   const recipients: RecipientData[] = []
   const phones = new Set<string>() // Evita duplicatas
 
+  if (audienceType === 'by_tags' && audienceFilter?.tags?.length) {
+    const target = audienceFilter.target || 'both'
+    const selectedTags = audienceFilter.tags
+
+    if (target === 'leads' || target === 'both') {
+      const leads = await prisma.lead.findMany({
+        where: {
+          professionalId,
+          companyId,
+          tags: {
+            hasSome: selectedTags
+          }
+        },
+        select: { id: true, name: true, phone: true }
+      })
+
+      for (const l of leads) {
+        if (l.phone && !phones.has(l.phone)) {
+          phones.add(l.phone)
+          recipients.push({ name: l.name, phone: l.phone, sourceType: 'lead', sourceId: l.id })
+        }
+      }
+    }
+
+    if (target === 'clients' || target === 'both') {
+      const clients = await prisma.client.findMany({
+        where: {
+          professionalId,
+          companyId,
+          tags: {
+            hasSome: selectedTags
+          }
+        },
+        select: { id: true, name: true, phone: true }
+      })
+
+      for (const c of clients) {
+        if (c.phone && !phones.has(c.phone)) {
+          phones.add(c.phone)
+          recipients.push({ name: c.name, phone: c.phone, sourceType: 'client', sourceId: c.id })
+        }
+      }
+    }
+  }
+
   if (audienceType === 'all_leads' || audienceType === 'leads_by_status') {
     const where: any = { professionalId, companyId }
     if (audienceType === 'leads_by_status' && audienceFilter?.statuses?.length) {

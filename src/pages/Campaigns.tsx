@@ -18,6 +18,7 @@ const AUDIENCE_OPTIONS = [
   { value: 'all_clients', label: 'Todos os Clientes', icon: 'group', desc: 'Enviar para todos os clientes cadastrados' },
   { value: 'both', label: 'Leads + Clientes', icon: 'groups', desc: 'Enviar para leads e clientes simultaneamente' },
   { value: 'leads_by_status', label: 'Leads por Etapa', icon: 'filter_alt', desc: 'Filtrar leads por etapa do funil' },
+  { value: 'by_tags', label: 'Por Tags', icon: 'tag', desc: 'Filtrar contatos por tags específicas' },
 ];
 
 const VARIABLES = [
@@ -53,6 +54,11 @@ export default function Campaigns() {
   const [isSending, setIsSending] = useState(false);
   const [previewRecipients, setPreviewRecipients] = useState(0);
 
+  // Tags filter states
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagTarget, setTagTarget] = useState<'both' | 'leads' | 'clients'>('both');
+
   const loadCampaigns = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -64,36 +70,91 @@ export default function Campaigns() {
 
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
+  // Load available tags dynamically
+  useEffect(() => {
+    if (!professional?.id) return;
+    (async () => {
+      try {
+        const tagsSet = new Set<string>();
+        const [rLeads, rClients] = await Promise.all([
+          leadsApi.getAll({ professionalId: Number(professional.id), pageSize: 1000 }),
+          clientsApi.getAll({ pageSize: 1000 })
+        ]);
+        if (rLeads.success && rLeads.data) {
+          rLeads.data.forEach((l: any) => {
+            if (Array.isArray(l.tags)) l.tags.forEach((t: string) => { if (t) tagsSet.add(t); });
+          });
+        }
+        if (rClients.success && rClients.data) {
+          rClients.data.forEach((c: any) => {
+            if (Array.isArray(c.tags)) c.tags.forEach((t: string) => { if (t) tagsSet.add(t); });
+          });
+        }
+        setAvailableTags(Array.from(tagsSet).sort());
+      } catch (e) {
+        console.error('Error fetching tags:', e);
+      }
+    })();
+  }, [professional?.id, campaigns]);
+
   // Preview count when audience changes
   useEffect(() => {
     if (!audienceType || !professional?.id) { setPreviewRecipients(0); return; }
     (async () => {
       try {
         let count = 0;
-        if (audienceType === 'all_leads' || audienceType === 'leads_by_status' || audienceType === 'both') {
-          const r = await leadsApi.getAll({ professionalId: Number(professional.id), pageSize: 1000 });
-          if (r.success) count += (r.data || []).filter((l: any) => l.phone).length;
-        }
-        if (audienceType === 'all_clients' || audienceType === 'both') {
-          const r = await clientsApi.getAll({ pageSize: 1000 });
-          if (r.success) count += (r.data || []).filter((c: any) => c.phone).length;
+        if (audienceType === 'by_tags') {
+          if (selectedTags.length === 0) { setPreviewRecipients(0); return; }
+          if (tagTarget === 'leads' || tagTarget === 'both') {
+            const r = await leadsApi.getAll({ professionalId: Number(professional.id), pageSize: 1000 });
+            if (r.success) {
+              count += (r.data || []).filter((l: any) => 
+                l.phone && 
+                Array.isArray(l.tags) && 
+                l.tags.some((t: string) => selectedTags.includes(t))
+              ).length;
+            }
+          }
+          if (tagTarget === 'clients' || tagTarget === 'both') {
+            const r = await clientsApi.getAll({ pageSize: 1000 });
+            if (r.success) {
+              count += (r.data || []).filter((c: any) => 
+                c.phone && 
+                Array.isArray(c.tags) && 
+                c.tags.some((t: string) => selectedTags.includes(t))
+              ).length;
+            }
+          }
+        } else {
+          if (audienceType === 'all_leads' || audienceType === 'leads_by_status' || audienceType === 'both') {
+            const r = await leadsApi.getAll({ professionalId: Number(professional.id), pageSize: 1000 });
+            if (r.success) count += (r.data || []).filter((l: any) => l.phone).length;
+          }
+          if (audienceType === 'all_clients' || audienceType === 'both') {
+            const r = await clientsApi.getAll({ pageSize: 1000 });
+            if (r.success) count += (r.data || []).filter((c: any) => c.phone).length;
+          }
         }
         setPreviewRecipients(count);
       } catch { setPreviewRecipients(0); }
     })();
-  }, [audienceType, professional?.id]);
+  }, [audienceType, professional?.id, selectedTags, tagTarget]);
 
   const resetForm = () => {
-    setStep(1); setName(''); setMessage(''); setAudienceType(''); setIsCreating(false);
+    setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both'); setIsCreating(false);
   };
 
   const handleCreate = async () => {
     if (!name.trim() || !message.trim() || !audienceType) {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' }); return;
     }
+    if (audienceType === 'by_tags' && selectedTags.length === 0) {
+      toast({ title: 'Selecione pelo menos uma tag', variant: 'destructive' }); return;
+    }
     setIsSending(true);
     try {
-      const res = await campaignsApi.create({ name, message, audienceType });
+      const audienceFilter = audienceType === 'by_tags' ? { tags: selectedTags, target: tagTarget } : undefined;
+      const res = await campaignsApi.create({ name, message, audienceType, audienceFilter });
       if (res.success) {
         toast({ title: 'Campanha criada!' });
         resetForm(); loadCampaigns();
@@ -274,6 +335,69 @@ export default function Campaigns() {
                       </button>
                     ))}
                   </div>
+                  {audienceType === 'by_tags' && (
+                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100/60 space-y-4">
+                      {/* Target Select */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Quem deve receber?</label>
+                        <div className="flex gap-2">
+                          {[
+                            { value: 'both', label: 'Todos' },
+                            { value: 'leads', label: 'Apenas Leads' },
+                            { value: 'clients', label: 'Apenas Clientes' },
+                          ].map((t) => (
+                            <button
+                              key={t.value}
+                              type="button"
+                              onClick={() => setTagTarget(t.value as any)}
+                              className={`flex-1 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                                tagTarget === t.value
+                                  ? 'bg-secondary text-white border-secondary shadow-md shadow-secondary/15'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Tag list */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Selecione as Tags</label>
+                        {availableTags.length === 0 ? (
+                          <p className="text-xs text-muted-foreground italic">Nenhuma tag cadastrada no sistema.</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-white rounded-xl border border-slate-100">
+                            {availableTags.map((tag) => {
+                              const isSelected = selectedTags.includes(tag);
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedTags((prev) =>
+                                      isSelected ? prev.filter((t) => t !== tag) : [...prev, tag]
+                                    )
+                                  }
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                    isSelected
+                                      ? 'bg-[#F97316]/10 text-[#F97316] border border-[#F97316]/20'
+                                      : 'bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined text-xs">
+                                    {isSelected ? 'check_box' : 'add'}
+                                  </span>
+                                  {tag}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {audienceType && (
                     <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm text-secondary">group</span>
@@ -334,6 +458,12 @@ export default function Campaigns() {
                 <div className="bg-slate-50 rounded-xl p-5 space-y-3">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Campanha</span><span className="font-bold text-primary">{name}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Audiência</span><span className="font-bold text-primary">{AUDIENCE_OPTIONS.find(a => a.value === audienceType)?.label}</span></div>
+                  {audienceType === 'by_tags' && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tags selecionadas</span>
+                      <span className="font-bold text-primary">{selectedTags.join(', ')} ({tagTarget === 'both' ? 'Todos' : tagTarget === 'leads' ? 'Apenas Leads' : 'Apenas Clientes'})</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Destinatários</span><span className="font-bold text-primary">{previewRecipients} contatos</span></div>
                   <hr className="border-slate-200" />
                   <div><p className="text-xs text-muted-foreground mb-1">Mensagem:</p><p className="text-sm whitespace-pre-wrap bg-white rounded-lg p-3 border border-slate-100">{message}</p></div>
@@ -371,6 +501,17 @@ export default function Campaigns() {
                     {(STATUS_MAP[viewCampaign.status] || STATUS_MAP.draft).label}
                   </Badge>
                 </div>
+                {viewCampaign.audienceType === 'by_tags' && viewCampaign.audienceFilter?.tags && (
+                  <div className="mt-2 flex flex-wrap gap-1 items-center">
+                    <span className="text-xs text-muted-foreground font-semibold mr-1">Tags filtradas:</span>
+                    {viewCampaign.audienceFilter.tags.map((t: string) => (
+                      <Badge key={t} variant="secondary" className="text-[10px] bg-orange-50 text-secondary border border-orange-100/50 hover:bg-orange-50">{t}</Badge>
+                    ))}
+                    <span className="text-[10px] text-muted-foreground font-bold uppercase ml-2 bg-slate-100 px-2 py-0.5 rounded">
+                      {viewCampaign.audienceFilter.target === 'both' ? 'Todos' : viewCampaign.audienceFilter.target === 'leads' ? 'Apenas Leads' : 'Apenas Clientes'}
+                    </span>
+                  </div>
+                )}
               </DialogHeader>
 
               <div className="grid grid-cols-3 gap-3 mb-5">
