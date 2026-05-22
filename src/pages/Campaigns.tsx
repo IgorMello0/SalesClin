@@ -301,7 +301,7 @@ export default function Campaigns() {
 
       {/* ═══ CREATE CAMPAIGN DIALOG ═══ */}
       <Dialog open={isCreating} onOpenChange={(o) => !o && resetForm()}>
-        <DialogContent className="max-w-2xl p-0 bg-white rounded-3xl overflow-hidden">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-white rounded-3xl">
           <div className="h-1 w-full bg-gradient-to-r from-secondary to-orange-400" />
           <div className="p-6 sm:p-8">
             <DialogHeader className="mb-6">
