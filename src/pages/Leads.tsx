@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,8 @@ import { ProposalViewer } from '@/components/ProposalViewer';
 import { FileText, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { STAGES } from '@/config/funnelConfig';
+import { useMemo } from 'react';
 
 const safeFormatDate = (dateStr: any, formatStr: string = "dd/MM/yyyy") => {
   try {
@@ -93,10 +95,47 @@ const Leads = () => {
   const [isViewingProposal, setIsViewingProposal] = useState(false);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
 
+  const [dynamicFunnels, setDynamicFunnels] = useState<any[]>([]);
+
+  const loadFunnelConfigs = async () => {
+    try {
+      const { funnelConfigApi } = await import('@/lib/api');
+      const res = await funnelConfigApi.getAll();
+      if (res.success && res.data?.length > 0) {
+        setDynamicFunnels(res.data);
+      }
+    } catch (e) {
+      console.error("Error loading funnel configs:", e);
+    }
+  };
+
   useEffect(() => {
     loadLeads();
     loadServices();
+    loadFunnelConfigs();
   }, [professional]);
+
+  const allAvailableStages = useMemo(() => {
+    const stagesList: {id: string, label: string}[] = [];
+    Object.values(STAGES).forEach(funnelStages => {
+      funnelStages.forEach(stage => {
+        stagesList.push({ id: stage.id, label: stage.label });
+      });
+    });
+
+    dynamicFunnels.forEach(funnel => {
+      if (funnel.stages && Array.isArray(funnel.stages)) {
+        funnel.stages.forEach((stage: any) => {
+          const code = stage.code || stage.id;
+          if (!stagesList.find(s => s.id === code)) {
+            stagesList.push({ id: code, label: stage.label });
+          }
+        });
+      }
+    });
+
+    return stagesList;
+  }, [dynamicFunnels]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -281,18 +320,11 @@ const Leads = () => {
   });
 
   const getStatusLabel = (status: string) => {
+    const stage = allAvailableStages.find(s => s.id === status);
+    if (stage) return stage.label;
+    
+    // Fallback dictionary for common hardcoded ones just in case
     const statuses: Record<string, string> = {
-      'prospect_lead': 'Novo Lead',
-      'prospect_qualified': 'Qualificado',
-      'prospect_scheduled': 'Agendado',
-      'prospect_attended': 'Compareceu',
-      'comercial_consult': 'Consulta Feita',
-      'comercial_proposal': 'Proposta',
-      'comercial_follow': 'Follow-up',
-      'comercial_closed': 'Fechado',
-      'sales_payment': 'Pagamento',
-      'sales_contract': 'Contrato',
-      'sales_post': 'Pós-Venda',
       'lost': 'Perdido'
     };
     return statuses[status.toLowerCase()] || status;
@@ -380,7 +412,7 @@ const Leads = () => {
                       <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Telefone *</Label>
                       <Input
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
                         placeholder="(11) 99999-9999"
                         className="h-11 rounded-xl bg-muted border-border"
                       />
@@ -410,17 +442,11 @@ const Leads = () => {
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-slate-100 shadow-xl">
-                          <SelectItem value="prospect_lead">Novo Lead</SelectItem>
-                          <SelectItem value="prospect_qualified">Qualificado</SelectItem>
-                          <SelectItem value="prospect_scheduled">Agendado</SelectItem>
-                          <SelectItem value="prospect_attended">Compareceu</SelectItem>
-                          <SelectItem value="comercial_consult">Consulta Feita</SelectItem>
-                          <SelectItem value="comercial_proposal">Proposta</SelectItem>
-                          <SelectItem value="comercial_follow">Follow-up</SelectItem>
-                          <SelectItem value="comercial_closed">Fechado</SelectItem>
-                          <SelectItem value="sales_payment">Pagamento</SelectItem>
-                          <SelectItem value="sales_contract">Contrato</SelectItem>
-                          <SelectItem value="sales_post">Pós-Venda</SelectItem>
+                          {allAvailableStages.map(stage => (
+                            <SelectItem key={stage.id} value={stage.id}>
+                              {stage.label}
+                            </SelectItem>
+                          ))}
                           <SelectItem value="lost">Perdido</SelectItem>
                         </SelectContent>
                       </Select>

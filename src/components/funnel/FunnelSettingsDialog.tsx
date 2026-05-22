@@ -43,6 +43,13 @@ const ICON_OPTIONS = [
   { value: 'calendar_today', label: 'Agenda' },
 ];
 
+const SYSTEM_FUNNELS = ['prospecting', 'commercial', 'sales'];
+const SYSTEM_STAGES = [
+  'prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended',
+  'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed',
+  'sales_payment', 'sales_contract', 'sales_post'
+];
+
 interface FunnelSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -380,13 +387,15 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteFunnel(funnel.id); }}
-                        className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50/80 transition-all duration-300"
-                        title="Remover funil"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {!SYSTEM_FUNNELS.includes(funnel.code) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteFunnel(funnel.id); }}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50/80 transition-all duration-300"
+                          title="Remover funil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                       {expandedFunnel === funnel.id ? (
                         <ChevronUp className="w-4 h-4 text-slate-400" />
                       ) : (
@@ -479,15 +488,19 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
                                     setEditStageData({ label: stage.label, color: stage.color });
                                   }}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-secondary hover:bg-orange-50 transition-all duration-200"
+                                  title="Editar etapa"
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteStage(stage.id)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {!SYSTEM_STAGES.includes(stage.code) && (
+                                  <button
+                                    onClick={() => handleDeleteStage(stage.id)}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
+                                    title="Remover etapa"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               </div>
                             </>
                           )}

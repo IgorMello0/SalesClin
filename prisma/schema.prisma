@@ -22,13 +22,13 @@ model Professional {
   contractType        String?                  @map("contract_type")
   createdAt           DateTime                 @default(now()) @map("created_at")
   updatedAt           DateTime                 @updatedAt @map("updated_at")
-  bio                 String?
+  bio                 String?                  @db.Text
   crm                 String?
   photoUrl            String?                  @map("photo_url")
   onboardingCompleted Boolean                  @default(false) @map("onboarding_completed")
   onboardingData      Json?                    @map("onboarding_data")
-  auth_provider       String?                  @default("local")
-  google_id           String?                  @unique
+  googleId            String?                  @unique @map("google_id")
+  authProvider        String?                  @default("local") @map("auth_provider")
   appointments        Appointment[]
   auditLogs           AuditLog[]
   catalogItems        CatalogItem[]
@@ -42,7 +42,6 @@ model Professional {
   fichas              Ficha[]
   goals               Goal[]
   leads               Lead[]
-  message_campaigns   message_campaigns[]
   payments            Payment[]
   permissions         ProfessionalPermission[]
   company             Empresa?                 @relation("CompanyProfessionals", fields: [companyId], references: [id])
@@ -51,6 +50,7 @@ model Professional {
   assignedTasks       Task[]                   @relation("AssignedTasks")
   createdTasks        Task[]                   @relation("CreatedTasks")
   notifications       Notification[]
+  messageCampaigns    MessageCampaign[]
 
   @@map("professionals")
 }
@@ -336,36 +336,37 @@ model Contract {
 
 model Empresa {
   id                   Int                 @id @default(autoincrement())
+  ownerId              Int?                @map("owner_id")
   name                 String
+  logoUrl              String?             @map("logo_url")
   domain               String?
   whatsapp             String?
+  whatsappProvider     String?             @default("evolution") @map("whatsapp_provider")
   apiKey               String?             @map("api_key")
+  evolutionApiUrl      String?             @map("evolution_api_url")
+  evolutionInstance    String?             @map("evolution_instance")
+  metaToken            String?             @map("meta_token")
+  metaPhoneNumberId    String?             @map("meta_phone_number_id")
   plan                 String?
+  openHour             String              @default("08:00") @map("open_hour")
+  closeHour            String              @default("20:00") @map("close_hour")
   isActive             Boolean             @default(true) @map("is_active")
   createdAt            DateTime            @default(now()) @map("created_at")
   updatedAt            DateTime            @updatedAt @map("updated_at")
-  ownerId              Int?                @map("owner_id")
-  logoUrl              String?             @map("logo_url")
-  closeHour            String              @default("20:00") @map("close_hour")
-  openHour             String              @default("08:00") @map("open_hour")
-  evolution_api_url    String?
-  evolution_instance   String?
-  meta_phone_number_id String?
-  meta_token           String?
-  whatsapp_provider    String?             @default("evolution")
-  agentesIa            AgenteIa[]
-  appointments         Appointment[]
-  clients              Client[]
-  conversas            Conversa[]
+  
   owner                Professional?       @relation("CompanyOwner", fields: [ownerId], references: [id])
-  funnelConfigs        FunnelConfig[]
-  leads                Lead[]
-  message_campaigns    message_campaigns[]
-  payments             Payment[]
   professionals        Professional[]      @relation("CompanyProfessionals")
-  roles                Role[]
-  userCompanyAccess    UserCompanyAccess[]
   usuarios             Usuario[]
+  userCompanyAccess    UserCompanyAccess[]
+  agentesIa            AgenteIa[]
+  conversas            Conversa[]
+  roles                Role[]
+  clients              Client[]
+  leads                Lead[]
+  appointments         Appointment[]
+  payments             Payment[]
+  funnelConfigs        FunnelConfig[]
+  messageCampaigns     MessageCampaign[]
   tasks                Task[]
   notifications        Notification[]
 
@@ -393,19 +394,20 @@ model Usuario {
   name                   String
   email                  String              @unique
   passwordHash           String              @map("password_hash")
+  roleId                 Int?                @map("role_id")
   isActive               Boolean             @default(true) @map("is_active")
+  googleId               String?             @unique @map("google_id")
+  authProvider           String?             @default("local") @map("auth_provider")
+  onboardingCompleted    Boolean             @default(false) @map("onboarding_completed")
   createdAt              DateTime            @default(now()) @map("created_at")
   updatedAt              DateTime            @updatedAt @map("updated_at")
-  roleId                 Int?                @map("role_id")
-  onboardingCompleted    Boolean             @default(false) @map("onboarding_completed")
-  auth_provider          String?             @default("local")
-  google_id              String?             @unique
+  
+  company                Empresa?            @relation(fields: [companyId], references: [id])
+  companyAccess          UserCompanyAccess[]
+  role                   Role?               @relation(fields: [roleId], references: [id])
+  permissions            UserPermission[]
   proposalsAsSalesperson Proposal[]          @relation("SalespersonProposals")
   proposalsAsSpecialist  Proposal[]          @relation("SpecialistProposals")
-  companyAccess          UserCompanyAccess[]
-  permissions            UserPermission[]
-  company                Empresa?            @relation(fields: [companyId], references: [id])
-  role                   Role?               @relation(fields: [roleId], references: [id])
 
   @@map("usuarios")
 }
@@ -598,43 +600,6 @@ model FunnelStage {
   @@map("funnel_stages")
 }
 
-model campaign_recipients {
-  id                Int               @id @default(autoincrement())
-  campaign_id       Int
-  name              String
-  phone             String
-  source_type       String
-  source_id         Int
-  status            RecipientStatus   @default(pending)
-  sent_at           DateTime?
-  error_message     String?
-  rendered_message  String?
-  created_at        DateTime          @default(now())
-  message_campaigns message_campaigns @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
-}
-
-model message_campaigns {
-  id                  Int                   @id @default(autoincrement())
-  company_id          Int
-  professional_id     Int
-  name                String
-  message             String
-  audience_type       String
-  audience_filter     Json?
-  status              CampaignStatus        @default(draft)
-  total_recipients    Int                   @default(0)
-  sent_count          Int                   @default(0)
-  failed_count        Int                   @default(0)
-  scheduled_at        DateTime?
-  started_at          DateTime?
-  completed_at        DateTime?
-  created_at          DateTime              @default(now())
-  updated_at          DateTime
-  campaign_recipients campaign_recipients[]
-  empresas            Empresa               @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  professionals       Professional          @relation(fields: [professional_id], references: [id], onDelete: Cascade)
-}
-
 enum CategoryStatus {
   ativo
   inativo
@@ -710,22 +675,6 @@ enum ContractStatus {
   cancelado
 }
 
-enum CampaignStatus {
-  draft
-  scheduled
-  sending
-  completed
-  failed
-  canceled
-}
-
-enum RecipientStatus {
-  pending
-  sent
-  failed
-  skipped
-}
-
 model Task {
   id              Int           @id @default(autoincrement())
   title           String
@@ -772,4 +721,69 @@ model Notification {
   task        Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+// ==================== CAMPANHAS DE MENSAGENS ====================
+
+enum CampaignStatus {
+  draft      // Rascunho
+  scheduled  // Agendada
+  sending    // Em envio
+  completed  // Finalizada
+  failed     // Falhou
+  canceled   // Cancelada
+}
+
+enum RecipientStatus {
+  pending   // Aguardando envio
+  sent      // Enviado com sucesso
+  failed    // Falha no envio
+  skipped   // Ignorado (sem telefone válido)
+}
+
+// Campanhas de mensagens em massa
+model MessageCampaign {
+  id             Int            @id @default(autoincrement())
+  companyId      Int            @map("company_id")
+  professionalId Int            @map("professional_id")
+  name           String         // Nome da campanha
+  message        String         @db.Text // Corpo da mensagem (suporta variáveis como {{nome}})
+  audienceType   String         @map("audience_type") // 'all_leads', 'all_clients', 'leads_by_status', 'manual'
+  audienceFilter Json?          @map("audience_filter") // Filtros aplicados (status, funil, tags, etc.)
+  status         CampaignStatus @default(draft)
+  totalRecipients Int           @default(0) @map("total_recipients")
+  sentCount      Int            @default(0) @map("sent_count")
+  failedCount    Int            @default(0) @map("failed_count")
+  scheduledAt    DateTime?      @map("scheduled_at") // Data de agendamento (se agendada)
+  startedAt      DateTime?      @map("started_at")   // Quando começou a enviar
+  completedAt    DateTime?      @map("completed_at") // Quando finalizou
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  company      Empresa              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional Professional         @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  recipients   CampaignRecipient[]
+
+  @@map("message_campaigns")
+}
+
+// Destinatários individuais de cada campanha
+model CampaignRecipient {
+  id           Int             @id @default(autoincrement())
+  campaignId   Int             @map("campaign_id")
+  name         String          // Nome do destinatário
+  phone        String          // Telefone do destinatário
+  sourceType   String          @map("source_type") // 'lead' ou 'client'
+  sourceId     Int             @map("source_id")   // ID do lead ou client
+  status       RecipientStatus @default(pending)
+  sentAt       DateTime?       @map("sent_at")
+  errorMessage String?         @map("error_message")
+  renderedMessage String?      @map("rendered_message") @db.Text // Mensagem final renderizada
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  // Relacionamentos
+  campaign MessageCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_recipients")
 }

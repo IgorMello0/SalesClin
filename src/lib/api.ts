@@ -109,6 +109,12 @@ export const dashboardApi = {
   },
 }
 
+// Auth (Google OAuth)
+export const authApi = {
+  loginWithGoogle: async (credential: string) =>
+    apiRequest<{ token: string; professional: any }>('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
+}
+
 // Profissionais
 export const professionalsApi = {
   login: async (email: string, password: string) => 
@@ -388,4 +394,25 @@ export const getImageUrl = (path: string | null | undefined): string => {
     ? import.meta.env.VITE_API_URL.replace('/api', '')
     : (import.meta.env.PROD ? '' : 'http://localhost:4000')
   return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`
+}
+
+// Campanhas de Mensagens em Massa
+export const campaignsApi = {
+  getAll: async (params?: { page?: number; pageSize?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.append('page', params.page.toString())
+    if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+    return apiRequest<Array<any>>(`/campaigns?${query.toString()}`)
+  },
+  getById: async (id: number) => apiRequest<any>(`/campaigns/${id}`),
+  create: async (data: { name: string; message: string; audienceType: string; audienceFilter?: any }) =>
+    apiRequest<any>('/campaigns', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: any) =>
+    apiRequest<any>(`/campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id: number) =>
+    apiRequest<any>(`/campaigns/${id}`, { method: 'DELETE' }),
+  send: async (id: number) =>
+    apiRequest<any>(`/campaigns/${id}/send`, { method: 'POST' }),
+  getProgress: async (id: number) =>
+    apiRequest<any>(`/campaigns/${id}/progress`),
 }
