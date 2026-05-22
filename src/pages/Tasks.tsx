@@ -597,7 +597,7 @@ export default function Tasks() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
                 !isTeamMode 
-                  ? "bg-secondary text-secondary-foreground shadow-sm" 
+                  ? "bg-secondary text-secondary-foreground" 
                   : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
               )}
             >
@@ -609,7 +609,7 @@ export default function Tasks() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
                 isTeamMode 
-                  ? "bg-secondary text-secondary-foreground shadow-sm" 
+                  ? "bg-secondary text-secondary-foreground" 
                   : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
               )}
             >
@@ -625,7 +625,7 @@ export default function Tasks() {
               className={cn(
                 "p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center",
                 viewMode === 'kanban' 
-                  ? "bg-primary text-primary-foreground shadow-sm" 
+                  ? "bg-primary text-primary-foreground" 
                   : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
               )}
               title="Quadro Kanban"
@@ -637,7 +637,7 @@ export default function Tasks() {
               className={cn(
                 "p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center",
                 viewMode === 'list' 
-                  ? "bg-primary text-primary-foreground shadow-sm" 
+                  ? "bg-primary text-primary-foreground" 
                   : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
               )}
               title="Visualização em Lista"
