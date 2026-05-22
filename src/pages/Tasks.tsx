@@ -662,9 +662,7 @@ export default function Tasks() {
         <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total de Tarefas</div>
-            <div className="p-2 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl shadow-none">
-              <span className="material-symbols-outlined text-lg">fact_check</span>
-            </div>
+            <span className="material-symbols-outlined text-2xl text-blue-600 dark:text-blue-400 select-none">fact_check</span>
           </div>
           <div className="mt-2">
             <h3 className="stats-value">{totalCount}</h3>
@@ -675,9 +673,7 @@ export default function Tasks() {
         <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Concluídas</div>
-            <div className="p-2 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl shadow-none">
-              <span className="material-symbols-outlined text-lg">check_circle</span>
-            </div>
+            <span className="material-symbols-outlined text-2xl text-emerald-600 dark:text-emerald-400 select-none">check_circle</span>
           </div>
           <div className="mt-2">
             <h3 className="stats-value text-emerald-600 dark:text-emerald-400">{completedCount}</h3>
@@ -690,9 +686,7 @@ export default function Tasks() {
         <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ativas</div>
-            <div className="p-2 bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl shadow-none">
-              <span className="material-symbols-outlined text-lg">hourglass_empty</span>
-            </div>
+            <span className="material-symbols-outlined text-2xl text-amber-600 dark:text-amber-400 select-none">hourglass_empty</span>
           </div>
           <div className="mt-2">
             <h3 className="stats-value text-amber-600 dark:text-amber-400">{pendingCount}</h3>
@@ -703,9 +697,7 @@ export default function Tasks() {
         <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Atrasadas</div>
-            <div className="p-2 bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl shadow-none">
-              <span className="material-symbols-outlined text-lg">alarm_on</span>
-            </div>
+            <span className="material-symbols-outlined text-2xl text-red-600 dark:text-red-400 select-none">alarm_on</span>
           </div>
           <div className="mt-2">
             <h3 className="stats-value text-red-600 dark:text-red-400">{overdueCount}</h3>
