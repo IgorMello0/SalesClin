@@ -24,6 +24,8 @@ import { router as metasRouter } from './routes/metas.js'
 import { router as webhooksRouter } from './routes/webhooks.js'
 import { router as rolesRouter } from './routes/roles.js'
 import { router as funnelConfigRouter } from './routes/funnelConfig.js'
+import { router as campaignsRouter } from './routes/campaigns.js'
+import { router as authRouter } from './routes/auth.js'
 import { createErrorResponse } from './utils/response.js'
 import path from 'path'
 
@@ -31,8 +33,8 @@ dotenv.config()
 
 const app = express()
 app.use(cors())
-app.use(json({ limit: '2mb' }))
-app.use(urlencoded({ extended: true }))
+app.use(json({ limit: '20mb' }))
+app.use(urlencoded({ limit: '20mb', extended: true }))
 
 app.get('/api/health', (_req, res) => {
   res.json({ success: true, data: { status: 'ok' } })
@@ -60,6 +62,8 @@ app.use('/api/metas', metasRouter)
 app.use('/api/webhooks', webhooksRouter)
 app.use('/api/roles', rolesRouter)
 app.use('/api/funnel-config', funnelConfigRouter)
+app.use('/api/campaigns', campaignsRouter)
+app.use('/api/auth', authRouter)
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))

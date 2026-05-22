@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
+import { getImageUrl } from '@/lib/api';
 
 const menuItems = [
   {
@@ -63,6 +64,12 @@ const menuItems = [
     url: '/metas',
     icon: 'trending_up',
     moduleCode: 'metas',
+  },
+  {
+    title: 'Campanhas',
+    url: '/campaigns',
+    icon: 'campaign',
+    moduleCode: 'campanhas',
   },
 ];
 
@@ -303,7 +310,7 @@ export function AppTopNavbar() {
             >
               {professional?.photoUrl ? (
                 <img 
-                  src={professional.photoUrl} 
+                  src={getImageUrl(professional.photoUrl)} 
                   alt="Foto do perfil" 
                   className="w-full h-full object-cover"
                 />

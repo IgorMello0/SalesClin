@@ -1,292 +1,290 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, ArrowLeft, TrendingUp, Users, Target } from 'lucide-react';
+import { Loader2, Mail, Lock, ArrowRight, Sun, Moon, Sunset, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { GoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, isLoading } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const { login, loginWithGoogle, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [greeting, setGreeting] = useState('Olá');
+  const [GreetingIcon, setGreetingIcon] = useState<any>(Sun);
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) {
+      setGreeting('Bom dia');
+      setGreetingIcon(Sun);
+    } else if (hour < 18) {
+      setGreeting('Boa tarde');
+      setGreetingIcon(Sunset);
+    } else {
+      setGreeting('Boa noite');
+      setGreetingIcon(Moon);
+    }
+  }, []);
+
+  const getFormattedDate = () => {
+    const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+    const dateStr = new Date().toLocaleDateString('pt-BR', options);
+    return dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!email || !password) {
-      toast({
-        title: 'Erro de validação',
-        description: 'Por favor, preencha todos os campos.',
-        variant: 'destructive',
+      toast({ 
+        title: 'Campos vazios', 
+        description: 'Por favor, preencha seu e-mail e senha.', 
+        variant: 'destructive' 
       });
       return;
     }
-
     const result = await login(email, password);
-
     if (result.success) {
-      const userType = localStorage.getItem('userType');
-      toast({
-        title: 'Login realizado com sucesso!',
-        description: `Bem-vindo ao sistema${userType === 'user' ? ' (Usuário)' : ' (Profissional)'}!`,
+      toast({ 
+        title: 'Que bom ter você aqui!', 
+        description: `Login realizado com sucesso no seu painel.` 
       });
       navigate('/dashboard');
     } else {
-      toast({
-        title: 'Erro no login',
-        description: result.error || 'Email ou senha incorretos. Verifique suas credenciais e tente novamente.',
-        variant: 'destructive',
+      toast({ 
+        title: 'Verifique seus dados', 
+        description: result.error || 'E-mail ou senha incorretos.', 
+        variant: 'destructive' 
       });
     }
   };
 
-  const stats = [
-    { icon: TrendingUp, label: 'Conversão média', value: '+38%' },
-    { icon: Users, label: 'Profissionais ativos', value: '2.400+' },
-    { icon: Target, label: 'Leads gerenciados', value: '120k+' },
-  ];
+  const handleGoogleLogin = () => {
+    toast({ 
+      title: 'Integração em andamento', 
+      description: 'O login do Google estará disponível em breve com a nova API.' 
+    });
+  };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel — brand */}
-      <div
-        className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-center px-12 py-8"
-        style={{
-          background: 'linear-gradient(135deg, hsl(219,74%,12%) 0%, hsl(219,74%,20%) 50%, hsl(25,95%,40%) 100%)',
-        }}
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center bg-[#FAF9F6]/80 font-body p-4 sm:p-6">
+      
+      {/* 1. Subtle Dotted Grid Pattern for texture */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-[0.25]" 
+        style={{ backgroundImage: 'radial-gradient(#CBD5E1 1px, transparent 1px)', backgroundSize: '32px 32px' }} 
+      />
+      
+      {/* 2. Soft, rich ambient glows (brand orange and navy) */}
+      <div className="absolute top-[-10%] left-[-10%] w-[55vw] h-[55vw] rounded-full bg-[#F97316]/8 blur-[130px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[#0F172A]/8 blur-[150px] pointer-events-none" />
+      <div className="absolute top-[40%] right-[20%] w-[35vw] h-[35vw] rounded-full bg-[#F97316]/4 blur-[110px] pointer-events-none" />
+      
+      {/* CENTRAL CONTAINER */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-5xl bg-white rounded-[2.5rem] shadow-[0_30px_70px_-15px_rgba(15,23,42,0.08)] border border-slate-100 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[600px]"
       >
-        {/* Decorative blobs */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-        >
-          <div
-            className="absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full opacity-20"
-            style={{ background: 'radial-gradient(circle, hsl(25,95%,53%) 0%, transparent 70%)' }}
-          />
-          <div
-            className="absolute -bottom-40 -right-20 w-[520px] h-[520px] rounded-full opacity-15"
-            style={{ background: 'radial-gradient(circle, hsl(217,91%,60%) 0%, transparent 70%)' }}
-          />
-          {/* Grid pattern */}
-          <svg className="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
-        </div>
-
-        {/* All content — centered block, logo aligned with headline */}
-        <div className="relative z-10 space-y-8">
-
-          {/* Logo */}
-          <Link to="/">
-            <img
-              src="/logo-site.png"
-              alt="SalesClin Logo"
-              className="h-14 w-auto object-contain brightness-0 invert"
-            />
-          </Link>
-
-          {/* Headline */}
-          <div className="space-y-3">
-            <h1 className="text-2xl lg:text-3xl font-extrabold text-white leading-tight" style={{ fontFamily: 'Manrope, sans-serif' }}>
-              Gerencie seus leads<br />
-              <span style={{ color: 'hsl(25,95%,63%)' }}>com inteligência.</span>
-            </h1>
-            <p className="text-white/70 text-base leading-relaxed max-w-sm">
-              O CRM especializado em clínicas e consultórios que transforma contatos em pacientes fidelizados.
-            </p>
-          </div>
-
-          {/* Stats + Quote — single glass card */}
-          <div
-            className="rounded-2xl p-5 space-y-5"
-            style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.12)' }}
-          >
-            {/* Stats row */}
-            <div className="grid grid-cols-3 gap-3">
-              {stats.map(({ icon: Icon, label, value }) => (
-                <div key={label} className="space-y-1.5">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ background: 'rgba(255,255,255,0.15)' }}
-                  >
-                    <Icon className="w-3.5 h-3.5 text-white" />
-                  </div>
-                  <p className="text-xl font-extrabold text-white" style={{ fontFamily: 'Manrope, sans-serif' }}>{value}</p>
-                  <p className="text-white/60 text-xs leading-snug">{label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Divider */}
-            <div style={{ height: '1px', background: 'rgba(255,255,255,0.10)' }} />
-
-            {/* Quote */}
+        
+        {/* LEFT COLUMN: BRANDING & WELCOME AURA */}
+        <div className="md:col-span-5 bg-[#0F172A] p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden text-white">
+          
+          {/* Cozy Amber Warm Glow inside the dark panel */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-[#F97316]/15 rounded-full blur-[80px] pointer-events-none" />
+          
+          <div className="relative z-10 space-y-12">
+            {/* Brand Logo */}
             <div>
-              <p className="text-white/80 text-sm italic leading-relaxed">
-                "O SalesClin transformou a forma como gerenciamos nossos pacientes. Nossa conversão aumentou 42% em 3 meses."
+              <img 
+                src="/logo-site.png" 
+                alt="SalesClin Logo" 
+                className="h-8 w-auto brightness-0 invert" 
+              />
+            </div>
+            
+            {/* Dynamic Greeting */}
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#F97316] border border-white/5">
+                {GreetingIcon && <GreetingIcon size={14} className="text-[#F97316] animate-pulse" />}
+                <span className="text-[11px] font-bold uppercase tracking-wider">{greeting}!</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-headline font-bold text-white tracking-tight leading-tight">
+                Que bom ver você <br/> de volta.
+              </h2>
+              <p className="text-slate-300 text-sm leading-relaxed font-medium max-w-[280px]">
+                Preparamos seu espaço para que o dia de hoje seja produtivo, leve e cheio de resultados.
               </p>
-              <div className="mt-3 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: 'hsl(25,95%,53%)' }}>
-                  DM
-                </div>
-                <div>
-                  <p className="text-white text-xs font-semibold">Dra. Marina Costa</p>
-                  <p className="text-white/50 text-xs">Clínica Estética São Paulo</p>
-                </div>
+            </div>
+          </div>
+          
+          {/* Warm indicators card */}
+          <div className="relative z-10 bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 space-y-4 mt-8">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[#F97316] uppercase tracking-wider">{getFormattedDate()}</span>
+            </div>
+            
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2.5 text-xs text-slate-200">
+                <CheckCircle2 size={14} className="text-[#F97316]" />
+                <span>Sua agenda está sincronizada</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-slate-200">
+                <CheckCircle2 size={14} className="text-[#F97316]" />
+                <span>Funil de vendas ativo</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-slate-200">
+                <CheckCircle2 size={14} className="text-[#F97316]" />
+                <span>Faturamento do dia pronto</span>
               </div>
             </div>
           </div>
+          
         </div>
-      </div>
 
-      {/* Right panel — form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-16 bg-[hsl(210,40%,98%)] min-h-screen lg:min-h-0">
-        <div className="w-full max-w-md space-y-8">
-
-          {/* Mobile logo */}
-          <div className="lg:hidden flex justify-center">
-            <Link to="/">
-              <img src="/logo-site.png" alt="SalesClin Logo" className="h-12 w-auto object-contain" />
-            </Link>
-          </div>
-
-          {/* Header */}
-          <div className="space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-extrabold" style={{ color: 'hsl(219,74%,15%)', fontFamily: 'Manrope, sans-serif' }}>
-              Bem-vindo de volta
-            </h2>
-            <p className="text-[hsl(215,16%,47%)]">
-              Acesse sua área como profissional ou usuário
-            </p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-semibold" style={{ color: 'hsl(217,33%,17%)' }}>
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'hsl(215,16%,55%)' }} />
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full pl-11 pr-4 py-3.5 rounded-xl text-sm outline-none transition-all duration-200"
-                  style={{
-                    background: 'hsl(210,40%,96%)',
-                    border: '1.5px solid hsl(214,32%,88%)',
-                    color: 'hsl(217,33%,17%)',
-                    fontFamily: 'Inter, sans-serif',
-                  }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'hsl(219,74%,15%)'; e.currentTarget.style.background = '#fff'; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = 'hsl(214,32%,88%)'; e.currentTarget.style.background = 'hsl(210,40%,96%)'; }}
+        {/* RIGHT COLUMN: CLEAN FORM */}
+        <div className="md:col-span-7 p-8 sm:p-12 md:p-16 flex flex-col justify-center bg-gradient-to-br from-white to-slate-50/40">
+          <div className="max-w-md w-full mx-auto space-y-8">
+            
+            {/* Title */}
+            <div>
+              {/* Logo for mobile only */}
+              <div className="md:hidden mb-6">
+                <img 
+                  src="/logo-site.png" 
+                  alt="SalesClin Logo" 
+                  className="h-8 w-auto" 
                 />
               </div>
+              <h1 className="text-2xl font-headline font-bold text-[#0F172A] tracking-tight mb-2">Faça o seu acesso</h1>
+              <p className="text-slate-400 text-sm font-medium">Insira suas credenciais para entrar no painel da clínica.</p>
             </div>
 
-            {/* Password */}
-            <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-semibold" style={{ color: 'hsl(217,33%,17%)' }}>
-                Senha
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'hsl(215,16%,55%)' }} />
-                <input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full pl-11 pr-4 py-3.5 rounded-xl text-sm outline-none transition-all duration-200"
-                  style={{
-                    background: 'hsl(210,40%,96%)',
-                    border: '1.5px solid hsl(214,32%,88%)',
-                    color: 'hsl(217,33%,17%)',
-                    fontFamily: 'Inter, sans-serif',
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              
+              <div className="space-y-4">
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="block text-[13px] font-bold text-[#0F172A] ml-1">E-mail corporativo</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      id="email"
+                      type="email" 
+                      placeholder="nome@clinica.com.br"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full h-[54px] pl-11 pr-5 border border-slate-200 rounded-2xl text-[14px] focus:outline-none focus:ring-4 focus:ring-[#F97316]/10 focus:border-[#F97316] transition-all bg-slate-50/50 placeholder:text-slate-300 text-slate-700"
+                    />
+                  </div>
+                </div>
+                
+                {/* Password */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center ml-1">
+                    <label htmlFor="password" className="block text-[13px] font-bold text-[#0F172A]">Senha de acesso</label>
+                    <a href="#" className="text-[12px] text-slate-400 hover:text-[#F97316] font-medium transition-colors">Esqueceu a senha?</a>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      id="password"
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="w-full h-[54px] pl-11 pr-12 border border-slate-200 rounded-2xl text-[14px] focus:outline-none focus:ring-4 focus:ring-[#F97316]/10 focus:border-[#F97316] transition-all bg-slate-50/50 placeholder:text-slate-300 text-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-[54px] mt-2 bg-[#F97316] hover:bg-orange-600 text-white rounded-2xl text-[14px] font-headline font-bold uppercase tracking-wider hover:shadow-lg hover:shadow-orange-100 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed shadow-[0_10px_20px_-10px_rgba(249,115,22,0.25)]"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                {isLoading ? 'Conectando...' : 'Acessar painel'}
+              </button>
+
+              {/* Divider */}
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100" /></div>
+                <div className="relative flex justify-center"><span className="px-4 text-[11px] font-bold text-slate-400 bg-white uppercase tracking-wider">ou acesse com</span></div>
+              </div>
+
+              {/* Google Button */}
+              <div className="flex justify-center w-full">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    if (!credentialResponse.credential) {
+                      toast({ 
+                        title: 'Erro no login com Google', 
+                        description: 'Não foi possível obter credencial.', 
+                        variant: 'destructive' 
+                      });
+                      return;
+                    }
+                    const result = await loginWithGoogle(credentialResponse.credential);
+                    if (result.success) {
+                      toast({ 
+                        title: 'Login com Google realizado!', 
+                        description: 'Que bom ter você de volta!' 
+                      });
+                      navigate('/dashboard');
+                    } else {
+                      toast({ 
+                        title: 'Erro no login com Google', 
+                        description: result.error || 'Tente novamente.', 
+                        variant: 'destructive' 
+                      });
+                    }
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'hsl(219,74%,15%)'; e.currentTarget.style.background = '#fff'; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = 'hsl(214,32%,88%)'; e.currentTarget.style.background = 'hsl(210,40%,96%)'; }}
+                  onError={() => {
+                    toast({ 
+                      title: 'Erro no Google', 
+                      description: 'Não foi possível conectar com o Google.', 
+                      variant: 'destructive' 
+                    });
+                  }}
+                  theme="outline"
+                  size="large"
+                  width="360"
+                  text="continue_with"
+                  shape="pill"
+                  logo_alignment="left"
                 />
               </div>
-            </div>
 
-            {/* Submit button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-              style={{
-                background: isLoading
-                  ? 'hsl(219,74%,20%)'
-                  : 'linear-gradient(135deg, hsl(219,74%,15%) 0%, hsl(219,74%,22%) 100%)',
-                color: '#fff',
-                fontFamily: 'Manrope, sans-serif',
-                boxShadow: '0 4px 20px rgba(10,31,68,0.3)',
-              }}
-              onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {isLoading ? 'Entrando...' : 'Entrar no sistema'}
-            </button>
-          </form>
+              {/* Back to site */}
+              <div className="text-center pt-2">
+                <Link to="/" className="text-xs font-bold text-slate-400 hover:text-[#F97316] transition-colors">
+                  ← Voltar para a página inicial
+                </Link>
+              </div>
 
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full" style={{ height: '1px', background: 'hsl(214,32%,91%)' }} />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-4 text-xs" style={{ background: 'hsl(210,40%,98%)', color: 'hsl(215,16%,55%)' }}>
-                Novo por aqui?
-              </span>
-            </div>
-          </div>
+            </form>
 
-          {/* Sign up link */}
-          <Link
-            to="/signup"
-            className="w-full py-3.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-            style={{
-              border: '1.5px solid hsl(214,32%,88%)',
-              color: 'hsl(219,74%,15%)',
-              background: 'transparent',
-              fontFamily: 'Manrope, sans-serif',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'hsl(219,74%,30%)'; e.currentTarget.style.background = 'hsl(219,74%,97%)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'hsl(214,32%,88%)'; e.currentTarget.style.background = 'transparent'; }}
-          >
-            Criar minha conta grátis
-          </Link>
-
-          {/* Back */}
-          <div className="text-center">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 text-xs transition-colors group"
-              style={{ color: 'hsl(215,16%,55%)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'hsl(219,74%,15%)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'hsl(215,16%,55%)'; }}
-            >
-              <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
-              Voltar ao site
-            </Link>
           </div>
         </div>
-      </div>
+
+      </motion.div>
     </div>
   );
 };

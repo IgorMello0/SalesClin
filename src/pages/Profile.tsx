@@ -13,15 +13,27 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { professionalsApi } from '@/lib/api';
+import { professionalsApi, uploadApi, getImageUrl } from '@/lib/api';
 
 const Profile = () => {
-  const { professional, updateProfilePhoto } = useAuth();
+  const { professional, updateProfileData } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Estados para recorte / ajuste de foto
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [origDimensions, setOrigDimensions] = useState({ width: 0, height: 0 });
+  const [minScale, setMinScale] = useState(1);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -52,6 +64,11 @@ const Profile = () => {
           photoUrl: d.photoUrl || '',
         });
         if (d.photoUrl) setProfileImage(d.photoUrl);
+        updateProfileData({
+          name: d.name || '',
+          specialization: d.specialization || '',
+          photoUrl: d.photoUrl || undefined
+        });
       }
     } catch (e) {
       toast({ title: 'Erro', description: 'Não foi possível carregar o perfil', variant: 'destructive' });
@@ -60,21 +77,171 @@ const Profile = () => {
     }
   };
 
+  // Efeito global de drag & drop da imagem
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      handleDragMove(e.clientX, e.clientY);
+    };
+    
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        handleDragMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+    
+    if (isDragging) {
+      window.addEventListener('mousemove', handleGlobalMouseMove);
+      window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+      window.addEventListener('touchend', handleDragEnd);
+    }
+    
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleGlobalTouchMove);
+      window.removeEventListener('touchend', handleDragEnd);
+    };
+  }, [isDragging, dragStart, scale, minScale, origDimensions]);
+
+  const handleDragStart = (clientX: number, clientY: number) => {
+    setIsDragging(true);
+    setDragStart({ x: clientX - position.x, y: clientY - position.y });
+  };
+
+  const handleDragMove = (clientX: number, clientY: number) => {
+    if (!isDragging) return;
+    const newX = clientX - dragStart.x;
+    const newY = clientY - dragStart.y;
+    
+    const renderedWidth = origDimensions.width * minScale * scale;
+    const renderedHeight = origDimensions.height * minScale * scale;
+    const maxDragX = Math.max(0, (renderedWidth - 256) / 2);
+    const maxDragY = Math.max(0, (renderedHeight - 256) / 2);
+    
+    setPosition({
+      x: Math.max(-maxDragX, Math.min(maxDragX, newX)),
+      y: Math.max(-maxDragY, Math.min(maxDragY, newY))
+    });
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    handleDragStart(e.clientX, e.clientY);
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 0) {
+      handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextScale = parseFloat(e.target.value);
+    setScale(nextScale);
+    
+    const renderedWidth = origDimensions.width * minScale * nextScale;
+    const renderedHeight = origDimensions.height * minScale * nextScale;
+    const maxDragX = Math.max(0, (renderedWidth - 256) / 2);
+    const maxDragY = Math.max(0, (renderedHeight - 256) / 2);
+    
+    setPosition(prev => ({
+      x: Math.max(-maxDragX, Math.min(maxDragX, prev.x)),
+      y: Math.max(-maxDragY, Math.min(maxDragY, prev.y))
+    }));
+  };
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast({ title: 'Erro', description: 'Imagem deve ter no máximo 2MB.', variant: 'destructive' });
+      if (file.size > 15 * 1024 * 1024) {
+        toast({ title: 'Erro', description: 'Imagem deve ter no máximo 15MB.', variant: 'destructive' });
         return;
       }
+      setSelectedFile(file);
+      
       const reader = new FileReader();
       reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        setProfileImage(base64);
-        setFormData(prev => ({ ...prev, photoUrl: base64 }));
+        const url = e.target?.result as string;
+        setImageToCrop(url);
+        
+        const img = new Image();
+        img.onload = () => {
+          const w = img.width;
+          const h = img.height;
+          setOrigDimensions({ width: w, height: h });
+          
+          const calculatedMinScale = Math.max(256 / w, 256 / h);
+          setMinScale(calculatedMinScale);
+          setScale(1);
+          setPosition({ x: 0, y: 0 });
+          setCropModalOpen(true);
+        };
+        img.src = url;
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleCropConfirm = async () => {
+    if (!imageToCrop || !selectedFile) return;
+    
+    setCropModalOpen(false);
+    setUploadingImage(true);
+    
+    const img = new Image();
+    img.onload = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 400, 400);
+        
+        const canvasScale = 400 / 256;
+        const renderedWidth = origDimensions.width * minScale * scale;
+        const renderedHeight = origDimensions.height * minScale * scale;
+        const left = 128 + position.x - renderedWidth / 2;
+        const top = 128 + position.y - renderedHeight / 2;
+        
+        ctx.drawImage(
+          img,
+          left * canvasScale,
+          top * canvasScale,
+          renderedWidth * canvasScale,
+          renderedHeight * canvasScale
+        );
+        
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            const croppedFile = new File([blob], selectedFile.name, { type: 'image/jpeg' });
+            
+            try {
+              const res = await uploadApi.uploadImage(croppedFile);
+              if (res.success && res.data?.url) {
+                setProfileImage(res.data.url);
+                setFormData(prev => ({ ...prev, photoUrl: res.data.url }));
+                toast({ title: 'Sucesso', description: 'Imagem ajustada com sucesso!' });
+              } else {
+                throw new Error(res.error?.message || 'Erro no envio');
+              }
+            } catch (error) {
+              console.error(error);
+              toast({ title: 'Erro ao carregar', description: 'Não foi possível enviar a imagem ao servidor.', variant: 'destructive' });
+              setProfileImage(formData.photoUrl || null);
+            } finally {
+              setUploadingImage(false);
+            }
+          }
+        }, 'image/jpeg', 0.95);
+      }
+    };
+    img.src = imageToCrop;
   };
 
   const handleSave = async () => {
@@ -94,7 +261,11 @@ const Profile = () => {
       });
       if (res.success) {
         toast({ title: 'Perfil atualizado', description: 'Suas informações foram salvas com sucesso.' });
-        if (formData.photoUrl) updateProfilePhoto(formData.photoUrl);
+        updateProfileData({
+          name: formData.name,
+          specialization: formData.specialization,
+          photoUrl: formData.photoUrl || undefined
+        });
         setIsEditing(false);
       } else {
         throw new Error(res.error?.message || 'Erro ao salvar');
@@ -165,11 +336,16 @@ const Profile = () => {
             </CardHeader>
             <CardContent className="text-center space-y-4">
               <div className="relative inline-block">
-                <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
-                  <AvatarImage src={profileImage || undefined} />
+                <Avatar className="h-32 w-32 border-4 border-white shadow-xl relative overflow-hidden">
+                  <AvatarImage src={profileImage ? getImageUrl(profileImage) : undefined} />
                   <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-headline">
                     {getInitials(formData.name || 'U')}
                   </AvatarFallback>
+                  {uploadingImage && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
+                      Enviando...
+                    </div>
+                  )}
                 </Avatar>
                 {isEditing && (
                   <Label
@@ -366,6 +542,71 @@ const Profile = () => {
           </Card>
         </div>
       </div>
+    {/* Modal de Recorte / Ajuste de Imagem */}
+      {cropModalOpen && imageToCrop && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl border border-slate-200/50 shadow-2xl max-w-sm w-full overflow-hidden p-6 space-y-6 flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-bold text-primary font-headline">Ajustar Foto do Perfil</h3>
+              <p className="text-xs text-slate-500">Arraste e ajuste o zoom da imagem</p>
+            </div>
+            
+            <div 
+              className="relative w-64 h-64 rounded-full overflow-hidden border-4 border-white shadow-xl bg-slate-100 cursor-move select-none"
+              onMouseDown={onMouseDown}
+              onTouchStart={onTouchStart}
+            >
+              <img
+                src={imageToCrop}
+                alt="Ajuste"
+                className="absolute pointer-events-none select-none max-w-none origin-center"
+                style={{
+                  width: `${origDimensions.width * minScale * scale}px`,
+                  height: `${origDimensions.height * minScale * scale}px`,
+                  left: `${128 + position.x - (origDimensions.width * minScale * scale) / 2}px`,
+                  top: `${128 + position.y - (origDimensions.height * minScale * scale) / 2}px`,
+                }}
+              />
+            </div>
+            
+            <div className="w-full space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <span>Zoom</span>
+                <span>{Math.round(scale * 100)}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-slate-400 text-[18px]">zoom_out</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.01"
+                  value={scale}
+                  onChange={handleZoomChange}
+                  className="flex-1 custom-slider"
+                />
+                <span className="material-symbols-outlined text-slate-400 text-[18px]">zoom_in</span>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 w-full">
+              <Button 
+                variant="outline" 
+                onClick={() => { setCropModalOpen(false); setSelectedFile(null); }} 
+                className="flex-1 rounded-xl font-headline border-slate-200"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleCropConfirm} 
+                className="flex-1 bg-secondary hover:bg-secondary/90 text-primary font-bold rounded-xl font-headline shadow-lg shadow-secondary/20"
+              >
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

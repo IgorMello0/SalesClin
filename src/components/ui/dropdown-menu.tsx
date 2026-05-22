@@ -14,9 +14,16 @@ const DropdownMenu = ({ open: controlledOpen, onOpenChange, children }: { open?:
 const DropdownMenuTrigger = ({ asChild, children, className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) => {
   const { open, setOpen } = React.useContext(DropdownMenuContext)
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement<any>, { onClick: () => setOpen(!open) })
+    const child = children as React.ReactElement<any>
+    return React.cloneElement(child, {
+      "data-dropdown-trigger": "true",
+      onClick: (e: React.MouseEvent) => {
+        if (child.props.onClick) child.props.onClick(e)
+        if (!e.defaultPrevented) setOpen(!open)
+      }
+    })
   }
-  return <button type="button" onClick={() => setOpen(!open)} className={className} {...props}>{children}</button>
+  return <button type="button" data-dropdown-trigger="true" onClick={() => setOpen(!open)} className={className} {...props}>{children}</button>
 }
 
 const DropdownMenuContent = ({ className, children, align, sideOffset, ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { align?: string; sideOffset?: number; ref?: React.Ref<HTMLDivElement> }) => {
@@ -24,22 +31,38 @@ const DropdownMenuContent = ({ className, children, align, sideOffset, ref, ...p
   const contentRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     if (!open) return
-    const h = (e: MouseEvent) => { if (contentRef.current && !contentRef.current.contains(e.target as Node)) setOpen(false) }
+    const h = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (contentRef.current && !contentRef.current.contains(target) && !target.closest("[data-dropdown-trigger]")) {
+        setOpen(false)
+      }
+    }
     const t = setTimeout(() => document.addEventListener("mousedown", h), 0)
     return () => { clearTimeout(t); document.removeEventListener("mousedown", h) }
   }, [open, setOpen])
   if (!open) return null
   return (
     <div ref={(n) => { (contentRef as any).current = n; if (typeof ref === "function") ref(n); else if (ref) (ref as any).current = n }}
-      className={cn("z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md", className)} {...props}>
+      className={cn("absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md", className)} {...props}>
       {children}
     </div>
   )
 }
 
-const DropdownMenuItem = ({ className, inset, ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { inset?: boolean; ref?: React.Ref<HTMLDivElement> }) => {
+const DropdownMenuItem = ({ className, inset, onClick, ref, ...props }: React.HTMLAttributes<HTMLDivElement> & { inset?: boolean; ref?: React.Ref<HTMLDivElement> }) => {
   const { setOpen } = React.useContext(DropdownMenuContext)
-  return <div ref={ref} role="menuitem" onClick={() => setOpen(false)} className={cn("relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0", inset && "pl-8", className)} {...props} />
+  return (
+    <div 
+      ref={ref} 
+      role="menuitem" 
+      onClick={(e) => {
+        setOpen(false)
+        if (onClick) onClick(e)
+      }} 
+      className={cn("relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0", inset && "pl-8", className)} 
+      {...props} 
+    />
+  )
 }
 
 const DropdownMenuCheckboxItem = DropdownMenuItem

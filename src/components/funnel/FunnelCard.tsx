@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
@@ -69,6 +70,7 @@ export function FunnelCard({
   professionalName,
   quickStatuses
 }: FunnelCardProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   return (
     <div 
@@ -77,7 +79,8 @@ export function FunnelCard({
       onClick={() => onSelect(lead)}
       className={cn(
         "premium-card p-3 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
-        isDragged && "opacity-40 grayscale-[0.5]"
+        isDragged && "opacity-40 grayscale-[0.5]",
+        isDropdownOpen && "z-30"
       )}
     >
       <div className="flex justify-between items-start mb-2">
@@ -123,17 +126,31 @@ export function FunnelCard({
 
       <div className="flex items-start justify-between mt-2 pt-1.5 border-t border-slate-100">
         <div className="flex flex-col gap-1">
-          <div className="text-xs font-bold text-primary">
-            {lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </div>
+          {lead.value > 0 && (
+            <div className="text-xs font-bold text-primary">
+              {lead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
+          )}
           {activeFunnel === 'prospecting' && (
-            <div onClick={(e) => e.stopPropagation()}>
-              <DropdownMenu>
+            <div 
+              onClick={(e) => e.stopPropagation()} 
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="relative"
+            >
+              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
-                  <button className={cn(
-                    "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors border text-left",
-                    lead.subStatus ? quickStatuses.find(s => s.id === lead.subStatus)?.color : quickStatuses[0].color
-                  )}>
+                  <button 
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className={cn(
+                      "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors border text-left",
+                      lead.subStatus 
+                        ? (quickStatuses.find(s => s.id === lead.subStatus)?.color || "bg-slate-100 text-slate-600 border-slate-200") 
+                        : "bg-slate-50 text-slate-400 border-slate-200/60"
+                    )}
+                  >
                     {lead.subStatus ? quickStatuses.find(s => s.id === lead.subStatus)?.label : 'Status (Nenhum)'}
                   </button>
                 </DropdownMenuTrigger>

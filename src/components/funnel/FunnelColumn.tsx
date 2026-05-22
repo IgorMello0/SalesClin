@@ -67,11 +67,7 @@ export function FunnelColumn({
   quickStatuses
 }: FunnelColumnProps) {
   
-  const stageLeads = leads.filter(l => {
-    const isOperational = !l.isPaid;
-    if (!isOperational) return false;
-    return l.status === stage.id;
-  });
+  const stageLeads = leads.filter(l => l.status === stage.id);
 
   return (
     <div 

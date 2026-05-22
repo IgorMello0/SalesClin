@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog"
 
@@ -55,13 +56,13 @@ const SheetContent = ({ side = "right", className, children, ref, ...props }: Re
   }, [open, onOpenChange])
 
   if (!open) return null
-  return (
+  return createPortal(
     <>
-      <div className="fixed inset-0 z-[100] bg-white/10 backdrop-blur-md transition-all duration-300" onClick={() => onOpenChange(false)} />
+      <div className="fixed inset-0 z-[100] bg-black/25 transition-all duration-300 animate-in fade-in" onClick={() => onOpenChange(false)} />
       <div
         ref={ref}
         className={cn(
-          "fixed z-[101] gap-4 bg-background p-6 shadow-2xl transition ease-in-out duration-300",
+          "fixed z-[101] gap-4 bg-background p-6 shadow-2xl transition ease-in-out duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
           sheetVariants[side],
           className
         )}
@@ -76,7 +77,8 @@ const SheetContent = ({ side = "right", className, children, ref, ...props }: Re
           <span className="sr-only">Close</span>
         </button>
       </div>
-    </>
+    </>,
+    document.body
   )
 }
 SheetContent.displayName = "SheetContent"

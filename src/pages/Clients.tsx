@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -362,7 +362,7 @@ const Clients = () => {
                     <Input
                       id="phone"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
                       placeholder="(11) 99999-9999"
                       className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
                     />

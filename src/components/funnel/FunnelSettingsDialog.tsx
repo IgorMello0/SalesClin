@@ -43,6 +43,13 @@ const ICON_OPTIONS = [
   { value: 'calendar_today', label: 'Agenda' },
 ];
 
+const SYSTEM_FUNNELS = ['prospecting', 'commercial', 'sales'];
+const SYSTEM_STAGES = [
+  'prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended',
+  'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed',
+  'sales_payment', 'sales_contract', 'sales_post'
+];
+
 interface FunnelSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,6 +68,21 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
   const [editingStage, setEditingStage] = useState<number | null>(null);
   const [editStageData, setEditStageData] = useState({ label: '', color: '' });
   const [isSaving, setIsSaving] = useState(false);
+
+  // Custom Confirm Dialog State
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  // Drag and Drop State
+  const [draggedStage, setDraggedStage] = useState<{ funnelIdx: number; stageIdx: number } | null>(null);
+  const [dragOverStageIdx, setDragOverStageIdx] = useState<number | null>(null);
+
+  const askConfirmation = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmAction({ title, message, onConfirm });
+  };
 
   useEffect(() => {
     if (open) loadFunnels();
@@ -109,18 +131,22 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
     }
   };
 
-  const handleDeleteFunnel = async (funnelId: number) => {
-    if (!confirm('Tem certeza? Os leads deste funil serão movidos para a primeira etapa do primeiro funil ativo.')) return;
-
-    try {
-      const res = await funnelConfigApi.delete(funnelId);
-      if (res.success) {
-        toast({ title: 'Funil removido!' });
-        loadFunnels();
+  const handleDeleteFunnel = (funnelId: number) => {
+    askConfirmation(
+      'Remover Funil',
+      'Tem certeza? Os leads deste funil serão movidos para a primeira etapa do primeiro funil ativo.',
+      async () => {
+        try {
+          const res = await funnelConfigApi.delete(funnelId);
+          if (res.success) {
+            toast({ title: 'Funil removido!' });
+            loadFunnels();
+          }
+        } catch (e) {
+          toast({ title: 'Erro ao remover funil', variant: 'destructive' });
+        }
       }
-    } catch (e) {
-      toast({ title: 'Erro ao remover funil', variant: 'destructive' });
-    }
+    );
   };
 
   const handleAddStage = async (funnelId: number) => {
@@ -177,18 +203,22 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
     }
   };
 
-  const handleDeleteStage = async (stageId: number) => {
-    if (!confirm('Tem certeza? Os leads desta etapa serão movidos para a primeira etapa do mesmo funil.')) return;
-
-    try {
-      const res = await funnelConfigApi.deleteStage(stageId);
-      if (res.success) {
-        toast({ title: 'Etapa removida!' });
-        loadFunnels();
+  const handleDeleteStage = (stageId: number) => {
+    askConfirmation(
+      'Remover Etapa',
+      'Tem certeza? Os leads desta etapa serão movidos para a primeira etapa do mesmo funil.',
+      async () => {
+        try {
+          const res = await funnelConfigApi.deleteStage(stageId);
+          if (res.success) {
+            toast({ title: 'Etapa removida!' });
+            loadFunnels();
+          }
+        } catch (e) {
+          toast({ title: 'Erro ao remover etapa', variant: 'destructive' });
+        }
       }
-    } catch (e) {
-      toast({ title: 'Erro ao remover etapa', variant: 'destructive' });
-    }
+    );
   };
 
   const handleMoveStage = async (funnelIdx: number, stageIdx: number, direction: 'up' | 'down') => {
@@ -200,34 +230,121 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
     // Swap orders
     [stages[stageIdx], stages[targetIdx]] = [stages[targetIdx], stages[stageIdx]];
 
+    // Save original state in case of failure
+    const originalFunnels = [...funnels];
+
+    // Optimistic update
+    const updatedFunnels = [...funnels];
+    updatedFunnels[funnelIdx] = {
+      ...funnel,
+      stages: stages.map((s, i) => ({ ...s, order: i }))
+    };
+    setFunnels(updatedFunnels);
+
     try {
       await funnelConfigApi.reorder([{
         id: funnel.id,
         order: funnel.order,
         stages: stages.map((s: any, i: number) => ({ id: s.id, order: i }))
       }]);
-      loadFunnels();
+      // Silently reload to ensure data integrity
+      const res = await funnelConfigApi.getAll();
+      if (res.success) {
+        setFunnels(res.data || []);
+      }
     } catch (e) {
+      setFunnels(originalFunnels);
       toast({ title: 'Erro ao reordenar', variant: 'destructive' });
     }
   };
 
-  const handleResetDefaults = async () => {
-    if (!confirm('Isso vai RESTAURAR todos os funis para a configuração padrão. Tem certeza?')) return;
+  const handleResetDefaults = () => {
+    askConfirmation(
+      'Restaurar Configurações',
+      'Isso vai RESTAURAR todos os funis para a configuração padrão. Tem certeza?',
+      async () => {
+        try {
+          const res = await funnelConfigApi.seedDefaults();
+          if (res.success) {
+            toast({ title: 'Funis restaurados para o padrão!' });
+            loadFunnels();
+          }
+        } catch (e) {
+          toast({ title: 'Erro ao restaurar', variant: 'destructive' });
+        }
+      }
+    );
+  };
+
+  // HTML5 Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, funnelIdx: number, stageIdx: number) => {
+    if (editingStage !== null) {
+      e.preventDefault();
+      return;
+    }
+    setDraggedStage({ funnelIdx, stageIdx });
+    e.dataTransfer.effectAllowed = 'move';
+    e.currentTarget.classList.add('opacity-40');
+  };
+
+  const handleDragOver = (e: React.DragEvent, stageIdx: number) => {
+    e.preventDefault();
+    setDragOverStageIdx(stageIdx);
+  };
+
+  const handleDropStage = async (e: React.DragEvent, targetFunnelIdx: number, targetStageIdx: number) => {
+    e.preventDefault();
+    if (!draggedStage || draggedStage.funnelIdx !== targetFunnelIdx) {
+      return;
+    }
+
+    const { stageIdx: sourceStageIdx } = draggedStage;
+    if (sourceStageIdx === targetStageIdx) return;
+
+    const funnel = funnels[targetFunnelIdx];
+    const stages = [...funnel.stages];
+    
+    // Reorder array
+    const [removed] = stages.splice(sourceStageIdx, 1);
+    stages.splice(targetStageIdx, 0, removed);
+
+    // Save original state in case of failure
+    const originalFunnels = [...funnels];
+
+    // Optimistic update
+    const updatedFunnels = [...funnels];
+    updatedFunnels[targetFunnelIdx] = {
+      ...funnel,
+      stages: stages.map((s, i) => ({ ...s, order: i }))
+    };
+    setFunnels(updatedFunnels);
 
     try {
-      const res = await funnelConfigApi.seedDefaults();
+      await funnelConfigApi.reorder([{
+        id: funnel.id,
+        order: funnel.order,
+        stages: stages.map((s: any, i: number) => ({ id: s.id, order: i }))
+      }]);
+      // Silently reload to ensure data integrity
+      const res = await funnelConfigApi.getAll();
       if (res.success) {
-        toast({ title: 'Funis restaurados para o padrão!' });
-        loadFunnels();
+        setFunnels(res.data || []);
       }
-    } catch (e) {
-      toast({ title: 'Erro ao restaurar', variant: 'destructive' });
+    } catch (err) {
+      setFunnels(originalFunnels);
+      toast({ title: 'Erro ao reordenar etapas', variant: 'destructive' });
     }
   };
 
+  const handleDragEnd = (e: React.DragEvent) => {
+    e.currentTarget.classList.remove('opacity-40');
+    setDraggedStage(null);
+    setDragOverStageIdx(null);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[680px] max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 shadow-2xl">
         <div className="p-6 sm:p-8 bg-gradient-to-br from-primary/5 to-transparent border-b border-slate-100">
           <DialogTitle className="text-xl sm:text-2xl font-extrabold text-primary font-headline tracking-tight flex items-center gap-3">
@@ -245,25 +362,40 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
           ) : (
             <>
               {funnels.map((funnel, funnelIdx) => (
-                <div key={funnel.id} className="border border-slate-200 rounded-2xl overflow-hidden transition-all">
+                <div 
+                  key={funnel.id} 
+                  className={cn(
+                    "border border-slate-100 rounded-2xl overflow-hidden bg-white transition-all duration-300 shadow-sm",
+                    expandedFunnel === funnel.id ? "ring-1 ring-secondary/20 shadow-md border-secondary/10" : "hover:shadow-md hover:border-slate-200"
+                  )}
+                >
                   {/* Funnel Header */}
                   <div 
-                    className="flex items-center justify-between p-4 bg-slate-50/80 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                    className={cn(
+                      "flex items-center justify-between p-4.5 cursor-pointer transition-colors duration-300",
+                      expandedFunnel === funnel.id ? "bg-slate-50/40 border-b border-slate-100" : "bg-white hover:bg-slate-50/50"
+                    )}
                     onClick={() => setExpandedFunnel(expandedFunnel === funnel.id ? null : funnel.id)}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-lg text-secondary">{funnel.icon}</span>
-                      <span className="font-bold text-primary text-sm">{funnel.label}</span>
-                      <span className="text-[10px] font-mono bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">{funnel.stages?.length || 0} etapas</span>
+                      <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-secondary">
+                        <span className="material-symbols-outlined text-lg">{funnel.icon}</span>
+                      </div>
+                      <span className="font-extrabold text-primary text-base tracking-tight">{funnel.label}</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-orange-50 text-secondary border border-orange-100/60 px-2.5 py-0.5 rounded-full">
+                        {funnel.stages?.length || 0} etapas
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteFunnel(funnel.id); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                        title="Remover funil"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {!SYSTEM_FUNNELS.includes(funnel.code) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteFunnel(funnel.id); }}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50/80 transition-all duration-300"
+                          title="Remover funil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                       {expandedFunnel === funnel.id ? (
                         <ChevronUp className="w-4 h-4 text-slate-400" />
                       ) : (
@@ -274,12 +406,23 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
 
                   {/* Stages List */}
                   {expandedFunnel === funnel.id && (
-                    <div className="p-4 space-y-2 bg-white animate-in slide-in-from-top-1 duration-200">
+                    <div className="p-4 space-y-1.5 bg-white animate-in slide-in-from-top-1 duration-200">
                       {funnel.stages?.map((stage: any, stageIdx: number) => (
-                        <div key={stage.id} className="flex items-center gap-2 group">
-                          <GripVertical className="w-4 h-4 text-slate-200 group-hover:text-slate-400 transition-colors flex-shrink-0" />
+                        <div 
+                          key={stage.id} 
+                          draggable={editingStage !== stage.id}
+                          onDragStart={(e) => handleDragStart(e, funnelIdx, stageIdx)}
+                          onDragOver={(e) => handleDragOver(e, stageIdx)}
+                          onDrop={(e) => handleDropStage(e, funnelIdx, stageIdx)}
+                          onDragEnd={handleDragEnd}
+                          className={cn(
+                            "flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-all duration-200 group border border-transparent hover:border-slate-100 cursor-grab active:cursor-grabbing",
+                            dragOverStageIdx === stageIdx && draggedStage?.funnelIdx === funnelIdx ? "border-dashed border-secondary bg-orange-50/20" : ""
+                          )}
+                        >
+                          <GripVertical className="w-4 h-4 text-slate-300 group-hover:text-slate-400 transition-colors flex-shrink-0 cursor-grab" />
                           
-                          <div className={cn("w-3 h-3 rounded-full flex-shrink-0", stage.color)} />
+                          <div className={cn("w-3 h-3 rounded-full flex-shrink-0 ring-4 ring-slate-100", stage.color)} />
 
                           {editingStage === stage.id ? (
                             <div className="flex-1 flex items-center gap-2 animate-in fade-in">
@@ -316,7 +459,7 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
                             </div>
                           ) : (
                             <>
-                              <span className="flex-1 text-sm font-medium text-primary">{stage.label}</span>
+                              <span className="flex-1 text-sm font-semibold text-primary">{stage.label}</span>
                               
                               {stage.isTransition && (
                                 <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100">
@@ -324,36 +467,40 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
                                 </span>
                               )}
                               
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <button
                                   onClick={() => handleMoveStage(funnelIdx, stageIdx, 'up')}
                                   disabled={stageIdx === 0}
-                                  className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-primary hover:bg-primary/5 disabled:opacity-20 transition-all"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-primary hover:bg-slate-100 disabled:opacity-10 transition-all duration-200"
                                 >
-                                  <ChevronUp className="w-3.5 h-3.5" />
+                                  <ChevronUp className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleMoveStage(funnelIdx, stageIdx, 'down')}
                                   disabled={stageIdx === funnel.stages.length - 1}
-                                  className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-primary hover:bg-primary/5 disabled:opacity-20 transition-all"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-primary hover:bg-slate-100 disabled:opacity-10 transition-all duration-200"
                                 >
-                                  <ChevronDown className="w-3.5 h-3.5" />
+                                  <ChevronDown className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => {
                                     setEditingStage(stage.id);
                                     setEditStageData({ label: stage.label, color: stage.color });
                                   }}
-                                  className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-secondary hover:bg-secondary/5 transition-all"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-secondary hover:bg-orange-50 transition-all duration-200"
+                                  title="Editar etapa"
                                 >
-                                  <Pencil className="w-3 h-3" />
+                                  <Pencil className="w-3.5 h-3.5" />
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteStage(stage.id)}
-                                  className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                {!SYSTEM_STAGES.includes(stage.code) && (
+                                  <button
+                                    onClick={() => handleDeleteStage(stage.id)}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
+                                    title="Remover etapa"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               </div>
                             </>
                           )}
@@ -427,9 +574,9 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
                             setAddingStageToFunnel(funnel.id);
                             setNewStageData({ label: '', code: '', color: 'bg-blue-500' });
                           }}
-                          className="w-full py-2.5 border-2 border-dashed border-slate-200 rounded-xl text-xs font-bold text-slate-400 hover:text-secondary hover:border-secondary/30 transition-all flex items-center justify-center gap-2"
+                          className="w-full py-3 border border-dashed border-slate-200 rounded-xl text-xs font-bold text-slate-400 hover:text-secondary hover:border-secondary/30 hover:bg-orange-50/10 transition-all duration-300 flex items-center justify-center gap-2 mt-2"
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          <Plus className="w-4 h-4" />
                           Adicionar Etapa
                         </button>
                       )}
@@ -496,17 +643,17 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4 pt-2">
                   <button
                     onClick={() => setIsAddingFunnel(true)}
-                    className="flex-1 py-3 border-2 border-dashed border-slate-200 rounded-2xl text-sm font-bold text-slate-400 hover:text-secondary hover:border-secondary/30 hover:bg-secondary/5 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 py-4 border border-dashed border-slate-300 hover:border-secondary/40 hover:bg-orange-50/30 rounded-2xl text-sm font-bold text-slate-400 hover:text-secondary transition-all duration-300 flex items-center justify-center gap-2 active:scale-[0.99]"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4 text-secondary" />
                     Criar Novo Funil
                   </button>
                   <button
                     onClick={handleResetDefaults}
-                    className="py-3 px-4 border border-slate-200 rounded-2xl text-xs font-bold text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                    className="py-4 px-6 border border-slate-200 bg-white hover:bg-red-50/50 hover:text-red-500 hover:border-red-100 rounded-2xl text-xs font-bold text-slate-400 transition-all duration-300 flex items-center justify-center gap-2 active:scale-[0.99]"
                     title="Restaurar configuração padrão"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
@@ -539,5 +686,39 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Custom Confirmation Dialog */}
+    <Dialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+      <DialogContent className="sm:max-w-[400px] p-6 rounded-3xl border-0 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex flex-col items-center text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+            <span className="material-symbols-outlined text-2xl">info</span>
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-extrabold text-primary">{confirmAction?.title}</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">{confirmAction?.message}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 mt-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => setConfirmAction(null)} 
+            className="flex-1 rounded-xl h-10 text-xs font-bold"
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={() => {
+              confirmAction?.onConfirm();
+              setConfirmAction(null);
+            }} 
+            className="flex-1 rounded-xl h-10 text-xs font-bold bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20"
+          >
+            Confirmar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

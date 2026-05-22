@@ -22,7 +22,9 @@ import {
   Tag,
   Monitor,
   LayoutTemplate,
-  PanelLeft
+  PanelLeft,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -198,6 +200,8 @@ const EquipeView = () => {
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
+  const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const loadRoles = async () => {
     try {
@@ -434,7 +438,22 @@ const EquipeView = () => {
             </div>
             <div className="space-y-2">
               <Label>Senha</Label>
-              <Input type="password" value={newMember.password} onChange={e => setNewMember({...newMember, password: e.target.value})} placeholder="Mínimo 6 caracteres" />
+              <div className="relative">
+                <Input 
+                  type={showNewMemberPassword ? "text" : "password"} 
+                  value={newMember.password} 
+                  onChange={e => setNewMember({...newMember, password: e.target.value})} 
+                  placeholder="Mínimo 6 caracteres" 
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewMemberPassword(!showNewMemberPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showNewMemberPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Cargo / Função</Label>
@@ -614,13 +633,22 @@ const EquipeView = () => {
                   <div className="flex gap-3 items-end">
                     <div className="flex-1 space-y-1.5">
                       <Label className="text-[11px] uppercase text-muted-foreground font-bold">Nova Senha</Label>
-                      <Input
-                        type="password"
-                        value={resetPassword}
-                        onChange={e => setResetPassword(e.target.value)}
-                        placeholder="Mínimo 6 caracteres"
-                        className="h-9 text-sm"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showResetPassword ? "text" : "password"}
+                          value={resetPassword}
+                          onChange={e => setResetPassword(e.target.value)}
+                          placeholder="Mínimo 6 caracteres"
+                          className="h-9 text-sm pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowResetPassword(!showResetPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <Button
                       size="sm"
@@ -1308,6 +1336,181 @@ const AparenciaView = () => {
   );
 };
 
+const WhatsAppView = () => {
+  const { toast } = useToast();
+  const { professional } = useAuth();
+  const [data, setData] = useState({
+    whatsappProvider: 'evolution',
+    evolutionApiUrl: '',
+    apiKey: '',
+    evolutionInstance: '',
+    metaToken: '',
+    metaPhoneNumberId: ''
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    loadConfig();
+  }, []);
+
+  const loadConfig = async () => {
+    try {
+      if (!professional?.companyId) return;
+      const res = await empresasApi.getById(professional.companyId);
+      if (res.success && res.data) {
+        setData({
+          whatsappProvider: res.data.whatsappProvider || 'evolution',
+          evolutionApiUrl: res.data.evolutionApiUrl || '',
+          apiKey: res.data.apiKey || '',
+          evolutionInstance: res.data.evolutionInstance || '',
+          metaToken: res.data.metaToken || '',
+          metaPhoneNumberId: res.data.metaPhoneNumberId || ''
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível carregar as configurações', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      if (!professional?.companyId) throw new Error("ID da empresa não encontrado");
+      const res = await empresasApi.update(professional.companyId, {
+        whatsappProvider: data.whatsappProvider,
+        evolutionApiUrl: data.evolutionApiUrl,
+        apiKey: data.apiKey,
+        evolutionInstance: data.evolutionInstance,
+        metaToken: data.metaToken,
+        metaPhoneNumberId: data.metaPhoneNumberId
+      });
+      if (res.success) {
+        toast({ title: 'Sucesso', description: 'Configurações de WhatsApp atualizadas!' });
+      } else {
+        throw new Error(res.error?.message || "Erro ao salvar");
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <div className="p-8 text-center"><span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span></div>;
+
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl text-sm border border-emerald-200/50 dark:border-emerald-800/50 flex items-start gap-3 shadow-sm">
+        <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
+        <div className="leading-relaxed">
+          <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">Integração WhatsApp</strong>
+          Configure as credenciais para permitir disparos em massa automáticos e conversas com clientes. Suporta Evolution API ou API Oficial da Meta (Cloud API).
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <Label>Provedor de WhatsApp</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div 
+              onClick={() => setData({...data, whatsappProvider: 'evolution'})}
+              className={`p-4 border rounded-xl cursor-pointer transition-all ${data.whatsappProvider === 'evolution' ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500 shadow-md' : 'hover:border-emerald-500/50 bg-background'}`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div className="font-bold text-sm text-emerald-700">Evolution API</div>
+                {data.whatsappProvider === 'evolution' && <div className="w-3 h-3 rounded-full bg-emerald-500" />}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Conecta seu número via QR Code usando uma instância Evolution (Não-oficial).</div>
+            </div>
+
+            <div 
+              onClick={() => setData({...data, whatsappProvider: 'meta'})}
+              className={`p-4 border rounded-xl cursor-pointer transition-all ${data.whatsappProvider === 'meta' ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500 shadow-md' : 'hover:border-emerald-500/50 bg-background'}`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div className="font-bold text-sm text-emerald-700">API Oficial Meta</div>
+                {data.whatsappProvider === 'meta' && <div className="w-3 h-3 rounded-full bg-emerald-500" />}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">WhatsApp Business Cloud API (Oficial). Requer número verificado no Facebook.</div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {data.whatsappProvider === 'evolution' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="space-y-1.5">
+              <Label>URL da Evolution API</Label>
+              <Input 
+                placeholder="Ex: https://api.sua-evolution.com" 
+                value={data.evolutionApiUrl}
+                onChange={e => setData({...data, evolutionApiUrl: e.target.value})}
+              />
+              <p className="text-xs text-muted-foreground">URL base onde sua instância da Evolution API está hospedada (sem barra no final).</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Global API Key</Label>
+              <Input 
+                type="password"
+                placeholder="Sua Global API Key" 
+                value={data.apiKey}
+                onChange={e => setData({...data, apiKey: e.target.value})}
+              />
+              <p className="text-xs text-muted-foreground">Chave de autenticação global configurada na Evolution API.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Nome da Instância</Label>
+              <Input 
+                placeholder="Ex: clinica-whatsapp" 
+                value={data.evolutionInstance}
+                onChange={e => setData({...data, evolutionInstance: e.target.value})}
+              />
+              <p className="text-xs text-muted-foreground">Nome exato da instância criada para conectar seu número de WhatsApp.</p>
+            </div>
+          </div>
+        )}
+
+        {data.whatsappProvider === 'meta' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="space-y-1.5">
+              <Label>Phone Number ID (ID do Número de Telefone)</Label>
+              <Input 
+                placeholder="Ex: 1048593849502" 
+                value={data.metaPhoneNumberId}
+                onChange={e => setData({...data, metaPhoneNumberId: e.target.value})}
+              />
+              <p className="text-xs text-muted-foreground">Encontrado no painel de desenvolvedor da Meta (WhatsApp &gt; API Setup).</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Access Token (Token de Acesso Permanente)</Label>
+              <Input 
+                type="password"
+                placeholder="Ex: EAAQZAM..." 
+                value={data.metaToken}
+                onChange={e => setData({...data, metaToken: e.target.value})}
+              />
+              <p className="text-xs text-muted-foreground">Token gerado no painel da Meta com permissões de 'whatsapp_business_messaging'.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+          {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 // Map of components per setting
 const ViewsMap: Record<string, React.FC<any>> = {
   'Serviços': ServicosView,
@@ -1316,6 +1519,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   'Minhas Clínicas': ClinicasView,
   'Meu Negócio': InfoNegocioView,
   'Aparência': AparenciaView,
+  'Integração WhatsApp': WhatsAppView,
 };
 
 const Settings = () => {
@@ -1351,6 +1555,7 @@ const Settings = () => {
       items: [
         ...(isOwner ? [
           { name: 'Minhas Clínicas', description: 'Crie e gerencie sua rede de clínicas' },
+          { name: 'Integração WhatsApp', description: 'Configure API para disparos em massa' },
         ] : []),
       ]
     },

@@ -11,6 +11,7 @@ import { LayoutProvider } from "./contexts/LayoutContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import SelectPlan from "./pages/SelectPlan";
 import Dashboard from "./pages/Dashboard";
 import Appointments from "./pages/Appointments";
 import Clients from "./pages/Clients";
@@ -30,6 +31,13 @@ import Leads from "./pages/Leads";
 import SalesFunnel from "./pages/SalesFunnel";
 import Goals from "./pages/Goals";
 import FAQ from "./pages/FAQ";
+import FunilPage from "./pages/FunilPage";
+import AgendaPage from "./pages/AgendaPage";
+import MetasPage from "./pages/MetasPage";
+import PrecosPage from "./pages/PrecosPage";
+import ClientesPage from "./pages/ClientesPage";
+import SobrePage from "./pages/SobrePage";
+import Campaigns from "./pages/Campaigns";
 
 const queryClient = new QueryClient();
 
@@ -46,7 +54,14 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/select-plan" element={<SelectPlan />} />
                 <Route path="/faq" element={<FAQ />} />
+                <Route path="/funcionalidades/funil" element={<FunilPage />} />
+                <Route path="/funcionalidades/agenda" element={<AgendaPage />} />
+                <Route path="/funcionalidades/metas" element={<MetasPage />} />
+                <Route path="/precos" element={<PrecosPage />} />
+                <Route path="/clientes" element={<ClientesPage />} />
+                <Route path="/sobre" element={<SobrePage />} />
                 <Route path="/" element={<AppLayout />}>
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="appointments" element={<ProtectedRoute moduleCode="agendamentos" moduleName="Agenda"><Appointments /></ProtectedRoute>} />
@@ -71,6 +86,7 @@ const App = () => (
                   <Route path="dental-test" element={<DentalTest />} />
                   <Route path="sales-funnel" element={<ProtectedRoute moduleCode="funnel" moduleName="Comercial"><SalesFunnel /></ProtectedRoute>} />
                   <Route path="metas" element={<ProtectedRoute moduleCode="metas" moduleName="Metas"><Goals /></ProtectedRoute>} />
+                  <Route path="campaigns" element={<ProtectedRoute moduleCode="campanhas" moduleName="Campanhas"><Campaigns /></ProtectedRoute>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

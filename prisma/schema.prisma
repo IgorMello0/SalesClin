@@ -105,6 +105,8 @@ model Professional {
   contractType   String?  @map("contract_type")
   bio            String?  @db.Text
   crm            String?
+  googleId       String?  @unique @map("google_id")
+  authProvider   String?  @default("local") @map("auth_provider") // 'local' ou 'google'
   onboardingCompleted Boolean @default(false) @map("onboarding_completed")
   onboardingData Json?    @map("onboarding_data")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -129,6 +131,7 @@ model Professional {
   leads           Lead[]
   goals           Goal[]
   roles           Role[]
+  messageCampaigns MessageCampaign[]
 
   @@map("professionals")
 }
@@ -460,8 +463,13 @@ model Empresa {
   name      String // Nome da empresa
   logoUrl   String?  @map("logo_url") // Logo da empresa
   domain    String? // Domínio da empresa
-  whatsapp  String?
-  apiKey    String?  @map("api_key")
+  whatsapp          String?
+  whatsappProvider  String?  @default("evolution") @map("whatsapp_provider") // 'evolution' ou 'meta'
+  apiKey            String?  @map("api_key")
+  evolutionApiUrl   String?  @map("evolution_api_url")
+  evolutionInstance String?  @map("evolution_instance")
+  metaToken         String?  @map("meta_token") // Token da API Oficial da Meta
+  metaPhoneNumberId String?  @map("meta_phone_number_id") // ID do número na Meta
   plan      String? // Plano de assinatura da empresa
   openHour  String   @default("08:00") @map("open_hour")
   closeHour String   @default("20:00") @map("close_hour")
@@ -482,6 +490,7 @@ model Empresa {
   appointments      Appointment[]
   payments          Payment[]
   funnelConfigs     FunnelConfig[]
+  messageCampaigns  MessageCampaign[]
 
   @@map("empresas")
 }
@@ -512,6 +521,8 @@ model Usuario {
   passwordHash String   @map("password_hash") // Hash da senha do usuário
   roleId       Int?     @map("role_id") // ID do cargo do usuário (Legado/Principal)
   isActive     Boolean  @default(true) @map("is_active") // Indica se o usuário está ativo
+  googleId     String?  @unique @map("google_id")
+  authProvider String?  @default("local") @map("auth_provider") // 'local' ou 'google'
   onboardingCompleted Boolean @default(false) @map("onboarding_completed") // Status do onboarding
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -748,4 +759,69 @@ model FunnelStage {
 
   @@unique([funnelId, code])
   @@map("funnel_stages")
+}
+
+// ==================== CAMPANHAS DE MENSAGENS ====================
+
+enum CampaignStatus {
+  draft      // Rascunho
+  scheduled  // Agendada
+  sending    // Em envio
+  completed  // Finalizada
+  failed     // Falhou
+  canceled   // Cancelada
+}
+
+enum RecipientStatus {
+  pending   // Aguardando envio
+  sent      // Enviado com sucesso
+  failed    // Falha no envio
+  skipped   // Ignorado (sem telefone válido)
+}
+
+// Campanhas de mensagens em massa
+model MessageCampaign {
+  id             Int            @id @default(autoincrement())
+  companyId      Int            @map("company_id")
+  professionalId Int            @map("professional_id")
+  name           String         // Nome da campanha
+  message        String         @db.Text // Corpo da mensagem (suporta variáveis como {{nome}})
+  audienceType   String         @map("audience_type") // 'all_leads', 'all_clients', 'leads_by_status', 'manual'
+  audienceFilter Json?          @map("audience_filter") // Filtros aplicados (status, funil, tags, etc.)
+  status         CampaignStatus @default(draft)
+  totalRecipients Int           @default(0) @map("total_recipients")
+  sentCount      Int            @default(0) @map("sent_count")
+  failedCount    Int            @default(0) @map("failed_count")
+  scheduledAt    DateTime?      @map("scheduled_at") // Data de agendamento (se agendada)
+  startedAt      DateTime?      @map("started_at")   // Quando começou a enviar
+  completedAt    DateTime?      @map("completed_at") // Quando finalizou
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  company      Empresa              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional Professional         @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  recipients   CampaignRecipient[]
+
+  @@map("message_campaigns")
+}
+
+// Destinatários individuais de cada campanha
+model CampaignRecipient {
+  id           Int             @id @default(autoincrement())
+  campaignId   Int             @map("campaign_id")
+  name         String          // Nome do destinatário
+  phone        String          // Telefone do destinatário
+  sourceType   String          @map("source_type") // 'lead' ou 'client'
+  sourceId     Int             @map("source_id")   // ID do lead ou client
+  status       RecipientStatus @default(pending)
+  sentAt       DateTime?       @map("sent_at")
+  errorMessage String?         @map("error_message")
+  renderedMessage String?      @map("rendered_message") @db.Text // Mensagem final renderizada
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  // Relacionamentos
+  campaign MessageCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_recipients")
 }

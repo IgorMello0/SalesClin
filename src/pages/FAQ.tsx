@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ChevronDown, 
@@ -12,91 +12,88 @@ import {
   Zap,
   Sparkles,
   ArrowRight,
-  Menu,
-  X,
   Instagram
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SiteNavbar } from '@/components/SiteNavbar';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
-const FAQItem = ({ question, answer, isOpen, onClick, category }: { question: string, answer: React.ReactNode, isOpen: boolean, onClick: () => void, category: string }) => {
+interface FAQItemProps {
+  question: string;
+  category: string;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+const FAQItem = ({ question, category, isActive, onClick }: FAQItemProps) => {
   return (
-    <motion.div 
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden transition-all duration-500 rounded-3xl border ${isOpen ? 'bg-white shadow-[0_20px_40px_-15px_rgba(15,23,42,0.05)] border-slate-200' : 'bg-white/60 hover:bg-white border-slate-100 hover:border-slate-200 hover:shadow-lg'}`}
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-center justify-between group",
+        isActive
+          ? "bg-white border-slate-200 shadow-sm ring-1 ring-slate-100/50"
+          : "bg-transparent border-transparent hover:bg-slate-100/50 hover:border-slate-200/40"
+      )}
     >
-      {/* Hidden Branding / Accent when open */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#F97316] to-orange-400 transition-opacity duration-500 ${isOpen ? 'opacity-100' : 'opacity-0'}`} />
-
-      <button 
-        onClick={onClick}
-        className="w-full flex items-center justify-between p-6 sm:p-8 text-left group"
-      >
-        <div className="flex flex-col gap-2 pr-6">
-          <span className="text-[10px] font-black uppercase tracking-widest text-[#F97316] opacity-80">{category}</span>
-          <span className="font-headline font-extrabold text-xl sm:text-2xl text-[#0F172A] group-hover:text-[#F97316] transition-colors leading-tight">
-            {question}
-          </span>
-        </div>
-        <div className={`flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-sm ${isOpen ? 'bg-[#0F172A] text-[#F97316] rotate-180' : 'bg-white border border-slate-100 text-slate-400 group-hover:text-[#F97316] group-hover:border-[#F97316]/20'}`}>
-          <ChevronDown className="w-6 h-6" />
-        </div>
-      </button>
-      
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }}
-          >
-            <div className="px-6 sm:px-8 pb-8">
-              <div className="h-px w-full bg-gradient-to-r from-slate-100 via-slate-200 to-transparent mb-6" />
-              <div className="prose prose-slate max-w-none text-slate-600 font-medium leading-loose">
-                {answer}
-              </div>
-              
-              {/* Premium Footer detail inside answer */}
-              <div className="mt-8 flex items-center gap-3 py-4 px-5 rounded-2xl bg-slate-50 border border-slate-100">
-                <div className="w-8 h-8 rounded-full bg-[#F97316]/10 flex items-center justify-center text-[#F97316]">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <span className="text-sm text-slate-500 font-semibold">Esse artigo foi útil? O SalesClin está sempre evoluindo para você.</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+      <div className="flex flex-col gap-1.5 pr-4">
+        <span className="text-[9px] font-mono uppercase tracking-widest text-[#F97316] font-bold">{category}</span>
+        <span className={cn(
+          "font-sans font-medium text-sm leading-snug transition-colors",
+          isActive ? "text-slate-900 font-semibold" : "text-slate-600 group-hover:text-slate-950"
+        )}>
+          {question}
+        </span>
+      </div>
+      <div className={cn(
+        "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all",
+        isActive 
+          ? "bg-slate-900 text-white" 
+          : "bg-slate-100 text-slate-400 group-hover:bg-slate-200/80 group-hover:text-slate-600"
+      )}>
+        <ArrowRight className="w-3.5 h-3.5" />
+      </div>
+    </button>
   );
 };
 
 const FAQ = () => {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [selectedFAQ, setSelectedFAQ] = useState<{ question: string; answer: string; category: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("Todos");
-  
-  // States for Navbar
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    // Scroll listener for Navbar
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const categories = [
-    { id: "Geral", icon: <ShieldCheck className="w-6 h-6" />, desc: "Conceitos básicos", count: 2 },
-    { id: "Agenda", icon: <Calendar className="w-6 h-6" />, desc: "Gestão de horários", count: 2 },
-    { id: "Vendas", icon: <BarChart className="w-6 h-6" />, desc: "Funil e metas", count: 4 },
-    { id: "Pacientes", icon: <Users className="w-6 h-6" />, desc: "Prontuários e dados", count: 2 },
-    { id: "Suporte", icon: <MessageCircle className="w-6 h-6" />, desc: "Configurações", count: 2 },
+    { id: "Geral", icon: <ShieldCheck className="w-4 h-4" />, desc: "Conceitos básicos" },
+    { id: "Agenda", icon: <Calendar className="w-4 h-4" />, desc: "Gestão de horários" },
+    { id: "Vendas", icon: <BarChart className="w-4 h-4" />, desc: "Funil e metas" },
+    { id: "Pacientes", icon: <Users className="w-4 h-4" />, desc: "Prontuários e dados" },
+    { id: "Suporte", icon: <MessageCircle className="w-4 h-4" />, desc: "Configurações" },
   ];
 
   const faqs = [
@@ -168,298 +165,352 @@ const FAQ = () => {
     return matchesSearch && matchesCategory;
   });
 
+  // If no selectedFAQ yet, automatically select the first item on desktop
+  useEffect(() => {
+    if (!isMobile && filteredFaqs.length > 0 && !selectedFAQ) {
+      setSelectedFAQ(filteredFaqs[0]);
+    }
+  }, [isMobile, activeCategory, searchQuery]);
+
+  const handleFAQClick = (faq: typeof faqs[0]) => {
+    setSelectedFAQ(faq);
+    if (isMobile) {
+      setDrawerOpen(true);
+    }
+  };
+
+  const getCategoryCount = (catId: string) => {
+    if (catId === "Todos") return faqs.length;
+    return faqs.filter(faq => faq.category === catId).length;
+  };
+
   return (
-    <div className="min-h-screen bg-[#F4F4F5] text-[#0F172A] font-body selection:bg-[#F97316]/20 flex flex-col relative">
+    <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A] font-body selection:bg-[#F97316]/20 flex flex-col relative">
       
-      {/* GLOBAL NAVBAR (Identical to Landing Page with adaptive colors for dark hero) */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-700 ${scrolled ? 'py-4 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm' : 'py-8 bg-transparent'}`}>
-        <div className="max-w-7xl mx-auto px-8 flex items-center justify-between">
-          <Link to="/" className="opacity-90 hover:opacity-100 transition-opacity">
-            <img 
-              src="/logo-site.png" 
-              alt="SalesClin" 
-              className={`h-10 w-auto object-contain transition-all duration-300 ${!scrolled ? 'brightness-0 invert' : ''}`} 
+      {/* SHARED SITE NAVBAR */}
+      <SiteNavbar />
+
+      {/* Docs Header */}
+      <header className="border-b border-slate-200/80 bg-white pt-28 pb-10">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div className="space-y-2">
+            <div className="text-[10px] font-mono font-bold tracking-widest text-[#F97316] uppercase">
+              Central de Ajuda / Docs
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-headline font-black tracking-tight text-slate-900">
+              Como podemos ajudar?
+            </h1>
+          </div>
+
+          {/* Minimalist Search Bar */}
+          <div className="relative w-full md:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+            <input 
+              ref={inputRef}
+              type="text"
+              className="w-full pl-10 pr-12 py-2.5 rounded-xl border border-slate-200 bg-[#FAFAFA] text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-slate-300 transition-all font-medium"
+              placeholder="Pesquisar dúvidas e artigos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
-          </Link>
-
-          <div className="flex items-center gap-6 lg:gap-10">
-            <div className="hidden md:flex items-center gap-10">
-              <Link to="/#planos" className={`text-sm font-semibold transition-colors ${scrolled ? 'text-[#0F172A]/70 hover:text-[#0F172A]' : 'text-white/70 hover:text-white'}`}>Planos</Link>
-              <Link to="/#suporte" className={`text-sm font-semibold transition-colors ${scrolled ? 'text-[#0F172A]/70 hover:text-[#0F172A]' : 'text-white/70 hover:text-white'}`}>Suporte</Link>
-              <Link to="/faq" className={`text-sm font-semibold transition-colors ${scrolled ? 'text-[#0F172A] font-bold' : 'text-white font-bold'}`}>FAQ</Link>
-              <div className={`h-4 w-[1px] mx-2 ${scrolled ? 'bg-slate-200' : 'bg-white/20'}`} />
-              <Link to="/login" className="group relative overflow-hidden bg-[#0F172A] text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-500 flex items-center gap-3 hover:scale-105 active:scale-95 shadow-[0_10px_20px_-10px_rgba(15,23,42,0.5)] hover:shadow-[0_0_40px_rgba(249,115,22,0.5)]">
-                <span className="absolute -inset-[1px] bg-[#F97316] translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 ease-out z-0" />
-                <span className="relative flex items-center gap-3 z-10">
-                  Acessar Plataforma 
-                  <ArrowRight size={14} className="text-[#F97316] group-hover:text-white group-hover:translate-x-1 transition-all duration-500"/>
-                </span>
-              </Link>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[10px] text-slate-400 font-mono shadow-sm">
+              <span>Ctrl</span>
+              <span>K</span>
             </div>
-            
-            <button className="lg:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              {isMenuOpen ? <X size={20} className={scrolled ? 'text-[#0F172A]' : 'text-white'}/> : <Menu size={20} className={scrolled ? 'text-[#0F172A]' : 'text-white'}/>}
-            </button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* 1. ULTRA PREMIUM DARK HERO */}
-      <section className="relative bg-[#0B1525] pt-32 pb-32 overflow-hidden rounded-b-[3rem] sm:rounded-b-[4rem] shadow-2xl z-10">
-        
-        {/* Intricate Hero Background Elements */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] z-0 mix-blend-overlay" />
-        <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full bg-gradient-to-br from-[#F97316]/20 to-transparent blur-[150px] pointer-events-none z-0" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none z-0" />
-        
-        {/* Subtle glowing grid */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] z-0" />
-
-        {/* Hero Content */}
-        <div className="max-w-4xl mx-auto px-6 relative z-10 text-center mt-12">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-8"
-          >
-            <Zap className="w-4 h-4 text-[#F97316]" />
-            <span className="text-xs font-bold text-white/90 uppercase tracking-widest">Suporte Pro Max</span>
-          </motion.div>
+      {/* 3-Column docs layout */}
+      <main className="flex-1 max-w-7xl mx-auto px-6 w-full py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-5xl sm:text-6xl lg:text-7xl font-black font-headline text-white tracking-tight mb-6 leading-[1.1]"
-          >
-            Como podemos <br className="hidden sm:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F97316] to-orange-400">acelerar sua clínica?</span>
-          </motion.h1>
-          
-          {/* Immersive Search Bar */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="relative max-w-2xl mx-auto mt-12 group"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-[#F97316] to-orange-400 rounded-3xl blur opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
-            <div className="relative flex items-center bg-white/10 border border-white/20 rounded-3xl backdrop-blur-xl p-2 focus-within:bg-white/15 focus-within:border-white/30 transition-all">
-              <div className="pl-6 pr-4">
-                <Search className="h-6 w-6 text-[#F97316]" />
-              </div>
-              <input
-                type="text"
-                className="w-full h-14 bg-transparent text-xl text-white focus:outline-none placeholder:text-white/40 font-medium"
-                placeholder="Ex: Como configurar o funil de vendas..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <div className="pr-2 hidden sm:block">
-                <div className="px-4 py-2 rounded-xl bg-white/10 text-white/60 text-xs font-bold uppercase tracking-wider">
-                  Buscar
-                </div>
-              </div>
+          {/* Column 1: Category Sidebar */}
+          <aside className="lg:col-span-3 lg:sticky lg:top-24 space-y-1">
+            <div className="px-3 mb-2 text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase">
+              Tópicos
             </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* 2. THE BENTO GRID CATEGORIES */}
-      <main className="flex-1 max-w-7xl mx-auto px-6 w-full relative z-20 -mt-16 mb-24">
-        
-        {/* Show Categories only if no search */}
-        <AnimatePresence>
-          {searchQuery === "" && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, height: 0 }}
-              className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-16"
-            >
-              {/* Reset to "Todos" card */}
-              <button
-                onClick={() => setActiveCategory("Todos")}
-                className={`relative overflow-hidden p-6 rounded-[2rem] text-left transition-all duration-500 flex flex-col justify-between h-48 border ${activeCategory === "Todos" ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-2xl shadow-[#0F172A]/20 scale-105 z-10' : 'bg-white text-slate-800 border-slate-100 hover:border-[#F97316]/30 hover:shadow-xl'}`}
-              >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${activeCategory === "Todos" ? 'bg-white/10' : 'bg-slate-50 text-slate-400'}`}>
-                  <Sparkles className={`w-6 h-6 ${activeCategory === "Todos" ? 'text-[#F97316]' : ''}`} />
-                </div>
-                <div>
-                  <h3 className="font-headline font-black text-xl mb-1">Explorar Todos</h3>
-                  <p className={`text-sm font-medium ${activeCategory === "Todos" ? 'text-white/60' : 'text-slate-400'}`}>Visão geral do sistema</p>
-                </div>
-              </button>
-
-              {/* Dynamic Categories */}
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`group relative overflow-hidden p-6 rounded-[2rem] text-left transition-all duration-500 flex flex-col justify-between h-48 border ${activeCategory === cat.id ? 'bg-[#F97316] text-white border-[#F97316] shadow-2xl shadow-[#F97316]/30 scale-105 z-10' : 'bg-white text-slate-800 border-slate-100 hover:border-[#F97316]/30 hover:shadow-xl'}`}
-                >
-                  {/* Hidden brand watermark */}
-                  <div className={`absolute -bottom-6 -right-6 transition-transform duration-700 group-hover:scale-150 group-hover:-rotate-12 ${activeCategory === cat.id ? 'opacity-10' : 'opacity-[0.03]'}`}>
-                    {React.cloneElement(cat.icon as React.ReactElement, { className: "w-40 h-40" })}
-                  </div>
-
-                  <div className="relative z-10">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${activeCategory === cat.id ? 'bg-white text-[#F97316] shadow-lg' : 'bg-slate-50 text-slate-400 group-hover:bg-orange-50 group-hover:text-[#F97316]'}`}>
-                      {cat.icon}
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <h3 className="font-headline font-black text-xl mb-1">{cat.id}</h3>
-                    <p className={`text-sm font-medium ${activeCategory === cat.id ? 'text-white/80' : 'text-slate-400 group-hover:text-slate-500'}`}>
-                      {cat.count} Artigos
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 3. ARTICLES LIST (THE RICH FAQ CONTENT) */}
-        <div className="max-w-4xl mx-auto">
-          {/* Section Header */}
-          <div className="flex flex-col sm:flex-row items-center justify-between mb-10 gap-4">
-            <h2 className="text-3xl sm:text-4xl font-extrabold font-headline text-[#0F172A] tracking-tight">
-              {searchQuery ? (
-                <>Resultados para <span className="text-[#F97316]">"{searchQuery}"</span></>
-              ) : activeCategory === "Todos" ? (
-                "Dúvidas Recentes"
-              ) : (
-                `Tópico: ${activeCategory}`
+            
+            {/* Reset / All */}
+            <button
+              onClick={() => setActiveCategory("Todos")}
+              className={cn(
+                "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all",
+                activeCategory === "Todos"
+                  ? "bg-slate-105 bg-slate-200/50 text-slate-950 font-bold"
+                  : "text-slate-500 hover:bg-slate-100/50 hover:text-slate-900"
               )}
-            </h2>
-            
-            {activeCategory !== "Todos" && !searchQuery && (
-              <button 
-                onClick={() => setActiveCategory("Todos")}
-                className="px-5 py-2 rounded-xl bg-slate-200/50 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors"
-              >
-                Limpar Filtro
-              </button>
-            )}
-          </div>
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Explorar Todos</span>
+              </div>
+              <span className="font-mono text-[10px] bg-slate-200/50 px-1.5 py-0.5 rounded text-slate-500 font-bold">
+                {getCategoryCount("Todos")}
+              </span>
+            </button>
 
-          {/* Cards List */}
-          <div className="space-y-6">
-            {filteredFaqs.length > 0 ? (
-              filteredFaqs.map((faq, index) => (
-                <FAQItem 
-                  key={index} 
-                  category={faq.category}
-                  question={faq.question} 
-                  answer={faq.answer} 
-                  isOpen={openIndex === index}
-                  onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                />
-              ))
-            ) : (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-24 bg-white rounded-[3rem] border border-slate-100 shadow-xl"
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all",
+                  activeCategory === cat.id
+                    ? "bg-slate-200/50 text-slate-950 font-bold"
+                    : "text-slate-500 hover:bg-slate-100/50 hover:text-slate-900"
+                )}
               >
-                <div className="w-24 h-24 rounded-full bg-slate-50 mx-auto mb-6 flex items-center justify-center">
-                  <Search className="w-10 h-10 text-slate-300" />
+                <div className="flex items-center gap-2">
+                  {cat.icon}
+                  <span>{cat.id}</span>
                 </div>
-                <h3 className="text-2xl font-bold font-headline text-[#0F172A] mb-3">Nenhum registro encontrado</h3>
-                <p className="text-slate-500 font-medium max-w-md mx-auto">Parece que não temos um artigo exato para "{searchQuery}". Tente usar palavras-chave mais genéricas.</p>
-              </motion.div>
-            )}
-          </div>
-        </div>
+                <span className="font-mono text-[10px] bg-slate-200/50 px-1.5 py-0.5 rounded text-slate-500 font-bold">
+                  {getCategoryCount(cat.id)}
+                </span>
+              </button>
+            ))}
+          </aside>
 
-        {/* 4. FINAL CTA — ABACATE PAY STYLE EDITION (FAQ VERSION) */}
+          {/* Column 2: Question List */}
+          <section className="lg:col-span-4 space-y-4">
+            <div className="px-1 text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase">
+              Perguntas
+            </div>
+            
+            <div className="space-y-2">
+              {filteredFaqs.length > 0 ? (
+                filteredFaqs.map((faq, index) => (
+                  <FAQItem
+                    key={index}
+                    category={faq.category}
+                    question={faq.question}
+                    isActive={selectedFAQ?.question === faq.question}
+                    onClick={() => handleFAQClick(faq)}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-12 bg-white rounded-2xl border border-slate-200/60 p-6">
+                  <Search className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                  <h3 className="text-sm font-bold text-slate-800 mb-1">Nenhum resultado</h3>
+                  <p className="text-xs text-slate-500">Tente buscar por outro termo.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Column 3: Desktop Reading Pane */}
+          <section className="hidden lg:block lg:col-span-5">
+            <div className="px-1 mb-4 text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase">
+              Artigo
+            </div>
+
+            {selectedFAQ ? (
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm sticky top-24">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-[#F97316] bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
+                    {selectedFAQ.category}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">Última atualização: 2026</span>
+                </div>
+                
+                <h2 className="text-xl sm:text-2xl font-headline font-black text-slate-900 leading-snug">
+                  {selectedFAQ.question}
+                </h2>
+                
+                <div className="h-px bg-slate-100" />
+                
+                <div className="prose prose-slate max-w-none text-slate-600 font-normal leading-relaxed text-sm whitespace-pre-line">
+                  {selectedFAQ.answer}
+                </div>
+                
+                <div className="pt-6 border-t border-slate-100 flex items-center justify-between gap-4">
+                  <div className="text-xs text-slate-500 font-semibold">Esse artigo foi útil?</div>
+                  <div className="flex gap-2">
+                    <button className="px-3 py-1 rounded-lg border border-slate-200 hover:border-slate-300 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors">
+                      Sim
+                    </button>
+                    <button className="px-3 py-1 rounded-lg border border-slate-200 hover:border-slate-300 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors">
+                      Não
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-3">
+                  <p className="text-xs text-slate-500 font-medium leading-normal">
+                    Ficou com alguma dúvida residual sobre este tópico? Fale com a gente.
+                  </p>
+                  <div className="flex gap-2">
+                    <a 
+                      href="https://wa.me/5551999999999" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex-grow bg-slate-900 hover:bg-slate-800 text-white text-center py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" /> Falar no WhatsApp
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-[300px] border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 text-center text-slate-400">
+                <Sparkles className="w-8 h-8 text-slate-300 mb-3" />
+                <p className="text-xs font-medium">Selecione uma dúvida ao lado para visualizar a resposta completa.</p>
+              </div>
+            )}
+          </section>
+
+        </div>
       </main>
 
-      <section className="py-32 px-8 w-full bg-[#F4F4F5]">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-[#F97316] rounded-[3rem] p-12 md:p-24 text-white relative overflow-hidden group">
-            {/* Background Decorative Elements */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-[100px] -mr-48 -mt-48 rounded-full" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 blur-[80px] -ml-32 -mb-32 rounded-full" />
-            
-            <div className="relative z-10 text-center max-w-3xl mx-auto">
-              <h2 className="text-5xl md:text-8xl font-headline font-black mb-10 leading-[0.95] tracking-tighter">
-                Ainda com <br/> dúvidas?
-              </h2>
-              <p className="text-xl md:text-2xl font-medium text-orange-50 mb-14 leading-relaxed">
-                Se você não encontrou o que procurava, nossa equipe de suporte e consultoria de sucesso está de prontidão para destrinchar o seu processo.
-              </p>
-              <div className="flex justify-center">
-                <Link to="/login" className="bg-white text-[#F97316] px-16 py-7 rounded-full font-black text-xs uppercase tracking-[0.3em] hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-orange-900/30 flex items-center gap-4 group/btn">
-                  Falar com o Suporte
-                  <ArrowRight size={20} className="group-hover/btn:translate-x-2 transition-transform"/>
-                </Link>
-              </div>
+      {/* Sleek CTA section at the bottom */}
+      <section className="max-w-7xl mx-auto px-6 w-full mb-16 mt-8">
+        <div className="bg-[#0B132B] rounded-[2.5rem] border border-slate-800 text-white relative overflow-hidden shadow-sm grid grid-cols-1 lg:grid-cols-12 items-stretch">
+          <div className="lg:col-span-7 p-8 md:p-12 lg:p-16 flex flex-col justify-center space-y-6 text-left relative z-20">
+            <div className="flex">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F97316]/10 text-[#F97316] text-[10px] font-mono font-bold uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F97316] animate-pulse" />
+                Suporte Premium
+              </span>
             </div>
+            
+            <h2 className="text-3xl sm:text-4xl font-headline font-extrabold text-white tracking-tight leading-tight">
+              Ainda com dúvidas?
+            </h2>
+            
+            <p className="text-slate-400 text-sm md:text-base font-normal leading-relaxed max-w-lg">
+              Se você não encontrou o que procurava nos artigos acima, converse com nosso time de especialistas para desenhar o processo ideal para a sua clínica.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <a 
+                href="https://wa.me/5551999999999"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-[#F97316] text-white hover:bg-orange-500 px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all text-center flex items-center justify-center gap-2"
+              >
+                Falar com Consultor
+              </a>
+              <Link 
+                to="/login" 
+                className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all text-center flex items-center justify-center gap-2"
+              >
+                Falar com o Suporte
+              </Link>
+            </div>
+          </div>
+          
+          <div className="lg:col-span-5 relative min-h-[280px] lg:min-h-full overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(249,115,22,0.1),transparent_70%)] z-10 pointer-events-none" />
+            <img 
+              src="/atendente.jpg" 
+              alt="Atendente SalesClin" 
+              className="absolute inset-0 w-full h-full object-cover" 
+            />
           </div>
         </div>
       </section>
 
       {/* FOOTER — COMPREHENSIVE EDITORIAL */}
-      <footer className="py-8 bg-white border-t border-slate-100 relative overflow-hidden w-full">
+      <footer className="py-12 bg-white border-t border-slate-200/60 relative overflow-hidden w-full mt-auto">
         <div className="max-w-7xl mx-auto px-8 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-4">
-            {/* Column 1: Brand */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-8">
             <div className="space-y-4">
-              <img src="/logo-site.png" alt="SalesClin" className="h-8 w-auto opacity-90" />
-              <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-xs">
+              <img src="/logo-site.png" alt="SalesClin" className="h-7 w-auto opacity-90" />
+              <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-xs">
                 A infraestrutura comercial definitiva para clínicas de alto ticket. Transformamos leads em faturamento com inteligência e precisão.
               </p>
-              <div className="flex gap-4">
-                <a href="#" className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316] transition-all cursor-pointer">
-                  <Instagram size={14} />
+              <div className="flex gap-3">
+                <a href="#" className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316]/50 transition-all cursor-pointer">
+                  <Instagram size={12} />
                 </a>
-                <a href="#" className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316] transition-all cursor-pointer">
-                  <MessageCircle size={14} />
+                <a href="#" className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316]/50 transition-all cursor-pointer">
+                  <MessageCircle size={12} />
                 </a>
               </div>
             </div>
 
-            {/* Column 2: Produto */}
             <div className="space-y-4">
-              <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">Produto</h4>
+              <h4 className="text-[10px] font-mono font-bold text-slate-900 uppercase tracking-widest">Produto</h4>
               <ul className="space-y-2">
                 {["Funcionalidades", "Simulador de Metas", "Planos e Preços", "Integrações"].map((item, i) => (
-                  <li key={i}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>
+                  <li key={i}><a href="#" className="text-xs text-slate-500 hover:text-[#F97316] transition-colors font-medium">{item}</a></li>
                 ))}
               </ul>
             </div>
 
-            {/* Column 3: Suporte */}
             <div className="space-y-4">
-              <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">Suporte</h4>
+              <h4 className="text-[10px] font-mono font-bold text-slate-900 uppercase tracking-widest">Suporte</h4>
               <ul className="space-y-2">
                 {["Central de Ajuda", "FAQ", "Falar com Consultor", "Comunidade"].map((item, i) => (
-                  <li key={i}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>
+                  <li key={i}><a href="#" className="text-xs text-slate-500 hover:text-[#F97316] transition-colors font-medium">{item}</a></li>
                 ))}
               </ul>
             </div>
 
-            {/* Column 4: Legal */}
             <div className="space-y-4">
-              <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">Legal</h4>
+              <h4 className="text-[10px] font-mono font-bold text-slate-900 uppercase tracking-widest">Legal</h4>
               <ul className="space-y-2">
                 {["Termos de Uso", "Privacidade", "Cookies", "Segurança"].map((item, i) => (
-                  <li key={i}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>
+                  <li key={i}><a href="#" className="text-xs text-slate-500 hover:text-[#F97316] transition-colors font-medium">{item}</a></li>
                 ))}
               </ul>
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-50 flex flex-col md:flex-row items-center justify-center">
-            <div className="text-[10px] font-black text-[#64748B] uppercase tracking-[0.3em]">
+          <div className="pt-8 border-t border-slate-200/50 flex flex-col md:flex-row items-center justify-center">
+            <div className="text-[10px] font-mono font-bold text-slate-400 tracking-wider">
               © 2026 SalesClin · CRM Especializado em Alto Ticket
             </div>
           </div>
         </div>
       </footer>
+
+      {/* Mobile Drawer */}
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <SheetContent className="sm:max-w-md w-full bg-white border-l border-slate-200 flex flex-col h-full justify-between p-8">
+          {selectedFAQ && (
+            <>
+              <div className="space-y-6 overflow-y-auto pr-2 flex-1 pt-6">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F97316]/10 text-[#F97316] text-[10px] font-mono font-bold uppercase tracking-wider">
+                    {selectedFAQ.category}
+                  </span>
+                </div>
+                <h3 className="font-headline font-black text-2xl text-slate-900 leading-tight">
+                  {selectedFAQ.question}
+                </h3>
+                <div className="h-px bg-slate-100" />
+                <div className="prose prose-slate max-w-none text-slate-600 font-normal leading-relaxed text-sm whitespace-pre-line">
+                  {selectedFAQ.answer}
+                </div>
+              </div>
+              
+              <div className="pt-6 mt-6 border-t border-slate-200 space-y-4">
+                <div className="flex items-center gap-3 py-4 px-5 rounded-2xl bg-slate-50 border border-slate-100">
+                  <div className="w-8 h-8 rounded-full bg-[#F97316]/10 flex items-center justify-center text-[#F97316] flex-shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Ficou com alguma dúvida residual sobre este tópico? Fale com a gente.
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href="https://wa.me/5551999999999"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all text-center flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle size={16} /> Falar no WhatsApp
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
     </div>
   );
 };

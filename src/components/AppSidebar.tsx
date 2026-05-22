@@ -59,6 +59,12 @@ const menuItems = [
     icon: 'trending_up',
     moduleCode: 'metas',
   },
+  {
+    title: 'Campanhas',
+    url: '/campaigns',
+    icon: 'campaign',
+    moduleCode: 'campanhas',
+  },
 ];
 
 export function AppSidebar() {
@@ -106,7 +112,7 @@ export function AppSidebar() {
           <img
             alt="SalesClin Logo"
             className="h-8 w-auto object-contain"
-            src="/logo-site.png"
+            src="/logo-oficial-v3.png"
           />
         </Link>
       </div>
@@ -134,7 +140,7 @@ export function AppSidebar() {
           {isSidebarCollapsed && !isMobileSidebarOpen ? (
              <Link to="/dashboard" className="transition-transform hover:scale-110">
                <img alt="S" className="h-8 w-8 object-contain" src="/favicon.png" onError={(e) => {
-                 (e.target as HTMLImageElement).src = "/logo-site.png";
+                 (e.target as HTMLImageElement).src = "/logo-oficial-v3.png";
                  (e.target as HTMLImageElement).className = "h-6 w-auto object-contain";
                }} />
              </Link>
