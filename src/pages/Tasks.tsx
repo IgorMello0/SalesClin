@@ -597,8 +597,8 @@ export default function Tasks() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
                 !isTeamMode 
-                  ? "bg-secondary text-secondary-foreground" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
+                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
+                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
               )}
             >
               <User className="w-3.5 h-3.5" />
@@ -609,8 +609,8 @@ export default function Tasks() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
                 isTeamMode 
-                  ? "bg-secondary text-secondary-foreground" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
+                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
+                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
               )}
             >
               <UserCheck className="w-3.5 h-3.5" />
@@ -625,8 +625,8 @@ export default function Tasks() {
               className={cn(
                 "p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center",
                 viewMode === 'kanban' 
-                  ? "bg-primary text-primary-foreground" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
+                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
+                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
               )}
               title="Quadro Kanban"
             >
@@ -637,8 +637,8 @@ export default function Tasks() {
               className={cn(
                 "p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center",
                 viewMode === 'list' 
-                  ? "bg-primary text-primary-foreground" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white"
+                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
+                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
               )}
               title="Visualização em Lista"
             >
