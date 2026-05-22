@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { professionalsApi, permissionsApi, usuariosApi } from '@/lib/api';
+import { professionalsApi, permissionsApi, usuariosApi, authApi } from '@/lib/api';
 
 interface CompanyAccess {
   id: number;
@@ -31,6 +31,7 @@ interface AuthContextType {
   professional: Professional | null;
   permissions: Permission[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (credential: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   signup: (data: Omit<Professional, 'id'> & { password: string }) => Promise<{ success: boolean; error?: string }>;
   hasModuleAccess: (moduleCode: string) => boolean;
@@ -203,12 +204,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: data.email === 'admin@admin.com' ? 'admin' : (profData ? 'profissional' : (data.role || 'usuario')),
           photoUrl: data.photoUrl || undefined,
           onboardingCompleted: data.onboardingCompleted || false,
+          companyId: profData ? profData.company?.id : userData?.companyId,
+          companyName: profData ? profData.company?.name : userData?.companyName,
+          companies: data.companies || [],
         };
         
         setProfessional(professionalData);
         localStorage.setItem('professional', JSON.stringify(professionalData));
         localStorage.setItem('token', token);
         localStorage.setItem('userType', profData ? 'professional' : 'user');
+        if (professionalData.companyId) {
+          localStorage.setItem('activeCompanyId', String(professionalData.companyId));
+        }
         
         // Carregar permissões do usuário logado
         await loadPermissions();
@@ -230,6 +237,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { 
         success: false, 
         error: 'Erro de conexão. Verifique se o servidor está rodando e tente novamente.' 
+      };
+    }
+  };
+
+  const loginWithGoogle = async (credential: string): Promise<{ success: boolean; error?: string }> => {
+    setIsLoading(true);
+
+    try {
+      console.log('[Auth] Attempting Google login...');
+      const response = await authApi.loginWithGoogle(credential);
+      console.log('[Auth] Google login response:', response);
+
+      if (response.success && response.data) {
+        const { token, professional: profData } = response.data as any;
+
+        if (!profData || !token) {
+          console.error('[Auth] Missing data in Google response:', response);
+          setIsLoading(false);
+          return {
+            success: false,
+            error: 'Resposta inválida do servidor. Tente novamente.'
+          };
+        }
+
+        const professionalData: Professional = {
+          id: profData.id.toString(),
+          name: profData.name,
+          email: profData.email,
+          phone: profData.phone || '',
+          specialization: profData.specialization || '',
+          role: 'profissional',
+          photoUrl: profData.photoUrl || undefined,
+          onboardingCompleted: profData.onboardingCompleted || false,
+          companyId: profData.company?.id,
+          companyName: profData.company?.name,
+          companies: profData.companies || [],
+        };
+
+        setProfessional(professionalData);
+        localStorage.setItem('professional', JSON.stringify(professionalData));
+        localStorage.setItem('token', token);
+        localStorage.setItem('userType', 'professional');
+        if (professionalData.companyId) {
+          localStorage.setItem('activeCompanyId', String(professionalData.companyId));
+        }
+
+        // Carregar permissões do usuário logado
+        await loadPermissions();
+
+        setIsLoading(false);
+        console.log('[Auth] Google login successful');
+        return { success: true };
+      }
+
+      console.error('[Auth] Google login failed:', response.error);
+      setIsLoading(false);
+      return {
+        success: false,
+        error: (response.error as any)?.message || 'Erro ao fazer login com Google.'
+      };
+    } catch (error) {
+      console.error('[Auth] Google login exception:', error);
+      setIsLoading(false);
+      return {
+        success: false,
+        error: 'Erro de conexão. Verifique se o servidor está rodando e tente novamente.'
       };
     }
   };
@@ -268,6 +341,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           specialization: profData.specialization || '',
           role: 'profissional',
           onboardingCompleted: profData.onboardingCompleted || false,
+          companyId: profData.companyId || profData.company?.id,
+          companyName: profData.companyName || profData.company?.name,
+          companies: profData.companies || [],
         };
         
         setProfessional(professionalData);
@@ -330,6 +406,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('professional');
     localStorage.removeItem('token');
     localStorage.removeItem('userType');
+    localStorage.removeItem('activeCompanyId');
   };
 
   return (
@@ -337,6 +414,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       professional,
       permissions,
       login,
+      loginWithGoogle,
       logout,
       signup,
       hasModuleAccess,

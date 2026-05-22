@@ -24,6 +24,8 @@ import { router as metasRouter } from './routes/metas.js'
 import { router as webhooksRouter } from './routes/webhooks.js'
 import { router as rolesRouter } from './routes/roles.js'
 import { router as funnelConfigRouter } from './routes/funnelConfig.js'
+import { router as campaignsRouter } from './routes/campaigns.js'
+import { router as authRouter } from './routes/auth.js'
 import { createErrorResponse } from './utils/response.js'
 import path from 'path'
 
@@ -60,6 +62,8 @@ app.use('/api/metas', metasRouter)
 app.use('/api/webhooks', webhooksRouter)
 app.use('/api/roles', rolesRouter)
 app.use('/api/funnel-config', funnelConfigRouter)
+app.use('/api/campaigns', campaignsRouter)
+app.use('/api/auth', authRouter)
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))

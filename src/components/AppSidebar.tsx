@@ -59,6 +59,12 @@ const menuItems = [
     icon: 'trending_up',
     moduleCode: 'metas',
   },
+  {
+    title: 'Campanhas',
+    url: '/campaigns',
+    icon: 'campaign',
+    moduleCode: 'campanhas',
+  },
 ];
 
 export function AppSidebar() {

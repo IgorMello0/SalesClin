@@ -37,6 +37,7 @@ import MetasPage from "./pages/MetasPage";
 import PrecosPage from "./pages/PrecosPage";
 import ClientesPage from "./pages/ClientesPage";
 import SobrePage from "./pages/SobrePage";
+import Campaigns from "./pages/Campaigns";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +86,7 @@ const App = () => (
                   <Route path="dental-test" element={<DentalTest />} />
                   <Route path="sales-funnel" element={<ProtectedRoute moduleCode="funnel" moduleName="Comercial"><SalesFunnel /></ProtectedRoute>} />
                   <Route path="metas" element={<ProtectedRoute moduleCode="metas" moduleName="Metas"><Goals /></ProtectedRoute>} />
+                  <Route path="campaigns" element={<ProtectedRoute moduleCode="campanhas" moduleName="Campanhas"><Campaigns /></ProtectedRoute>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
