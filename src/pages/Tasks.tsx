@@ -413,9 +413,9 @@ export default function Tasks() {
     const colTasks = tasks.filter(t => t.status === colStatus);
 
     return (
-      <div className="flex flex-col h-full min-h-[500px] bg-slate-50/60 dark:bg-slate-900/30 backdrop-blur-md rounded-3xl border border-slate-200/50 dark:border-white/5 p-4 sm:p-5">
+      <Card className="flex flex-col h-full min-h-[500px] p-4 sm:p-5 shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-muted/30">
         {/* Column Header */}
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-border dark:border-white/5">
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
           <div className="flex items-center gap-2">
             <div className={cn("p-1.5 rounded-lg", themeClass)}>
               {colIcon}
@@ -438,7 +438,7 @@ export default function Tasks() {
             return (
               <div 
                 key={task.id} 
-                className="p-4 bg-white dark:bg-[#0B1525] border border-slate-200/60 dark:border-white/5 hover:border-secondary/30 dark:hover:border-secondary/30 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_20px_rgba(10,31,68,0.06)] dark:hover:shadow-[0_8px_20px_rgba(0,0,0,0.3)] transition-all duration-300 hover:scale-[1.01] rounded-2xl flex flex-col gap-3 group relative overflow-hidden"
+                className="p-4 bg-card text-card-foreground border border-border hover:border-secondary/30 shadow-none hover:shadow-none transition-all duration-300 rounded-2xl flex flex-col gap-3 group relative overflow-hidden"
               >
                 {/* Accent line on left for priority */}
                 <div className={cn(
@@ -519,11 +519,11 @@ export default function Tasks() {
 
                 {/* Client / Lead Relation badge */}
                 {(task.client || task.lead) && (
-                  <div className="bg-slate-50 dark:bg-[#0E1726]/40 rounded-xl p-2 border border-slate-200/60 dark:border-white/5 flex items-center gap-2">
+                  <div className="bg-muted rounded-xl p-2 border border-border flex items-center gap-2">
                     <span className="material-symbols-outlined text-[14px] text-secondary">
                       {task.client ? 'person' : 'person_add'}
                     </span>
-                    <span className="text-[10px] font-bold text-foreground dark:text-slate-300 truncate">
+                    <span className="text-[10px] font-bold text-foreground truncate">
                       {task.client ? `Cliente: ${task.client.name}` : `Lead: ${task.lead?.name}`}
                     </span>
                   </div>
@@ -565,6 +565,7 @@ export default function Tasks() {
               </div>
             );
           })}
+        </div>
 
           {colTasks.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground py-10 px-4">
@@ -572,8 +573,7 @@ export default function Tasks() {
               <p className="text-xs font-bold uppercase tracking-wider text-center">Coluna vazia</p>
             </div>
           )}
-        </div>
-      </div>
+      </Card>
     );
   };
 
@@ -659,79 +659,79 @@ export default function Tasks() {
 
       {/* Bento Grid Analytics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-        <Card className="bg-white dark:bg-[#0B1525] border border-slate-200/60 dark:border-white/5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] rounded-3xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px]">
+        <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Total de Tarefas</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total de Tarefas</div>
             <div className="p-2 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30">
               <span className="material-symbols-outlined text-lg">fact_check</span>
             </div>
           </div>
           <div className="mt-2">
             <h3 className="stats-value">{totalCount}</h3>
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase mt-1 tracking-wider">Registradas no painel</p>
+            <p className="text-[9px] text-muted-foreground/80 font-bold uppercase mt-1 tracking-wider">Registradas no painel</p>
           </div>
         </Card>
 
-        <Card className="bg-white dark:bg-[#0B1525] border border-slate-200/60 dark:border-white/5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] rounded-3xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px]">
+        <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Concluídas</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Concluídas</div>
             <div className="p-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
               <span className="material-symbols-outlined text-lg">check_circle</span>
             </div>
           </div>
           <div className="mt-2">
             <h3 className="stats-value text-emerald-600 dark:text-emerald-400">{completedCount}</h3>
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase mt-1 tracking-wider">
+            <p className="text-[9px] text-muted-foreground/80 font-bold uppercase mt-1 tracking-wider">
               {totalCount > 0 ? `${Math.round((completedCount / totalCount) * 100)}% de taxa de conclusão` : 'Nenhuma tarefa'}
             </p>
           </div>
         </Card>
 
-        <Card className="bg-white dark:bg-[#0B1525] border border-slate-200/60 dark:border-white/5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] rounded-3xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px]">
+        <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Ativas</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ativas</div>
             <div className="p-2 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-900/30">
               <span className="material-symbols-outlined text-lg">hourglass_empty</span>
             </div>
           </div>
           <div className="mt-2">
             <h3 className="stats-value text-amber-600 dark:text-amber-400">{pendingCount}</h3>
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase mt-1 tracking-wider">A fazer ou Em Andamento</p>
+            <p className="text-[9px] text-muted-foreground/80 font-bold uppercase mt-1 tracking-wider">A fazer ou Em Andamento</p>
           </div>
         </Card>
 
-        <Card className="bg-white dark:bg-[#0B1525] border border-slate-200/60 dark:border-white/5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] rounded-3xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px]">
+        <Card className="p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Atrasadas</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Atrasadas</div>
             <div className="p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-xl border border-red-100 dark:border-red-900/30">
               <span className="material-symbols-outlined text-lg">alarm_on</span>
             </div>
           </div>
           <div className="mt-2">
             <h3 className="stats-value text-red-600 dark:text-red-400">{overdueCount}</h3>
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase mt-1 tracking-wider">Vencidas e sem conclusão</p>
+            <p className="text-[9px] text-muted-foreground/80 font-bold uppercase mt-1 tracking-wider">Vencidas e sem conclusão</p>
           </div>
         </Card>
       </div>
 
       {/* Filters Bar Card */}
-      <Card className="p-5 sm:p-6 space-y-4 bg-white dark:bg-[#0B1525] border border-slate-200/60 dark:border-white/5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] rounded-3xl">
+      <Card className="p-5 sm:p-6 space-y-4 shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-secondary" />
-          <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Filtrar Atividades</h3>
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Filtrar Atividades</h3>
         </div>
  
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {/* Text Search */}
           <div className="space-y-1">
-            <Label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Busca livre</Label>
+            <Label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Busca livre</Label>
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Título ou descrição..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/10 text-foreground focus-visible:ring-secondary focus-visible:ring-offset-0"
+                className="pl-9 h-10 text-xs rounded-xl bg-muted border border-border text-foreground focus-visible:ring-secondary focus-visible:ring-offset-0"
               />
             </div>
           </div>
@@ -739,10 +739,14 @@ export default function Tasks() {
           {/* Responsible Select */}
           {isTeamMode && (
             <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Responsável</Label>
+              <Label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Responsável</Label>
               <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
-                <SelectTrigger className="h-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/10 text-foreground focus:ring-secondary">
-                  <SelectValue placeholder="Todos" />
+                <SelectTrigger className="h-10 text-xs rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                  <SelectValue placeholder="Todos">
+                    {responsibleFilter === 'all' 
+                      ? 'Todos os Colaboradores' 
+                      : (professionals.find(p => String(p.id) === responsibleFilter)?.name || 'Todos os Colaboradores')}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   <SelectItem value="all">Todos os Colaboradores</SelectItem>
@@ -756,10 +760,12 @@ export default function Tasks() {
  
           {/* Priority Select */}
           <div className="space-y-1">
-            <Label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Prioridade</Label>
+            <Label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Prioridade</Label>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="h-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/10 text-foreground focus:ring-secondary">
-                <SelectValue placeholder="Todas" />
+              <SelectTrigger className="h-10 text-xs rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                <SelectValue placeholder="Todas">
+                  {priorityFilter === 'all' ? 'Todas as prioridades' : getPriorityLabel(priorityFilter)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="all">Todas as prioridades</SelectItem>
@@ -773,10 +779,15 @@ export default function Tasks() {
  
           {/* Date Filter */}
           <div className="space-y-1">
-            <Label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Vencimento</Label>
+            <Label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Vencimento</Label>
             <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="h-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/10 text-foreground focus:ring-secondary">
-                <SelectValue placeholder="Todos os períodos" />
+              <SelectTrigger className="h-10 text-xs rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                <SelectValue placeholder="Todos os períodos">
+                  {dateFilter === 'all' ? 'Qualquer data' : 
+                   dateFilter === 'today' ? 'Vence Hoje' :
+                   dateFilter === 'overdue' ? 'Atrasadas' :
+                   dateFilter === 'upcoming' ? 'Próximos Dias' : 'Qualquer data'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="all">Qualquer data</SelectItem>
@@ -790,10 +801,12 @@ export default function Tasks() {
           {/* Status Select for List View */}
           {viewMode === 'list' && (
             <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Status</Label>
+              <Label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/10 text-foreground focus:ring-secondary">
-                  <SelectValue placeholder="Todos" />
+                <SelectTrigger className="h-10 text-xs rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                  <SelectValue placeholder="Todos">
+                    {statusFilter === 'all' ? 'Qualquer status' : getStatusLabel(statusFilter)}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   <SelectItem value="all">Qualquer status</SelectItem>
@@ -829,10 +842,10 @@ export default function Tasks() {
 
       {/* Main Views Container */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-32 bg-white dark:bg-[#0B1525] rounded-3xl border border-slate-200/60 dark:border-white/5 shadow-sm">
+        <Card className="flex flex-col items-center justify-center py-32">
           <Loader2 className="w-8 h-8 text-secondary animate-spin mb-3" />
           <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Carregando atividades...</span>
-        </div>
+        </Card>
       ) : viewMode === 'kanban' ? (
         /* Kanban Board View */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -842,11 +855,11 @@ export default function Tasks() {
         </div>
       ) : (
         /* List View */
-        <div className="overflow-hidden border border-slate-200/60 dark:border-white/5 bg-white dark:bg-[#0B1525] rounded-3xl shadow-sm">
+        <Card className="overflow-hidden p-0 shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-card">
           <div className="p-0 bg-transparent">
             <Table>
-              <TableHeader className="bg-slate-50/80 dark:bg-slate-950/40 border-b border-slate-200/60 dark:border-white/5">
-                <TableRow className="hover:bg-transparent border-border dark:border-white/5">
+              <TableHeader className="bg-muted/50 border-b border-border">
+                <TableRow className="hover:bg-transparent border-border">
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground h-12 px-6">Atividade</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground h-12">Responsável</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground h-12">Prioridade</TableHead>
@@ -864,7 +877,7 @@ export default function Tasks() {
                     : 'U';
 
                   return (
-                    <TableRow key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 border-b border-slate-200/60 dark:border-white/5 transition-colors">
+                    <TableRow key={task.id} className="hover:bg-muted/40 border-b border-border transition-colors">
                       {/* Title & Description */}
                       <TableCell className="px-6 py-4">
                         <div>
@@ -988,13 +1001,12 @@ export default function Tasks() {
               </div>
             )}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Task Creation / Editing Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="w-[95vw] max-w-[620px] border-0 shadow-2xl rounded-3xl bg-card p-0 overflow-hidden text-foreground">
-          
           {/* Header */}
           <div className="p-6 bg-[#0B1525] border-b border-[#0B1525] rounded-t-3xl">
             <DialogTitle className="text-xl font-bold text-white font-headline">
@@ -1013,11 +1025,11 @@ export default function Tasks() {
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Ex: Ligar para confirmar consulta..."
-                className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus-visible:ring-secondary focus-visible:ring-offset-0 text-sm"
+                className="h-11 rounded-xl bg-muted border border-border text-foreground focus-visible:ring-secondary focus-visible:ring-offset-0 text-sm"
                 required
               />
             </div>
-
+ 
             {/* Description */}
             <div className="space-y-1.5">
               <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Descrição detalhada</Label>
@@ -1025,10 +1037,10 @@ export default function Tasks() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Insira notas, observações, links ou detalhes importantes..."
-                className="w-full min-h-[90px] p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus:border-secondary text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
+                className="w-full min-h-[90px] p-3 rounded-xl bg-muted border border-border text-foreground focus:border-secondary text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
               />
             </div>
-
+ 
             {/* Grid for parameters */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Responsible user select */}
@@ -1038,8 +1050,10 @@ export default function Tasks() {
                   value={formData.assignedToId}
                   onValueChange={(val) => setFormData({ ...formData, assignedToId: val })}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus:ring-secondary">
-                    <SelectValue placeholder="Selecione um profissional" />
+                  <SelectTrigger className="h-11 rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                    <SelectValue placeholder="Selecione um profissional">
+                      {professionals.find(p => String(p.id) === formData.assignedToId)?.name || 'Selecione um profissional'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {professionals.map(p => (
@@ -1048,7 +1062,7 @@ export default function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
-
+ 
               {/* Due date picker */}
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Data de Vencimento *</Label>
@@ -1057,12 +1071,12 @@ export default function Tasks() {
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground text-sm pr-10 font-headline focus-visible:ring-secondary"
+                    className="h-11 rounded-xl bg-muted border border-border text-foreground text-sm pr-10 font-headline focus-visible:ring-secondary"
                     required
                   />
                 </div>
               </div>
-
+ 
               {/* Priority select */}
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Prioridade</Label>
@@ -1070,8 +1084,10 @@ export default function Tasks() {
                   value={formData.priority}
                   onValueChange={(val: any) => setFormData({ ...formData, priority: val })}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus:ring-secondary">
-                    <SelectValue placeholder="Média" />
+                  <SelectTrigger className="h-11 rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                    <SelectValue placeholder="Média">
+                      {getPriorityLabel(formData.priority)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="low">Baixa</SelectItem>
@@ -1081,7 +1097,7 @@ export default function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
-
+ 
               {/* Status select (only for editing tasks) */}
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status</Label>
@@ -1089,8 +1105,10 @@ export default function Tasks() {
                   value={formData.status}
                   onValueChange={(val: any) => setFormData({ ...formData, status: val })}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus:ring-secondary">
-                    <SelectValue placeholder="A Fazer" />
+                  <SelectTrigger className="h-11 rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                    <SelectValue placeholder="A Fazer">
+                      {getStatusLabel(formData.status)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="pending">A Fazer</SelectItem>
@@ -1100,7 +1118,7 @@ export default function Tasks() {
                 </Select>
               </div>
             </div>
-
+ 
             {/* Link to Lead or Client */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 border-t border-border dark:border-white/5 pt-4">
               <div className="space-y-1.5">
@@ -1109,8 +1127,10 @@ export default function Tasks() {
                   value={formData.clientId}
                   onValueChange={(val) => setFormData({ ...formData, clientId: val, leadId: val ? '' : formData.leadId })}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus:ring-secondary">
-                    <SelectValue placeholder="Selecione um cliente" />
+                  <SelectTrigger className="h-11 rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                    <SelectValue placeholder="Selecione um cliente">
+                      {clients.find(c => String(c.id) === formData.clientId)?.name || 'Nenhum cliente'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="">Nenhum cliente</SelectItem>
@@ -1120,15 +1140,17 @@ export default function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
-
+ 
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Associar Lead</Label>
                 <Select
                   value={formData.leadId}
                   onValueChange={(val) => setFormData({ ...formData, leadId: val, clientId: val ? '' : formData.clientId })}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus:ring-secondary">
-                    <SelectValue placeholder="Selecione um lead" />
+                  <SelectTrigger className="h-11 rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                    <SelectValue placeholder="Selecione um lead">
+                      {leads.find(l => String(l.id) === formData.leadId)?.name || 'Nenhum lead'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="">Nenhum lead</SelectItem>
@@ -1139,7 +1161,7 @@ export default function Tasks() {
                 </Select>
               </div>
             </div>
-
+ 
             {/* Recurrence Setup */}
             <div className="border-t border-border dark:border-white/5 pt-4 space-y-4">
               <div className="flex items-center justify-between">
@@ -1157,7 +1179,7 @@ export default function Tasks() {
                   className="w-5 h-5 accent-secondary rounded-lg border-input cursor-pointer bg-background focus:outline-none"
                 />
               </div>
-
+ 
               {formData.isRecurring && (
                 <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Periodicidade da Recorrência</Label>
@@ -1165,8 +1187,12 @@ export default function Tasks() {
                     value={formData.recurrenceRule}
                     onValueChange={(val: any) => setFormData({ ...formData, recurrenceRule: val })}
                   >
-                    <SelectTrigger className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 text-foreground focus:ring-secondary">
-                      <SelectValue placeholder="Diária" />
+                    <SelectTrigger className="h-11 rounded-xl bg-muted border border-border text-foreground focus:ring-secondary">
+                      <SelectValue placeholder="Diária">
+                        {formData.recurrenceRule === 'daily' ? 'Diária (Todo dia)' :
+                         formData.recurrenceRule === 'weekly' ? 'Semanal (Toda semana)' :
+                         formData.recurrenceRule === 'monthly' ? 'Mensal (Todo mês)' : 'Diária (Todo dia)'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
                       <SelectItem value="daily">Diária (Todo dia)</SelectItem>
@@ -1177,9 +1203,9 @@ export default function Tasks() {
                 </div>
               )}
             </div>
-
+ 
             {/* Buttons */}
-            <div className="p-5 border-t border-border dark:border-white/5 bg-slate-50 dark:bg-slate-950/20 flex justify-end gap-3 rounded-b-3xl">
+            <div className="p-5 border-t border-border dark:border-white/5 bg-muted/50 dark:bg-slate-950/20 flex justify-end gap-3 rounded-b-3xl">
               <Button 
                 type="button"
                 variant="ghost" 
@@ -1191,7 +1217,7 @@ export default function Tasks() {
               <Button 
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold h-11 px-6 shadow-sm flex items-center gap-2"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold h-11 px-6 shadow-none flex items-center gap-2"
               >
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editingTask ? 'Atualizar Tarefa' : 'Criar Tarefa'}
