@@ -591,14 +591,14 @@ export default function Tasks() {
         
         <div className="flex flex-wrap items-center gap-2">
           {/* My Tasks vs Team Tasks Switch */}
-          <div className="flex bg-muted/60 dark:bg-[#0B1525]/80 p-1 rounded-xl border border-border dark:border-white/5">
+          <div className="flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60">
             <button
               onClick={() => setIsTeamMode(false)}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
                 !isTeamMode 
-                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200" 
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
               )}
             >
               <User className="w-3.5 h-3.5" />
@@ -609,8 +609,8 @@ export default function Tasks() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
                 isTeamMode 
-                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200" 
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
               )}
             >
               <UserCheck className="w-3.5 h-3.5" />
@@ -619,14 +619,14 @@ export default function Tasks() {
           </div>
 
           {/* View Toggle */}
-          <div className="flex bg-muted/60 dark:bg-[#0B1525]/80 p-1 rounded-xl border border-border dark:border-white/5">
+          <div className="flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60">
             <button
               onClick={() => setViewMode('kanban')}
               className={cn(
                 "p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center",
                 viewMode === 'kanban' 
-                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200" 
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
               )}
               title="Quadro Kanban"
             >
@@ -637,8 +637,8 @@ export default function Tasks() {
               className={cn(
                 "p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center",
                 viewMode === 'list' 
-                  ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" 
-                  : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-white border border-transparent"
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200" 
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
               )}
               title="Visualização em Lista"
             >
