@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, ArrowRight, Sun, Moon, Sunset, CheckCircle2 } from 'lucide-react';
+import { Loader2, Mail, Lock, ArrowRight, Sun, Moon, Sunset, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Login = () => {
@@ -128,15 +128,15 @@ const Login = () => {
             
             <div className="space-y-2.5">
               <div className="flex items-center gap-2.5 text-xs text-slate-200">
-                <CheckCircle2 size={14} className="text-[#F97316]" />
+                <Check size={14} className="text-[#F97316] stroke-[3]" />
                 <span>Sua agenda está sincronizada</span>
               </div>
               <div className="flex items-center gap-2.5 text-xs text-slate-200">
-                <CheckCircle2 size={14} className="text-[#F97316]" />
+                <Check size={14} className="text-[#F97316] stroke-[3]" />
                 <span>Funil de vendas ativo</span>
               </div>
               <div className="flex items-center gap-2.5 text-xs text-slate-200">
-                <CheckCircle2 size={14} className="text-[#F97316]" />
+                <Check size={14} className="text-[#F97316] stroke-[3]" />
                 <span>Faturamento do dia pronto</span>
               </div>
             </div>

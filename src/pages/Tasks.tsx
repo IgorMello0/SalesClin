@@ -115,6 +115,10 @@ export default function Tasks() {
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [responsibleFilter, setResponsibleFilter] = useState<string>('all');
 
+  // Drag and Drop State
+  const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+  const [dropTargetStatus, setDropTargetStatus] = useState<'pending' | 'in_progress' | 'completed' | null>(null);
+
   // Relations & Autocomplete / Option Lists
   const [professionals, setProfessionals] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -161,8 +165,8 @@ export default function Tasks() {
   }, []);
 
   // Fetch Tasks from API
-  const loadTasks = useCallback(async () => {
-    setIsLoading(true);
+  const loadTasks = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const params: any = {
         search: searchQuery || undefined,
@@ -194,7 +198,7 @@ export default function Tasks() {
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [searchQuery, isTeamMode, statusFilter, priorityFilter, dateFilter, responsibleFilter]);
 
@@ -337,6 +341,13 @@ export default function Tasks() {
 
   // Update Status Quick-Move
   const handleUpdateStatus = async (task: Task, newStatus: 'pending' | 'in_progress' | 'completed') => {
+    const previousTasks = [...tasks];
+
+    // Atualização otimista (instantânea na UI)
+    setTasks(prevTasks => 
+      prevTasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t)
+    );
+
     try {
       const res = await tasksApi.update(task.id, { status: newStatus });
       if (res.success) {
@@ -344,13 +355,14 @@ export default function Tasks() {
           title: 'Status atualizado',
           description: `Tarefa movida para ${newStatus === 'completed' ? 'Concluída' : newStatus === 'in_progress' ? 'Em Andamento' : 'A Fazer'}.`,
         });
-        loadTasks();
+        loadTasks(true); // silent reload
       } else {
         toast({
           title: 'Erro',
           description: res.error?.message || 'Erro ao atualizar status.',
           variant: 'destructive',
         });
+        setTasks(previousTasks); // Rollback
       }
     } catch (err) {
       toast({
@@ -358,7 +370,45 @@ export default function Tasks() {
         description: 'Erro na requisição.',
         variant: 'destructive',
       });
+      setTasks(previousTasks); // Rollback
     }
+  };
+
+  // Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, taskId: number) => {
+    setDraggedTaskId(taskId);
+    e.dataTransfer.setData('taskId', String(taskId));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, status: 'pending' | 'in_progress' | 'completed') => {
+    e.preventDefault();
+    setDropTargetStatus(status);
+  };
+
+  const handleDragLeave = () => {
+    setDropTargetStatus(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, status: 'pending' | 'in_progress' | 'completed') => {
+    e.preventDefault();
+    const taskIdStr = e.dataTransfer.getData('taskId');
+    const taskId = taskIdStr ? Number(taskIdStr) : draggedTaskId;
+
+    if (taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task && task.status !== status) {
+        handleUpdateStatus(task, status);
+      }
+    }
+
+    setDraggedTaskId(null);
+    setDropTargetStatus(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDropTargetStatus(null);
   };
 
   // Helpers
@@ -413,7 +463,15 @@ export default function Tasks() {
     const colTasks = tasks.filter(t => t.status === colStatus);
 
     return (
-      <Card className="flex flex-col h-full min-h-[500px] p-4 sm:p-5 shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-muted/30">
+      <Card 
+        onDragOver={(e) => handleDragOver(e, colStatus)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, colStatus)}
+        className={cn(
+          "flex flex-col h-full min-h-[500px] p-4 sm:p-5 shadow-none hover:translate-y-0 hover:shadow-none border border-border bg-muted/30 transition-all duration-200",
+          dropTargetStatus === colStatus && "bg-secondary/5 border-dashed border-secondary ring-2 ring-secondary/10"
+        )}
+      >
         {/* Column Header */}
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
           <div className="flex items-center gap-2">
@@ -438,7 +496,13 @@ export default function Tasks() {
             return (
               <div 
                 key={task.id} 
-                className="p-4 bg-card text-card-foreground border border-border hover:border-secondary/30 shadow-none hover:shadow-none transition-all duration-300 rounded-2xl flex flex-col gap-3 group relative overflow-hidden"
+                draggable
+                onDragStart={(e) => handleDragStart(e, task.id)}
+                onDragEnd={handleDragEnd}
+                className={cn(
+                  "p-4 bg-card text-card-foreground border border-border hover:border-secondary/30 shadow-none hover:shadow-none transition-all duration-300 rounded-2xl flex flex-col gap-3 group relative overflow-hidden cursor-grab active:cursor-grabbing",
+                  draggedTaskId === task.id && "opacity-40 border-dashed"
+                )}
               >
                 {/* Accent line on left for priority */}
                 <div className={cn(
@@ -1197,7 +1261,7 @@ export default function Tasks() {
             </div>
  
             {/* Buttons */}
-            <div className="p-5 border-t border-border dark:border-white/5 bg-muted/50 dark:bg-slate-950/20 flex justify-end gap-3 rounded-b-3xl">
+            <div className="pt-5 border-t border-border dark:border-white/5 flex justify-end gap-3">
               <Button 
                 type="button"
                 variant="ghost" 
