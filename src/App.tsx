@@ -30,6 +30,7 @@ import DentalTest from "./pages/DentalTest";
 import Leads from "./pages/Leads";
 import SalesFunnel from "./pages/SalesFunnel";
 import Goals from "./pages/Goals";
+import Tasks from "./pages/Tasks";
 import FAQ from "./pages/FAQ";
 import FunilPage from "./pages/FunilPage";
 import AgendaPage from "./pages/AgendaPage";
@@ -85,6 +86,7 @@ const App = () => (
                   <Route path="dental-test" element={<DentalTest />} />
                   <Route path="sales-funnel" element={<ProtectedRoute moduleCode="funnel" moduleName="Comercial"><SalesFunnel /></ProtectedRoute>} />
                   <Route path="metas" element={<ProtectedRoute moduleCode="metas" moduleName="Metas"><Goals /></ProtectedRoute>} />
+                  <Route path="tasks" element={<ProtectedRoute moduleCode="tarefas" moduleName="Tarefas"><Tasks /></ProtectedRoute>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

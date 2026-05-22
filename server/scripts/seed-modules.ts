@@ -69,6 +69,12 @@ const modules = [
     description: 'Engenharia reversa e simulador de metas',
     icon: 'TrendingUp',
   },
+  {
+    code: 'tarefas',
+    name: 'Tarefas',
+    description: 'Gestão de tarefas, prazos e alertas',
+    icon: 'CheckSquare',
+  },
 ]
 
 async function main() {
