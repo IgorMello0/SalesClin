@@ -24,6 +24,8 @@ import { router as metasRouter } from './routes/metas.js'
 import { router as webhooksRouter } from './routes/webhooks.js'
 import { router as rolesRouter } from './routes/roles.js'
 import { router as funnelConfigRouter } from './routes/funnelConfig.js'
+import { router as notificationsRouter } from './routes/notifications.js'
+import { router as tasksRouter } from './routes/tasks.js'
 import { router as campaignsRouter } from './routes/campaigns.js'
 import { router as authRouter } from './routes/auth.js'
 import { createErrorResponse } from './utils/response.js'
@@ -62,6 +64,8 @@ app.use('/api/metas', metasRouter)
 app.use('/api/webhooks', webhooksRouter)
 app.use('/api/roles', rolesRouter)
 app.use('/api/funnel-config', funnelConfigRouter)
+app.use('/api/notifications', notificationsRouter)
+app.use('/api/tasks', tasksRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/auth', authRouter)
 

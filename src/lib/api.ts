@@ -361,6 +361,29 @@ export const uploadApi = {
   }
 }
 
+// Tarefas (Tasks)
+export const tasksApi = {
+  getAll: async (params?: { status?: string; priority?: string; dueDateRange?: string; search?: string; team?: boolean }) => {
+    const query = new URLSearchParams()
+    if (params?.status) query.append('status', params.status)
+    if (params?.priority) query.append('priority', params.priority)
+    if (params?.dueDateRange) query.append('dueDateRange', params.dueDateRange)
+    if (params?.search) query.append('search', params.search)
+    if (params?.team) query.append('team', params.team.toString())
+    return apiRequest<Array<any>>(`/tasks?${query.toString()}`)
+  },
+  create: async (data: any) => apiRequest<any>('/tasks', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: any) => apiRequest<any>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id: number) => apiRequest<{ id: number }>(`/tasks/${id}`, { method: 'DELETE' }),
+}
+
+// Notificações (Notifications)
+export const notificationsApi = {
+  getAll: async () => apiRequest<Array<any>>('/notifications'),
+  readAll: async () => apiRequest<any>('/notifications/read-all', { method: 'PUT' }),
+  read: async (id: number) => apiRequest<any>(`/notifications/${id}/read`, { method: 'PUT' }),
+}
+
 // Resolver URLs de imagens locais/remotas/base64
 export const getImageUrl = (path: string | null | undefined): string => {
   if (!path) return ''

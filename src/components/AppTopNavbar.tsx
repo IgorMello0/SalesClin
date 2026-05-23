@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
-import { getImageUrl } from '@/lib/api';
+import { getImageUrl, notificationsApi } from '@/lib/api';
 
 const menuItems = [
   {
@@ -34,6 +34,12 @@ const menuItems = [
     url: '/sales-funnel',
     icon: 'filter_alt',
     moduleCode: 'funnel',
+  },
+  {
+    title: 'Tarefas',
+    url: '/tasks',
+    icon: 'task_alt',
+    moduleCode: 'tarefas',
   },
   {
     title: 'Financeiro',
@@ -81,8 +87,12 @@ export function AppTopNavbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [blockedTooltip, setBlockedTooltip] = useState<string | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
   const menuRef = useRef<HTMLDivElement>(null);
   const companyMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Módulos restritos da v1 (ficam ocultos para não-admin)
@@ -95,8 +105,8 @@ export function AppTopNavbar() {
       return false;
     }
     
-    // 2. Módulos essenciais sempre visíveis (Dashboard e Agenda)
-    const essentialModules = ['dashboard', 'agendamentos'];
+    // 2. Módulos essenciais sempre visíveis (Dashboard, Agenda e Tarefas)
+    const essentialModules = ['dashboard', 'agendamentos', 'tarefas'];
     if (essentialModules.includes(item.moduleCode)) {
       return true;
     }
@@ -147,6 +157,63 @@ export function AppTopNavbar() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [companyMenuOpen]);
+
+  // Close notifications dropdown on outside click
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) setNotificationsOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [notificationsOpen]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationsApi.getAll();
+      if (res.success && res.data) {
+        setNotifications(res.data);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar notificações:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (professional) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [professional]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleReadAll = async () => {
+    try {
+      const res = await notificationsApi.readAll();
+      if (res.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReadSingle = async (n: any) => {
+    if (!n.read) {
+      try {
+        await notificationsApi.read(n.id);
+        setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    setNotificationsOpen(false);
+    if (n.taskId) {
+      navigate('/tasks');
+    }
+  };
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -285,21 +352,90 @@ export function AppTopNavbar() {
           <div className="flex-1 lg:hidden" />
 
           {/* Right Side — Bell + Avatar Dropdown */}
-          <div className="flex items-center gap-2 sm:gap-4 ml-2 sm:ml-4 shrink-0" ref={menuRef}>
+          <div className="flex items-center gap-2 sm:gap-4 ml-2 sm:ml-4 shrink-0">
             {/* Notification Bell */}
-            <button
-              className="relative flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors"
-              title="Notificações"
-            >
-              <span className="material-symbols-outlined text-[22px] sm:text-[26px]">notifications</span>
-              {/* Red dot */}
-              <span className="absolute top-0 right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-500 rounded-full border-2 border-[#0B1525]" />
-            </button>
+            <div className="relative" ref={notificationsRef}>
+              <button
+                onClick={() => {
+                  setNotificationsOpen(!notificationsOpen);
+                  if (!notificationsOpen) {
+                    fetchNotifications();
+                  }
+                }}
+                className="relative flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors cursor-pointer w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-white/5"
+                title="Notificações"
+              >
+                <span className="material-symbols-outlined text-[22px] sm:text-[26px]">notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-[#0B1525]">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute top-12 right-0 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 text-slate-700 animate-fade-in-up z-[100] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 font-headline">Notificações</h4>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Você tem {unreadCount} mensagens não lidas</p>
+                    </div>
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={handleReadAll}
+                        className="text-xs font-semibold text-primary hover:text-primary-dark hover:underline transition-colors cursor-pointer"
+                      >
+                        Limpar todas
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-slate-400">
+                        <span className="material-symbols-outlined text-3xl opacity-50 mb-1">notifications_off</span>
+                        <p className="text-xs font-medium">Nenhuma notificação por enquanto</p>
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => handleReadSingle(n)}
+                          className={cn(
+                            "w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex gap-3 items-start cursor-pointer",
+                            !n.read ? "bg-primary/5 font-semibold" : ""
+                          )}
+                        >
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                            n.type === 'task_assigned' 
+                              ? "bg-blue-100 text-blue-600" 
+                              : n.type === 'task_completed'
+                              ? "bg-green-100 text-green-600"
+                              : "bg-orange-100 text-orange-600"
+                          )}>
+                            <span className="material-symbols-outlined text-[18px]">
+                              {n.type === 'task_assigned' ? 'assignment' : n.type === 'task_completed' ? 'check_circle' : 'info'}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-slate-800 break-words leading-tight">{n.content}</p>
+                            <span className="text-[9px] text-slate-400 mt-1 block">
+                              {new Date(n.createdAt).toLocaleDateString('pt-BR')} às {new Date(n.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Avatar */}
-            <button
-              id="tour-settings"
-              onClick={() => setMenuOpen(!menuOpen)}
+            <div className="relative" ref={menuRef}>
+              <button
+                id="tour-settings"
+                onClick={() => setMenuOpen(!menuOpen)}
               className={cn(
                 "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-[12px] sm:text-[13px] font-bold transition-all cursor-pointer shadow-sm overflow-hidden",
                 isProfileActive 
@@ -367,7 +503,8 @@ export function AppTopNavbar() {
             )}
           </div>
         </div>
-      </header>
+      </div>
+    </header>
 
       {/* Mobile Navigation Drawer */}
       {mobileMenuOpen && (

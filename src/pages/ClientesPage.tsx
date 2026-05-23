@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Star, Quote, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Star, Quote, ArrowRight, Check } from 'lucide-react';
 import { SiteNavbar } from '@/components/SiteNavbar';
 import { SiteFooter } from '@/components/SiteFooter';
 import { Link } from 'react-router-dom';
@@ -340,13 +340,13 @@ const ClientesPage = () => {
               {/* Trust Indicators */}
               <div className="mt-16 pt-12 border-t border-slate-200/60 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 text-slate-500 font-bold text-sm uppercase tracking-widest">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 size={20} className="text-[#F97316]" /> Implantação Rápida
+                  <Check size={20} className="text-[#F97316] stroke-[3]" /> Implantação Rápida
                 </div>
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 size={20} className="text-[#F97316]" /> Suporte Dedicado
+                  <Check size={20} className="text-[#F97316] stroke-[3]" /> Suporte Dedicado
                 </div>
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 size={20} className="text-[#F97316]" /> Sem Fidelidade
+                  <Check size={20} className="text-[#F97316] stroke-[3]" /> Sem Fidelidade
                 </div>
               </div>
 

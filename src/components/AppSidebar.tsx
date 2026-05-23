@@ -36,6 +36,12 @@ const menuItems = [
     moduleCode: 'funnel',
   },
   {
+    title: 'Tarefas',
+    url: '/tasks',
+    icon: 'task_alt',
+    moduleCode: 'tarefas',
+  },
+  {
     title: 'Gestão Financeira',
     url: '/payments',
     icon: 'payments',
