@@ -2,9 +2,31 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, ArrowRight, Sun, Moon, Sunset, Check, Eye, EyeOff } from 'lucide-react';
+import { 
+  Loader2, Mail, Lock, ArrowRight, Check, Eye, EyeOff, 
+  Calendar, Filter, TrendingUp, DollarSign, MessageSquare, 
+  Sparkles, Database, Code, Zap, Server, Bot 
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { GoogleLogin } from '@react-oauth/google';
+
+const leftBadges = [
+  { id: 1, text: 'Agenda Inteligente', icon: Calendar, top: '15%', left: '8%', path: 'M 33 40 C 22 40, 20 15, 8 15' },
+  { id: 2, text: 'Funil de Vendas', icon: Filter, top: '30%', left: '5%', path: 'M 33 45 C 22 45, 18 30, 5 30' },
+  { id: 3, text: 'Gestão Comercial', icon: TrendingUp, top: '45%', left: '8%', path: 'M 33 50 C 22 50, 18 45, 8 45' },
+  { id: 4, text: 'Faturamento do Dia', icon: DollarSign, top: '60%', left: '4%', path: 'M 33 55 C 22 55, 16 60, 4 60' },
+  { id: 5, text: 'Avisos WhatsApp', icon: MessageSquare, top: '75%', left: '9%', path: 'M 33 60 C 22 60, 18 75, 9 75' }
+];
+
+const rightBadges = [
+  { id: 1, text: 'WhatsApp Cloud', icon: MessageSquare, top: '10%', right: '9%', path: 'M 67 35 C 78 35, 80 10, 91 10' },
+  { id: 2, text: 'Agentes de IA', icon: Bot, top: '22%', right: '5%', path: 'M 67 40 C 78 40, 82 22, 95 22' },
+  { id: 3, text: 'Prisma Client', icon: Database, top: '34%', right: '10%', path: 'M 67 45 C 78 45, 80 34, 90 34' },
+  { id: 4, text: 'React & TS', icon: Code, top: '46%', right: '4%', path: 'M 67 50 C 78 50, 82 46, 96 46' },
+  { id: 5, text: 'Vite Bundler', icon: Zap, top: '58%', right: '11%', path: 'M 67 55 C 78 55, 80 58, 89 58' },
+  { id: 6, text: 'PostgreSQL', icon: Server, top: '70%', right: '6%', path: 'M 67 60 C 78 60, 82 70, 94 70' },
+  { id: 7, text: 'Google Calendar', icon: Calendar, top: '82%', right: '10%', path: 'M 67 65 C 78 65, 80 82, 90 82' }
+];
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -13,28 +35,6 @@ const Login = () => {
   const { login, loginWithGoogle, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [greeting, setGreeting] = useState('Olá');
-  const [GreetingIcon, setGreetingIcon] = useState<any>(Sun);
-
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) {
-      setGreeting('Bom dia');
-      setGreetingIcon(Sun);
-    } else if (hour < 18) {
-      setGreeting('Boa tarde');
-      setGreetingIcon(Sunset);
-    } else {
-      setGreeting('Boa noite');
-      setGreetingIcon(Moon);
-    }
-  }, []);
-
-  const getFormattedDate = () => {
-    const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
-    const dateStr = new Date().toLocaleDateString('pt-BR', options);
-    return dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,309 +63,294 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center bg-slate-50 font-body p-4 sm:p-6 md:p-8">
+    <div className="min-h-screen relative overflow-hidden bg-[#FAF9F6] font-body flex items-center justify-center">
       
-      {/* 1. Subtle Dotted Grid Pattern for background depth */}
+      {/* 1. Background Grid Pattern */}
       <div 
-        className="absolute inset-0 pointer-events-none opacity-[0.4]" 
-        style={{ backgroundImage: 'radial-gradient(#CBD5E1 1px, transparent 1px)', backgroundSize: '24px 24px' }} 
+        className="absolute inset-0 pointer-events-none opacity-[0.25]" 
+        style={{ backgroundImage: 'radial-gradient(#CBD5E1 1px, transparent 1px)', backgroundSize: '32px 32px' }} 
       />
       
-      {/* 2. Soft, rich ambient glows (brand orange and soft blue-violet) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#F97316]/10 blur-[130px] pointer-events-none animate-pulse duration-5000" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[55vw] h-[55vw] rounded-full bg-indigo-500/8 blur-[150px] pointer-events-none" />
-      <div className="absolute top-[30%] right-[10%] w-[35vw] h-[35vw] rounded-full bg-[#F97316]/5 blur-[120px] pointer-events-none" />
-      
-      {/* CENTRAL CONTAINER */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-5xl bg-white rounded-[2.5rem] shadow-[0_30px_80px_-15px_rgba(15,23,42,0.08),0_0_0_1px_rgba(15,23,42,0.02)] overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[640px]"
-      >
-        
-        {/* LEFT COLUMN: BRANDING & WELCOME AURA */}
-        <div className="md:col-span-5 bg-gradient-to-br from-[#0B0F19] via-[#0F172A] to-[#1E293B] p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden text-white border-r border-white/5">
-          
-          {/* Glowing brand accents */}
-          <div className="absolute top-[-20%] right-[-20%] w-80 h-80 bg-[#F97316]/15 rounded-full blur-[80px] pointer-events-none" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-72 h-72 bg-indigo-500/10 rounded-full blur-[70px] pointer-events-none" />
-          
-          {/* Subtle line mesh */}
-          <div 
-            className="absolute inset-0 pointer-events-none opacity-[0.03]" 
-            style={{ backgroundImage: 'radial-gradient(#FFFFFF 1px, transparent 1px)', backgroundSize: '32px 32px' }} 
-          />
+      {/* 2. Vibrant Orange Gradient Area at the bottom of the screen (Abacatepay style) */}
+      <div className="absolute bottom-0 left-0 right-0 h-[45%] bg-gradient-to-t from-[#F97316]/75 via-[#F97316]/30 to-transparent pointer-events-none" />
 
-          <div className="relative z-10 space-y-12">
-            {/* Brand Logo */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.5 }}
-            >
-              <img 
-                src="/logo-site.png" 
-                alt="SalesClin Logo" 
-                className="h-9 w-auto brightness-0 invert" 
-              />
-            </motion.div>
-            
-            {/* Dynamic Greeting */}
-            <div className="space-y-4">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/20 text-orange-400 font-bold shadow-sm"
+      {/* 3. Central responsive container containing both layout sides and the login card */}
+      <div className="w-full max-w-7xl min-h-screen mx-auto relative flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        
+        {/* SVG CONNECTIONS (Mindmap paths) */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none hidden lg:block" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="leftLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#F97316" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#F97316" stopOpacity="0.1" />
+            </linearGradient>
+            <linearGradient id="rightLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#F97316" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#F97316" stopOpacity="0.4" />
+            </linearGradient>
+          </defs>
+          <style>{`
+            @keyframes dashflow {
+              to {
+                stroke-dashoffset: -40;
+              }
+            }
+            .animated-path {
+              stroke-dasharray: 6, 6;
+              animation: dashflow 5s linear infinite;
+            }
+          `}</style>
+          
+          {/* Left lines */}
+          {leftBadges.map((badge) => (
+            <path 
+              key={`line-left-${badge.id}`} 
+              d={badge.path} 
+              fill="none" 
+              stroke="url(#leftLineGradient)" 
+              strokeWidth="1.2"
+              className="animated-path"
+            />
+          ))}
+
+          {/* Right lines */}
+          {rightBadges.map((badge) => (
+            <path 
+              key={`line-right-${badge.id}`} 
+              d={badge.path} 
+              fill="none" 
+              stroke="url(#rightLineGradient)" 
+              strokeWidth="1.2"
+              className="animated-path"
+            />
+          ))}
+        </svg>
+
+        {/* LEFT FLOATING BADGES */}
+        <div className="absolute inset-y-0 left-0 w-full pointer-events-none hidden lg:block">
+          {leftBadges.map((badge) => {
+            const IconComponent = badge.icon;
+            return (
+              <motion.div
+                key={`badge-left-${badge.id}`}
+                style={{ top: badge.top, left: badge.left }}
+                animate={{
+                  y: [0, -5, 0],
+                }}
+                transition={{
+                  duration: 4 + badge.id,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="absolute px-4 py-2.5 bg-white rounded-full border border-slate-100/80 shadow-[0_8px_30px_rgba(15,23,42,0.04)] flex items-center gap-2.5 hover:shadow-md hover:border-orange-100 hover:scale-105 transition-all duration-300 pointer-events-auto cursor-default group"
               >
-                {GreetingIcon && <GreetingIcon size={14} className="text-orange-400 animate-pulse" />}
-                <span className="text-[10px] uppercase tracking-wider">{greeting}!</span>
+                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-50 text-[#F97316] group-hover:bg-[#F97316] group-hover:text-white transition-colors duration-300">
+                  <IconComponent size={11} className="stroke-[2.5]" />
+                </div>
+                <span className="text-[11px] font-bold text-slate-700 tracking-tight">{badge.text}</span>
               </motion.div>
-              
-              <motion.h2 
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.6 }}
-                className="text-3xl sm:text-4xl font-headline font-black text-white tracking-tight leading-tight"
-              >
-                Que bom ver você <br/> de volta.
-              </motion.h2>
-              
-              <motion.p 
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.6 }}
-                className="text-slate-300 text-sm leading-relaxed font-medium max-w-[280px]"
-              >
-                Preparamos seu espaço para que o dia de hoje seja produtivo, leve e cheio de resultados.
-              </motion.p>
-            </div>
-          </div>
-          
-          {/* Glassmorphic indicators card */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="relative z-10 bg-white/[0.03] backdrop-blur-lg p-6 rounded-2xl border border-white/[0.08] space-y-4 mt-8 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.25)] hover:border-white/[0.15] transition-all duration-300 group"
-          >
-            <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <span className="text-[9px] font-black text-orange-400 uppercase tracking-[0.2em]">{getFormattedDate()}</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-xs text-slate-200 font-medium">
-                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-500/10 border border-orange-500/20">
-                  <Check size={11} className="text-[#F97316] stroke-[3.5]" />
-                </div>
-                <span>Sua agenda está sincronizada</span>
-              </div>
-              
-              <div className="flex items-center gap-3 text-xs text-slate-200 font-medium">
-                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-500/10 border border-orange-500/20">
-                  <Check size={11} className="text-[#F97316] stroke-[3.5]" />
-                </div>
-                <span>Funil de vendas ativo</span>
-              </div>
-              
-              <div className="flex items-center gap-3 text-xs text-slate-200 font-medium">
-                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-500/10 border border-orange-500/20">
-                  <Check size={11} className="text-[#F97316] stroke-[3.5]" />
-                </div>
-                <span>Faturamento do dia pronto</span>
-              </div>
-            </div>
-          </motion.div>
-          
+            );
+          })}
         </div>
 
-        {/* RIGHT COLUMN: CLEAN FORM */}
-        <div className="md:col-span-7 p-8 sm:p-12 md:p-16 flex flex-col justify-center bg-gradient-to-br from-white via-white to-slate-50/50">
-          <div className="max-w-md w-full mx-auto space-y-8">
-            
-            {/* Title */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.6 }}
-            >
-              {/* Logo for mobile only */}
-              <div className="md:hidden mb-6">
-                <img 
-                  src="/logo-site.png" 
-                  alt="SalesClin Logo" 
-                  className="h-8 w-auto" 
-                />
-              </div>
-              <h1 className="text-3xl font-headline font-black text-slate-900 tracking-tight mb-2">Faça o seu acesso</h1>
-              <p className="text-slate-400 text-sm font-medium">Insira suas credenciais para entrar no painel da clínica.</p>
-            </motion.div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              
-              <div className="space-y-4">
-                {/* Email */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2, duration: 0.6 }}
-                  className="space-y-2"
-                >
-                  <label htmlFor="email" className="block text-[13px] font-bold text-slate-700 ml-1">E-mail corporativo</label>
-                  <div className="relative group">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F97316] transition-colors duration-300">
-                      <Mail className="w-4 h-4" />
-                    </div>
-                    <input 
-                      id="email"
-                      type="email" 
-                      placeholder="nome@clinica.com.br"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full h-[54px] pl-11 pr-5 border border-slate-200 rounded-2xl text-[14px] font-medium text-slate-700 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-[#F97316]/8 focus:border-[#F97316] transition-all duration-300 shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
-                    />
-                  </div>
-                </motion.div>
-                
-                {/* Password */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.6 }}
-                  className="space-y-2"
-                >
-                  <div className="flex justify-between items-center ml-1">
-                    <label htmlFor="password" className="block text-[13px] font-bold text-slate-700">Senha de acesso</label>
-                    <a href="#" className="text-[12px] text-slate-400 hover:text-[#F97316] font-bold transition-colors duration-300">Esqueceu a senha?</a>
-                  </div>
-                  <div className="relative group">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F97316] transition-colors duration-300">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <input 
-                      id="password"
-                      type={showPassword ? "text" : "password"} 
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="w-full h-[54px] pl-11 pr-12 border border-slate-200 rounded-2xl text-[14px] font-medium text-slate-700 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-[#F97316]/8 focus:border-[#F97316] transition-all duration-300 shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#F97316] transition-colors duration-300"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* Submit Button */}
+        {/* RIGHT FLOATING BADGES */}
+        <div className="absolute inset-y-0 right-0 w-full pointer-events-none hidden lg:block">
+          {rightBadges.map((badge) => {
+            const IconComponent = badge.icon;
+            return (
               <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.6 }}
+                key={`badge-right-${badge.id}`}
+                style={{ top: badge.top, right: badge.right }}
+                animate={{
+                  y: [0, -5, 0],
+                }}
+                transition={{
+                  duration: 4 + badge.id,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="absolute px-4 py-2.5 bg-white rounded-full border border-slate-100/80 shadow-[0_8px_30px_rgba(15,23,42,0.04)] flex items-center gap-2.5 hover:shadow-md hover:border-orange-100 hover:scale-105 transition-all duration-300 pointer-events-auto cursor-default group"
               >
-                <motion.button
-                  type="submit"
-                  disabled={isLoading}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  className="w-full h-[54px] bg-gradient-to-r from-orange-500 to-[#F97316] hover:from-orange-600 hover:to-orange-500 text-white rounded-2xl text-[14px] font-headline font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-85 disabled:cursor-not-allowed shadow-[0_8px_20px_-6px_rgba(249,115,22,0.3)] hover:shadow-[0_12px_24px_-6px_rgba(249,115,22,0.5)] transition-all duration-300"
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                  {isLoading ? 'Conectando...' : 'Acessar painel'}
-                </motion.button>
+                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-50 text-[#F97316] group-hover:bg-[#F97316] group-hover:text-white transition-colors duration-300">
+                  <IconComponent size={11} className="stroke-[2.5]" />
+                </div>
+                <span className="text-[11px] font-bold text-slate-700 tracking-tight">{badge.text}</span>
               </motion.div>
+            );
+          })}
+        </div>
 
-              {/* Divider */}
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.6 }}
-                className="relative py-2"
-              >
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100" /></div>
-                <div className="relative flex justify-center"><span className="px-4 text-[10px] font-black text-slate-400 bg-white uppercase tracking-[0.15em]">ou acesse com</span></div>
-              </motion.div>
+        {/* CENTRAL LOGIN CARD */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-10 w-full max-w-[440px] bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_30px_70px_-20px_rgba(120,40,0,0.08),0_0_0_1px_rgba(15,23,42,0.03)] border border-slate-100/60 p-8 sm:p-10 flex flex-col justify-center gap-6"
+        >
+          {/* Logo */}
+          <div className="flex justify-center mb-1">
+            <img 
+              src="/logo-site.png" 
+              alt="SalesClin Logo" 
+              className="h-9 w-auto" 
+            />
+          </div>
 
-              {/* Google Button */}
-              <motion.div 
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.6 }}
-                className="flex justify-center w-full"
-              >
-                <div className="relative shadow-sm hover:shadow transition-shadow duration-300 rounded-full overflow-hidden border border-slate-100">
-                  <GoogleLogin
-                    onSuccess={async (credentialResponse) => {
-                      if (!credentialResponse.credential) {
-                        toast({ 
-                          title: 'Erro no login com Google', 
-                          description: 'Não foi possível obter credencial.', 
-                          variant: 'destructive' 
-                        });
-                        return;
-                      }
-                      const result = await loginWithGoogle(credentialResponse.credential);
-                      if (result.success) {
-                        toast({ 
-                          title: 'Login com Google realizado!', 
-                          description: 'Que bom ter você de volta!' 
-                        });
-                        navigate('/dashboard');
-                      } else {
-                        toast({ 
-                          title: 'Erro no login com Google', 
-                          description: result.error || 'Tente novamente.', 
-                          variant: 'destructive' 
-                        });
-                      }
-                    }}
-                    onError={() => {
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-headline font-black text-slate-800 tracking-tight">
+              Boas vindas ao <span className="text-[#F97316]">SalesClin.</span>
+            </h1>
+            <p className="text-slate-400 text-xs font-semibold leading-relaxed px-4">
+              Preparamos seu espaço para que o dia de hoje seja produtivo, leve e cheio de resultados.
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            
+            {/* Google Sign-In Button */}
+            <div className="flex justify-center w-full">
+              <div className="relative w-full shadow-sm hover:shadow transition-shadow duration-300 rounded-full overflow-hidden border border-slate-200/80 bg-white">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    if (!credentialResponse.credential) {
                       toast({ 
-                        title: 'Erro no Google', 
-                        description: 'Não foi possível conectar com o Google.', 
+                        title: 'Erro no login com Google', 
+                        description: 'Não foi possível obter credencial.', 
                         variant: 'destructive' 
                       });
-                    }}
-                    theme="outline"
-                    size="large"
-                    width="360"
-                    text="continue_with"
-                    shape="pill"
-                    logo_alignment="left"
+                      return;
+                    }
+                    const result = await loginWithGoogle(credentialResponse.credential);
+                    if (result.success) {
+                      toast({ 
+                        title: 'Login com Google realizado!', 
+                        description: 'Que bom ter você de volta!' 
+                      });
+                      navigate('/dashboard');
+                    } else {
+                      toast({ 
+                        title: 'Erro no login com Google', 
+                        description: result.error || 'Tente novamente.', 
+                        variant: 'destructive' 
+                      });
+                    }
+                  }}
+                  onError={() => {
+                    toast({ 
+                      title: 'Erro no Google', 
+                      description: 'Não foi possível conectar com o Google.', 
+                      variant: 'destructive' 
+                    });
+                  }}
+                  theme="outline"
+                  size="large"
+                  width="360"
+                  text="continue_with"
+                  shape="pill"
+                  logo_alignment="left"
+                />
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100" /></div>
+              <div className="relative flex justify-center">
+                <span className="px-4 text-[10px] font-black text-slate-400 bg-white uppercase tracking-[0.15em]">
+                  ou acesse com e-mail
+                </span>
+              </div>
+            </div>
+
+            {/* Inputs Group */}
+            <div className="space-y-4">
+              {/* Email */}
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="block text-[12px] font-bold text-slate-600 ml-1">E-mail de acesso</label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F97316] transition-colors duration-300">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input 
+                    id="email"
+                    type="email" 
+                    placeholder="voce@exemplo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full h-[50px] pl-11 pr-5 border border-slate-200 rounded-2xl text-[13px] font-medium text-slate-700 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-[#F97316]/5 focus:border-[#F97316] transition-all duration-300 shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
                   />
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Back to site */}
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.7, duration: 0.6 }}
-                className="text-center pt-2"
-              >
+              {/* Password */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center ml-1">
+                  <label htmlFor="password" className="block text-[12px] font-bold text-slate-600">Senha de acesso</label>
+                  <a href="#" className="text-[11px] text-slate-400 hover:text-[#F97316] font-bold transition-colors duration-300">Esqueceu a senha?</a>
+                </div>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F97316] transition-colors duration-300">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input 
+                    id="password"
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="Sua senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full h-[50px] pl-11 pr-12 border border-slate-200 rounded-2xl text-[13px] font-medium text-slate-700 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-[#F97316]/5 focus:border-[#F97316] transition-all duration-300 shadow-[0_2px_4px_rgba(0,0,0,0.01)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#F97316] transition-colors duration-300"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <motion.button
+              type="submit"
+              disabled={isLoading}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              className="w-full h-[50px] bg-[#F97316] hover:bg-orange-600 text-white rounded-2xl text-[14px] font-headline font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-85 disabled:cursor-not-allowed shadow-[0_8px_20px_-6px_rgba(249,115,22,0.3)] hover:shadow-[0_12px_24px_-6px_rgba(249,115,22,0.5)] transition-all duration-300 mt-2"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+              {isLoading ? 'Acessando...' : 'Acessar painel'}
+            </motion.button>
+
+            {/* Terms Consent and Back Link */}
+            <div className="space-y-4 pt-2">
+              <p className="text-[11px] text-slate-400 text-center leading-relaxed font-medium px-2">
+                Ao fazer login, você concorda com nossos{' '}
+                <a href="#" className="underline text-slate-500 hover:text-[#F97316] transition-colors">
+                  termos e condições
+                </a>
+                .
+              </p>
+              
+              <div className="text-center">
                 <Link 
                   to="/" 
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-[#F97316] hover:-translate-x-1 transition-all duration-300"
                 >
                   <span>← Voltar para a página inicial</span>
                 </Link>
-              </motion.div>
+              </div>
+            </div>
 
-            </form>
+          </form>
+        </motion.div>
 
-          </div>
-        </div>
-
-      </motion.div>
+      </div>
     </div>
   );
 };
