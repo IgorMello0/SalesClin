@@ -11,21 +11,21 @@ import { motion } from 'framer-motion';
 import { GoogleLogin } from '@react-oauth/google';
 
 const leftBadges = [
-  { id: 1, text: 'Agenda Inteligente', icon: Calendar, top: '15%', left: '8%', path: 'M 33 40 C 22 40, 20 15, 8 15' },
-  { id: 2, text: 'Funil de Vendas', icon: Filter, top: '30%', left: '5%', path: 'M 33 45 C 22 45, 18 30, 5 30' },
-  { id: 3, text: 'Gestão Comercial', icon: TrendingUp, top: '45%', left: '8%', path: 'M 33 50 C 22 50, 18 45, 8 45' },
-  { id: 4, text: 'Faturamento do Dia', icon: DollarSign, top: '60%', left: '4%', path: 'M 33 55 C 22 55, 16 60, 4 60' },
-  { id: 5, text: 'Avisos WhatsApp', icon: MessageSquare, top: '75%', left: '9%', path: 'M 33 60 C 22 60, 18 75, 9 75' }
+  { id: 1, text: 'Agenda Inteligente', icon: Calendar, top: '15%', left: '8%', path: 'M 420 360 C 330 360, 320 120, 230 120' },
+  { id: 2, text: 'Funil de Vendas', icon: Filter, top: '30%', left: '5%', path: 'M 420 380 C 310 380, 290 240, 180 240' },
+  { id: 3, text: 'Gestão Comercial', icon: TrendingUp, top: '45%', left: '8%', path: 'M 420 400 C 330 400, 320 360, 230 360' },
+  { id: 4, text: 'Faturamento do Dia', icon: DollarSign, top: '60%', left: '4%', path: 'M 420 420 C 310 420, 310 480, 200 480' },
+  { id: 5, text: 'Avisos WhatsApp', icon: MessageSquare, top: '75%', left: '9%', path: 'M 420 440 C 330 440, 320 600, 230 600' }
 ];
 
 const rightBadges = [
-  { id: 1, text: 'WhatsApp Cloud', icon: MessageSquare, top: '10%', right: '9%', path: 'M 67 35 C 78 35, 80 10, 91 10' },
-  { id: 2, text: 'Agentes de IA', icon: Bot, top: '22%', right: '5%', path: 'M 67 40 C 78 40, 82 22, 95 22' },
-  { id: 3, text: 'Prisma Client', icon: Database, top: '34%', right: '10%', path: 'M 67 45 C 78 45, 80 34, 90 34' },
-  { id: 4, text: 'React & TS', icon: Code, top: '46%', right: '4%', path: 'M 67 50 C 78 50, 82 46, 96 46' },
-  { id: 5, text: 'Vite Bundler', icon: Zap, top: '58%', right: '11%', path: 'M 67 55 C 78 55, 80 58, 89 58' },
-  { id: 6, text: 'PostgreSQL', icon: Server, top: '70%', right: '6%', path: 'M 67 60 C 78 60, 82 70, 94 70' },
-  { id: 7, text: 'Google Calendar', icon: Calendar, top: '82%', right: '10%', path: 'M 67 65 C 78 65, 80 82, 90 82' }
+  { id: 1, text: 'WhatsApp Cloud', icon: MessageSquare, top: '10%', right: '9%', path: 'M 860 320 C 950 320, 940 80, 1030 80' },
+  { id: 2, text: 'Agentes de IA', icon: Bot, top: '22%', right: '5%', path: 'M 860 350 C 970 350, 970 176, 1080 176' },
+  { id: 3, text: 'Prisma Client', icon: Database, top: '34%', right: '10%', path: 'M 860 380 C 930 380, 940 272, 1010 272' },
+  { id: 4, text: 'React & TS', icon: Code, top: '46%', right: '4%', path: 'M 860 400 C 980 400, 980 368, 1100 368' },
+  { id: 5, text: 'Vite Bundler', icon: Zap, top: '58%', right: '11%', path: 'M 860 420 C 930 420, 930 464, 1000 464' },
+  { id: 6, text: 'PostgreSQL', icon: Server, top: '70%', right: '6%', path: 'M 860 450 C 960 450, 970 560, 1070 560' },
+  { id: 7, text: 'Google Calendar', icon: Calendar, top: '82%', right: '10%', path: 'M 860 480 C 930 480, 940 656, 1010 656' }
 ];
 
 const Login = () => {
@@ -35,6 +35,7 @@ const Login = () => {
   const { login, loginWithGoogle, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [activeBadge, setActiveBadge] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,21 +72,25 @@ const Login = () => {
         style={{ backgroundImage: 'radial-gradient(#CBD5E1 1px, transparent 1px)', backgroundSize: '32px 32px' }} 
       />
       
-      {/* 2. Vibrant Orange Gradient Area at the bottom of the screen (Abacatepay style) */}
+      {/* 2. Vibrant Orange Gradient Area at the bottom of the screen */}
       <div className="absolute bottom-0 left-0 right-0 h-[45%] bg-gradient-to-t from-[#F97316]/75 via-[#F97316]/30 to-transparent pointer-events-none" />
 
       {/* 3. Central responsive container containing both layout sides and the login card */}
       <div className="w-full max-w-7xl min-h-screen mx-auto relative flex items-center justify-center px-4 sm:px-6 lg:px-8">
         
-        {/* SVG CONNECTIONS (Mindmap paths) */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none hidden lg:block" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {/* SVG CONNECTIONS (Mindmap paths with high-res viewBox to avoid scaling distortion) */}
+        <svg 
+          className="absolute inset-0 w-full h-full pointer-events-none hidden lg:block" 
+          viewBox="0 0 1280 800" 
+          preserveAspectRatio="none"
+        >
           <defs>
             <linearGradient id="leftLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#F97316" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#F97316" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#F97316" stopOpacity="0.08" />
             </linearGradient>
             <linearGradient id="rightLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#F97316" stopOpacity="0.1" />
+              <stop offset="0%" stopColor="#F97316" stopOpacity="0.08" />
               <stop offset="100%" stopColor="#F97316" stopOpacity="0.4" />
             </linearGradient>
           </defs>
@@ -97,39 +102,48 @@ const Login = () => {
             }
             .animated-path {
               stroke-dasharray: 6, 6;
-              animation: dashflow 5s linear infinite;
+              animation: dashflow 6s linear infinite;
             }
           `}</style>
           
           {/* Left lines */}
-          {leftBadges.map((badge) => (
-            <path 
-              key={`line-left-${badge.id}`} 
-              d={badge.path} 
-              fill="none" 
-              stroke="url(#leftLineGradient)" 
-              strokeWidth="1.2"
-              className="animated-path"
-            />
-          ))}
+          {leftBadges.map((badge) => {
+            const isHighlighted = activeBadge === `left-${badge.id}`;
+            return (
+              <path 
+                key={`line-left-${badge.id}`} 
+                d={badge.path} 
+                fill="none" 
+                stroke={isHighlighted ? '#F97316' : 'url(#leftLineGradient)'} 
+                strokeWidth={isHighlighted ? '2.5' : '1.2'}
+                opacity={isHighlighted ? '0.95' : '1'}
+                className="animated-path transition-all duration-300"
+              />
+            );
+          })}
 
           {/* Right lines */}
-          {rightBadges.map((badge) => (
-            <path 
-              key={`line-right-${badge.id}`} 
-              d={badge.path} 
-              fill="none" 
-              stroke="url(#rightLineGradient)" 
-              strokeWidth="1.2"
-              className="animated-path"
-            />
-          ))}
+          {rightBadges.map((badge) => {
+            const isHighlighted = activeBadge === `right-${badge.id}`;
+            return (
+              <path 
+                key={`line-right-${badge.id}`} 
+                d={badge.path} 
+                fill="none" 
+                stroke={isHighlighted ? '#F97316' : 'url(#rightLineGradient)'} 
+                strokeWidth={isHighlighted ? '2.5' : '1.2'}
+                opacity={isHighlighted ? '0.95' : '1'}
+                className="animated-path transition-all duration-300"
+              />
+            );
+          })}
         </svg>
 
         {/* LEFT FLOATING BADGES */}
         <div className="absolute inset-y-0 left-0 w-full pointer-events-none hidden lg:block">
           {leftBadges.map((badge) => {
             const IconComponent = badge.icon;
+            const isHovered = activeBadge === `left-${badge.id}`;
             return (
               <motion.div
                 key={`badge-left-${badge.id}`}
@@ -142,12 +156,18 @@ const Login = () => {
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
-                className="absolute px-4 py-2.5 bg-white rounded-full border border-slate-100/80 shadow-[0_8px_30px_rgba(15,23,42,0.04)] flex items-center gap-2.5 hover:shadow-md hover:border-orange-100 hover:scale-105 transition-all duration-300 pointer-events-auto cursor-default group"
+                onMouseEnter={() => setActiveBadge(`left-${badge.id}`)}
+                onMouseLeave={() => setActiveBadge(null)}
+                className="absolute px-4 py-2.5 bg-white rounded-full border border-slate-100/80 shadow-[0_8px_30px_rgba(15,23,42,0.04)] flex items-center gap-2.5 hover:shadow-[0_10px_25px_-5px_rgba(249,115,22,0.15)] hover:border-orange-200 hover:scale-[1.06] transition-all duration-300 pointer-events-auto cursor-pointer group"
               >
-                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-50 text-[#F97316] group-hover:bg-[#F97316] group-hover:text-white transition-colors duration-300">
+                <div className={`flex items-center justify-center w-5 h-5 rounded-full ${
+                  isHovered ? 'bg-[#F97316] text-white' : 'bg-orange-50 text-[#F97316]'
+                } transition-colors duration-300`}>
                   <IconComponent size={11} className="stroke-[2.5]" />
                 </div>
-                <span className="text-[11px] font-bold text-slate-700 tracking-tight">{badge.text}</span>
+                <span className={`text-[11px] font-bold ${
+                  isHovered ? 'text-[#F97316]' : 'text-slate-700'
+                } tracking-tight transition-colors duration-300`}>{badge.text}</span>
               </motion.div>
             );
           })}
@@ -157,6 +177,7 @@ const Login = () => {
         <div className="absolute inset-y-0 right-0 w-full pointer-events-none hidden lg:block">
           {rightBadges.map((badge) => {
             const IconComponent = badge.icon;
+            const isHovered = activeBadge === `right-${badge.id}`;
             return (
               <motion.div
                 key={`badge-right-${badge.id}`}
@@ -169,12 +190,18 @@ const Login = () => {
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
-                className="absolute px-4 py-2.5 bg-white rounded-full border border-slate-100/80 shadow-[0_8px_30px_rgba(15,23,42,0.04)] flex items-center gap-2.5 hover:shadow-md hover:border-orange-100 hover:scale-105 transition-all duration-300 pointer-events-auto cursor-default group"
+                onMouseEnter={() => setActiveBadge(`right-${badge.id}`)}
+                onMouseLeave={() => setActiveBadge(null)}
+                className="absolute px-4 py-2.5 bg-white rounded-full border border-slate-100/80 shadow-[0_8px_30px_rgba(15,23,42,0.04)] flex items-center gap-2.5 hover:shadow-[0_10px_25px_-5px_rgba(249,115,22,0.15)] hover:border-orange-200 hover:scale-[1.06] transition-all duration-300 pointer-events-auto cursor-pointer group"
               >
-                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-50 text-[#F97316] group-hover:bg-[#F97316] group-hover:text-white transition-colors duration-300">
+                <div className={`flex items-center justify-center w-5 h-5 rounded-full ${
+                  isHovered ? 'bg-[#F97316] text-white' : 'bg-orange-50 text-[#F97316]'
+                } transition-colors duration-300`}>
                   <IconComponent size={11} className="stroke-[2.5]" />
                 </div>
-                <span className="text-[11px] font-bold text-slate-700 tracking-tight">{badge.text}</span>
+                <span className={`text-[11px] font-bold ${
+                  isHovered ? 'text-[#F97316]' : 'text-slate-700'
+                } tracking-tight transition-colors duration-300`}>{badge.text}</span>
               </motion.div>
             );
           })}
