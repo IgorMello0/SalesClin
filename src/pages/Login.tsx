@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, Mail, Lock, ArrowRight, Check, Eye, EyeOff, 
   Calendar, Filter, TrendingUp, DollarSign, MessageSquare, 
-  Sparkles, Database, Code, Zap, Server, Bot 
+  Sparkles, Bot, Shield, Cloud, HeartHandshake 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { GoogleLogin } from '@react-oauth/google';
@@ -21,10 +21,10 @@ const leftBadges = [
 const rightBadges = [
   { id: 1, text: 'WhatsApp Cloud', icon: MessageSquare, top: '10%', right: '9%', path: 'M 860 320 C 950 320, 940 80, 1030 80' },
   { id: 2, text: 'Agentes de IA', icon: Bot, top: '22%', right: '5%', path: 'M 860 350 C 970 350, 970 176, 1080 176' },
-  { id: 3, text: 'Prisma Client', icon: Database, top: '34%', right: '10%', path: 'M 860 380 C 930 380, 940 272, 1010 272' },
-  { id: 4, text: 'React & TS', icon: Code, top: '46%', right: '4%', path: 'M 860 400 C 980 400, 980 368, 1100 368' },
-  { id: 5, text: 'Vite Bundler', icon: Zap, top: '58%', right: '11%', path: 'M 860 420 C 930 420, 930 464, 1000 464' },
-  { id: 6, text: 'PostgreSQL', icon: Server, top: '70%', right: '6%', path: 'M 860 450 C 960 450, 970 560, 1070 560' },
+  { id: 3, text: 'Relatórios de Métricas', icon: Sparkles, top: '34%', right: '10%', path: 'M 860 380 C 930 380, 940 272, 1010 272' },
+  { id: 4, text: 'Segurança LGPD', icon: Shield, top: '46%', right: '4%', path: 'M 860 400 C 980 400, 980 368, 1100 368' },
+  { id: 5, text: 'Suporte Dedicado', icon: HeartHandshake, top: '58%', right: '11%', path: 'M 860 420 C 930 420, 930 464, 1000 464' },
+  { id: 6, text: 'Backup em Nuvem', icon: Cloud, top: '70%', right: '6%', path: 'M 860 450 C 960 450, 970 560, 1070 560' },
   { id: 7, text: 'Google Calendar', icon: Calendar, top: '82%', right: '10%', path: 'M 860 480 C 930 480, 940 656, 1010 656' }
 ];
 
