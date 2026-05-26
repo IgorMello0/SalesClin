@@ -56,11 +56,16 @@ router.post('/google', async (req, res) => {
         include: { company: true, ownedCompanies: true }
       })
 
-      // Se achou pelo e-mail, vincular o googleId
+      // Se achou pelo e-mail, vincular o googleId e a foto se não tiver nenhuma
       if (professional) {
-        await prisma.professional.update({
+        professional = await prisma.professional.update({
           where: { id: professional.id },
-          data: { googleId, authProvider: professional.authProvider || 'local' }
+          data: { 
+            googleId, 
+            authProvider: professional.authProvider || 'local',
+            photoUrl: professional.photoUrl || picture || null
+          },
+          include: { company: true, ownedCompanies: true }
         })
       }
     }
