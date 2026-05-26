@@ -470,7 +470,8 @@ function formatPhoneForWhatsApp(phone: string, provider: string = 'evolution'): 
 }
 
 async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
-  const url = `${config.evolutionUrl}/message/sendText/${config.evolutionInstance}`
+  const baseUrl = config.evolutionUrl.replace(/\/+$/, '')
+  const url = `${baseUrl}/message/sendText/${config.evolutionInstance}`
   const response = await fetch(url, {
     method: 'POST',
     headers: {
