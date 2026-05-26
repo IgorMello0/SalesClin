@@ -389,26 +389,41 @@ const Profile = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pt-4">
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-slate-400 text-[20px]">mail</span>
-                  <span className="text-sm font-medium text-slate-600">E-mail</span>
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
+                <span className="material-symbols-outlined text-slate-400 text-[20px] mt-0.5 shrink-0">mail</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">E-mail</p>
+                  <p className="text-sm font-semibold text-primary truncate mt-0.5" title={formData.email}>
+                    {formData.email}
+                  </p>
                 </div>
-                <span className="text-xs font-medium text-primary truncate max-w-[150px]">{formData.email}</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-slate-400 text-[20px]">phone</span>
-                  <span className="text-sm font-medium text-slate-600">Telefone</span>
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
+                <span className="material-symbols-outlined text-slate-400 text-[20px] mt-0.5 shrink-0">phone</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Telefone</p>
+                  <p className="text-sm font-semibold text-primary truncate mt-0.5">
+                    {formData.phone || 'Não informado'}
+                  </p>
                 </div>
-                <span className="text-xs font-medium text-primary">{formData.phone || 'Não informado'}</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-slate-400 text-[20px]">badge</span>
-                  <span className="text-sm font-medium text-slate-600">CRM</span>
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
+                <span className="material-symbols-outlined text-slate-400 text-[20px] mt-0.5 shrink-0">badge</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CRM</p>
+                  <p className="text-sm font-semibold text-primary truncate mt-0.5">
+                    {formData.crm || 'Não informado'}
+                  </p>
                 </div>
-                <span className="text-xs font-medium text-primary">{formData.crm || 'Não informado'}</span>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
+                <span className="material-symbols-outlined text-secondary text-[20px] mt-0.5 shrink-0">workspace_premium</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plano Contratado</p>
+                  <p className="text-sm font-semibold text-primary mt-0.5">
+                    {professional?.role === 'admin' ? 'Plano Developer' : 'SalesClin Pro'}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

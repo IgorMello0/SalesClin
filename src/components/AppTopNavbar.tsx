@@ -100,18 +100,16 @@ export function AppTopNavbar() {
 
   // Filtra módulos v1 restritos e módulos bloqueados por permissão
   const visibleMenuItems = menuItems.filter((item) => {
-    // 1. Regra Legada V1 (módulos que não estão no sistema de permissões modular ainda)
-    if (restrictedV1Modules.includes(item.title) && professional?.role !== 'admin') {
+    // Módulos que NÃO estão no MVP (Gestão Financeira, Conversas, Catálogos, Contratos, Relatórios)
+    // Devem aparecer APENAS para a conta do desenvolvedor (admin@admin.com)
+    const nonMVPModules = ['pagamentos', 'conversas', 'catalogos', 'contratos', 'relatorios'];
+    const isDeveloper = professional?.email === 'admin@admin.com';
+    
+    if (nonMVPModules.includes(item.moduleCode) && !isDeveloper) {
       return false;
     }
     
-    // 2. Módulos essenciais sempre visíveis (Dashboard, Agenda e Tarefas)
-    const essentialModules = ['dashboard', 'agendamentos', 'tarefas'];
-    if (essentialModules.includes(item.moduleCode)) {
-      return true;
-    }
-    
-    // 3. Regra de Permissão Modular
+    // Regra de Permissão Modular
     // Se tivermos permissões carregadas, verificamos o acesso
     if (permissions.length > 0) {
       return hasModuleAccess(item.moduleCode);
@@ -479,14 +477,16 @@ export function AppTopNavbar() {
                     <span className="material-symbols-outlined text-[20px] text-slate-400">person_outline</span>
                     Meu Perfil
                   </Link>
-                  <Link
-                    to="/settings"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[20px] text-slate-400">settings</span>
-                    Configurações
-                  </Link>
+                  {(professional?.role === 'admin' || professional?.role === 'profissional') && (
+                    <Link
+                      to="/settings"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[20px] text-slate-400">settings</span>
+                      Configurações
+                    </Link>
+                  )}
                 </div>
 
                 {/* Logout */}
@@ -554,13 +554,15 @@ export function AppTopNavbar() {
                 <span className="material-symbols-outlined text-[22px] text-slate-500">person_outline</span>
                 Meu Perfil
               </Link>
-              <Link
-                to="/settings"
-                className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-              >
-                <span className="material-symbols-outlined text-[22px] text-slate-500">settings</span>
-                Configurações
-              </Link>
+              {(professional?.role === 'admin' || professional?.role === 'profissional') && (
+                <Link
+                  to="/settings"
+                  className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  <span className="material-symbols-outlined text-[22px] text-slate-500">settings</span>
+                  Configurações
+                </Link>
+              )}
               <button
                 onClick={() => { setMobileMenuOpen(false); handleLogout(); }}
                 className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 w-full transition-all"

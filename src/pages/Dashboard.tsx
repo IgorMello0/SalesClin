@@ -294,9 +294,9 @@ const Dashboard = () => {
       </div>
 
       {/* Primary Stats Grid */}
-      <div id="tour-dashboard-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+      <div id="tour-dashboard-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6 relative z-10">
         {/* Card 1: Total de Leads */}
-        <Card className="p-4 sm:p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">groups</span>
@@ -304,14 +304,14 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Total de Leads</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Total de Leads</p>
             <h3 className="stats-value">{counters.leads}</h3>
           </div>
           
         </Card>
 
         {/* Card 2: Avaliação Agendada */}
-        <Card className="p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">event_available</span>
@@ -319,14 +319,14 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Agendada</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Avaliação Agendada</p>
             <h3 className="stats-value">{counters.agendamentos}</h3>
           </div>
           
         </Card>
 
         {/* Card 3: Avaliação Comparada */}
-        <Card className="p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">how_to_reg</span>
@@ -334,14 +334,14 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Avaliação Comparecida</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Avaliação Comparecida</p>
             <h3 className="stats-value">{counters.comparada}</h3>
           </div>
           
         </Card>
 
         {/* Card 4: Propostas */}
-        <Card className="p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">rocket_launch</span>
@@ -349,7 +349,7 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Propostas</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Propostas</p>
             <h3 className="stats-value">{counters.oportunidades}</h3>
           </div>
           
@@ -357,9 +357,9 @@ const Dashboard = () => {
       </div>
 
       {/* Secondary Stats Grid (New Metrics) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6 relative z-10">
         {/* Card 5: Faturamento Total */}
-        <Card className="p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
@@ -367,14 +367,14 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Faturamento Total</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Faturamento Total</p>
             <h4 className="stats-value">{formatCurrency(counters.faturamento)}</h4>
           </div>
           
         </Card>
 
         {/* Card 6: Ticket (Orçado) */}
-        <Card className="p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">calculate</span>
@@ -382,14 +382,14 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Orçado)</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Ticket (Orçado)</p>
             <h4 className="stats-value">{formatCurrency(counters.ticketOrcado)}</h4>
           </div>
           
         </Card>
 
         {/* Card 7: Ticket (Fechado) */}
-        <Card className="p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">handshake</span>
@@ -397,14 +397,14 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Ticket (Fechado)</p>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Ticket (Fechado)</p>
             <h4 className="stats-value">{formatCurrency(counters.ticketFechado)}</h4>
           </div>
           
         </Card>
 
         {/* Card 8: Taxa de Conversão */}
-        <Card className="p-6">
+        <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">{conversionMode === 'percent' ? 'percent' : 'payments'}</span>
@@ -425,7 +425,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
               {conversionMode === 'percent' ? 'Conversão de Leads' : 'Conversão Financeira'}
             </p>
             <div className="flex items-baseline gap-2">
