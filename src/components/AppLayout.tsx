@@ -39,7 +39,7 @@ const AppLayout = () => {
               <Outlet />
             </div>
           ) : (
-            <main className="w-full flex-1 px-3 sm:px-6 md:px-12 lg:px-24 py-4 sm:py-6 md:py-10 overflow-y-auto">
+            <main className="w-full flex-1 px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-10 overflow-y-auto">
               <div className="max-w-[1400px] mx-auto animate-fade-in-up">
                 <Outlet />
               </div>
@@ -63,7 +63,7 @@ const AppLayout = () => {
           <Outlet />
         </div>
       ) : (
-        <main className="w-full flex-1 px-3 sm:px-6 md:px-12 lg:px-24 py-4 sm:py-6 md:py-10">
+        <main className="w-full flex-1 px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-10">
           <div className="max-w-[1400px] mx-auto animate-fade-in-up">
             <Outlet />
           </div>

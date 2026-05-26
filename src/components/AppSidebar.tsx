@@ -74,12 +74,23 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
-  const { logout, hasModuleAccess, permissions } = useAuth();
+  const { professional, logout, hasModuleAccess, permissions, switchCompany } = useAuth();
   const { isMobileSidebarOpen, setMobileSidebarOpen, isSidebarCollapsed, setSidebarCollapsed } = useLayout();
   const navigate = useNavigate();
   const location = useLocation();
+  const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const filteredMenuItems = menuItems.filter((item) => {
+    // Módulos que NÃO estão no MVP (Gestão Financeira, Conversas, Análises/Relatórios)
+    // Devem aparecer APENAS para a conta do desenvolvedor (admin@admin.com)
+    const nonMVPModules = ['pagamentos', 'conversas', 'relatorios'];
+    const isDeveloper = professional?.email === 'admin@admin.com';
+    
+    if (nonMVPModules.includes(item.moduleCode) && !isDeveloper) {
+      return false;
+    }
+
     if (permissions.length === 0) return true;
     return hasModuleAccess(item.moduleCode);
   });
@@ -133,7 +144,7 @@ export function AppSidebar() {
 
       {/* Sidebar Container */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-[#0B1525] text-white flex flex-col border-r border-white/5 transition-all duration-300 lg:relative lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 bg-[#0B1525] text-white flex flex-col border-r border-white/5 transition-all duration-300 lg:sticky lg:h-screen lg:top-0 lg:translate-x-0",
         isMobileSidebarOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0",
         !isMobileSidebarOpen && (isSidebarCollapsed ? "lg:w-20" : "lg:w-64")
       )}>
@@ -180,6 +191,99 @@ export function AppSidebar() {
           </button>
         </div>
         
+        {/* Clinic Switcher */}
+        {professional?.companies && professional.companies.length > 0 && (
+          <div className="px-4 py-1.5 mb-1.5 border-b border-white/5 relative z-50">
+            {isSidebarCollapsed && !isMobileSidebarOpen ? (
+              <div className="relative group/company flex justify-center">
+                <button 
+                  onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
+                  className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/10 transition-all text-secondary"
+                  title="Mudar de Clínica"
+                >
+                  <span className="material-symbols-outlined text-[18px]">storefront</span>
+                </button>
+                {companyMenuOpen && (
+                  <div className="absolute left-13 top-0 w-60 bg-[#0B1525] rounded-xl shadow-2xl border border-white/10 py-2 text-white animate-fade-in-up z-[100]">
+                    <div className="px-4 py-2 border-b border-white/5 bg-white/5">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mudar de Clínica</p>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-1">
+                      {professional.companies.map((company) => (
+                        <button
+                          key={company.id}
+                          onClick={() => {
+                            setCompanyMenuOpen(false);
+                            switchCompany(company.id);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold transition-colors text-left",
+                            company.id === professional.companyId 
+                              ? "bg-white/10 text-secondary" 
+                              : "text-slate-400 hover:bg-white/5 hover:text-white"
+                          )}
+                        >
+                          <span className="material-symbols-outlined text-[16px] shrink-0">
+                            {company.id === professional.companyId ? 'check_circle' : 'business'}
+                          </span>
+                          <span className="truncate">{company.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="relative">
+                <button 
+                  onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
+                  className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2.5 overflow-hidden flex-1">
+                    <span className="material-symbols-outlined text-[18px] text-secondary shrink-0">storefront</span>
+                    <span className="text-xs font-semibold text-slate-200 truncate">
+                      {professional.companies.find(c => c.id === professional.companyId)?.name || professional.companyName || 'Clínica'}
+                    </span>
+                  </div>
+                  <span className="material-symbols-outlined text-[16px] text-slate-400 shrink-0 ml-1">
+                    expand_more
+                  </span>
+                </button>
+                
+                {companyMenuOpen && (
+                  <div className="absolute top-10 left-0 right-0 bg-[#0B1525] rounded-xl shadow-2xl border border-white/10 py-2 text-white animate-fade-in-up z-[100]">
+                    <div className="px-4 py-2 border-b border-white/5 bg-white/5">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mudar de Clínica</p>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-1">
+                      {professional.companies.map((company) => (
+                        <button
+                          key={company.id}
+                          onClick={() => {
+                            setCompanyMenuOpen(false);
+                            switchCompany(company.id);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold transition-colors text-left",
+                            company.id === professional.companyId 
+                              ? "bg-white/10 text-secondary" 
+                              : "text-slate-400 hover:bg-white/5 hover:text-white"
+                          )}
+                        >
+                          <span className="material-symbols-outlined text-[16px] shrink-0">
+                            {company.id === professional.companyId ? 'check_circle' : 'business'}
+                          </span>
+                          <span className="truncate">{company.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        
         <div id="tour-menu" className={cn(
           "flex-1 overflow-y-auto scrollbar-hide py-2 space-y-1.5 transition-all",
           isSidebarCollapsed && !isMobileSidebarOpen ? "px-2" : "px-4"
@@ -214,47 +318,136 @@ export function AppSidebar() {
           })}
         </div>
         
+        {/* Profile Footer */}
         <div id="tour-settings" className={cn(
-          "p-4 mt-auto shrink-0 border-t border-white/5 transition-all",
-          isSidebarCollapsed && !isMobileSidebarOpen ? "p-2" : "p-4"
+          "p-4 mt-auto shrink-0 border-t border-white/5 relative",
+          isSidebarCollapsed && !isMobileSidebarOpen ? "p-2 flex justify-center" : "p-4"
         )}>
-          <div className="space-y-0.5">
-            <Link 
-              to="/profile"
-              className={cn(
-                "flex items-center transition-all rounded-xl",
-                isSidebarCollapsed && !isMobileSidebarOpen ? "justify-center p-3" : "gap-3 px-4 py-2",
-                location.pathname === '/profile' ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+          {isSidebarCollapsed && !isMobileSidebarOpen ? (
+            // Collapsed Profile (Only avatar showing, clicking opens the absolute menu)
+            <div className="relative group/profile flex justify-center">
+              <button 
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className="w-10 h-10 rounded-full hover:ring-2 hover:ring-secondary/50 transition-all flex items-center justify-center bg-white/5 overflow-hidden border border-white/10"
+              >
+                {professional?.photoUrl ? (
+                  <img src={professional.photoUrl} alt={professional.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-slate-300">
+                    {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
+                  </span>
+                )}
+              </button>
+              
+              {profileMenuOpen && (
+                <div className="absolute left-12 bottom-0 w-48 bg-[#0B1525] rounded-xl shadow-2xl border border-white/10 py-1.5 text-white animate-fade-in-up z-[100]">
+                  <div className="px-4 py-2 border-b border-white/5 bg-white/5">
+                    <p className="text-xs font-bold text-slate-200 truncate">{professional?.name || 'Usuário'}</p>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{professional?.email}</p>
+                  </div>
+                  <div className="py-1">
+                    <Link
+                      to="/profile"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">person</span>
+                      Meu Perfil
+                    </Link>
+                    {(professional?.role === 'admin' || professional?.role === 'profissional') && (
+                      <Link
+                        to="/settings"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">settings</span>
+                        Configurações
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">logout</span>
+                      Sair
+                    </button>
+                  </div>
+                </div>
               )}
-              title={isSidebarCollapsed && !isMobileSidebarOpen ? "Meu Perfil" : undefined}
-            >
-              <span className="material-symbols-outlined text-xl shrink-0">account_circle</span>
-              {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm font-medium">Meu Perfil</span>}
-            </Link>
-            <Link 
-              to="/settings"
-              className={cn(
-                "flex items-center transition-all rounded-xl",
-                isSidebarCollapsed && !isMobileSidebarOpen ? "justify-center p-3" : "gap-3 px-4 py-2",
-                location.pathname === '/settings' ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            </div>
+          ) : (
+            // Expanded Profile Card
+            <div className="relative">
+              <div className="flex items-center justify-between bg-white/5 px-3 py-2.5 rounded-xl border border-white/10">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full bg-secondary/20 text-secondary flex items-center justify-center shrink-0 overflow-hidden border border-white/10">
+                    {professional?.photoUrl ? (
+                      <img src={professional.photoUrl} alt={professional.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-bold text-slate-300">
+                        {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col overflow-hidden">
+                    <span className="text-xs font-bold text-slate-200 truncate">
+                      {professional?.name || 'Usuário'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 truncate">
+                      {professional?.specialization || 'Profissional'}
+                    </span>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  className="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 flex items-center justify-center shrink-0 transition-colors"
+                  title="Opções de Perfil"
+                >
+                  <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                </button>
+              </div>
+
+              {profileMenuOpen && (
+                <div className="absolute bottom-14 left-0 right-0 bg-[#0B1525] rounded-xl shadow-2xl border border-white/10 py-1.5 text-white animate-fade-in-up z-[100]">
+                  <div className="py-1">
+                    <Link
+                      to="/profile"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
+                      Meu Perfil
+                    </Link>
+                    {(professional?.role === 'admin' || professional?.role === 'profissional') && (
+                      <Link
+                        to="/settings"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-slate-400">settings</span>
+                        Configurações
+                      </Link>
+                    )}
+                    <div className="border-t border-white/5 my-1" />
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-slate-400">logout</span>
+                      Sair
+                    </button>
+                  </div>
+                </div>
               )}
-              title={isSidebarCollapsed && !isMobileSidebarOpen ? "Configurações" : undefined}
-            >
-              <span className="material-symbols-outlined text-xl shrink-0">settings</span>
-              {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm font-medium">Configurações</span>}
-            </Link>
-            <button 
-              onClick={handleLogout}
-              className={cn(
-                "flex items-center w-full transition-all text-slate-400 hover:bg-red-500/10 rounded-xl text-left hover:text-red-400",
-                isSidebarCollapsed && !isMobileSidebarOpen ? "justify-center p-3" : "gap-3 px-4 py-2"
-              )}
-              title={isSidebarCollapsed && !isMobileSidebarOpen ? "Sair" : undefined}
-            >
-              <span className="material-symbols-outlined text-xl shrink-0">logout</span>
-              {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm font-medium">Sair</span>}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </aside>
     </>

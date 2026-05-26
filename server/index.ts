@@ -1,6 +1,6 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import dotenv from 'dotenv'
 import { json, urlencoded } from 'express'
 import { router as professionalsRouter } from './routes/professionals.js'
 import { router as clientsRouter } from './routes/clients.js'
@@ -30,8 +30,6 @@ import { router as campaignsRouter } from './routes/campaigns.js'
 import { router as authRouter } from './routes/auth.js'
 import { createErrorResponse } from './utils/response.js'
 import path from 'path'
-
-dotenv.config()
 
 const app = express()
 app.use(cors())
