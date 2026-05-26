@@ -123,30 +123,35 @@ router.post('/', auth(), async (req, res) => {
 })
 
 router.put('/:id', auth(), async (req, res) => {
-  const id = Number(req.params.id)
-  const {
-    name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour,
-    // Campos de integração WhatsApp
-    whatsappProvider, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId
-  } = req.body
+  try {
+    const id = Number(req.params.id)
+    const {
+      name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour,
+      // Campos de integração WhatsApp
+      whatsappProvider, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId
+    } = req.body
 
-  const data: any = {}
-  if (name !== undefined) data.name = name
-  if (domain !== undefined) data.domain = domain
-  if (whatsapp !== undefined) data.whatsapp = whatsapp
-  if (apiKey !== undefined) data.apiKey = apiKey
-  if (plan !== undefined) data.plan = plan
-  if (isActive !== undefined) data.isActive = isActive
-  if (openHour !== undefined) data.openHour = openHour
-  if (closeHour !== undefined) data.closeHour = closeHour
-  if (whatsappProvider !== undefined) data.whatsappProvider = whatsappProvider
-  if (evolutionApiUrl !== undefined) data.evolutionApiUrl = evolutionApiUrl
-  if (evolutionInstance !== undefined) data.evolutionInstance = evolutionInstance
-  if (metaToken !== undefined) data.metaToken = metaToken
-  if (metaPhoneNumberId !== undefined) data.metaPhoneNumberId = metaPhoneNumberId
+    const data: any = {}
+    if (name !== undefined) data.name = name
+    if (domain !== undefined) data.domain = domain
+    if (whatsapp !== undefined) data.whatsapp = whatsapp
+    if (apiKey !== undefined) data.apiKey = apiKey
+    if (plan !== undefined) data.plan = plan
+    if (isActive !== undefined) data.isActive = isActive
+    if (openHour !== undefined) data.openHour = openHour
+    if (closeHour !== undefined) data.closeHour = closeHour
+    if (whatsappProvider !== undefined) data.whatsappProvider = whatsappProvider
+    if (evolutionApiUrl !== undefined) data.evolutionApiUrl = evolutionApiUrl
+    if (evolutionInstance !== undefined) data.evolutionInstance = evolutionInstance
+    if (metaToken !== undefined) data.metaToken = metaToken
+    if (metaPhoneNumberId !== undefined) data.metaPhoneNumberId = metaPhoneNumberId
 
-  const updated = await prisma.empresa.update({ where: { id }, data })
-  res.json(createSuccessResponse(updated))
+    const updated = await prisma.empresa.update({ where: { id }, data })
+    res.json(createSuccessResponse(updated))
+  } catch (error: any) {
+    console.error('[Empresas] Erro ao atualizar empresa:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar clínica', 500))
+  }
 })
 
 router.delete('/:id', auth(), async (req, res) => {
