@@ -39,7 +39,8 @@ async function fnAlertUrgentTask(task: any, assignee: any, creatorName: string, 
     if (company && company.whatsapp_provider === 'evolution' && company.evolution_api_url && company.evolution_instance) {
       try {
         console.log(`[Alerts - WhatsApp] Disparando via Evolution API para: ${cleanPhone}`)
-        const response = await fetch(`${company.evolution_api_url}/message/sendText/${company.evolution_instance}`, {
+        const baseUrl = company.evolution_api_url.replace(/\/+$/, '')
+        const response = await fetch(`${baseUrl}/message/sendText/${company.evolution_instance}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
