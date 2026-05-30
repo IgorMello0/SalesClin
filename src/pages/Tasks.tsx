@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { tasksApi, professionalsApi, clientsApi, leadsApi } from '@/lib/api';
+import { tasksApi, professionalsApi, clientsApi, leadsApi, getImageUrl } from '@/lib/api';
 import { format, isBefore, isToday, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -612,7 +612,7 @@ export default function Tasks() {
                   <div className="flex items-center gap-1.5" title={`Responsável: ${task.assignedTo?.name}`}>
                     {task.assignedTo?.photoUrl ? (
                       <img 
-                        src={task.assignedTo.photoUrl} 
+                        src={getImageUrl(task.assignedTo.photoUrl)} 
                         alt={task.assignedTo.name} 
                         className="h-5 w-5 rounded-full object-cover border border-border dark:border-white/10" 
                       />
@@ -948,7 +948,7 @@ export default function Tasks() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {task.assignedTo?.photoUrl ? (
-                            <img src={task.assignedTo.photoUrl} alt={task.assignedTo.name} className="h-6 w-6 rounded-full object-cover border border-border dark:border-white/10" />
+                            <img src={getImageUrl(task.assignedTo.photoUrl)} alt={task.assignedTo.name} className="h-6 w-6 rounded-full object-cover border border-border dark:border-white/10" />
                           ) : (
                             <div className="h-6 w-6 rounded-full bg-secondary/20 border border-secondary/30 text-secondary text-[9px] font-bold flex items-center justify-center">
                               {initials}

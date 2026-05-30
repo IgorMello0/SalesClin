@@ -3,6 +3,7 @@ import { useLayout } from '@/contexts/LayoutContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { getImageUrl } from '@/lib/api';
 
 const menuItems = [
   {
@@ -331,7 +332,7 @@ export function AppSidebar() {
                 className="w-10 h-10 rounded-full hover:ring-2 hover:ring-secondary/50 transition-all flex items-center justify-center bg-white/5 overflow-hidden border border-white/10"
               >
                 {professional?.photoUrl ? (
-                  <img src={professional.photoUrl} alt={professional.name} className="w-full h-full object-cover" />
+                  <img src={getImageUrl(professional.photoUrl)} alt={professional.name} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-xs font-bold text-slate-300">
                     {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
@@ -385,7 +386,7 @@ export function AppSidebar() {
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className="w-8 h-8 rounded-full bg-secondary/20 text-secondary flex items-center justify-center shrink-0 overflow-hidden border border-white/10">
                     {professional?.photoUrl ? (
-                      <img src={professional.photoUrl} alt={professional.name} className="w-full h-full object-cover" />
+                      <img src={getImageUrl(professional.photoUrl)} alt={professional.name} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-xs font-bold text-slate-300">
                         {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}

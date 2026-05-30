@@ -1520,9 +1520,14 @@ const WhatsAppView = () => {
           const isMetaReady = data.whatsappProvider === 'meta' && data.metaToken && data.metaPhoneNumberId;
           const isReady = isEvolutionReady || isMetaReady;
           
+          // Usar a URL de produção, não localhost
+          const productionOrigin = import.meta.env.PROD 
+            ? window.location.origin 
+            : 'https://salesclin.vercel.app';
+          
           const webhookUrl = data.whatsappProvider === 'evolution' 
-            ? `${window.location.origin}/api/webhooks/evolution`
-            : `${window.location.origin}/api/webhooks/meta`;
+            ? `${productionOrigin}/api/webhooks/evolution`
+            : `${productionOrigin}/api/webhooks/meta`;
 
           return (
             <div className="space-y-4">
@@ -1600,28 +1605,61 @@ const WhatsAppView = () => {
                       variant="outline"
                       className="w-full border-[#F97316]/30 text-[#F97316] hover:bg-[#F97316]/5 font-bold"
                       onClick={async () => {
-                        try {
-                          const response = await fetch(`${data.evolutionApiUrl}/webhook/set/${data.evolutionInstance}`, {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'apikey': data.apiKey
-                            },
-                            body: JSON.stringify({
-                              enabled: true,
-                              url: webhookUrl,
-                              webhookByEvents: true,
-                              events: ['MESSAGES_UPSERT']
-                            })
-                          });
-                          if (response.ok) {
-                            toast({ title: '✅ Webhook configurado!', description: 'O Evolution API já está enviando as mensagens para o SalesClin.' });
-                          } else {
-                            const err = await response.json().catch(() => ({}));
-                            throw new Error(err.message || `HTTP ${response.status}`);
+                        const baseUrl = data.evolutionApiUrl.replace(/\/+$/, '');
+                        const instance = data.evolutionInstance;
+                        
+                        // Tentar múltiplos endpoints (Evolution API v1 e v2 têm formatos diferentes)
+                        const attempts = [
+                          // Evolution v2 (mais recente)
+                          {
+                            url: `${baseUrl}/webhook/set/${instance}`,
+                            body: { url: webhookUrl, enabled: true, webhookByEvents: true, events: ['MESSAGES_UPSERT'] }
+                          },
+                          // Evolution v2 alternativo
+                          {
+                            url: `${baseUrl}/webhook/manage/${instance}`,
+                            body: { url: webhookUrl, enabled: true, webhookByEvents: true, events: ['MESSAGES_UPSERT'] }
+                          },
+                          // Evolution v1
+                          {
+                            url: `${baseUrl}/webhook/instance/${instance}`,
+                            body: { url: webhookUrl, enabled: true, webhook_by_events: true, events: ['MESSAGES_UPSERT'] }
                           }
-                        } catch (e: any) {
-                          toast({ title: 'Erro', description: `Falha ao configurar webhook: ${e.message}`, variant: 'destructive' });
+                        ];
+                        
+                        let success = false;
+                        let lastError = '';
+                        
+                        for (const attempt of attempts) {
+                          try {
+                            const response = await fetch(attempt.url, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': data.apiKey
+                              },
+                              body: JSON.stringify(attempt.body)
+                            });
+                            
+                            if (response.ok) {
+                              success = true;
+                              toast({ title: '✅ Webhook configurado!', description: `Endpoint: ${attempt.url}. A Evolution API já está enviando mensagens para o SalesClin.` });
+                              break;
+                            } else {
+                              const errBody = await response.text().catch(() => '');
+                              lastError = `${attempt.url} → HTTP ${response.status}: ${errBody.substring(0, 200)}`;
+                            }
+                          } catch (e: any) {
+                            lastError = `${attempt.url} → ${e.message}`;
+                          }
+                        }
+                        
+                        if (!success) {
+                          toast({ 
+                            title: '⚠️ Configuração automática falhou', 
+                            description: `Configure manualmente no painel da Evolution. Último erro: ${lastError}`, 
+                            variant: 'destructive' 
+                          });
                         }
                       }}
                     >
