@@ -176,9 +176,33 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       ? ((leadsFechados / leadsCount) * 100) 
       : 0;
 
+    // Taxa de Conversão por Quantidade de Propostas: Vendas Fechadas / Oportunidades (Propostas)
+    const conversaoPropostas = oportunidades > 0
+      ? ((leadsFechados / oportunidades) * 100)
+      : 0;
+
     // Taxa de Conversão Financeira: Receita Efetiva / Faturamento Orçado
     const conversaoFinanceira = faturamento > 0 
       ? ((receita / faturamento) * 100) 
+      : 0;
+
+    // Cálculo do Parcelamento Médio de Boleto:
+    // Dividir o número de boletos gerados (método 'transferencia') pelo número de contratos fechados que têm boleto
+    const boletosGrouped = await prisma.payment.groupBy({
+      by: ['clientId'],
+      where: {
+        method: 'transferencia',
+        professionalId: { in: professionalIds },
+        ...(companyId && { companyId }),
+        date: { gte: startDate, lte: endDate }
+      },
+      _count: { id: true }
+    });
+
+    const totalBoletos = boletosGrouped.reduce((acc, curr) => acc + curr._count.id, 0);
+    const uniqueContratosComBoleto = boletosGrouped.length;
+    const parcelamentoMedioBoleto = uniqueContratosComBoleto > 0 
+      ? Number((totalBoletos / uniqueContratosComBoleto).toFixed(1))
       : 0;
       
     // Processamento dos Agrupamentos (Sub-Métricas)
@@ -221,12 +245,15 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       agendamentos: agendamentosConfirmados,
       comparada: avaliacoesComparecidas,
       oportunidades: oportunidades,
+      contratos: leadsFechados,
       faturamento: faturamento,
       receita: receita,
       ticketOrcado: ticketOrcado,
       ticketFechado: ticketFechado,
       conversao: conversaoLeads.toFixed(1),
+      conversaoPropostas: conversaoPropostas.toFixed(1),
       conversaoFinanceira: conversaoFinanceira.toFixed(1),
+      parcelamentoMedioBoleto,
       metodos,
       funil,
       origem

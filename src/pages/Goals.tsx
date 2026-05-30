@@ -205,8 +205,12 @@ const Goals = () => {
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant font-bold text-sm">R$</span>
                 <input
                   type="number"
-                  value={revenueTarget}
-                  onChange={(e) => setRevenueTarget(Number(e.target.value))}
+                  value={revenueTarget === 0 ? '' : revenueTarget}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const num = val === '' ? 0 : Number(val);
+                    setRevenueTarget(num);
+                  }}
                   className="flex w-full rounded-xl border border-slate-200 bg-slate-50 h-11 text-base font-bold pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-primary/20 text-primary"
                 />
               </div>
@@ -219,8 +223,12 @@ const Goals = () => {
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant font-bold text-sm">R$</span>
                 <input
                   type="number"
-                  value={avgTicket}
-                  onChange={(e) => setAvgTicket(Number(e.target.value))}
+                  value={avgTicket === 0 ? '' : avgTicket}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const num = val === '' ? 0 : Number(val);
+                    setAvgTicket(num);
+                  }}
                   className="flex w-full rounded-xl border border-slate-200 bg-slate-50 h-11 text-base font-bold pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-primary/20 text-primary"
                 />
               </div>
@@ -332,12 +340,10 @@ const Goals = () => {
 
               <Button
                 id="goals-save"
-                variant="secondary"
-                size="xl"
-                className="shadow-lg shadow-secondary/20 font-bold"
+                className="bg-[#F97316] hover:bg-[#EA580C] text-white font-bold shadow-lg shadow-orange-500/20 border-none transition-colors px-6 py-3 h-auto text-base rounded-xl flex items-center gap-2"
                 onClick={handleSavePlan}
               >
-                <span className="material-symbols-outlined text-lg mr-1">save</span>
+                <span className="material-symbols-outlined text-lg">save</span>
                 Salvar Plano
               </Button>
             </div>

@@ -115,6 +115,7 @@ model Lead {
   professional         Professional   @relation(fields: [professionalId], references: [id])
   proposals            Proposal[]
   tasks                Task[]
+  conversas            Conversa[]
 
   @@unique([phone, companyId])
   @@map("leads")
@@ -433,7 +434,9 @@ model Conversa {
   companyId      Int           @map("company_id")
   agentId        Int?          @map("agent_id")
   clientId       Int?          @map("client_id")
+  leadId         Int?          @map("lead_id")
   professionalId Int?          @map("professional_id")
+  phone          String?       // Telefone do contato (para lookup rápido)
   app            String?
   channel        String?
   startedAt      DateTime      @map("started_at")
@@ -441,10 +444,12 @@ model Conversa {
   createdAt      DateTime      @default(now()) @map("created_at")
   agent          AgenteIa?     @relation(fields: [agentId], references: [id])
   client         Client?       @relation(fields: [clientId], references: [id])
+  lead           Lead?         @relation(fields: [leadId], references: [id])
   company        Empresa       @relation(fields: [companyId], references: [id])
   professional   Professional? @relation(fields: [professionalId], references: [id])
   mensagens      Mensagem[]
 
+  @@unique([phone, companyId])
   @@map("conversas")
 }
 
@@ -754,6 +759,12 @@ model MessageCampaign {
   totalRecipients Int           @default(0) @map("total_recipients")
   sentCount      Int            @default(0) @map("sent_count")
   failedCount    Int            @default(0) @map("failed_count")
+  mediaUrl       String?        @map("media_url") @db.Text
+  mediaType      String?        @map("media_type") // 'image', 'video', 'audio'
+  minDelay       Int            @default(180) @map("min_delay")
+  maxDelay       Int            @default(200) @map("max_delay")
+  randomize      Boolean        @default(false)
+  variations     Json?          // Array de strings com as variações de mensagens
   scheduledAt    DateTime?      @map("scheduled_at") // Data de agendamento (se agendada)
   startedAt      DateTime?      @map("started_at")   // Quando começou a enviar
   completedAt    DateTime?      @map("completed_at") // Quando finalizou

@@ -1502,6 +1502,140 @@ const WhatsAppView = () => {
         )}
       </div>
 
+      <Separator />
+
+      {/* ═══ SEÇÃO: CAPTURA AUTOMÁTICA DE LEADS VIA WEBHOOK ═══ */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-xl text-[#F97316]">webhook</span>
+          <div>
+            <h3 className="font-bold text-sm text-primary">Captura Automática de Leads</h3>
+            <p className="text-xs text-muted-foreground">Quando alguém mandar mensagem no WhatsApp da clínica, o lead será criado automaticamente no funil.</p>
+          </div>
+        </div>
+
+        {/* Status da configuração */}
+        {(() => {
+          const isEvolutionReady = data.whatsappProvider === 'evolution' && data.evolutionApiUrl && data.apiKey && data.evolutionInstance;
+          const isMetaReady = data.whatsappProvider === 'meta' && data.metaToken && data.metaPhoneNumberId;
+          const isReady = isEvolutionReady || isMetaReady;
+          
+          const webhookUrl = data.whatsappProvider === 'evolution' 
+            ? `${window.location.origin}/api/webhooks/evolution`
+            : `${window.location.origin}/api/webhooks/meta`;
+
+          return (
+            <div className="space-y-4">
+              {/* Status Badge */}
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold ${
+                isReady 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                  : 'bg-amber-50 border-amber-200 text-amber-700'
+              }`}>
+                <span className="material-symbols-outlined text-sm">
+                  {isReady ? 'check_circle' : 'warning'}
+                </span>
+                {isReady 
+                  ? 'Credenciais configuradas — Webhook pronto para usar!'
+                  : 'Preencha as credenciais acima para ativar a captura automática.'
+                }
+              </div>
+
+              {isReady && (
+                <>
+                  {/* Webhook URL com botão de copiar */}
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 space-y-3">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      URL do Webhook ({data.whatsappProvider === 'evolution' ? 'Evolution API' : 'Meta Official'})
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        readOnly
+                        value={webhookUrl}
+                        className="bg-white font-mono text-xs"
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        className="shrink-0 px-3"
+                        onClick={() => {
+                          navigator.clipboard.writeText(webhookUrl);
+                          toast({ title: '📋 URL copiada!', description: 'Cole na configuração do seu provedor de WhatsApp.' });
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-sm">content_copy</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Instruções de configuração */}
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4">
+                    <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">
+                      {data.whatsappProvider === 'evolution' ? '📋 Como configurar na Evolution API' : '📋 Como configurar na Meta Business'}
+                    </p>
+                    {data.whatsappProvider === 'evolution' ? (
+                      <ol className="text-xs text-muted-foreground space-y-2 list-decimal list-inside">
+                        <li>Acesse o painel da sua <strong>Evolution API</strong></li>
+                        <li>Vá em <strong>Settings → Webhook</strong> da instância <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px] font-mono">{data.evolutionInstance}</code></li>
+                        <li>Cole a URL acima no campo <strong>Webhook URL</strong></li>
+                        <li>Selecione o evento <strong>MESSAGES_UPSERT</strong></li>
+                        <li>Salve. Pronto! Novos leads serão criados automaticamente.</li>
+                      </ol>
+                    ) : (
+                      <ol className="text-xs text-muted-foreground space-y-2 list-decimal list-inside">
+                        <li>Acesse o <strong>Meta Developer Console</strong> ({`developers.facebook.com`})</li>
+                        <li>Vá em <strong>WhatsApp → Configuration → Webhook</strong></li>
+                        <li>Cole a URL acima no campo <strong>Callback URL</strong></li>
+                        <li>Use qualquer <strong>Verify Token</strong> (ex: <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px] font-mono">salesclin-verify</code>)</li>
+                        <li>Assine o evento <strong>messages</strong></li>
+                        <li>Salve. Pronto! Novos leads serão criados automaticamente.</li>
+                      </ol>
+                    )}
+                  </div>
+
+                  {/* Botão de configuração automática (apenas para Evolution) */}
+                  {data.whatsappProvider === 'evolution' && (
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      className="w-full border-[#F97316]/30 text-[#F97316] hover:bg-[#F97316]/5 font-bold"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${data.evolutionApiUrl}/webhook/set/${data.evolutionInstance}`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'apikey': data.apiKey
+                            },
+                            body: JSON.stringify({
+                              enabled: true,
+                              url: webhookUrl,
+                              webhookByEvents: true,
+                              events: ['MESSAGES_UPSERT']
+                            })
+                          });
+                          if (response.ok) {
+                            toast({ title: '✅ Webhook configurado!', description: 'O Evolution API já está enviando as mensagens para o SalesClin.' });
+                          } else {
+                            const err = await response.json().catch(() => ({}));
+                            throw new Error(err.message || `HTTP ${response.status}`);
+                          }
+                        } catch (e: any) {
+                          toast({ title: 'Erro', description: `Falha ao configurar webhook: ${e.message}`, variant: 'destructive' });
+                        }
+                      }}
+                    >
+                      <span className="material-symbols-outlined text-sm mr-2">settings_suggest</span>
+                      Configurar Webhook Automaticamente
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
       <div className="flex justify-end pt-4">
         <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
           {isSaving ? 'Salvando...' : 'Salvar Configurações'}

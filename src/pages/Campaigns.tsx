@@ -54,6 +54,19 @@ export default function Campaigns() {
   const [isSending, setIsSending] = useState(false);
   const [previewRecipients, setPreviewRecipients] = useState(0);
 
+  // Media attachments
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | ''>('');
+
+  // Delay settings
+  const [minDelay, setMinDelay] = useState(180);
+  const [maxDelay, setMaxDelay] = useState(200);
+
+  // Anti-ban variations
+  const [randomize, setRandomize] = useState(false);
+  const [variations, setVariations] = useState<string[]>([]);
+  const [newVariation, setNewVariation] = useState('');
+
   // Tags filter states
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -141,7 +154,9 @@ export default function Campaigns() {
   }, [audienceType, professional?.id, selectedTags, tagTarget]);
 
   const resetForm = () => {
-    setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both'); setIsCreating(false);
+    setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both');
+    setMediaUrl(''); setMediaType(''); setMinDelay(180); setMaxDelay(200); setRandomize(false); setVariations([]); setNewVariation('');
+    setIsCreating(false);
   };
 
   const handleCreate = async () => {
@@ -154,7 +169,18 @@ export default function Campaigns() {
     setIsSending(true);
     try {
       const audienceFilter = audienceType === 'by_tags' ? { tags: selectedTags, target: tagTarget } : undefined;
-      const res = await campaignsApi.create({ name, message, audienceType, audienceFilter });
+      const res = await campaignsApi.create({ 
+        name, 
+        message, 
+        audienceType, 
+        audienceFilter,
+        mediaUrl: mediaUrl.trim() || null,
+        mediaType: mediaUrl.trim() ? mediaType : null,
+        minDelay: Number(minDelay),
+        maxDelay: Number(maxDelay),
+        randomize,
+        variations: randomize && variations.length > 0 ? variations : null
+      });
       if (res.success) {
         toast({ title: 'Campanha criada!' });
         resetForm(); loadCampaigns();
@@ -415,13 +441,16 @@ export default function Campaigns() {
             )}
 
             {step === 2 && (
-              <div className="space-y-5">
+              <div className="space-y-6">
+                {/* Text Message Input */}
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Mensagem</label>
-                  <textarea value={message} onChange={e => setMessage(e.target.value)} rows={5}
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Mensagem Principal</label>
+                  <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
                     placeholder="Olá {{primeiro_nome}}, temos uma novidade especial para você! ✨"
                     className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary" />
                 </div>
+
+                {/* Variables */}
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Variáveis Dinâmicas</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -433,14 +462,159 @@ export default function Campaigns() {
                     ))}
                   </div>
                 </div>
+
+                {/* Media Attachment section */}
+                <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
+                    <span className="material-symbols-outlined text-base">attach_file</span>
+                    Anexar Mídia (Opcional)
+                  </div>
+                  <div>
+                    <Input 
+                      value={mediaUrl} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setMediaUrl(val);
+                        if (val && !mediaType) setMediaType('image');
+                      }} 
+                      placeholder="URL do arquivo (ex: https://site.com/imagem.png)" 
+                      className="rounded-xl h-10 bg-white" 
+                    />
+                  </div>
+                  {mediaUrl.trim() !== '' && (
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-muted-foreground uppercase">Formato do Arquivo</label>
+                      <div className="flex gap-2">
+                        {[
+                          { value: 'image', label: '🖼️ Imagem' },
+                          { value: 'video', label: '🎥 Vídeo' },
+                          { value: 'audio', label: '🔊 Áudio' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setMediaType(opt.value as any)}
+                            className={`flex-1 py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
+                              mediaType === opt.value
+                                ? 'bg-secondary text-white border-secondary shadow-md shadow-secondary/15'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Anti-ban & Delay settings */}
+                <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
+                      <span className="material-symbols-outlined text-base text-[#F97316]">shield</span>
+                      Segurança & Intervalo Seguro (Anti-Ban)
+                    </div>
+                  </div>
+
+                  {/* Delay range inputs */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Atraso Mínimo (segundos)</label>
+                      <Input 
+                        type="number" 
+                        value={minDelay === 0 ? '' : minDelay} 
+                        onChange={e => setMinDelay(e.target.value === '' ? 0 : Number(e.target.value))} 
+                        placeholder="Ex: 180" 
+                        className="rounded-xl h-10 bg-white" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Atraso Máximo (segundos)</label>
+                      <Input 
+                        type="number" 
+                        value={maxDelay === 0 ? '' : maxDelay} 
+                        onChange={e => setMaxDelay(e.target.value === '' ? 0 : Number(e.target.value))} 
+                        placeholder="Ex: 200" 
+                        className="rounded-xl h-10 bg-white" 
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium italic mt-1">
+                    *Recomendado: 180 a 200 segundos por envio para máxima proteção da sua linha.
+                  </p>
+
+                  <div className="border-t border-slate-200/60 pt-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        id="chk-randomize" 
+                        checked={randomize} 
+                        onChange={e => setRandomize(e.target.checked)} 
+                        className="w-4 h-4 rounded border-slate-300 text-secondary focus:ring-secondary accent-[#F97316]" 
+                      />
+                      <label htmlFor="chk-randomize" className="text-xs font-bold text-slate-700 cursor-pointer">
+                        Randomizar variações de texto (Evita bloqueio do WhatsApp)
+                      </label>
+                    </div>
+
+                    {randomize && (
+                      <div className="space-y-2 mt-2 bg-white p-3 rounded-xl border border-slate-100">
+                        <label className="block text-[10px] font-bold text-muted-foreground uppercase">Adicionar variações da mensagem</label>
+                        <div className="flex gap-2">
+                          <Input 
+                            value={newVariation} 
+                            onChange={e => setNewVariation(e.target.value)} 
+                            placeholder="Adicione outra variação do texto..." 
+                            className="rounded-lg h-9 bg-slate-50 border-slate-200 text-xs" 
+                          />
+                          <Button 
+                            type="button"
+                            onClick={() => {
+                              if (newVariation.trim()) {
+                                setVariations([...variations, newVariation.trim()]);
+                                setNewVariation('');
+                              }
+                            }}
+                            className="bg-[#F97316] text-white hover:bg-orange-600 rounded-lg px-3 h-9 text-xs font-bold"
+                          >
+                            Add
+                          </Button>
+                        </div>
+
+                        {variations.length > 0 && (
+                          <div className="space-y-1.5 mt-2 max-h-32 overflow-y-auto">
+                            {variations.map((v, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 text-xs">
+                                <span className="truncate flex-1 pr-2 text-slate-600 font-medium">{v}</span>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setVariations(variations.filter((_, i) => i !== idx))} 
+                                  className="text-red-500 hover:text-red-700 font-bold"
+                                >
+                                  ✖
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-400 font-semibold italic mt-1">
+                          *Adicione mensagens com palavras ou saudações diferentes. O sistema enviará aleatoriamente uma delas para cada lead.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {message && (
                   <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                    <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wide mb-1.5">Preview da Mensagem</p>
+                    <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wide mb-1.5">Preview da Mensagem Principal</p>
                     <p className="text-sm text-emerald-800 whitespace-pre-wrap">
                       {message.replace(/\{\{nome\}\}/gi, 'João da Silva').replace(/\{\{primeiro_nome\}\}/gi, 'João').replace(/\{\{telefone\}\}/gi, '(11) 99999-9999')}
                     </p>
                   </div>
                 )}
+
                 <div className="flex justify-between">
                   <Button variant="outline" onClick={() => setStep(1)} className="rounded-xl h-10">
                     <span className="material-symbols-outlined text-sm mr-1">chevron_left</span> Voltar
@@ -465,8 +639,37 @@ export default function Campaigns() {
                     </div>
                   )}
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Destinatários</span><span className="font-bold text-primary">{previewRecipients} contatos</span></div>
+                  
+                  {/* Media confirmation */}
+                  {mediaUrl.trim() && (
+                    <div className="flex justify-between text-sm bg-white p-2 rounded-lg border border-slate-100">
+                      <span className="text-muted-foreground">Anexo de Mídia ({mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : 'Áudio'})</span>
+                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-secondary underline truncate max-w-xs">{mediaUrl}</a>
+                    </div>
+                  )}
+
+                  {/* Delay confirmation */}
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Intervalo de Envio</span><span className="font-bold text-primary">{minDelay}s a {maxDelay}s (aleatório)</span></div>
+
+                  {/* Variations confirmation */}
+                  {randomize && variations.length > 0 && (
+                    <div className="text-sm space-y-1">
+                      <span className="text-muted-foreground">Variações Anti-Ban</span>
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-100 text-xs text-slate-500 max-h-24 overflow-y-auto space-y-1">
+                        <p className="font-bold text-slate-700">Mensagem 1 (Principal):</p>
+                        <p className="italic truncate mb-2">{message}</p>
+                        {variations.map((v, i) => (
+                          <div key={i}>
+                            <p className="font-bold text-slate-700">Mensagem {i + 2}:</p>
+                            <p className="italic truncate">{v}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <hr className="border-slate-200" />
-                  <div><p className="text-xs text-muted-foreground mb-1">Mensagem:</p><p className="text-sm whitespace-pre-wrap bg-white rounded-lg p-3 border border-slate-100">{message}</p></div>
+                  <div><p className="text-xs text-muted-foreground mb-1">Mensagem Principal:</p><p className="text-sm whitespace-pre-wrap bg-white rounded-lg p-3 border border-slate-100">{message}</p></div>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 flex items-start gap-2">
                   <span className="material-symbols-outlined text-amber-500 text-lg mt-0.5">info</span>
@@ -528,9 +731,51 @@ export default function Campaigns() {
                 ))}
               </div>
 
-              <div className="bg-slate-50 rounded-xl p-4 mb-5">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Mensagem</p>
-                <p className="text-sm whitespace-pre-wrap">{viewCampaign.message}</p>
+              <div className="bg-slate-50 rounded-xl p-4 mb-5 space-y-4">
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1.5">Mensagem Principal</p>
+                  <p className="text-sm whitespace-pre-wrap">{viewCampaign.message}</p>
+                </div>
+
+                {/* Render media attachments if any */}
+                {viewCampaign.mediaUrl && (
+                  <div className="border-t border-slate-200/60 pt-3 space-y-1.5">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Mídia Anexada ({viewCampaign.mediaType === 'image' ? 'Imagem' : viewCampaign.mediaType === 'video' ? 'Vídeo' : 'Áudio'})</p>
+                    <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-100/80">
+                      <span className="material-symbols-outlined text-secondary text-lg">
+                        {viewCampaign.mediaType === 'image' ? 'image' : viewCampaign.mediaType === 'video' ? 'video_file' : 'volume_up'}
+                      </span>
+                      <a href={viewCampaign.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-secondary hover:underline truncate max-w-xs sm:max-w-md">
+                        {viewCampaign.mediaUrl}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Render anti-ban security parameters */}
+                <div className="border-t border-slate-200/60 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Configurações de Atraso</span>
+                    <span className="font-semibold text-slate-700">{viewCampaign.minDelay || 180} a {viewCampaign.maxDelay || 200} segundos por contato</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Randomização de Textos</span>
+                    <span className="font-semibold text-slate-700">
+                      {viewCampaign.randomize ? '✅ Ativado' : '❌ Desativado'}
+                    </span>
+                  </div>
+                </div>
+
+                {viewCampaign.randomize && viewCampaign.variations && Array.isArray(viewCampaign.variations) && viewCampaign.variations.length > 0 && (
+                  <div className="border-t border-slate-200/60 pt-3 space-y-1.5 text-xs">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Variações Alternadas</span>
+                    <div className="bg-white p-2 rounded-lg border border-slate-100 space-y-1">
+                      {viewCampaign.variations.map((v: string, idx: number) => (
+                        <p key={idx} className="text-slate-600 truncate italic">Variação {idx + 1}: "{v}"</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {viewCampaign.recipients?.length > 0 && (

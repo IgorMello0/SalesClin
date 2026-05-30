@@ -7,7 +7,7 @@ export const router = Router()
 
 router.get('/', auth(), requireModule('conversas'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
-  const { agentId, clientId } = req.query as any
+  const { agentId, clientId, leadId } = req.query as any
   
   let companyId = req.user?.companyId;
 
@@ -18,6 +18,7 @@ router.get('/', auth(), requireModule('conversas'), async (req, res) => {
   const where: any = { companyId };
   if (agentId) where.agentId = Number(agentId)
   if (clientId) where.clientId = Number(clientId)
+  if (leadId) where.leadId = Number(leadId)
 
   const [items, total] = await Promise.all([
     prisma.conversa.findMany({
@@ -25,7 +26,7 @@ router.get('/', auth(), requireModule('conversas'), async (req, res) => {
       skip,
       take,
       orderBy: { startedAt: 'desc' },
-      include: { company: true, agent: true, client: true, professional: true, mensagens: true }
+      include: { company: true, agent: true, client: true, lead: true, professional: true, mensagens: true }
     }),
     prisma.conversa.count({ where })
   ])
@@ -36,7 +37,7 @@ router.get('/:id', auth(), requireModule('conversas'), async (req, res) => {
   const id = Number(req.params.id)
   const item = await prisma.conversa.findUnique({
     where: { id },
-    include: { company: true, agent: true, client: true, professional: true, mensagens: true }
+    include: { company: true, agent: true, client: true, lead: true, professional: true, mensagens: true }
   })
   if (!item) return res.status(404).json(createErrorResponse('Conversa não encontrada', 404))
   res.json(createSuccessResponse(item))

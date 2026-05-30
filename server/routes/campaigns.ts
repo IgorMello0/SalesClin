@@ -82,7 +82,7 @@ router.get('/:id', auth(false), async (req, res) => {
 router.post('/', auth(false), async (req, res) => {
   try {
     const { professionalId, companyId } = resolveIds(req)
-    const { name, message, audienceType, audienceFilter } = req.body
+    const { name, message, audienceType, audienceFilter, mediaUrl, mediaType, minDelay, maxDelay, randomize, variations } = req.body
 
     if (!name || !message || !audienceType) {
       return res.status(400).json(createErrorResponse('Nome, mensagem e tipo de audiência são obrigatórios'))
@@ -115,6 +115,12 @@ router.post('/', auth(false), async (req, res) => {
         audienceFilter: audienceFilter || undefined,
         status: 'draft',
         totalRecipients: recipients.length,
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaType || null,
+        minDelay: minDelay ? Number(minDelay) : 180,
+        maxDelay: maxDelay ? Number(maxDelay) : 200,
+        randomize: randomize !== undefined ? !!randomize : false,
+        variations: variations || null,
         recipients: {
           create: recipients.map(r => ({
             name: r.name,
@@ -186,7 +192,13 @@ router.post('/:id/send', auth(false), async (req, res) => {
       evolutionKey: empresa!.apiKey!,
       evolutionInstance: empresa!.evolutionInstance!,
       metaToken: empresa!.metaToken!,
-      metaPhoneId: empresa!.metaPhoneNumberId!
+      metaPhoneId: empresa!.metaPhoneNumberId!,
+      mediaUrl: campaign.mediaUrl,
+      mediaType: campaign.mediaType,
+      minDelay: campaign.minDelay,
+      maxDelay: campaign.maxDelay,
+      randomize: campaign.randomize,
+      variations: campaign.variations ? (campaign.variations as string[]) : undefined
     }).catch(err => {
       console.error('[campaigns] background send error:', err)
     })
@@ -202,7 +214,7 @@ router.put('/:id', auth(false), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { companyId } = resolveIds(req)
-    const { name, message } = req.body
+    const { name, message, mediaUrl, mediaType, minDelay, maxDelay, randomize, variations } = req.body
 
     const existing = await prisma.messageCampaign.findFirst({
       where: { id, companyId: companyId || undefined }
@@ -218,7 +230,16 @@ router.put('/:id', auth(false), async (req, res) => {
 
     const campaign = await prisma.messageCampaign.update({
       where: { id },
-      data: { name, message }
+      data: { 
+        name, 
+        message,
+        mediaUrl: mediaUrl !== undefined ? mediaUrl : undefined,
+        mediaType: mediaType !== undefined ? mediaType : undefined,
+        minDelay: minDelay ? Number(minDelay) : undefined,
+        maxDelay: maxDelay ? Number(maxDelay) : undefined,
+        randomize: randomize !== undefined ? !!randomize : undefined,
+        variations: variations !== undefined ? variations : undefined
+      }
     })
 
     res.json(createSuccessResponse(campaign))
@@ -447,6 +468,12 @@ interface WhatsAppConfig {
   evolutionInstance: string
   metaToken: string
   metaPhoneId: string
+  mediaUrl?: string | null
+  mediaType?: string | null
+  minDelay?: number
+  maxDelay?: number
+  randomize?: boolean
+  variations?: string[]
 }
 
 // Formata telefone para o padrão internacional (55XXXXXXXXXXX)
@@ -471,6 +498,83 @@ function formatPhoneForWhatsApp(phone: string, provider: string = 'evolution'): 
 
 async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
   const baseUrl = config.evolutionUrl.replace(/\/+$/, '')
+  
+  // Se houver anexo de mídia configurado
+  if (config.mediaUrl) {
+    const mediaUrlEndpoint = `${baseUrl}/message/sendMedia/${config.evolutionInstance}`
+    
+    // Tratamento premium para imagens e vídeos (com texto no caption)
+    if (config.mediaType === 'image' || config.mediaType === 'video') {
+      const response = await fetch(mediaUrlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': config.evolutionKey,
+        },
+        body: JSON.stringify({
+          number: formattedPhone,
+          mediaMessage: {
+            mediatype: config.mediaType,
+            media: config.mediaUrl,
+            caption: message
+          }
+        })
+      })
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error(`[whatsapp-evolution] send media failed for ${formattedPhone}:`, errorData)
+        return { success: false, error: `HTTP ${response.status}: ${errorData}` }
+      }
+      return { success: true }
+    } else if (config.mediaType === 'audio') {
+      // Para áudio, enviamos primeiro o arquivo de áudio e depois o texto acompanhando
+      const audioResponse = await fetch(mediaUrlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': config.evolutionKey,
+        },
+        body: JSON.stringify({
+          number: formattedPhone,
+          mediaMessage: {
+            mediatype: 'audio',
+            media: config.mediaUrl
+          }
+        })
+      })
+      
+      if (!audioResponse.ok) {
+        const errorData = await audioResponse.text()
+        console.error(`[whatsapp-evolution] send audio failed for ${formattedPhone}:`, errorData)
+        return { success: false, error: `HTTP ${audioResponse.status}: ${errorData}` }
+      }
+      
+      // Pequeno delay de 1.2s antes de enviar a mensagem de texto como follow-up
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      
+      const textUrl = `${baseUrl}/message/sendText/${config.evolutionInstance}`
+      const textResponse = await fetch(textUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': config.evolutionKey,
+        },
+        body: JSON.stringify({
+          number: formattedPhone,
+          text: message
+        })
+      })
+      
+      if (!textResponse.ok) {
+        const errorData = await textResponse.text()
+        console.error(`[whatsapp-evolution] send text after audio failed for ${formattedPhone}:`, errorData)
+        return { success: false, error: `HTTP ${textResponse.status}: ${errorData}` }
+      }
+      return { success: true }
+    }
+  }
+
+  // Envio padrão de texto pura
   const url = `${baseUrl}/message/sendText/${config.evolutionInstance}`
   const response = await fetch(url, {
     method: 'POST',
@@ -494,7 +598,6 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
 
 async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
   // A Meta Cloud API usa a graph API para envios.
-  // v19.0 ou versão atual. O endpoint é /<PHONE_NUMBER_ID>/messages
   const url = `https://graph.facebook.com/v19.0/${config.metaPhoneId}/messages`
   
   const response = await fetch(url, {
@@ -546,7 +649,13 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
   let failedCount = 0
 
   for (const recipient of recipients) {
-    const messageToSend = recipient.renderedMessage || recipient.name
+    // Escolhe aleatoriamente uma variação se a randomização estiver ativa
+    let messageToSend = recipient.renderedMessage || recipient.name
+    if (config.randomize && config.variations && Array.isArray(config.variations) && config.variations.length > 0) {
+      const randomIndex = Math.floor(Math.random() * config.variations.length)
+      const selectedVariation = config.variations[randomIndex]
+      messageToSend = renderMessage(selectedVariation, recipient)
+    }
 
     try {
       const result = await sendWhatsAppMessage(config, recipient.phone, messageToSend)
@@ -578,8 +687,12 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
       data: { sentCount, failedCount }
     })
 
-    // Delay de 2s entre mensagens para evitar bloqueio do WhatsApp
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Delay variável para evitar bloqueio do WhatsApp
+    const minD = config.minDelay ?? 180
+    const maxD = config.maxDelay ?? 200
+    const delaySeconds = minD === maxD ? minD : Math.floor(Math.random() * (maxD - minD + 1)) + minD
+    
+    await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000))
   }
 
   // Finaliza a campanha

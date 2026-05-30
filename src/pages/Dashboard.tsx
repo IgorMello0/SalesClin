@@ -21,12 +21,15 @@ const Dashboard = () => {
     agendamentos: 0,
     comparada: 0,
     oportunidades: 0,
+    contratos: 0,
     faturamento: 0,
     receita: 0,
     ticketOrcado: 0,
     ticketFechado: 0,
     conversao: 0,
-    conversaoFinanceira: 0
+    conversaoPropostas: 0,
+    conversaoFinanceira: 0,
+    parcelamentoMedioBoleto: 0
   });
 
   const [extraData, setExtraData] = useState({
@@ -45,8 +48,9 @@ const Dashboard = () => {
       console.error(e);
     }
     return { 
-      leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, 
+      leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, contratos: 0,
       faturamento: 0, receita: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
+      conversaoPropostas: 0, conversaoFinanceira: 0, parcelamentoMedioBoleto: 0,
       metodos: { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
       funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
       origem: []
@@ -70,12 +74,15 @@ const Dashboard = () => {
         agendamentos: Math.floor(currentValues.agendamentos + ease * (targets.agendamentos - currentValues.agendamentos)),
         comparada: Math.floor(currentValues.comparada + ease * (targets.comparada - currentValues.comparada)),
         oportunidades: Math.floor(currentValues.oportunidades + ease * (targets.oportunidades - currentValues.oportunidades)),
+        contratos: Math.floor(currentValues.contratos + ease * ((targets.contratos || 0) - currentValues.contratos)),
         faturamento: Math.floor(currentValues.faturamento + ease * (targets.faturamento - currentValues.faturamento)),
         receita: Math.floor(currentValues.receita + ease * (targets.receita - currentValues.receita)),
         ticketOrcado: Math.floor(currentValues.ticketOrcado + ease * (targets.ticketOrcado - currentValues.ticketOrcado)),
         ticketFechado: Math.floor(currentValues.ticketFechado + ease * (targets.ticketFechado - currentValues.ticketFechado)),
         conversao: Number((currentValues.conversao + ease * (targets.conversao - currentValues.conversao)).toFixed(1)),
-        conversaoFinanceira: Number((currentValues.conversaoFinanceira + ease * (targets.conversaoFinanceira - currentValues.conversaoFinanceira)).toFixed(1))
+        conversaoPropostas: Number((currentValues.conversaoPropostas + ease * ((targets.conversaoPropostas || 0) - currentValues.conversaoPropostas)).toFixed(1)),
+        conversaoFinanceira: Number((currentValues.conversaoFinanceira + ease * (targets.conversaoFinanceira - currentValues.conversaoFinanceira)).toFixed(1)),
+        parcelamentoMedioBoleto: Number((currentValues.parcelamentoMedioBoleto + ease * ((targets.parcelamentoMedioBoleto || 0) - currentValues.parcelamentoMedioBoleto)).toFixed(1))
       });
 
       if (progress === 1) {
@@ -119,12 +126,15 @@ const Dashboard = () => {
           agendamentos: Math.floor(ease * targets.agendamentos),
           comparada: Math.floor(ease * targets.comparada),
           oportunidades: Math.floor(ease * targets.oportunidades),
+          contratos: Math.floor(ease * (targets.contratos || 0)),
           faturamento: Math.floor(ease * targets.faturamento),
           receita: Math.floor(ease * targets.receita),
           ticketOrcado: Math.floor(ease * targets.ticketOrcado),
           ticketFechado: Math.floor(ease * targets.ticketFechado),
           conversao: Number((ease * targets.conversao).toFixed(1)),
-          conversaoFinanceira: Number((ease * targets.conversaoFinanceira).toFixed(1))
+          conversaoPropostas: Number((ease * (targets.conversaoPropostas || 0)).toFixed(1)),
+          conversaoFinanceira: Number((ease * targets.conversaoFinanceira).toFixed(1)),
+          parcelamentoMedioBoleto: Number((ease * (targets.parcelamentoMedioBoleto || 0)).toFixed(1))
         });
         
         if (progress === 1) {
@@ -341,36 +351,38 @@ const Dashboard = () => {
         </Card>
 
         {/* Card 4: Propostas */}
-        <Card className="p-4 xl:p-6">
+        <Card className="p-4 xl:p-6 bg-gradient-to-br from-card to-slate-50/50">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">rocket_launch</span>
             </div>
-            
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Propostas</p>
-            <h3 className="stats-value">{counters.oportunidades}</h3>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Propostas Geradas</p>
+            <h3 className="stats-value text-2xl font-black text-primary">{formatCurrency(counters.faturamento)}</h3>
+            <p className="text-slate-400 text-xs font-bold mt-1">
+              {counters.oportunidades} {counters.oportunidades === 1 ? 'proposta criada' : 'propostas criadas'}
+            </p>
           </div>
-          
         </Card>
       </div>
 
-      {/* Secondary Stats Grid (New Metrics) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6 relative z-10">
-        {/* Card 5: Faturamento Total */}
+      {/* Secondary Stats Grid (New Metrics & Double Conversion) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6 relative z-10">
+        {/* Card 5: Faturamento (Contratos Fechados) */}
         <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
+            <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-lg">
+              <span className="material-symbols-outlined text-xl">handshake</span>
             </div>
-            
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Faturamento Total</p>
-            <h4 className="stats-value">{formatCurrency(counters.faturamento)}</h4>
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Faturamento Realizado</p>
+            <h4 className="stats-value text-2xl font-black text-emerald-600">{formatCurrency(counters.receita)}</h4>
+            <p className="text-slate-400 text-xs font-bold mt-1">
+              {counters.contratos} {counters.contratos === 1 ? 'contrato fechado' : 'contratos fechados'}
+            </p>
           </div>
-          
         </Card>
 
         {/* Card 6: Ticket (Orçado) */}
@@ -379,46 +391,60 @@ const Dashboard = () => {
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
               <span className="material-symbols-outlined text-xl">calculate</span>
             </div>
-            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Ticket (Orçado)</p>
-            <h4 className="stats-value">{formatCurrency(counters.ticketOrcado)}</h4>
+            <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketOrcado)}</h4>
+            <p className="text-slate-400 text-[11px] font-medium mt-1">média por proposta</p>
           </div>
-          
         </Card>
 
         {/* Card 7: Ticket (Fechado) */}
         <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">handshake</span>
+              <span className="material-symbols-outlined text-xl">payments</span>
             </div>
-            
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Ticket (Fechado)</p>
-            <h4 className="stats-value">{formatCurrency(counters.ticketFechado)}</h4>
+            <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketFechado)}</h4>
+            <p className="text-slate-400 text-[11px] font-medium mt-1">média por fechamento</p>
           </div>
-          
         </Card>
 
-        {/* Card 8: Taxa de Conversão */}
+        {/* Card 8: Parcelamento Médio de Boleto */}
         <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">{conversionMode === 'percent' ? 'percent' : 'payments'}</span>
+              <span className="material-symbols-outlined text-xl">receipt_long</span>
             </div>
-            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg border border-border">
+          </div>
+          <div className="space-y-1">
+            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Parc. Médio Boleto</p>
+            <h4 className="stats-value text-xl font-bold text-accent">{counters.parcelamentoMedioBoleto}x</h4>
+            <p className="text-slate-400 text-[11px] font-medium mt-1">parcelas por boleto</p>
+          </div>
+        </Card>
+
+        {/* Card 9: Taxa de Conversão Dupla */}
+        <Card className="p-4 xl:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-accent/10 text-accent rounded-lg">
+              <span className="material-symbols-outlined text-xl">{conversionMode === 'percent' ? 'percent' : 'insights'}</span>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                <button 
                   onClick={() => setConversionMode('percent')}
-                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'percent' ? 'bg-card text-secondary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-all ${conversionMode === 'percent' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Conversão por Quantidade de Propostas"
                >
-                  %
+                  Qtd.
                </button>
                <button 
                   onClick={() => setConversionMode('reais')}
-                  className={`text-[10px] font-bold px-2 py-1 rounded transition-all ${conversionMode === 'reais' ? 'bg-card text-secondary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-all ${conversionMode === 'reais' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Conversão Financeira (Valor de Proposta vs Receita)"
                >
                   R$
                </button>
@@ -426,20 +452,17 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-              {conversionMode === 'percent' ? 'Conversão de Leads' : 'Conversão Financeira'}
+              {conversionMode === 'percent' ? 'Conversão (Qtd.)' : 'Conversão (Financ.)'}
             </p>
             <div className="flex items-baseline gap-2">
-              <h4 className="stats-value">
-                 {conversionMode === 'percent' ? `${counters.conversao}%` : `${counters.conversaoFinanceira}%`}
+              <h4 className="stats-value text-xl font-bold text-secondary">
+                 {conversionMode === 'percent' ? `${counters.conversaoPropostas}%` : `${counters.conversaoFinanceira}%`}
               </h4>
-              {conversionMode === 'reais' && (
-                <span className="text-[10px] font-bold text-slate-400">
-                  (Realizado vs Orçado)
-                </span>
-              )}
             </div>
+            <p className="text-slate-400 text-[10px] font-medium mt-1">
+              {conversionMode === 'percent' ? 'Contratos / Propostas' : 'Receita / Faturamento'}
+            </p>
           </div>
-          
         </Card>
       </div>
 

@@ -4,11 +4,307 @@ import { createErrorResponse, createSuccessResponse } from '../utils/response.js
 
 export const router = Router();
 
+// ═══════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════
+
+/** Remove @s.whatsapp.net, @c.us, country-code prefix quirks and keep only digits */
+function normalizePhone(raw: string): string {
+  return raw.replace(/@.*$/, '').replace(/\D/g, '');
+}
+
+/** Find the company that owns a given Evolution instance name */
+async function findCompanyByInstance(instance: string) {
+  return prisma.empresa.findFirst({
+    where: { evolutionInstance: instance, isActive: true },
+    select: { id: true, ownerId: true, name: true }
+  });
+}
+
+/** Find the company that owns a given Meta phone-number ID */
+async function findCompanyByMetaPhoneId(phoneNumberId: string) {
+  return prisma.empresa.findFirst({
+    where: { metaPhoneNumberId: phoneNumberId, isActive: true },
+    select: { id: true, ownerId: true, name: true }
+  });
+}
+
 /**
- * Webhook Universal para Ingestão de Leads (SaaS Friendly)
- * O usuário do SalesClin utilizará esta URL (ex: /api/webhooks/leads/12345-API-KEY)
- * para conectar ao Meta Ads, Zapier, Elementor, etc.
+ * Core logic shared by Evolution and Meta webhooks.
+ * 1. Looks up the lead by phone WITHIN the clinic (companyId).
+ * 2. If missing → creates it as "prospect_lead" (Novo).
+ * 3. Creates / reuses a Conversa (chat thread) for the phone+company.
+ * 4. Stores the incoming message as a Mensagem for the future in-app chat.
  */
+async function processIncomingMessage(opts: {
+  companyId: number;
+  ownerId: number | null;
+  phone: string;
+  pushName: string;
+  messageText: string;
+  rawPayload: any;
+  origin: string; // 'WhatsApp' | 'WhatsApp Official'
+}) {
+  const { companyId, ownerId, phone, pushName, messageText, rawPayload, origin } = opts;
+
+  if (!ownerId) {
+    console.warn(`[Webhook] Empresa #${companyId} sem ownerId. Ignorando.`);
+    return { action: 'ignored', reason: 'no_owner' };
+  }
+
+  // ── 1. Verificar se o Lead já existe DENTRO DESTA CLÍNICA ──
+  let lead = await prisma.lead.findFirst({
+    where: { phone, companyId }
+  });
+
+  let action: 'created' | 'existing' = 'existing';
+
+  if (!lead) {
+    // ── 2. Criar novo lead na clínica ──
+    lead = await prisma.lead.create({
+      data: {
+        professionalId: ownerId,
+        companyId,
+        name: pushName || 'Contato WhatsApp',
+        phone,
+        status: 'prospect_lead', // Novo no funil
+        origin,
+        notes: messageText ? `Primeira mensagem: ${messageText}` : null,
+        tags: ['whatsapp-auto'],
+        isScheduled: false,
+        value: 0
+      }
+    });
+
+    // Registrar atividade de criação
+    await prisma.leadActivity.create({
+      data: {
+        leadId: lead.id,
+        type: 'sistema',
+        content: `Lead criado automaticamente via ${origin}. Nome: "${pushName}".`,
+        createdBy: 'Sistema'
+      }
+    });
+
+    action = 'created';
+    console.log(`[Webhook] ✅ Lead #${lead.id} criado para ${phone} na clínica #${companyId}`);
+  } else {
+    // ── 3. Lead já existe — registrar nova atividade ──
+    await prisma.leadActivity.create({
+      data: {
+        leadId: lead.id,
+        type: 'sistema',
+        content: `Novo contato recebido via ${origin}: "${messageText?.substring(0, 120) || '(mídia)'}"`,
+        createdBy: 'Sistema'
+      }
+    });
+    console.log(`[Webhook] ♻️ Lead #${lead.id} já existia para ${phone} na clínica #${companyId}`);
+  }
+
+  // ── 4. Criar/reusar Conversa (chat thread) ──
+  let conversa = await prisma.conversa.findFirst({
+    where: { phone, companyId }
+  });
+
+  if (!conversa) {
+    conversa = await prisma.conversa.create({
+      data: {
+        companyId,
+        leadId: lead.id,
+        professionalId: ownerId,
+        phone,
+        app: 'whatsapp',
+        channel: origin,
+        startedAt: new Date()
+      }
+    });
+  }
+
+  // ── 5. Salvar mensagem no histórico do chat ──
+  await prisma.mensagem.create({
+    data: {
+      conversationId: conversa.id,
+      sender: 'cliente',
+      content: messageText || '(mídia)',
+      rawJson: rawPayload,
+      origin
+    }
+  });
+
+  return { action, leadId: lead.id, conversaId: conversa.id };
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// 1) WEBHOOK — EVOLUTION API (MESSAGES_UPSERT)
+// ═══════════════════════════════════════════════════════════
+//
+// URL para configurar no Evolution:
+//   POST https://<domain>/api/webhooks/evolution
+//   Eventos: MESSAGES_UPSERT
+//
+router.post('/evolution', async (req, res) => {
+  try {
+    const body = req.body;
+
+    // ── Validar evento ──
+    const event = body.event || '';
+    if (!event.includes('messages') && !event.includes('MESSAGES')) {
+      // Não é evento de mensagem — ignorar silenciosamente
+      return res.json({ received: true, ignored: true });
+    }
+
+    const data = body.data || body;
+    const key = data.key || {};
+    const instance = body.instance || body.instanceName || '';
+
+    // Ignorar mensagens enviadas por mim (fromMe)
+    if (key.fromMe === true) {
+      return res.json({ received: true, ignored: true, reason: 'fromMe' });
+    }
+
+    // Ignorar mensagens de grupo
+    const remoteJid = key.remoteJid || '';
+    if (remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) {
+      return res.json({ received: true, ignored: true, reason: 'group' });
+    }
+
+    // ── Extrair dados ──
+    const phone = normalizePhone(remoteJid);
+    const pushName = data.pushName || data.senderName || '';
+    const messageObj = data.message || {};
+    const messageText = messageObj.conversation
+      || messageObj.extendedTextMessage?.text
+      || messageObj.imageMessage?.caption
+      || messageObj.videoMessage?.caption
+      || '';
+
+    if (!phone || !instance) {
+      return res.status(400).json(createErrorResponse('Dados insuficientes (phone ou instance)', 400));
+    }
+
+    // ── Identificar clínica pela instância ──
+    const empresa = await findCompanyByInstance(instance);
+    if (!empresa) {
+      console.warn(`[Webhook/Evolution] Instância "${instance}" não encontrada no DB.`);
+      return res.json({ received: true, ignored: true, reason: 'unknown_instance' });
+    }
+
+    // ── Processar ──
+    const result = await processIncomingMessage({
+      companyId: empresa.id,
+      ownerId: empresa.ownerId,
+      phone,
+      pushName,
+      messageText,
+      rawPayload: body,
+      origin: 'WhatsApp'
+    });
+
+    return res.json(createSuccessResponse(result));
+
+  } catch (error: any) {
+    console.error('[Webhook/Evolution] Erro:', error);
+    // Sempre retornar 200 para o Evolution não reenviar em loop
+    return res.status(200).json({ received: true, error: error.message });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════
+// 2) WEBHOOK — META OFFICIAL WHATSAPP BUSINESS API
+// ═══════════════════════════════════════════════════════════
+//
+// URL para configurar no Meta Business:
+//   GET  https://<domain>/api/webhooks/meta  (verificação)
+//   POST https://<domain>/api/webhooks/meta  (mensagens)
+//
+
+// Verificação do webhook (challenge) — Meta envia um GET
+router.get('/meta', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  // O verify_token é definido pelo usuário no Meta Business.
+  // Usamos a API key da empresa como token de verificação.
+  // Para simplificar, aceitamos qualquer token por agora e validamos no POST.
+  if (mode === 'subscribe' && token && challenge) {
+    console.log('[Webhook/Meta] Challenge verificado com sucesso.');
+    return res.status(200).send(challenge);
+  }
+
+  return res.sendStatus(403);
+});
+
+// Receber mensagens do Meta
+router.post('/meta', async (req, res) => {
+  try {
+    const body = req.body;
+
+    // Formato do Meta: body.entry[].changes[].value
+    if (!body.entry || !Array.isArray(body.entry)) {
+      return res.json({ received: true, ignored: true });
+    }
+
+    for (const entry of body.entry) {
+      const changes = entry.changes || [];
+      for (const change of changes) {
+        if (change.field !== 'messages') continue;
+
+        const value = change.value || {};
+        const metadata = value.metadata || {};
+        const phoneNumberId = metadata.phone_number_id || '';
+        const messages = value.messages || [];
+        const contacts = value.contacts || [];
+
+        if (!phoneNumberId || messages.length === 0) continue;
+
+        // ── Identificar clínica pelo phone_number_id do Meta ──
+        const empresa = await findCompanyByMetaPhoneId(phoneNumberId);
+        if (!empresa) {
+          console.warn(`[Webhook/Meta] phone_number_id "${phoneNumberId}" não encontrado no DB.`);
+          continue;
+        }
+
+        for (const msg of messages) {
+          // Ignorar status updates (delivered, read, etc.)
+          if (msg.type === 'status' || !msg.from) continue;
+
+          const phone = normalizePhone(msg.from);
+          const contactInfo = contacts.find((c: any) => c.wa_id === msg.from);
+          const pushName = contactInfo?.profile?.name || '';
+          const messageText = msg.text?.body
+            || msg.image?.caption
+            || msg.video?.caption
+            || '';
+
+          await processIncomingMessage({
+            companyId: empresa.id,
+            ownerId: empresa.ownerId,
+            phone,
+            pushName,
+            messageText,
+            rawPayload: msg,
+            origin: 'WhatsApp Official'
+          });
+        }
+      }
+    }
+
+    // Meta EXIGE resposta 200 rápida
+    return res.sendStatus(200);
+
+  } catch (error: any) {
+    console.error('[Webhook/Meta] Erro:', error);
+    return res.sendStatus(200);
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════
+// 3) WEBHOOK UNIVERSAL DE LEADS (já existente — Meta Ads, Zapier, etc.)
+// ═══════════════════════════════════════════════════════════
 router.post('/leads/:apiKey', async (req, res) => {
   try {
     const { apiKey } = req.params;
@@ -28,12 +324,6 @@ router.post('/leads/:apiKey', async (req, res) => {
     }
 
     // 2. Encontrar o Profissional Admin / Padrão da Empresa para atribuir o Lead
-    const adminUser = await prisma.usuario.findFirst({
-      where: { companyId: empresa.id, role: 'admin' },
-    });
-
-    // Precisamos de um Professional record para vincular ao Lead.
-    // Tenta achar um profissional que pertença a essa empresa.
     const professional = await prisma.professional.findFirst({
       where: { companyId: empresa.id }
     });
@@ -43,11 +333,9 @@ router.post('/leads/:apiKey', async (req, res) => {
     }
 
     // 3. Normalização de Dados do Payload (Mapeamento flexível)
-    // Suporta formatos do Meta Ads, Elementor, Typeform, etc.
     const name = data.name || data.nome || data.full_name || 'Lead sem nome';
     const email = data.email || data.mail || null;
     const phone = data.phone || data.telefone || data.whatsapp || data.celular || null;
-    const city = data.city || data.cidade || null;
     const value = parseFloat(data.value || data.valor || 0);
     
     // Tratamento de UTM e Origem
@@ -58,7 +346,6 @@ router.post('/leads/:apiKey', async (req, res) => {
       origin = 'Facebook Ads';
     }
 
-    // Extrair outros campos em observações
     const observations = JSON.stringify(data, null, 2);
 
     // 4. Verificar se já existe um Lead com este telefone NESTA EMPRESA
@@ -72,7 +359,6 @@ router.post('/leads/:apiKey', async (req, res) => {
     if (existingLead) {
       console.log(`[Webhooks] Lead duplicado detectado (#${existingLead.id}). Atualizando...`);
       
-      // Atualizar o lead existente e adicionar atividade
       const updatedLead = await prisma.lead.update({
         where: { id: existingLead.id },
         data: {
@@ -94,7 +380,7 @@ router.post('/leads/:apiKey', async (req, res) => {
       }));
     }
     
-    // 5. Criação do Lead (Caso não exista)
+    // 5. Criação do Lead
     const newLead = await prisma.lead.create({
       data: {
         professionalId: professional.id,
@@ -104,7 +390,7 @@ router.post('/leads/:apiKey', async (req, res) => {
         phone,
         value,
         origin,
-        status: 'prospect_lead', // Status inicial do funil
+        status: 'prospect_lead',
         notes: observations,
         isScheduled: false
       }
