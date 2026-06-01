@@ -1345,7 +1345,8 @@ const WhatsAppView = () => {
     apiKey: '',
     evolutionInstance: '',
     metaToken: '',
-    metaPhoneNumberId: ''
+    metaPhoneNumberId: '',
+    webhookToken: ''
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -1365,7 +1366,8 @@ const WhatsAppView = () => {
           apiKey: res.data.apiKey || '',
           evolutionInstance: res.data.evolutionInstance || '',
           metaToken: res.data.metaToken || '',
-          metaPhoneNumberId: res.data.metaPhoneNumberId || ''
+          metaPhoneNumberId: res.data.metaPhoneNumberId || '',
+          webhookToken: res.data.webhookToken || ''
         });
       }
     } catch (e) {
@@ -1523,11 +1525,13 @@ const WhatsAppView = () => {
           // Usar a URL de produção, não localhost
           const productionOrigin = import.meta.env.PROD 
             ? window.location.origin 
-            : 'https://salesclin.vercel.app';
+            : 'https://sales-clin.vercel.app';
           
+          // URL com token exclusivo da clínica (seguro e sem conflito)
+          const tokenSuffix = data.webhookToken ? `/${data.webhookToken}` : '';
           const webhookUrl = data.whatsappProvider === 'evolution' 
-            ? `${productionOrigin}/api/webhooks/evolution`
-            : `${productionOrigin}/api/webhooks/meta`;
+            ? `${productionOrigin}/api/webhooks/evolution${tokenSuffix}`
+            : `${productionOrigin}/api/webhooks/meta${tokenSuffix}`;
 
           return (
             <div className="space-y-4">
@@ -1548,10 +1552,18 @@ const WhatsAppView = () => {
 
               {isReady && (
                 <>
+                  {/* Aviso de segurança sobre o token */}
+                  {data.webhookToken && (
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-xl border text-xs bg-blue-50 border-blue-200 text-blue-700">
+                      <span className="material-symbols-outlined text-sm mt-0.5">lock</span>
+                      <span>Esta URL é <strong>exclusiva da sua clínica</strong>. Ela contém um token de segurança único que identifica sua empresa. Não compartilhe com outras clínicas.</span>
+                    </div>
+                  )}
+
                   {/* Webhook URL com botão de copiar */}
                   <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 space-y-3">
                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      URL do Webhook ({data.whatsappProvider === 'evolution' ? 'Evolution API' : 'Meta Official'})
+                      URL Exclusiva do Webhook ({data.whatsappProvider === 'evolution' ? 'Evolution API' : 'Meta Official'})
                     </Label>
                     <div className="flex gap-2">
                       <Input 

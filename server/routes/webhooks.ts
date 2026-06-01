@@ -146,73 +146,120 @@ async function processIncomingMessage(opts: {
 // 1) WEBHOOK — EVOLUTION API (MESSAGES_UPSERT)
 // ═══════════════════════════════════════════════════════════
 //
-// URL para configurar no Evolution:
-//   POST https://<domain>/api/webhooks/evolution
-//   Eventos: MESSAGES_UPSERT
+// URL SEGURA (com token único por clínica):
+//   POST https://<domain>/api/webhooks/evolution/<webhookToken>
 //
+// URL LEGADA (fallback por nome de instância — menos seguro):
+//   POST https://<domain>/api/webhooks/evolution
+//
+
+/** Lógica compartilhada de processamento do payload da Evolution */
+async function handleEvolutionPayload(body: any, empresa: { id: number; ownerId: number | null; name: string }) {
+  // ── Validar evento ──
+  const event = body.event || '';
+  if (!event.includes('messages') && !event.includes('MESSAGES')) {
+    return { received: true, ignored: true, reason: 'not_message_event' };
+  }
+
+  const data = body.data || body;
+  const key = data.key || {};
+
+  // Ignorar mensagens enviadas por mim (fromMe)
+  if (key.fromMe === true) {
+    return { received: true, ignored: true, reason: 'fromMe' };
+  }
+
+  // Ignorar mensagens de grupo
+  const remoteJid = key.remoteJid || '';
+  if (remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) {
+    return { received: true, ignored: true, reason: 'group' };
+  }
+
+  // ── Extrair dados ──
+  const phone = normalizePhone(remoteJid);
+  const pushName = data.pushName || data.senderName || '';
+  const messageObj = data.message || {};
+  const messageText = messageObj.conversation
+    || messageObj.extendedTextMessage?.text
+    || messageObj.imageMessage?.caption
+    || messageObj.videoMessage?.caption
+    || '';
+
+  if (!phone) {
+    return { received: true, ignored: true, reason: 'no_phone' };
+  }
+
+  // ── Processar ──
+  const result = await processIncomingMessage({
+    companyId: empresa.id,
+    ownerId: empresa.ownerId,
+    phone,
+    pushName,
+    messageText,
+    rawPayload: body,
+    origin: 'WhatsApp'
+  });
+
+  return { success: true, ...result };
+}
+
+// ── ROTA PRINCIPAL: com token exclusivo da clínica na URL ──
+router.post('/evolution/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // Identificar clínica pelo token único (100% seguro, sem depender de nome de instância)
+    const empresa = await prisma.empresa.findUnique({
+      where: { webhookToken: token },
+      select: { id: true, ownerId: true, name: true, isActive: true }
+    });
+
+    if (!empresa || !empresa.isActive) {
+      console.warn(`[Webhook/Evolution] Token "${token}" não encontrado ou empresa inativa.`);
+      return res.json({ received: true, ignored: true, reason: 'invalid_token' });
+    }
+
+    console.log(`[Webhook/Evolution] ✅ Recebido para clínica "${empresa.name}" (ID: ${empresa.id})`);
+
+    const result = await handleEvolutionPayload(req.body, empresa);
+    return res.json(result);
+
+  } catch (error: any) {
+    console.error('[Webhook/Evolution] Erro:', error);
+    return res.status(200).json({ received: true, error: error.message });
+  }
+});
+
+// ── ROTA LEGADA: sem token, usa nome da instância (compatibilidade retroativa) ──
 router.post('/evolution', async (req, res) => {
   try {
     const body = req.body;
 
-    // ── Validar evento ──
     const event = body.event || '';
     if (!event.includes('messages') && !event.includes('MESSAGES')) {
-      // Não é evento de mensagem — ignorar silenciosamente
       return res.json({ received: true, ignored: true });
     }
 
-    const data = body.data || body;
-    const key = data.key || {};
     const instance = body.instance || body.instanceName || '';
 
-    // Ignorar mensagens enviadas por mim (fromMe)
-    if (key.fromMe === true) {
-      return res.json({ received: true, ignored: true, reason: 'fromMe' });
+    if (!instance) {
+      return res.status(400).json(createErrorResponse('Dados insuficientes (instance)', 400));
     }
 
-    // Ignorar mensagens de grupo
-    const remoteJid = key.remoteJid || '';
-    if (remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) {
-      return res.json({ received: true, ignored: true, reason: 'group' });
-    }
-
-    // ── Extrair dados ──
-    const phone = normalizePhone(remoteJid);
-    const pushName = data.pushName || data.senderName || '';
-    const messageObj = data.message || {};
-    const messageText = messageObj.conversation
-      || messageObj.extendedTextMessage?.text
-      || messageObj.imageMessage?.caption
-      || messageObj.videoMessage?.caption
-      || '';
-
-    if (!phone || !instance) {
-      return res.status(400).json(createErrorResponse('Dados insuficientes (phone ou instance)', 400));
-    }
-
-    // ── Identificar clínica pela instância ──
+    // Identificar clínica pela instância (fallback — menos seguro)
     const empresa = await findCompanyByInstance(instance);
     if (!empresa) {
       console.warn(`[Webhook/Evolution] Instância "${instance}" não encontrada no DB.`);
       return res.json({ received: true, ignored: true, reason: 'unknown_instance' });
     }
 
-    // ── Processar ──
-    const result = await processIncomingMessage({
-      companyId: empresa.id,
-      ownerId: empresa.ownerId,
-      phone,
-      pushName,
-      messageText,
-      rawPayload: body,
-      origin: 'WhatsApp'
-    });
+    console.log(`[Webhook/Evolution/Legacy] Recebido via rota legada para "${empresa.name}" (ID: ${empresa.id})`);
 
-    return res.json(createSuccessResponse(result));
+    const result = await handleEvolutionPayload(body, empresa);
+    return res.json(result);
 
   } catch (error: any) {
     console.error('[Webhook/Evolution] Erro:', error);
-    // Sempre retornar 200 para o Evolution não reenviar em loop
     return res.status(200).json({ received: true, error: error.message });
   }
 });
@@ -222,86 +269,117 @@ router.post('/evolution', async (req, res) => {
 // 2) WEBHOOK — META OFFICIAL WHATSAPP BUSINESS API
 // ═══════════════════════════════════════════════════════════
 //
-// URL para configurar no Meta Business:
-//   GET  https://<domain>/api/webhooks/meta  (verificação)
-//   POST https://<domain>/api/webhooks/meta  (mensagens)
+// URL SEGURA (com token):
+//   GET  https://<domain>/api/webhooks/meta/<webhookToken>
+//   POST https://<domain>/api/webhooks/meta/<webhookToken>
+//
+// URL LEGADA (sem token):
+//   GET  https://<domain>/api/webhooks/meta
+//   POST https://<domain>/api/webhooks/meta
 //
 
-// Verificação do webhook (challenge) — Meta envia um GET
-router.get('/meta', (req, res) => {
+/** Lógica compartilhada de verificação do Meta challenge */
+function handleMetaVerification(req: any, res: any) {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  // O verify_token é definido pelo usuário no Meta Business.
-  // Usamos a API key da empresa como token de verificação.
-  // Para simplificar, aceitamos qualquer token por agora e validamos no POST.
   if (mode === 'subscribe' && token && challenge) {
     console.log('[Webhook/Meta] Challenge verificado com sucesso.');
     return res.status(200).send(challenge);
   }
 
   return res.sendStatus(403);
-});
+}
 
-// Receber mensagens do Meta
-router.post('/meta', async (req, res) => {
-  try {
-    const body = req.body;
+/** Lógica compartilhada de processamento de mensagens do Meta */
+async function handleMetaMessages(body: any, empresaOverride?: { id: number; ownerId: number | null; name: string }) {
+  if (!body.entry || !Array.isArray(body.entry)) {
+    return;
+  }
 
-    // Formato do Meta: body.entry[].changes[].value
-    if (!body.entry || !Array.isArray(body.entry)) {
-      return res.json({ received: true, ignored: true });
-    }
+  for (const entry of body.entry) {
+    const changes = entry.changes || [];
+    for (const change of changes) {
+      if (change.field !== 'messages') continue;
 
-    for (const entry of body.entry) {
-      const changes = entry.changes || [];
-      for (const change of changes) {
-        if (change.field !== 'messages') continue;
+      const value = change.value || {};
+      const metadata = value.metadata || {};
+      const phoneNumberId = metadata.phone_number_id || '';
+      const messages = value.messages || [];
+      const contacts = value.contacts || [];
 
-        const value = change.value || {};
-        const metadata = value.metadata || {};
-        const phoneNumberId = metadata.phone_number_id || '';
-        const messages = value.messages || [];
-        const contacts = value.contacts || [];
+      if (messages.length === 0) continue;
 
-        if (!phoneNumberId || messages.length === 0) continue;
-
-        // ── Identificar clínica pelo phone_number_id do Meta ──
-        const empresa = await findCompanyByMetaPhoneId(phoneNumberId);
+      // Se já temos a empresa via token, usar ela. Senão, buscar pelo phoneNumberId
+      let empresa = empresaOverride;
+      if (!empresa) {
+        if (!phoneNumberId) continue;
+        empresa = await findCompanyByMetaPhoneId(phoneNumberId);
         if (!empresa) {
           console.warn(`[Webhook/Meta] phone_number_id "${phoneNumberId}" não encontrado no DB.`);
           continue;
         }
+      }
 
-        for (const msg of messages) {
-          // Ignorar status updates (delivered, read, etc.)
-          if (msg.type === 'status' || !msg.from) continue;
+      for (const msg of messages) {
+        if (msg.type === 'status' || !msg.from) continue;
 
-          const phone = normalizePhone(msg.from);
-          const contactInfo = contacts.find((c: any) => c.wa_id === msg.from);
-          const pushName = contactInfo?.profile?.name || '';
-          const messageText = msg.text?.body
-            || msg.image?.caption
-            || msg.video?.caption
-            || '';
+        const phone = normalizePhone(msg.from);
+        const contactInfo = contacts.find((c: any) => c.wa_id === msg.from);
+        const pushName = contactInfo?.profile?.name || '';
+        const messageText = msg.text?.body
+          || msg.image?.caption
+          || msg.video?.caption
+          || '';
 
-          await processIncomingMessage({
-            companyId: empresa.id,
-            ownerId: empresa.ownerId,
-            phone,
-            pushName,
-            messageText,
-            rawPayload: msg,
-            origin: 'WhatsApp Official'
-          });
-        }
+        await processIncomingMessage({
+          companyId: empresa.id,
+          ownerId: empresa.ownerId,
+          phone,
+          pushName,
+          messageText,
+          rawPayload: msg,
+          origin: 'WhatsApp Official'
+        });
       }
     }
+  }
+}
 
-    // Meta EXIGE resposta 200 rápida
+// Verificação (GET) — com token
+router.get('/meta/:token', (req, res) => handleMetaVerification(req, res));
+// Verificação (GET) — legada
+router.get('/meta', (req, res) => handleMetaVerification(req, res));
+
+// Receber mensagens (POST) — com token
+router.post('/meta/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const empresa = await prisma.empresa.findUnique({
+      where: { webhookToken: token },
+      select: { id: true, ownerId: true, name: true, isActive: true }
+    });
+
+    if (!empresa || !empresa.isActive) {
+      console.warn(`[Webhook/Meta] Token "${token}" não encontrado ou empresa inativa.`);
+      return res.sendStatus(200);
+    }
+
+    console.log(`[Webhook/Meta] ✅ Recebido para clínica "${empresa.name}" (ID: ${empresa.id})`);
+    await handleMetaMessages(req.body, empresa);
     return res.sendStatus(200);
+  } catch (error: any) {
+    console.error('[Webhook/Meta] Erro:', error);
+    return res.sendStatus(200);
+  }
+});
 
+// Receber mensagens (POST) — legada (busca por phone_number_id)
+router.post('/meta', async (req, res) => {
+  try {
+    await handleMetaMessages(req.body);
+    return res.sendStatus(200);
   } catch (error: any) {
     console.error('[Webhook/Meta] Erro:', error);
     return res.sendStatus(200);
