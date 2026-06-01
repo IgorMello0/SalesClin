@@ -3,6 +3,8 @@ import { prisma } from '../prisma.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
+import fs from 'fs'
+import path from 'path'
 
 export const router = Router()
 
@@ -35,7 +37,7 @@ router.post('/google', async (req, res) => {
       return res.status(401).json(createErrorResponse('Token do Google inválido ou expirado', 401))
     }
 
-    if (!payload?.email) {
+    if (!payload || !payload.email) {
       return res.status(401).json(createErrorResponse('Não foi possível obter o e-mail da conta Google', 401))
     }
 
@@ -49,6 +51,21 @@ router.post('/google', async (req, res) => {
       include: { company: true, ownedCompanies: true }
     })
 
+    if (professional) {
+      // Se achou pelo googleId, verificar se a foto física local no disco existe. Se não existir, atualizar para a foto do Google!
+      let photoToUse = professional.photoUrl
+      if (photoToUse && photoToUse.startsWith('/uploads/')) {
+        const fullPath = path.join(process.cwd(), photoToUse)
+        if (!fs.existsSync(fullPath)) {
+          professional = await prisma.professional.update({
+            where: { id: professional.id },
+            data: { photoUrl: picture || null },
+            include: { company: true, ownedCompanies: true }
+          })
+        }
+      }
+    }
+
     // ── 2. Se não achou pelo googleId, tentar pelo e-mail ──
     if (!professional) {
       professional = await prisma.professional.findUnique({
@@ -56,14 +73,24 @@ router.post('/google', async (req, res) => {
         include: { company: true, ownedCompanies: true }
       })
 
-      // Se achou pelo e-mail, vincular o googleId e a foto se não tiver nenhuma
+      // Se achou pelo e-mail, vincular o googleId e a foto
       if (professional) {
+        let photoToUse = professional.photoUrl
+        if (photoToUse && photoToUse.startsWith('/uploads/')) {
+          const fullPath = path.join(process.cwd(), photoToUse)
+          if (!fs.existsSync(fullPath)) {
+            photoToUse = picture || null
+          }
+        } else if (!photoToUse) {
+          photoToUse = picture || null
+        }
+
         professional = await prisma.professional.update({
           where: { id: professional.id },
           data: { 
             googleId, 
             authProvider: professional.authProvider || 'local',
-            photoUrl: professional.photoUrl || picture || null
+            photoUrl: photoToUse
           },
           include: { company: true, ownedCompanies: true }
         })

@@ -15,8 +15,15 @@ function normalizePhone(raw: string): string {
 
 /** Find the company that owns a given Evolution instance name */
 async function findCompanyByInstance(instance: string) {
+  const trimmed = instance.trim();
   return prisma.empresa.findFirst({
-    where: { evolutionInstance: instance, isActive: true },
+    where: { 
+      evolutionInstance: {
+        equals: trimmed,
+        mode: 'insensitive'
+      },
+      isActive: true 
+    },
     select: { id: true, ownerId: true, name: true }
   });
 }
