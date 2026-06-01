@@ -2,28 +2,11 @@ import { Router } from 'express'
 import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import multer from 'multer'
-import path from 'path'
-import fs from 'fs'
 
 export const router = Router()
 
-// Configurar storage do multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), 'uploads')
-    // Criar diretório se não existir
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true })
-    }
-    cb(null, uploadDir)
-  },
-  filename: (req, file, cb) => {
-    // Gerar nome único para o arquivo
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    const ext = path.extname(file.originalname)
-    cb(null, `image-${uniqueSuffix}${ext}`)
-  }
-})
+// Configurar storage na memória do multer (essencial para ambientes serverless como Vercel que são Read-Only)
+const storage = multer.memoryStorage()
 
 // Filtro para aceitar apenas imagens
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
@@ -38,7 +21,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 15 * 1024 * 1024 // 15MB
+    fileSize: 10 * 1024 * 1024 // Limitar a 10MB para Base64 eficiente
   }
 })
 
@@ -48,12 +31,14 @@ router.post('/', auth(), upload.single('image'), (req, res) => {
       return res.status(400).json(createErrorResponse('Nenhuma imagem foi enviada', 400))
     }
 
-    // Retornar URL da imagem
-    const imageUrl = `/uploads/${req.file.filename}`
+    // Converter buffer da imagem para Base64 Data URL
+    const b64 = req.file.buffer.toString('base64')
+    const mimeType = req.file.mimetype
+    const imageUrl = `data:${mimeType};base64,${b64}`
     
     res.json(createSuccessResponse({
       url: imageUrl,
-      filename: req.file.filename,
+      filename: req.file.originalname,
       originalName: req.file.originalname,
       size: req.file.size
     }))
