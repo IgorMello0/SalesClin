@@ -306,6 +306,9 @@ export const empresasApi = {
   create: async (data: any) => apiRequest<any>('/empresas', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) => apiRequest<any>(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/empresas/${id}`, { method: 'DELETE' }),
+  getWhatsappStatus: async () => apiRequest<any>('/empresas/my-company/whatsapp/status'),
+  disconnectWhatsapp: async () => apiRequest<any>('/empresas/my-company/whatsapp/disconnect', { method: 'POST' }),
+  restartWhatsapp: async () => apiRequest<any>('/empresas/my-company/whatsapp/restart', { method: 'POST' }),
 }
 
 // Configuração de Funis
@@ -415,4 +418,25 @@ export const campaignsApi = {
     apiRequest<any>(`/campaigns/${id}/send`, { method: 'POST' }),
   getProgress: async (id: number) =>
     apiRequest<any>(`/campaigns/${id}/progress`),
+  uploadMedia: async (file: File): Promise<ApiResponse<{ url: string; filename: string }>> => {
+    const token = localStorage.getItem('token')
+    const activeCompanyId = localStorage.getItem('activeCompanyId')
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${API_BASE_URL}/upload/campaign-media`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...(activeCompanyId && { 'X-Company-Id': activeCompanyId }),
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      throw new Error('Falha no upload do arquivo')
+    }
+
+    return response.json()
+  }
 }

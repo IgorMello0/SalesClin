@@ -89,10 +89,17 @@ router.get('/', auth(), async (req, res) => {
 
     // Se não for rota da equipe, restringe às tarefas atribuídas ou criadas pelo usuário
     if (team !== 'true') {
-      where.OR = [
-        { assignedToId: professionalId },
-        { createdById: professionalId }
-      ]
+      if (req.user?.type === 'usuario') {
+        where.OR = [
+          { assignedToUserId: professionalId },
+          { createdByUserId: professionalId }
+        ]
+      } else {
+        where.OR = [
+          { assignedToId: professionalId },
+          { createdById: professionalId }
+        ]
+      }
     }
 
     // Filtro por Status (pendente, em andamento, concluído)
@@ -142,8 +149,14 @@ router.get('/', auth(), async (req, res) => {
         assignedTo: {
           select: { id: true, name: true, email: true, phone: true, photoUrl: true }
         },
+        assignedToUser: {
+          select: { id: true, name: true, email: true }
+        },
         createdBy: {
           select: { id: true, name: true, email: true, photoUrl: true }
+        },
+        createdByUser: {
+          select: { id: true, name: true, email: true }
         },
         client: {
           select: { id: true, name: true, email: true, phone: true }
@@ -158,7 +171,18 @@ router.get('/', auth(), async (req, res) => {
       ]
     })
 
-    res.json(createSuccessResponse(tasks))
+    // Normalizar a resposta das tarefas para unificar assignedTo e createdBy
+    const mappedTasks = tasks.map(t => {
+      const assigned = t.assignedTo || (t.assignedToUser ? { ...t.assignedToUser, isUser: true } : null);
+      const creator = t.createdBy || (t.createdByUser ? { ...t.createdByUser, isUser: true } : null);
+      return {
+        ...t,
+        assignedTo: assigned,
+        createdBy: creator
+      };
+    });
+
+    res.json(createSuccessResponse(mappedTasks))
   } catch (error: any) {
     console.error('[Tasks] Erro ao buscar tarefas:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar tarefas', 500))
@@ -170,7 +194,7 @@ router.post('/', auth(), async (req, res) => {
   try {
     const creatorId = req.user!.id
     const companyId = req.user!.companyId
-    const { title, description, priority, dueDate, assignedToId, clientId, leadId, isRecurring, recurrenceRule } = req.body
+    const { title, description, priority, dueDate, assignedToId, assigneeType, clientId, leadId, isRecurring, recurrenceRule } = req.body
 
     if (!title || !dueDate || !assignedToId) {
       return res.status(400).json(createErrorResponse('Título, data de vencimento e responsável são obrigatórios.', 400))
@@ -180,48 +204,87 @@ router.post('/', auth(), async (req, res) => {
       return res.status(400).json(createErrorResponse('Clínica não definida', 400))
     }
 
+    const isAssigneeUser = assigneeType === 'user';
+    const isCreatorUser = req.user!.type === 'usuario';
+
+    const data: any = {
+      title,
+      description,
+      status: 'pending',
+      priority: priority || 'medium',
+      dueDate: new Date(dueDate),
+      companyId,
+      clientId: clientId ? Number(clientId) : null,
+      leadId: leadId ? Number(leadId) : null,
+      isRecurring: !!isRecurring,
+      recurrenceRule: isRecurring ? (recurrenceRule || 'daily') : null
+    }
+
+    if (isAssigneeUser) {
+      data.assignedToUserId = Number(assignedToId);
+    } else {
+      data.assignedToId = Number(assignedToId);
+    }
+
+    if (isCreatorUser) {
+      data.createdByUserId = creatorId;
+    } else {
+      data.createdById = creatorId;
+    }
+
     const task = await prisma.task.create({
-      data: {
-        title,
-        description,
-        status: 'pending',
-        priority: priority || 'medium',
-        dueDate: new Date(dueDate),
-        assignedToId: Number(assignedToId),
-        createdById: creatorId,
-        companyId,
-        clientId: clientId ? Number(clientId) : null,
-        leadId: leadId ? Number(leadId) : null,
-        isRecurring: !!isRecurring,
-        recurrenceRule: isRecurring ? (recurrenceRule || 'daily') : null
-      },
+      data,
       include: {
         assignedTo: true,
+        assignedToUser: true,
         createdBy: true,
+        createdByUser: true,
         company: true
       }
     })
 
     // Se foi atribuído a outra pessoa, dispara notificação no sininho
-    if (task.assignedToId !== creatorId) {
+    const isAssignedToSelf = isAssigneeUser 
+      ? (isCreatorUser && task.assignedToUserId === creatorId) 
+      : (!isCreatorUser && task.assignedToId === creatorId);
+
+    if (!isAssignedToSelf) {
+      const creatorName = isCreatorUser ? task.createdByUser?.name : task.createdBy?.name;
+      
+      const notificationData: any = {
+        title: 'Nova tarefa atribuída',
+        content: `${creatorName || 'Alguém'} delegou uma tarefa a você: "${task.title}"`,
+        type: 'task_assigned',
+        companyId: task.companyId,
+        taskId: task.id
+      };
+
+      if (isAssigneeUser) {
+        notificationData.recipientUserId = task.assignedToUserId;
+      } else {
+        notificationData.recipientId = task.assignedToId;
+      }
+
       await prisma.notification.create({
-        data: {
-          title: 'Nova tarefa atribuída',
-          content: `${task.createdBy.name} delegou uma tarefa a você: "${task.title}"`,
-          type: 'task_assigned',
-          recipientId: task.assignedToId,
-          companyId: task.companyId,
-          taskId: task.id
-        }
+        data: notificationData
       })
 
       // Dispara alerta se for tarefa URGENTE
       if (task.priority === 'urgent') {
-        await fnAlertUrgentTask(task, task.assignedTo, task.createdBy.name, task.company)
+        const assigneeInfo = isAssigneeUser ? task.assignedToUser : task.assignedTo;
+        if (assigneeInfo) {
+          await fnAlertUrgentTask(task, assigneeInfo, creatorName || 'Alguém', task.company)
+        }
       }
     }
 
-    res.status(201).json(createSuccessResponse(task))
+    const mappedTask = {
+      ...task,
+      assignedTo: task.assignedTo || (task.assignedToUser ? { ...task.assignedToUser, isUser: true } : null),
+      createdBy: task.createdBy || (task.createdByUser ? { ...task.createdByUser, isUser: true } : null)
+    };
+
+    res.status(201).json(createSuccessResponse(mappedTask))
   } catch (error: any) {
     console.error('[Tasks] Erro ao criar tarefa:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar tarefa', 500))
@@ -233,11 +296,11 @@ router.put('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const companyId = req.user!.companyId
-    const { title, description, status, priority, dueDate, assignedToId, clientId, leadId, isRecurring, recurrenceRule } = req.body
+    const { title, description, status, priority, dueDate, assignedToId, assigneeType, clientId, leadId, isRecurring, recurrenceRule } = req.body
 
     const existingTask = await prisma.task.findUnique({
       where: { id },
-      include: { assignedTo: true, createdBy: true, company: true }
+      include: { assignedTo: true, assignedToUser: true, createdBy: true, createdByUser: true, company: true }
     })
 
     if (!existingTask) {
@@ -247,38 +310,67 @@ router.put('/:id', auth(), async (req, res) => {
     // Se status mudou para concluída e a tarefa é recorrente
     const isNowCompleted = status === 'completed' && existingTask.status !== 'completed'
 
+    const isAssigneeUser = assigneeType === 'user' || req.body.assignedToUserId !== undefined;
+
+    const data: any = {
+      title,
+      description,
+      status,
+      priority,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      clientId: clientId !== undefined ? (clientId ? Number(clientId) : null) : undefined,
+      leadId: leadId !== undefined ? (leadId ? Number(leadId) : null) : undefined,
+      isRecurring: isRecurring !== undefined ? !!isRecurring : undefined,
+      recurrenceRule: isRecurring ? (recurrenceRule || 'daily') : (isRecurring === false ? null : undefined)
+    }
+
+    if (assignedToId !== undefined) {
+      if (isAssigneeUser) {
+        data.assignedToUserId = Number(assignedToId);
+        data.assignedToId = null;
+      } else {
+        data.assignedToId = Number(assignedToId);
+        data.assignedToUserId = null;
+      }
+    }
+
     const updated = await prisma.task.update({
       where: { id },
-      data: {
-        title,
-        description,
-        status,
-        priority,
-        dueDate: dueDate ? new Date(dueDate) : undefined,
-        assignedToId: assignedToId ? Number(assignedToId) : undefined,
-        clientId: clientId !== undefined ? (clientId ? Number(clientId) : null) : undefined,
-        leadId: leadId !== undefined ? (leadId ? Number(leadId) : null) : undefined,
-        isRecurring: isRecurring !== undefined ? !!isRecurring : undefined,
-        recurrenceRule: isRecurring ? (recurrenceRule || 'daily') : (isRecurring === false ? null : undefined)
-      },
+      data,
       include: {
         assignedTo: true,
+        assignedToUser: true,
         createdBy: true,
+        createdByUser: true,
         company: true
       }
     })
 
     // Notificar criador se outra pessoa concluiu a tarefa dele
-    if (isNowCompleted && updated.createdById !== req.user!.id) {
+    const isCreatorUser = updated.createdByUserId ? true : false;
+    const isUpdaterSelf = updated.createdByUserId 
+      ? (req.user!.type === 'usuario' && updated.createdByUserId === req.user!.id)
+      : (req.user!.type === 'profissional' && updated.createdById === req.user!.id);
+
+    if (isNowCompleted && !isUpdaterSelf) {
+      const updaterName = req.user!.type === 'usuario' ? updated.assignedToUser?.name : updated.assignedTo?.name;
+      
+      const notificationData: any = {
+        title: 'Tarefa concluída',
+        content: `${updaterName || 'Alguém'} concluiu a tarefa: "${updated.title}"`,
+        type: 'task_completed',
+        companyId: updated.companyId,
+        taskId: updated.id
+      };
+
+      if (isCreatorUser) {
+        notificationData.recipientUserId = updated.createdByUserId;
+      } else {
+        notificationData.recipientId = updated.createdById;
+      }
+
       await prisma.notification.create({
-        data: {
-          title: 'Tarefa concluída',
-          content: `${updated.assignedTo.name} concluiu a tarefa: "${updated.title}"`,
-          type: 'task_completed',
-          recipientId: updated.createdById,
-          companyId: updated.companyId,
-          taskId: updated.id
-        }
+        data: notificationData
       })
     }
 
@@ -287,44 +379,75 @@ router.put('/:id', auth(), async (req, res) => {
       const nextDate = getNextDueDate(updated.dueDate, updated.recurrenceRule)
       console.log(`[Tasks] Tarefa recorrente finalizada. Criando próxima recorrência para: ${nextDate.toISOString()}`)
 
+      const nextTaskData: any = {
+        title: updated.title,
+        description: updated.description,
+        status: 'pending',
+        priority: updated.priority,
+        dueDate: nextDate,
+        companyId: updated.companyId,
+        clientId: updated.clientId,
+        leadId: updated.leadId,
+        isRecurring: true,
+        recurrenceRule: updated.recurrenceRule,
+        parentTaskId: updated.parentTaskId || updated.id // Link para o pai raiz
+      };
+
+      if (updated.assignedToUserId) {
+        nextTaskData.assignedToUserId = updated.assignedToUserId;
+      } else {
+        nextTaskData.assignedToId = updated.assignedToId;
+      }
+
+      if (updated.createdByUserId) {
+        nextTaskData.createdByUserId = updated.createdByUserId;
+      } else {
+        nextTaskData.createdById = updated.createdById;
+      }
+
       const nextTask = await prisma.task.create({
-        data: {
-          title: updated.title,
-          description: updated.description,
-          status: 'pending',
-          priority: updated.priority,
-          dueDate: nextDate,
-          assignedToId: updated.assignedToId,
-          createdById: updated.createdById,
-          companyId: updated.companyId,
-          clientId: updated.clientId,
-          leadId: updated.leadId,
-          isRecurring: true,
-          recurrenceRule: updated.recurrenceRule,
-          parentTaskId: updated.parentTaskId || updated.id // Link para o pai raiz
-        },
+        data: nextTaskData,
         include: {
           assignedTo: true,
-          createdBy: true
+          assignedToUser: true,
+          createdBy: true,
+          createdByUser: true
         }
       })
 
       // Notificar o responsável da próxima tarefa agendada
-      if (nextTask.assignedToId !== req.user!.id) {
+      const isNextAssignedToSelf = nextTask.assignedToUserId 
+        ? (req.user!.type === 'usuario' && nextTask.assignedToUserId === req.user!.id)
+        : (req.user!.type === 'profissional' && nextTask.assignedToId === req.user!.id);
+
+      if (!isNextAssignedToSelf) {
+        const nextNotificationData: any = {
+          title: 'Nova recorrência agendada',
+          content: `Uma tarefa recorrente foi reiniciada para ${nextDate.toLocaleDateString('pt-BR')}: "${nextTask.title}"`,
+          type: 'task_assigned',
+          companyId: nextTask.companyId,
+          taskId: nextTask.id
+        };
+
+        if (nextTask.assignedToUserId) {
+          nextNotificationData.recipientUserId = nextTask.assignedToUserId;
+        } else {
+          nextNotificationData.recipientId = nextTask.assignedToId;
+        }
+
         await prisma.notification.create({
-          data: {
-            title: 'Nova recorrência agendada',
-            content: `Uma tarefa recorrente foi reiniciada para ${nextDate.toLocaleDateString('pt-BR')}: "${nextTask.title}"`,
-            type: 'task_assigned',
-            recipientId: nextTask.assignedToId,
-            companyId: nextTask.companyId,
-            taskId: nextTask.id
-          }
+          data: nextNotificationData
         })
       }
     }
 
-    res.json(createSuccessResponse(updated))
+    const mappedUpdated = {
+      ...updated,
+      assignedTo: updated.assignedTo || (updated.assignedToUser ? { ...updated.assignedToUser, isUser: true } : null),
+      createdBy: updated.createdBy || (updated.createdByUser ? { ...updated.createdByUser, isUser: true } : null)
+    };
+
+    res.json(createSuccessResponse(mappedUpdated))
   } catch (error: any) {
     console.error('[Tasks] Erro ao atualizar tarefa:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar tarefa', 500))

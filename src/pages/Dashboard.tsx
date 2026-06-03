@@ -314,7 +314,7 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Total de Leads</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Total de Leads</p>
             <h3 className="stats-value">{counters.leads}</h3>
           </div>
           
@@ -329,7 +329,7 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Avaliação Agendada</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Avaliação Agendada</p>
             <h3 className="stats-value">{counters.agendamentos}</h3>
           </div>
           
@@ -344,7 +344,7 @@ const Dashboard = () => {
             
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Avaliação Comparecida</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Avaliação Comparecida</p>
             <h3 className="stats-value">{counters.comparada}</h3>
           </div>
           
@@ -358,7 +358,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Propostas Geradas</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Propostas Geradas</p>
             <h3 className="stats-value text-2xl font-black text-primary">{formatCurrency(counters.faturamento)}</h3>
             <p className="text-slate-400 text-xs font-bold mt-1">
               {counters.oportunidades} {counters.oportunidades === 1 ? 'proposta criada' : 'propostas criadas'}
@@ -377,7 +377,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Faturamento Realizado</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Faturamento Realizado</p>
             <h4 className="stats-value text-2xl font-black text-emerald-600">{formatCurrency(counters.receita)}</h4>
             <p className="text-slate-400 text-xs font-bold mt-1">
               {counters.contratos} {counters.contratos === 1 ? 'contrato fechado' : 'contratos fechados'}
@@ -393,7 +393,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Ticket (Orçado)</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Ticket (Orçado)</p>
             <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketOrcado)}</h4>
             <p className="text-slate-400 text-[11px] font-medium mt-1">média por proposta</p>
           </div>
@@ -407,7 +407,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Ticket (Fechado)</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Ticket (Fechado)</p>
             <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketFechado)}</h4>
             <p className="text-slate-400 text-[11px] font-medium mt-1">média por fechamento</p>
           </div>
@@ -421,7 +421,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Parc. Médio Boleto</p>
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Parc. Médio Boleto</p>
             <h4 className="stats-value text-xl font-bold text-accent">{counters.parcelamentoMedioBoleto}x</h4>
             <p className="text-slate-400 text-[11px] font-medium mt-1">parcelas por boleto</p>
           </div>
@@ -451,7 +451,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">
               {conversionMode === 'percent' ? 'Conversão (Qtd.)' : 'Conversão (Financ.)'}
             </p>
             <div className="flex items-baseline gap-2">

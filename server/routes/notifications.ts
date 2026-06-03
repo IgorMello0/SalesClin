@@ -10,16 +10,21 @@ router.get('/', auth(), async (req, res) => {
   try {
     const recipientId = req.user!.id
     const companyId = req.user!.companyId
+    const isUser = req.user!.type === 'usuario'
 
     if (!companyId) {
       return res.status(400).json(createErrorResponse('Clínica não definida', 400))
     }
 
+    const where: any = { companyId }
+    if (isUser) {
+      where.recipientUserId = recipientId
+    } else {
+      where.recipientId = recipientId
+    }
+
     const notifications = await prisma.notification.findMany({
-      where: {
-        recipientId,
-        companyId
-      },
+      where,
       orderBy: {
         createdAt: 'desc'
       },
@@ -38,17 +43,21 @@ router.put('/read-all', auth(), async (req, res) => {
   try {
     const recipientId = req.user!.id
     const companyId = req.user!.companyId
+    const isUser = req.user!.type === 'usuario'
 
     if (!companyId) {
       return res.status(400).json(createErrorResponse('Clínica não definida', 400))
     }
 
+    const where: any = { companyId, read: false }
+    if (isUser) {
+      where.recipientUserId = recipientId
+    } else {
+      where.recipientId = recipientId
+    }
+
     await prisma.notification.updateMany({
-      where: {
-        recipientId,
-        companyId,
-        read: false
-      },
+      where,
       data: {
         read: true
       }
@@ -66,6 +75,7 @@ router.put('/:id/read', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const recipientId = req.user!.id
+    const isUser = req.user!.type === 'usuario'
 
     const notification = await prisma.notification.findUnique({
       where: { id }
@@ -75,7 +85,11 @@ router.put('/:id/read', auth(), async (req, res) => {
       return res.status(404).json(createErrorResponse('Notificação não encontrada', 404))
     }
 
-    if (notification.recipientId !== recipientId) {
+    const isOwnNotification = isUser 
+      ? notification.recipientUserId === recipientId
+      : notification.recipientId === recipientId;
+
+    if (!isOwnNotification) {
       return res.status(403).json(createErrorResponse('Acesso negado', 403))
     }
 

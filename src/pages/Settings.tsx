@@ -1336,6 +1336,211 @@ const AparenciaView = () => {
   );
 };
 
+
+// Gerenciador de conexão WhatsApp integrado para Evolution API
+const WhatsAppStatusManager = () => {
+  const { toast } = useToast();
+  const [statusInfo, setStatusInfo] = useState<{
+    status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' | 'ERROR' | 'LOADING';
+    qrcode?: string | null;
+    pairingCode?: string | null;
+    message?: string;
+  }>({ status: 'LOADING' });
+
+  const fetchStatus = async () => {
+    setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
+    try {
+      const res = await empresasApi.getWhatsappStatus();
+      if (res.success && res.data) {
+        setStatusInfo({
+          status: res.data.status,
+          qrcode: res.data.qrcode,
+          pairingCode: res.data.pairingCode
+        });
+      } else {
+        setStatusInfo({ status: 'ERROR', message: res.error?.message || 'Falha ao buscar status' });
+      }
+    } catch (e: any) {
+      setStatusInfo({ status: 'ERROR', message: e.message });
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Tem certeza que deseja desconectar o WhatsApp da clínica? Seu celular precisará escanear o QR Code novamente para reativar.')) return;
+    try {
+      setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
+      const res = await empresasApi.disconnectWhatsapp();
+      if (res.success) {
+        toast({ title: '🔌 WhatsApp Desconectado', description: 'Instância desconectada com sucesso.' });
+        fetchStatus();
+      } else {
+        throw new Error(res.error?.message || 'Erro ao desconectar');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+      fetchStatus();
+    }
+  };
+
+  const handleRestart = async () => {
+    try {
+      setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
+      const res = await empresasApi.restartWhatsapp();
+      if (res.success) {
+        toast({ title: '♻️ Instância Reiniciada', description: 'Aguarde alguns segundos e atualize o status.' });
+        setTimeout(fetchStatus, 4000);
+      } else {
+        throw new Error(res.error?.message || 'Erro ao reiniciar');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+      fetchStatus();
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+  }, []);
+
+  if (statusInfo.status === 'NOT_CONFIGURED') {
+    return null;
+  }
+
+  return (
+    <Card className="border border-emerald-500/20 bg-emerald-50/5 dark:bg-slate-900/40 backdrop-blur-md shadow-lg rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
+      <CardHeader className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl text-white shadow-md shadow-emerald-500/20">
+            <span className="material-symbols-outlined block text-xl">qr_code_scanner</span>
+          </div>
+          <div>
+            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100">Status da Conexão WhatsApp</CardTitle>
+            <CardDescription className="text-xs">Monitore a conexão e escaneie o QR Code diretamente do CRM</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6 space-y-6">
+        {statusInfo.status === 'LOADING' && (
+          <div className="flex flex-col items-center justify-center py-8 space-y-3">
+            <span className="material-symbols-outlined animate-spin text-3xl text-emerald-500">progress_activity</span>
+            <span className="text-xs text-muted-foreground">Comunicando com a sua VPS da Evolution API...</span>
+          </div>
+        )}
+
+        {statusInfo.status === 'CONNECTED' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-2xl">
+              <span className="relative flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">WhatsApp Conectado e Ativo</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 leading-relaxed">Sua clínica está integrada. Leads e mensagens automáticas estão funcionando normalmente.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5 pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={fetchStatus} className="flex-1 min-w-[140px] border-emerald-500/20 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400 font-semibold transition-all">
+                <span className="material-symbols-outlined text-sm mr-2">refresh</span>
+                Atualizar Status
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleRestart} className="flex-1 min-w-[140px] hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold transition-all">
+                <span className="material-symbols-outlined text-sm mr-2">restart_alt</span>
+                Reiniciar Conexão
+              </Button>
+              <Button type="button" variant="destructive" size="sm" onClick={handleDisconnect} className="flex-1 min-w-[140px] font-semibold transition-all">
+                <span className="material-symbols-outlined text-sm mr-2">logout</span>
+                Desconectar Número
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {statusInfo.status === 'DISCONNECTED' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-850 rounded-2xl shadow-inner min-h-[220px]">
+              {statusInfo.qrcode ? (
+                <div className="space-y-2 flex flex-col items-center">
+                  <img 
+                    src={statusInfo.qrcode.startsWith('data:') ? statusInfo.qrcode : `data:image/png;base64,${statusInfo.qrcode}`} 
+                    alt="WhatsApp QR Code" 
+                    className="w-44 h-44 rounded-lg border border-slate-100 bg-white p-1 shadow-sm"
+                  />
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold animate-pulse flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    QR Code pronto para escaneamento
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-4 space-y-2">
+                  <span className="material-symbols-outlined text-3xl text-amber-500 font-light">qr_code_2</span>
+                  <p className="text-xs text-muted-foreground max-w-[180px]">QR Code expirado ou não gerado. Clique no botão de atualizar abaixo.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 rounded-2xl space-y-1.5">
+                <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm">info</span>
+                  Aguardando Escaneamento
+                </p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                  Abra o WhatsApp no celular que deseja conectar, acesse <strong>Aparelhos Conectados &gt; Conectar um Aparelho</strong> e escaneie o QR Code ao lado.
+                </p>
+              </div>
+
+              {statusInfo.pairingCode && (
+                <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-xl flex items-center justify-between text-xs border border-slate-200/40 dark:border-slate-800">
+                  <span className="text-muted-foreground">Código de pareamento alternativo:</span>
+                  <strong className="font-mono text-sm font-extrabold tracking-wider bg-white dark:bg-slate-900 px-2.5 py-1 rounded border shadow-sm text-slate-800 dark:text-slate-100">{statusInfo.pairingCode}</strong>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 pt-1">
+                <Button type="button" onClick={fetchStatus} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-md shadow-emerald-500/10">
+                  <span className="material-symbols-outlined text-sm mr-2">sync</span>
+                  Gerar / Atualizar QR Code
+                </Button>
+                <Button type="button" variant="outline" onClick={handleRestart} className="w-full font-semibold border-slate-200 hover:bg-slate-50 transition-all text-slate-600 dark:text-slate-300">
+                  <span className="material-symbols-outlined text-sm mr-2">restart_alt</span>
+                  Reiniciar Instância Evolution
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {statusInfo.status === 'ERROR' && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
+              <span className="material-symbols-outlined text-rose-500 mt-0.5">error_outline</span>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-rose-800 dark:text-rose-400">Servidor Inacessível</p>
+                <p className="text-xs text-rose-600 dark:text-rose-500 leading-relaxed">
+                  {statusInfo.message || 'Falha ao se comunicar com a Evolution API. Certifique-se de que a instância e a URL estão corretas.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5 pt-2">
+              <Button type="button" onClick={fetchStatus} className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold">
+                <span className="material-symbols-outlined text-sm mr-2">cached</span>
+                Tentar Conectar
+              </Button>
+              <Button type="button" variant="outline" onClick={handleRestart} className="flex-1 border-rose-200 hover:bg-slate-50 text-slate-600 dark:text-slate-300 font-semibold">
+                <span className="material-symbols-outlined text-sm mr-2">restart_alt</span>
+                Forçar Reinício (VPS)
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const WhatsAppView = () => {
   const { toast } = useToast();
   const { professional } = useAuth();
@@ -1412,6 +1617,10 @@ const WhatsAppView = () => {
           Configure as credenciais para permitir disparos em massa automáticos e conversas com clientes. Suporta Evolution API ou API Oficial da Meta (Cloud API).
         </div>
       </div>
+
+      {data.whatsappProvider === 'evolution' && data.evolutionApiUrl && data.apiKey && data.evolutionInstance && (
+        <WhatsAppStatusManager key={`${data.evolutionApiUrl}-${data.evolutionInstance}`} />
+      )}
 
       <div className="space-y-6">
         <div className="space-y-3">

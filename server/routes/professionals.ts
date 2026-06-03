@@ -156,13 +156,7 @@ router.get('/', auth(false), async (req, res) => {
   
   const where: any = {}
   
-  if (req.user?.type === 'profissional') {
-    const currentProf = await prisma.professional.findUnique({ where: { id: req.user.id } })
-    if (currentProf?.companyId) {
-      where.companyId = currentProf.companyId
-    }
-  } else if (req.user?.type === 'usuario') {
-    // Membros da equipe só veem os profissionais da sua própria empresa
+  if (req.user?.companyId) {
     where.companyId = req.user.companyId
   }
 

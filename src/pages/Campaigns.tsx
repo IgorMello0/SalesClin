@@ -25,6 +25,10 @@ const VARIABLES = [
   { key: '{{nome}}', label: 'Nome completo' },
   { key: '{{primeiro_nome}}', label: 'Primeiro nome' },
   { key: '{{telefone}}', label: 'Telefone' },
+  { key: '{{proxima_data}}', label: 'Data da próxima consulta' },
+  { key: '{{proxima_hora}}', label: 'Hora da próxima consulta' },
+  { key: '{{ultima_data}}', label: 'Data da última consulta' },
+  { key: '{{ultima_hora}}', label: 'Hora da última consulta' },
 ];
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: string }> = {
@@ -45,6 +49,7 @@ export default function Campaigns() {
   const [isCreating, setIsCreating] = useState(false);
   const [viewCampaign, setViewCampaign] = useState<any>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Create form state
   const [step, setStep] = useState(1);
@@ -57,6 +62,8 @@ export default function Campaigns() {
   // Media attachments
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | ''>('');
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [attachments, setAttachments] = useState<{ url: string; type: 'image' | 'video' | 'audio' }[]>([]);
 
   // Delay settings
   const [minDelay, setMinDelay] = useState(180);
@@ -156,6 +163,7 @@ export default function Campaigns() {
   const resetForm = () => {
     setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both');
     setMediaUrl(''); setMediaType(''); setMinDelay(180); setMaxDelay(200); setRandomize(false); setVariations([]); setNewVariation('');
+    setAttachments([]);
     setIsCreating(false);
   };
 
@@ -169,13 +177,30 @@ export default function Campaigns() {
     setIsSending(true);
     try {
       const audienceFilter = audienceType === 'by_tags' ? { tags: selectedTags, target: tagTarget } : undefined;
+      
+      let finalMediaUrl = null;
+      let finalMediaType = null;
+
+      if (attachments.length > 0) {
+        if (attachments.length === 1) {
+          finalMediaUrl = attachments[0].url;
+          finalMediaType = attachments[0].type;
+        } else {
+          finalMediaUrl = JSON.stringify(attachments);
+          finalMediaType = attachments[0].type;
+        }
+      } else if (mediaUrl.trim()) {
+        finalMediaUrl = mediaUrl.trim();
+        finalMediaType = mediaType || 'image';
+      }
+
       const res = await campaignsApi.create({ 
         name, 
         message, 
         audienceType, 
         audienceFilter,
-        mediaUrl: mediaUrl.trim() || null,
-        mediaType: mediaUrl.trim() ? mediaType : null,
+        mediaUrl: finalMediaUrl,
+        mediaType: finalMediaType,
         minDelay: Number(minDelay),
         maxDelay: Number(maxDelay),
         randomize,
@@ -261,8 +286,17 @@ export default function Campaigns() {
 
       {/* Campaigns List */}
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100">
+        <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <h2 className="font-bold text-primary text-sm uppercase tracking-wider">Histórico de Campanhas</h2>
+          <div className="relative w-full sm:w-72">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+            <Input 
+              placeholder="Buscar campanha..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="pl-9 h-9 rounded-xl text-xs bg-slate-50/50 focus:bg-white transition-colors"
+            />
+          </div>
         </div>
         {isLoading ? (
           <div className="p-12 text-center text-muted-foreground"><span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span><p className="mt-2 text-sm">Carregando...</p></div>
@@ -272,55 +306,71 @@ export default function Campaigns() {
             <p className="mt-3 text-muted-foreground font-medium">Nenhuma campanha criada ainda</p>
             <p className="text-xs text-muted-foreground mt-1">Crie sua primeira campanha de mensagens em massa!</p>
           </div>
+        ) : campaigns.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 ? (
+          <div className="p-12 text-center">
+            <span className="material-symbols-outlined text-5xl text-slate-200">search_off</span>
+            <p className="mt-3 text-muted-foreground font-medium">Nenhuma campanha encontrada</p>
+            <p className="text-xs text-muted-foreground mt-1">Tente buscar por outro termo ou nome.</p>
+          </div>
         ) : (
           <div className="divide-y divide-slate-50">
-            {campaigns.map((c) => {
-              const st = STATUS_MAP[c.status] || STATUS_MAP.draft;
-              return (
-                <div key={c.id} className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition-colors group">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${st.color}`}>
-                    <span className="material-symbols-outlined text-xl">{st.icon}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-primary text-sm truncate">{c.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {c.totalRecipients} destinatários • {safeFormat(c.createdAt)}
-                    </p>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-2">
-                    {c.status === 'sending' && (
-                      <div className="flex items-center gap-2 mr-2">
-                        <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-secondary rounded-full transition-all" style={{ width: `${c.totalRecipients ? (c.sentCount / c.totalRecipients) * 100 : 0}%` }} />
+            {campaigns
+              .filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+              .map((c) => {
+                const st = STATUS_MAP[c.status] || STATUS_MAP.draft;
+                return (
+                  <div key={c.id} className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition-colors group">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${st.color}`}>
+                      <span className="material-symbols-outlined text-xl">{st.icon}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-primary text-sm truncate">{c.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {c.totalRecipients} destinatários • {safeFormat(c.createdAt)}
+                      </p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2">
+                      {c.status === 'sending' && (
+                        <div className="flex items-center gap-2 mr-2">
+                          <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-secondary rounded-full transition-all" style={{ width: `${c.totalRecipients ? (c.sentCount / c.totalRecipients) * 100 : 0}%` }} />
+                          </div>
+                          <span className="text-xs text-muted-foreground font-mono">{c.sentCount}/{c.totalRecipients}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground font-mono">{c.sentCount}/{c.totalRecipients}</span>
-                      </div>
-                    )}
-                    {c.status === 'completed' && (
-                      <span className="text-xs text-muted-foreground font-mono mr-2">
-                        ✅ {c.sentCount} • ❌ {c.failedCount}
-                      </span>
-                    )}
-                    <Badge className={`${st.color} border-0 text-[10px] font-bold`}>{st.label}</Badge>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => viewDetails(c.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 transition-colors" title="Detalhes">
-                      <span className="material-symbols-outlined text-lg">visibility</span>
-                    </button>
-                    {c.status === 'draft' && (
-                      <>
+                      )}
+                      {c.status === 'completed' && (
+                        <span className="text-xs text-muted-foreground font-mono mr-2">
+                          ✅ {c.sentCount} • ❌ {c.failedCount}
+                        </span>
+                      )}
+                      <Badge className={`${st.color} border-0 text-[10px] font-bold`}>{st.label}</Badge>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => viewDetails(c.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-100 transition-colors" title="Detalhes">
+                        <span className="material-symbols-outlined text-lg">visibility</span>
+                      </button>
+                      {c.status === 'draft' && (
                         <button onClick={() => handleSend(c.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors" title="Enviar">
                           <span className="material-symbols-outlined text-lg">send</span>
                         </button>
-                        <button onClick={() => handleDelete(c.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Excluir">
+                      )}
+                      {c.status !== 'sending' && (
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Deseja realmente excluir a campanha "${c.name}"? Esta ação é irreversível.`)) {
+                              handleDelete(c.id);
+                            }
+                          }} 
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors" 
+                          title="Excluir"
+                        >
                           <span className="material-symbols-outlined text-lg">delete</span>
                         </button>
-                      </>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         )}
       </div>
@@ -465,25 +515,111 @@ export default function Campaigns() {
 
                 {/* Media Attachment section */}
                 <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-3">
-                  <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
-                    <span className="material-symbols-outlined text-base">attach_file</span>
-                    Anexar Mídia (Opcional)
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
+                      <span className="material-symbols-outlined text-base text-[#F97316]">attach_file</span>
+                      Anexar Mídias (Múltiplas Opcionais)
+                    </div>
+                    {attachments.length > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setAttachments([])}
+                        className="text-[10px] font-bold text-red-500 hover:underline uppercase"
+                      >
+                        Limpar Todos
+                      </button>
+                    )}
                   </div>
-                  <div>
-                    <Input 
-                      value={mediaUrl} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        setMediaUrl(val);
-                        if (val && !mediaType) setMediaType('image');
-                      }} 
-                      placeholder="URL do arquivo (ex: https://site.com/imagem.png)" 
-                      className="rounded-xl h-10 bg-white" 
-                    />
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Upload de Arquivo</label>
+                      <div className="relative">
+                        <input 
+                          type="file" 
+                          id="campaign-file-input"
+                          accept="image/*,audio/*,video/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setIsUploadingMedia(true);
+                            try {
+                              const res = await campaignsApi.uploadMedia(file);
+                              if (res.success && res.data) {
+                                let detectedType: 'image' | 'video' | 'audio' = 'image';
+                                if (file.type.startsWith('audio/')) {
+                                  detectedType = 'audio';
+                                } else if (file.type.startsWith('video/')) {
+                                  detectedType = 'video';
+                                }
+                                setAttachments(prev => [...prev, { url: res.data.url, type: detectedType }]);
+                                toast({ title: 'Upload concluído com sucesso!' });
+                              }
+                            } catch (err: any) {
+                              toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
+                            } finally {
+                              setIsUploadingMedia(false);
+                            }
+                          }}
+                          className="hidden"
+                          disabled={isUploadingMedia}
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => document.getElementById('campaign-file-input')?.click()}
+                          disabled={isUploadingMedia}
+                          className="w-full h-10 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-center gap-2"
+                        >
+                          {isUploadingMedia ? (
+                            <>
+                              <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-sm text-[#F97316]">cloud_upload</span>
+                              Selecionar Arquivo
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Ou cole uma URL pública</label>
+                      <div className="flex gap-1.5">
+                        <Input 
+                          value={mediaUrl} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setMediaUrl(val);
+                            if (val && !mediaType) setMediaType('image');
+                          }} 
+                          placeholder="Ex: https://site.com/foto.jpg" 
+                          className="rounded-xl h-10 bg-white" 
+                          disabled={isUploadingMedia}
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (mediaUrl.trim()) {
+                              setAttachments(prev => [...prev, { url: mediaUrl.trim(), type: mediaType || 'image' }]);
+                              setMediaUrl('');
+                              setMediaType('');
+                            }
+                          }}
+                          disabled={!mediaUrl.trim()}
+                          className="bg-primary hover:bg-primary/95 text-white h-10 rounded-xl px-3 font-bold"
+                        >
+                          <span className="material-symbols-outlined text-sm">add</span>
+                        </Button>
+                      </div>
+                    </div>
                   </div>
+
                   {mediaUrl.trim() !== '' && (
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-muted-foreground uppercase">Formato do Arquivo</label>
+                      <label className="block text-[10px] font-bold text-muted-foreground uppercase">Formato do Arquivo a adicionar</label>
                       <div className="flex gap-2">
                         {[
                           { value: 'image', label: '🖼️ Imagem' },
@@ -502,6 +638,45 @@ export default function Campaigns() {
                           >
                             {opt.label}
                           </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* List of currently attached media files */}
+                  {attachments.length > 0 && (
+                    <div className="space-y-1.5 pt-2">
+                      <label className="block text-[10px] font-bold text-muted-foreground uppercase">Arquivos Anexados ({attachments.length})</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {attachments.map((att, index) => (
+                          <div key={index} className="flex items-center justify-between bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {att.type === 'image' && (
+                                <img src={att.url.startsWith('/') ? (import.meta.env.VITE_API_URL || 'http://localhost:4000') + att.url : att.url} className="w-8 h-8 rounded object-cover border border-slate-100 flex-shrink-0" />
+                              )}
+                              {att.type === 'video' && (
+                                <span className="material-symbols-outlined text-amber-500 bg-amber-50 p-1.5 rounded text-sm">video_file</span>
+                              )}
+                              {att.type === 'audio' && (
+                                <span className="material-symbols-outlined text-blue-500 bg-blue-50 p-1.5 rounded text-sm">volume_up</span>
+                              )}
+                              <div className="truncate flex flex-col">
+                                <span className="text-[11px] text-slate-700 font-bold leading-none truncate max-w-[130px] sm:max-w-[160px]">
+                                  Anexo {index + 1}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground uppercase font-bold mt-0.5">
+                                  {att.type === 'image' ? 'Imagem' : att.type === 'video' ? 'Vídeo' : 'Áudio'}
+                                </span>
+                              </div>
+                            </div>
+                            <button 
+                              type="button" 
+                              onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== index))}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors flex-shrink-0"
+                            >
+                              <span className="material-symbols-outlined text-base">delete</span>
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -641,12 +816,26 @@ export default function Campaigns() {
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Destinatários</span><span className="font-bold text-primary">{previewRecipients} contatos</span></div>
                   
                   {/* Media confirmation */}
-                  {mediaUrl.trim() && (
+                  {attachments.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] text-muted-foreground font-bold uppercase block">Mídias Anexadas ({attachments.length}):</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 bg-white p-2.5 rounded-xl border border-slate-100">
+                        {attachments.map((att, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-700 min-w-0">
+                            <span className="material-symbols-outlined text-sm text-secondary">
+                              {att.type === 'image' ? 'image' : att.type === 'video' ? 'video_file' : 'volume_up'}
+                            </span>
+                            <span className="truncate max-w-[150px] font-medium">Anexo {idx + 1} ({att.type === 'image' ? 'Imagem' : att.type === 'video' ? 'Vídeo' : 'Áudio'})</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : mediaUrl.trim() ? (
                     <div className="flex justify-between text-sm bg-white p-2 rounded-lg border border-slate-100">
                       <span className="text-muted-foreground">Anexo de Mídia ({mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : 'Áudio'})</span>
                       <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-secondary underline truncate max-w-xs">{mediaUrl}</a>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Delay confirmation */}
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Intervalo de Envio</span><span className="font-bold text-primary">{minDelay}s a {maxDelay}s (aleatório)</span></div>
@@ -738,19 +927,49 @@ export default function Campaigns() {
                 </div>
 
                 {/* Render media attachments if any */}
-                {viewCampaign.mediaUrl && (
-                  <div className="border-t border-slate-200/60 pt-3 space-y-1.5">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Mídia Anexada ({viewCampaign.mediaType === 'image' ? 'Imagem' : viewCampaign.mediaType === 'video' ? 'Vídeo' : 'Áudio'})</p>
-                    <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-100/80">
-                      <span className="material-symbols-outlined text-secondary text-lg">
-                        {viewCampaign.mediaType === 'image' ? 'image' : viewCampaign.mediaType === 'video' ? 'video_file' : 'volume_up'}
-                      </span>
-                      <a href={viewCampaign.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-secondary hover:underline truncate max-w-xs sm:max-w-md">
-                        {viewCampaign.mediaUrl}
-                      </a>
+                {viewCampaign.mediaUrl && (() => {
+                  let parsedAttachments: { url: string; type: string }[] = [];
+                  try {
+                    const parsed = JSON.parse(viewCampaign.mediaUrl);
+                    if (Array.isArray(parsed)) {
+                      parsedAttachments = parsed;
+                    }
+                  } catch {}
+
+                  if (parsedAttachments.length > 0) {
+                    return (
+                      <div className="border-t border-slate-200/60 pt-3 space-y-2">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Mídias Anexadas ({parsedAttachments.length})</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {parsedAttachments.map((att, idx) => (
+                            <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100/80">
+                              <span className="material-symbols-outlined text-secondary text-lg">
+                                {att.type === 'image' ? 'image' : att.type === 'video' ? 'video_file' : 'volume_up'}
+                              </span>
+                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-secondary hover:underline truncate max-w-[150px] sm:max-w-[200px]">
+                                Anexo {idx + 1} ({att.type === 'image' ? 'Imagem' : att.type === 'video' ? 'Vídeo' : 'Áudio'})
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="border-t border-slate-200/60 pt-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Mídia Anexada ({viewCampaign.mediaType === 'image' ? 'Imagem' : viewCampaign.mediaType === 'video' ? 'Vídeo' : 'Áudio'})</p>
+                      <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-100/80">
+                        <span className="material-symbols-outlined text-secondary text-lg">
+                          {viewCampaign.mediaType === 'image' ? 'image' : viewCampaign.mediaType === 'video' ? 'video_file' : 'volume_up'}
+                        </span>
+                        <a href={viewCampaign.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-secondary hover:underline truncate max-w-xs sm:max-w-md">
+                          {viewCampaign.mediaUrl}
+                        </a>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Render anti-ban security parameters */}
                 <div className="border-t border-slate-200/60 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -802,6 +1021,11 @@ export default function Campaigns() {
                                 r.status === 'skipped' ? 'bg-slate-100 text-slate-500' :
                                 'bg-amber-100 text-amber-700'
                               }`}>{r.status === 'sent' ? 'Enviado' : r.status === 'failed' ? 'Falhou' : r.status === 'skipped' ? 'Ignorado' : 'Pendente'}</span>
+                              {r.status === 'failed' && r.errorMessage && (
+                                <p className="text-[10px] text-red-500 font-semibold mt-1 break-words max-w-[180px]" title={r.errorMessage}>
+                                  Erro: {r.errorMessage}
+                                </p>
+                              )}
                             </td>
                           </tr>
                         ))}

@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { tasksApi, professionalsApi, clientsApi, leadsApi, getImageUrl } from '@/lib/api';
+import { tasksApi, professionalsApi, clientsApi, leadsApi, usuariosApi, getImageUrl } from '@/lib/api';
 import { format, isBefore, isToday, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -144,15 +144,36 @@ export default function Tasks() {
   // Load Initial Options
   const loadRelationData = useCallback(async () => {
     try {
-      const [profsRes, clientsRes, leadsRes] = await Promise.all([
+      const [profsRes, usersRes, clientsRes, leadsRes] = await Promise.all([
         professionalsApi.getAll({ pageSize: 100 }),
+        usuariosApi.getAll({ pageSize: 100 }),
         clientsApi.getAll({ pageSize: 100 }),
         leadsApi.getAll({ pageSize: 100 })
       ]);
 
+      let combinedProfs: any[] = [];
       if (profsRes.success && profsRes.data) {
-        setProfessionals(profsRes.data);
+        combinedProfs.push(...profsRes.data.map((p: any) => ({
+          id: `prof-${p.id}`,
+          name: p.name,
+          email: p.email,
+          photoUrl: p.photoUrl || null,
+          isUser: false,
+          realId: p.id
+        })));
       }
+      if (usersRes.success && usersRes.data) {
+        combinedProfs.push(...usersRes.data.map((u: any) => ({
+          id: `user-${u.id}`,
+          name: u.name,
+          email: u.email,
+          photoUrl: null,
+          isUser: true,
+          realId: u.id
+        })));
+      }
+      setProfessionals(combinedProfs);
+
       if (clientsRes.success && clientsRes.data) {
         setClients(clientsRes.data);
       }
@@ -181,7 +202,15 @@ export default function Tasks() {
         // Filtragem adicional no client-side para o responsibleFilter
         let filteredTasks = res.data;
         if (responsibleFilter !== 'all') {
-          filteredTasks = filteredTasks.filter((t: Task) => t.assignedToId === Number(responsibleFilter));
+          const isFilterUser = responsibleFilter.startsWith('user-');
+          const filterId = Number(responsibleFilter.replace('user-', '').replace('prof-', ''));
+          filteredTasks = filteredTasks.filter((t: any) => {
+            if (isFilterUser) {
+              return t.assignedToUserId === filterId || (t.assignedTo && t.assignedTo.isUser && t.assignedTo.id === filterId);
+            } else {
+              return t.assignedToId === filterId || (t.assignedTo && !t.assignedTo.isUser && t.assignedTo.id === filterId);
+            }
+          });
         }
         setTasks(filteredTasks);
       } else {
@@ -230,12 +259,16 @@ export default function Tasks() {
 
     setIsSubmitting(true);
     try {
+      const isAssigneeUser = formData.assignedToId.startsWith('user-');
+      const numericId = Number(formData.assignedToId.replace('user-', '').replace('prof-', ''));
+
       const dataToSave = {
         title: formData.title,
         description: formData.description || null,
         priority: formData.priority,
         dueDate: new Date(formData.dueDate).toISOString(),
-        assignedToId: Number(formData.assignedToId),
+        assignedToId: numericId,
+        assigneeType: isAssigneeUser ? 'user' : 'professional',
         clientId: formData.clientId ? Number(formData.clientId) : null,
         leadId: formData.leadId ? Number(formData.leadId) : null,
         isRecurring: formData.isRecurring,
@@ -282,13 +315,14 @@ export default function Tasks() {
   const handleOpenForm = (task: Task | null = null) => {
     if (task) {
       setEditingTask(task);
+      const isUserAssignee = task.assignedTo && (task.assignedTo as any).isUser;
       setFormData({
         title: task.title,
         description: task.description || '',
         status: task.status,
         priority: task.priority,
         dueDate: format(new Date(task.dueDate), 'yyyy-MM-dd'),
-        assignedToId: String(task.assignedToId),
+        assignedToId: task.assignedTo ? (isUserAssignee ? `user-${task.assignedTo.id}` : `prof-${task.assignedTo.id}`) : '',
         clientId: task.clientId ? String(task.clientId) : '',
         leadId: task.leadId ? String(task.leadId) : '',
         isRecurring: task.isRecurring,
@@ -296,13 +330,14 @@ export default function Tasks() {
       });
     } else {
       setEditingTask(null);
+      const userType = localStorage.getItem('userType');
       setFormData({
         title: '',
         description: '',
         status: 'pending',
         priority: 'medium',
         dueDate: format(new Date(), 'yyyy-MM-dd'),
-        assignedToId: professional ? String(professional.id) : '',
+        assignedToId: professional ? (userType === 'user' ? `user-${professional.id}` : `prof-${professional.id}`) : '',
         clientId: '',
         leadId: '',
         isRecurring: false,

@@ -20,6 +20,56 @@ function resolveIds(req: any) {
   return { professionalId, companyId }
 }
 
+// ─── Stream de Mídias de Campanhas (Público, para a Evolution API obter as mídias salvas em Base64) ───
+router.get('/media/:campaignId/:index', async (req, res) => {
+  try {
+    const campaignId = parseInt(req.params.campaignId)
+    const indexStr = req.params.index
+
+    const campaign = await prisma.messageCampaign.findUnique({
+      where: { id: campaignId },
+      select: { mediaUrl: true }
+    })
+
+    if (!campaign || !campaign.mediaUrl) {
+      return res.status(404).send('Mídia não encontrada')
+    }
+
+    let targetUrl = ''
+    if (indexStr === 'single') {
+      targetUrl = campaign.mediaUrl
+    } else {
+      const parsed = JSON.parse(campaign.mediaUrl)
+      const index = parseInt(indexStr)
+      if (Array.isArray(parsed) && parsed[index]) {
+        targetUrl = parsed[index].url
+      }
+    }
+
+    if (!targetUrl || !targetUrl.startsWith('data:')) {
+      return res.status(404).send('Formato de mídia inválido ou não encontrado')
+    }
+
+    // Parse do Data URL base64
+    const match = targetUrl.match(/^data:([^;]+);base64,(.+)$/)
+    if (!match) {
+      return res.status(400).send('Dados de mídia corrompidos')
+    }
+
+    const mimeType = match[1]
+    const base64Data = match[2]
+    const buffer = Buffer.from(base64Data, 'base64')
+
+    res.setHeader('Content-Type', mimeType)
+    res.setHeader('Content-Length', buffer.length)
+    res.setHeader('Cache-Control', 'public, max-age=31536000') // Cacheable por 1 ano
+    res.send(buffer)
+  } catch (error: any) {
+    console.error('[campaigns-media-stream] error:', error)
+    res.status(500).send('Erro ao processar mídia')
+  }
+})
+
 // ─── Listar campanhas ───
 router.get('/', auth(false), async (req, res) => {
   try {
@@ -105,6 +155,51 @@ router.post('/', auth(false), async (req, res) => {
     // Buscar destinatários com base no tipo de audiência
     const recipients = await resolveAudience(audienceType, audienceFilter, profId, companyId)
 
+    const leadIds = recipients.filter(r => r.sourceType === 'lead').map(r => r.sourceId)
+    const clientIds = recipients.filter(r => r.sourceType === 'client').map(r => r.sourceId)
+
+    // Buscar próximos agendamentos (futuros) em lote
+    const upcomingAppointments = await prisma.appointment.findMany({
+      where: {
+        OR: [
+          { clientId: { in: clientIds } },
+          { leadId: { in: leadIds } }
+        ],
+        startTime: { gte: new Date() },
+        status: { in: ['agendado', 'confirmado'] }
+      },
+      orderBy: { startTime: 'asc' }
+    })
+
+    // Buscar agendamentos concluídos (passados) em lote
+    const pastAppointments = await prisma.appointment.findMany({
+      where: {
+        OR: [
+          { clientId: { in: clientIds } },
+          { leadId: { in: leadIds } }
+        ],
+        status: 'concluido'
+      },
+      orderBy: { startTime: 'desc' }
+    })
+
+    // Criar mapas O(1) de busca por cliente/lead
+    const upcomingMap = new Map<string, any>()
+    for (const appt of upcomingAppointments) {
+      const key = appt.clientId ? `client_${appt.clientId}` : `lead_${appt.leadId}`
+      if (!upcomingMap.has(key)) {
+        upcomingMap.set(key, appt)
+      }
+    }
+
+    const pastMap = new Map<string, any>()
+    for (const appt of pastAppointments) {
+      const key = appt.clientId ? `client_${appt.clientId}` : `lead_${appt.leadId}`
+      if (!pastMap.has(key)) {
+        pastMap.set(key, appt)
+      }
+    }
+
     const campaign = await prisma.messageCampaign.create({
       data: {
         companyId,
@@ -122,14 +217,19 @@ router.post('/', auth(false), async (req, res) => {
         randomize: randomize !== undefined ? !!randomize : false,
         variations: variations || null,
         recipients: {
-          create: recipients.map(r => ({
-            name: r.name,
-            phone: r.phone,
-            sourceType: r.sourceType,
-            sourceId: r.sourceId,
-            status: 'pending',
-            renderedMessage: renderMessage(message, r)
-          }))
+          create: recipients.map(r => {
+            const key = r.sourceType === 'client' ? `client_${r.sourceId}` : `lead_${r.sourceId}`
+            const upcomingAppt = upcomingMap.get(key)
+            const pastAppt = pastMap.get(key)
+            return {
+              name: r.name,
+              phone: r.phone,
+              sourceType: r.sourceType,
+              sourceId: r.sourceId,
+              status: 'pending',
+              renderedMessage: renderMessage(message, r, upcomingAppt, pastAppt)
+            }
+          })
         }
       },
       include: {
@@ -185,6 +285,52 @@ router.post('/:id/send', auth(false), async (req, res) => {
       data: { status: 'sending', startedAt: new Date() }
     })
 
+    let absoluteMediaUrl = campaign.mediaUrl
+    if (absoluteMediaUrl) {
+      try {
+        const parsed = JSON.parse(absoluteMediaUrl)
+        if (Array.isArray(parsed)) {
+          const requestHost = req.get('host')
+          const protocol = req.protocol
+          const mapped = parsed.map((item: any, idx: number) => {
+            if (item.url) {
+              if (item.url.startsWith('data:')) {
+                return {
+                  ...item,
+                  url: `${protocol}://${requestHost}/api/campaigns/media/${id}/${idx}`
+                }
+              } else if (item.url.startsWith('/uploads/')) {
+                return {
+                  ...item,
+                  url: `${protocol}://${requestHost}${item.url}`
+                }
+              }
+            }
+            return item
+          })
+          absoluteMediaUrl = JSON.stringify(mapped)
+        } else if (absoluteMediaUrl.startsWith('data:')) {
+          const requestHost = req.get('host')
+          const protocol = req.protocol
+          absoluteMediaUrl = `${protocol}://${requestHost}/api/campaigns/media/${id}/single`
+        } else if (absoluteMediaUrl.startsWith('/uploads/')) {
+          const requestHost = req.get('host')
+          const protocol = req.protocol
+          absoluteMediaUrl = `${protocol}://${requestHost}${absoluteMediaUrl}`
+        }
+      } catch {
+        if (absoluteMediaUrl.startsWith('data:')) {
+          const requestHost = req.get('host')
+          const protocol = req.protocol
+          absoluteMediaUrl = `${protocol}://${requestHost}/api/campaigns/media/${id}/single`
+        } else if (absoluteMediaUrl.startsWith('/uploads/')) {
+          const requestHost = req.get('host')
+          const protocol = req.protocol
+          absoluteMediaUrl = `${protocol}://${requestHost}${absoluteMediaUrl}`
+        }
+      }
+    }
+
     // Processar envios em background
     processCampaignSend(id, campaign.recipients, {
       provider,
@@ -193,7 +339,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
       evolutionInstance: empresa!.evolutionInstance!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
-      mediaUrl: campaign.mediaUrl,
+      mediaUrl: absoluteMediaUrl,
       mediaType: campaign.mediaType,
       minDelay: campaign.minDelay,
       maxDelay: campaign.maxDelay,
@@ -261,6 +407,11 @@ router.delete('/:id', auth(false), async (req, res) => {
     if (!existing) {
       return res.status(404).json(createErrorResponse('Campanha não encontrada'))
     }
+
+    // Deletar destinatários primeiro para evitar erro de chave estrangeira
+    await prisma.campaignRecipient.deleteMany({
+      where: { campaignId: id }
+    })
 
     await prisma.messageCampaign.delete({ where: { id } })
     res.json(createSuccessResponse({ id }))
@@ -453,11 +604,77 @@ async function resolveAudience(
 }
 
 // Renderiza mensagem substituindo variáveis
-function renderMessage(template: string, recipient: RecipientData): string {
-  return template
+function renderMessage(
+  template: string, 
+  recipient: any, 
+  upcomingAppt?: any, 
+  pastAppt?: any
+): string {
+  let msg = template
     .replace(/\{\{nome\}\}/gi, recipient.name)
     .replace(/\{\{telefone\}\}/gi, recipient.phone)
     .replace(/\{\{primeiro_nome\}\}/gi, recipient.name.split(' ')[0])
+
+  // Substituição para o próximo agendamento (futuro)
+  if (upcomingAppt) {
+    const upcomingDate = formatDate(upcomingAppt.startTime)
+    const upcomingTime = formatTime(upcomingAppt.startTime)
+    msg = msg
+      .replace(/\{\{data_agendamento\}\}/gi, upcomingDate)
+      .replace(/\{\{hora_agendamento\}\}/gi, upcomingTime)
+      .replace(/\{\{proxima_data\}\}/gi, upcomingDate)
+      .replace(/\{\{proxima_hora\}\}/gi, upcomingTime)
+  } else {
+    msg = msg
+      .replace(/\{\{data_agendamento\}\}/gi, '')
+      .replace(/\{\{hora_agendamento\}\}/gi, '')
+      .replace(/\{\{proxima_data\}\}/gi, '')
+      .replace(/\{\{proxima_hora\}\}/gi, '')
+  }
+
+  // Substituição para o último agendamento (passado concluído)
+  if (pastAppt) {
+    const pastDate = formatDate(pastAppt.startTime)
+    const pastTime = formatTime(pastAppt.startTime)
+    msg = msg
+      .replace(/\{\{ultima_data\}\}/gi, pastDate)
+      .replace(/\{\{ultima_hora\}\}/gi, pastTime)
+      .replace(/\{\{data_ultima_consulta\}\}/gi, pastDate)
+      .replace(/\{\{hora_ultima_consulta\}\}/gi, pastTime)
+  } else {
+    msg = msg
+      .replace(/\{\{ultima_data\}\}/gi, '')
+      .replace(/\{\{ultima_hora\}\}/gi, '')
+      .replace(/\{\{data_ultima_consulta\}\}/gi, '')
+      .replace(/\{\{hora_ultima_consulta\}\}/gi, '')
+  }
+
+  return msg
+}
+
+function formatDate(date: any): string {
+  try {
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return ''
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}/${month}/${year}`
+  } catch {
+    return ''
+  }
+}
+
+function formatTime(date: any): string {
+  try {
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return ''
+    const hours = String(d.getHours()).padStart(2, '0')
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
+  } catch {
+    return ''
+  }
 }
 
 // Configuração agrupada
@@ -496,62 +713,52 @@ function formatPhoneForWhatsApp(phone: string, provider: string = 'evolution'): 
   return '55' + digits
 }
 
+function cleanMediaUrl(url: string): string {
+  if (url.startsWith('data:')) {
+    const commaIndex = url.indexOf(',')
+    if (commaIndex !== -1) {
+      return url.substring(commaIndex + 1)
+    }
+  }
+  return url
+}
+
+function getMimeType(url: string): string | undefined {
+  if (url.startsWith('data:')) {
+    const match = url.match(/data:([^;]+);base64/)
+    if (match) return match[1]
+  }
+  return undefined
+}
+
 async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
   const baseUrl = config.evolutionUrl.replace(/\/+$/, '')
-  
-  // Se houver anexo de mídia configurado
+
+  interface MediaAttachment {
+    url: string
+    type: 'image' | 'video' | 'audio'
+  }
+
+  let attachments: MediaAttachment[] = []
   if (config.mediaUrl) {
-    const mediaUrlEndpoint = `${baseUrl}/message/sendMedia/${config.evolutionInstance}`
-    
-    // Tratamento premium para imagens e vídeos (com texto no caption)
-    if (config.mediaType === 'image' || config.mediaType === 'video') {
-      const response = await fetch(mediaUrlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.evolutionKey,
-        },
-        body: JSON.stringify({
-          number: formattedPhone,
-          mediaMessage: {
-            mediatype: config.mediaType,
-            media: config.mediaUrl,
-            caption: message
-          }
-        })
-      })
-      if (!response.ok) {
-        const errorData = await response.text()
-        console.error(`[whatsapp-evolution] send media failed for ${formattedPhone}:`, errorData)
-        return { success: false, error: `HTTP ${response.status}: ${errorData}` }
+    try {
+      const parsed = JSON.parse(config.mediaUrl)
+      if (Array.isArray(parsed)) {
+        attachments = parsed.map((item: any) => ({
+          url: item.url,
+          type: item.type || 'image'
+        }))
+      } else {
+        attachments = [{ url: config.mediaUrl, type: (config.mediaType as any) || 'image' }]
       }
-      return { success: true }
-    } else if (config.mediaType === 'audio') {
-      // Para áudio, enviamos primeiro o arquivo de áudio e depois o texto acompanhando
-      const audioResponse = await fetch(mediaUrlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.evolutionKey,
-        },
-        body: JSON.stringify({
-          number: formattedPhone,
-          mediaMessage: {
-            mediatype: 'audio',
-            media: config.mediaUrl
-          }
-        })
-      })
-      
-      if (!audioResponse.ok) {
-        const errorData = await audioResponse.text()
-        console.error(`[whatsapp-evolution] send audio failed for ${formattedPhone}:`, errorData)
-        return { success: false, error: `HTTP ${audioResponse.status}: ${errorData}` }
-      }
-      
-      // Pequeno delay de 1.2s antes de enviar a mensagem de texto como follow-up
-      await new Promise(resolve => setTimeout(resolve, 1200))
-      
+    } catch {
+      attachments = [{ url: config.mediaUrl, type: (config.mediaType as any) || 'image' }]
+    }
+  }
+
+  // CASO 1: Múltiplas mídias
+  if (attachments.length > 1) {
+    if (message.trim()) {
       const textUrl = `${baseUrl}/message/sendText/${config.evolutionInstance}`
       const textResponse = await fetch(textUrl, {
         method: 'POST',
@@ -564,17 +771,139 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
           text: message
         })
       })
-      
+
       if (!textResponse.ok) {
         const errorData = await textResponse.text()
-        console.error(`[whatsapp-evolution] send text after audio failed for ${formattedPhone}:`, errorData)
+        console.error(`[whatsapp-evolution] send text failed in multi-media for ${formattedPhone}:`, errorData)
         return { success: false, error: `HTTP ${textResponse.status}: ${errorData}` }
+      }
+    }
+
+    for (let i = 0; i < attachments.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      const att = attachments[i]
+      const isAudio = att.type === 'audio'
+      const mediaUrlEndpoint = isAudio
+        ? `${baseUrl}/message/sendWhatsAppAudio/${config.evolutionInstance}`
+        : `${baseUrl}/message/sendMedia/${config.evolutionInstance}`
+      
+      const payload: any = isAudio
+        ? {
+            number: formattedPhone,
+            audio: att.url
+          }
+        : {
+            number: formattedPhone,
+            mediatype: att.type,
+            media: att.url,
+            fileName: att.type === 'image' ? 'imagem.png' : 'video.mp4'
+          }
+      if (!isAudio) {
+        const mime = getMimeType(att.url)
+        if (mime) {
+          payload.mimetype = mime
+        }
+      }
+
+      const mediaResponse = await fetch(mediaUrlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': config.evolutionKey,
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!mediaResponse.ok) {
+        const errorData = await mediaResponse.text()
+        console.error(`[whatsapp-evolution] send media index ${i} failed for ${formattedPhone}:`, errorData)
+        return { success: false, error: `Falha no anexo ${i + 1} (${att.type}): HTTP ${mediaResponse.status}: ${errorData}` }
+      }
+    }
+
+    return { success: true }
+  }
+
+  // CASO 2: Único anexo de mídia (Lógica original preservada)
+  if (attachments.length === 1) {
+    const single = attachments[0]
+
+    if (single.type === 'image' || single.type === 'video') {
+      const mediaUrlEndpoint = `${baseUrl}/message/sendMedia/${config.evolutionInstance}`
+      const payload: any = {
+        number: formattedPhone,
+        mediatype: single.type,
+        media: single.url,
+        caption: message,
+        fileName: single.type === 'image' ? 'imagem.png' : 'video.mp4'
+      }
+      const mime = getMimeType(single.url)
+      if (mime) {
+        payload.mimetype = mime
+      }
+
+      const response = await fetch(mediaUrlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': config.evolutionKey,
+        },
+        body: JSON.stringify(payload)
+      })
+      if (!response.ok) {
+        const responseError = await response.text()
+        console.error(`[whatsapp-evolution] send media failed for ${formattedPhone}:`, responseError)
+        return { success: false, error: `HTTP ${response.status}: ${responseError}` }
+      }
+      return { success: true }
+    } else if (single.type === 'audio') {
+      const mediaUrlEndpoint = `${baseUrl}/message/sendWhatsAppAudio/${config.evolutionInstance}`
+      const payload = {
+        number: formattedPhone,
+        audio: single.url
+      }
+
+      const audioResponse = await fetch(mediaUrlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': config.evolutionKey,
+        },
+        body: JSON.stringify(payload)
+      })
+      
+      if (!audioResponse.ok) {
+        const errorData = await audioResponse.text()
+        console.error(`[whatsapp-evolution] send audio failed for ${formattedPhone}:`, errorData)
+        return { success: false, error: `HTTP ${audioResponse.status}: ${errorData}` }
+      }
+      
+      if (message.trim()) {
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        const textUrl = `${baseUrl}/message/sendText/${config.evolutionInstance}`
+        const textResponse = await fetch(textUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.evolutionKey,
+          },
+          body: JSON.stringify({
+            number: formattedPhone,
+            text: message
+          })
+        })
+        
+        if (!textResponse.ok) {
+          const errorData = await textResponse.text()
+          console.error(`[whatsapp-evolution] send text after audio failed for ${formattedPhone}:`, errorData)
+          return { success: false, error: `HTTP ${textResponse.status}: ${errorData}` }
+        }
       }
       return { success: true }
     }
   }
 
-  // Envio padrão de texto pura
+  // CASO 3: Sem mídia (apenas texto)
   const url = `${baseUrl}/message/sendText/${config.evolutionInstance}`
   const response = await fetch(url, {
     method: 'POST',
@@ -654,7 +983,27 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
     if (config.randomize && config.variations && Array.isArray(config.variations) && config.variations.length > 0) {
       const randomIndex = Math.floor(Math.random() * config.variations.length)
       const selectedVariation = config.variations[randomIndex]
-      messageToSend = renderMessage(selectedVariation, recipient)
+      
+      const upcomingAppt = await prisma.appointment.findFirst({
+        where: {
+          clientId: recipient.sourceType === 'client' ? recipient.sourceId : undefined,
+          leadId: recipient.sourceType === 'lead' ? recipient.sourceId : undefined,
+          startTime: { gte: new Date() },
+          status: { in: ['agendado', 'confirmado'] }
+        },
+        orderBy: { startTime: 'asc' }
+      })
+
+      const pastAppt = await prisma.appointment.findFirst({
+        where: {
+          clientId: recipient.sourceType === 'client' ? recipient.sourceId : undefined,
+          leadId: recipient.sourceType === 'lead' ? recipient.sourceId : undefined,
+          status: 'concluido'
+        },
+        orderBy: { startTime: 'desc' }
+      })
+
+      messageToSend = renderMessage(selectedVariation, recipient, upcomingAppt, pastAppt)
     }
 
     try {

@@ -410,6 +410,9 @@ model Usuario {
   permissions            UserPermission[]
   proposalsAsSalesperson Proposal[]          @relation("SalespersonProposals")
   proposalsAsSpecialist  Proposal[]          @relation("SpecialistProposals")
+  assignedTasks          Task[]              @relation("AssignedUserTasks")
+  createdTasks           Task[]              @relation("CreatedUserTasks")
+  notifications          Notification[]      @relation("UserNotifications")
 
   @@map("usuarios")
 }
@@ -688,8 +691,10 @@ model Task {
   status          String        @default("pending") // pending, in_progress, completed
   priority        String        @default("medium") // low, medium, high, urgent
   dueDate         DateTime      @map("due_date")
-  assignedToId    Int           @map("assigned_to_id")
-  createdById     Int           @map("created_by_id")
+  assignedToId    Int?          @map("assigned_to_id")
+  assignedToUserId Int?         @map("assigned_to_user_id")
+  createdById     Int?          @map("created_by_id")
+  createdByUserId Int?          @map("created_by_user_id")
   companyId       Int           @map("company_id")
   clientId        Int?          @map("client_id")
   leadId          Int?          @map("lead_id")
@@ -699,8 +704,10 @@ model Task {
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
-  assignedTo      Professional  @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: Cascade)
-  createdBy       Professional  @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+  assignedTo      Professional? @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: Cascade)
+  assignedToUser  Usuario?      @relation("AssignedUserTasks", fields: [assignedToUserId], references: [id], onDelete: Cascade)
+  createdBy       Professional? @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+  createdByUser   Usuario?      @relation("CreatedUserTasks", fields: [createdByUserId], references: [id], onDelete: Cascade)
   company         Empresa       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   client          Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   lead            Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
@@ -717,12 +724,14 @@ model Notification {
   content     String
   read        Boolean      @default(false)
   type        String       // task_assigned, task_completed, urgent_alert, etc.
-  recipientId Int          @map("recipient_id")
+  recipientId Int?         @map("recipient_id")
+  recipientUserId Int?     @map("recipient_user_id")
   companyId   Int          @map("company_id")
   taskId      Int?         @map("task_id")
   createdAt   DateTime     @default(now()) @map("created_at")
 
-  recipient   Professional @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  recipient   Professional? @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientUser Usuario?    @relation("UserNotifications", fields: [recipientUserId], references: [id], onDelete: Cascade)
   company     Empresa      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   task        Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
