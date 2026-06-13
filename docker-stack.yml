@@ -1,0 +1,78 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  SalesClin — Docker Swarm Stack (Traefik + HTTPS)           ║
+# ║                                                              ║
+# ║  Deploy:                                                     ║
+# ║    docker stack deploy -c docker-stack.yml sellclin           ║
+# ║                                                              ║
+# ║  Remover:                                                    ║
+# ║    docker stack rm sellclin                                   ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+version: "3.8"
+
+services:
+  app:
+    image: sellclin:latest
+    networks:
+      - traefik-public
+    volumes:
+      - sellclin-uploads:/app/uploads
+    environment:
+      # ─── Banco de Dados ───
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      # ─── Autenticação ───
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      # ─── Runtime ───
+      - NODE_ENV=production
+      - PORT=4000
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+      labels:
+        # ─── Traefik: Ativar ───
+        - "traefik.enable=true"
+
+        # ─── Traefik: Serviço (porta interna do container) ───
+        - "traefik.http.services.sellclin.loadbalancer.server.port=80"
+
+        # ─── Traefik: Rota principal (sellclin.com) ───
+        - "traefik.http.routers.sellclin.rule=Host(`sellclin.com`)"
+        - "traefik.http.routers.sellclin.entrypoints=websecure"
+        - "traefik.http.routers.sellclin.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.sellclin.service=sellclin"
+
+        # ─── Traefik: Rota WWW (www.sellclin.com → redirect) ───
+        - "traefik.http.routers.sellclin-www.rule=Host(`www.sellclin.com`)"
+        - "traefik.http.routers.sellclin-www.entrypoints=websecure"
+        - "traefik.http.routers.sellclin-www.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.sellclin-www.service=sellclin"
+        - "traefik.http.routers.sellclin-www.middlewares=sellclin-www-redirect"
+
+        # ─── Traefik: Middleware de redirect www → raiz ───
+        - "traefik.http.middlewares.sellclin-www-redirect.redirectregex.regex=^https://www\\.sellclin\\.com/(.*)"
+        - "traefik.http.middlewares.sellclin-www-redirect.redirectregex.replacement=https://sellclin.com/$${1}"
+        - "traefik.http.middlewares.sellclin-www-redirect.redirectregex.permanent=true"
+
+volumes:
+  sellclin-uploads:
+    driver: local
+
+networks:
+  traefik-public:
+    external: true

@@ -1,0 +1,49 @@
+# ═══ Dependencies ═══
+node_modules
+.npm
+
+# ═══ Build output (será gerado dentro do Docker) ═══
+dist
+
+# ═══ Git ═══
+.git
+.gitignore
+
+# ═══ IDE ═══
+.vscode
+.idea
+*.swp
+*.swo
+
+# ═══ Environment (será passado via stack/compose) ═══
+.env
+.env.*
+
+# ═══ Logs ═══
+*.log
+npm-debug.log*
+
+# ═══ OS ═══
+.DS_Store
+Thumbs.db
+
+# ═══ Debug/test scripts ═══
+debug*.ts
+test*.ts
+db-count.ts
+fix-*.cjs
+cleanup-*.cjs
+disable-modules.ts
+check-evo-webhook.ts
+
+# ═══ Docs ═══
+*.md
+!README.md
+
+# ═══ Misc ═══
+scratch
+skills
+bun.lockb
+uploads/*
+.npmrc
+vite.config.ts.timestamp-*

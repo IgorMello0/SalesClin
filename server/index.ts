@@ -78,7 +78,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 })
 
 const port = process.env.PORT || 4000
-if (process.env.NODE_ENV !== 'production') {
+// No Vercel (serverless), o app é exportado sem listen.
+// Em todos os outros ambientes (Docker, dev local), o servidor escuta normalmente.
+if (!process.env.VERCEL) {
   app.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`[server] listening on http://localhost:${port}`)
