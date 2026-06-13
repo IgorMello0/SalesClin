@@ -4,6 +4,7 @@ node_modules
 
 # ═══ Build output (será gerado dentro do Docker) ═══
 dist
+dist-server
 
 # ═══ Git ═══
 .git

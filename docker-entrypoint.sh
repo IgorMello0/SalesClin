@@ -5,17 +5,16 @@ echo "╔═══════════════════════�
 echo "║  SalesClin — Starting Production Server  ║"
 echo "╚══════════════════════════════════════════╝"
 
-# Rodar Prisma migrations se necessário (opcional, descomente se quiser auto-migrate)
+# (Opcional) Descomentar para auto-migrate do Prisma no boot:
 # echo "[sellclin] Running database migrations..."
-# npx prisma migrate deploy
+# su-exec node npx prisma migrate deploy
 
-# Iniciar o backend Node.js em background
+# Iniciar backend Node.js como user "node" (segurança)
 echo "[sellclin] Starting Node.js backend on port ${PORT:-4000}..."
-node --import tsx server/index.ts &
+su-exec node node dist-server/index.js &
 NODE_PID=$!
 
-# Aguardar o backend ficar pronto
-echo "[sellclin] Waiting for backend to initialize..."
+# Aguardar o backend inicializar
 sleep 3
 
 # Verificar se o backend subiu
