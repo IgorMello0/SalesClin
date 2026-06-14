@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SiteNavbar } from '@/components/SiteNavbar';
+import { SiteFooter } from '@/components/SiteFooter';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
@@ -412,59 +413,7 @@ const FAQ = () => {
       </section>
 
       {/* FOOTER — COMPREHENSIVE EDITORIAL */}
-      <footer className="py-12 bg-white border-t border-slate-200/60 relative overflow-hidden w-full mt-auto">
-        <div className="max-w-7xl mx-auto px-8 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-8">
-            <div className="space-y-4">
-              <img src="/logo-site.png" alt="SalesClin" className="h-7 w-auto opacity-90" />
-              <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-xs">
-                A infraestrutura comercial definitiva para clínicas de alto ticket. Transformamos leads em faturamento com inteligência e precisão.
-              </p>
-              <div className="flex gap-3">
-                <a href="#" className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316]/50 transition-all cursor-pointer">
-                  <Instagram size={12} />
-                </a>
-                <a href="#" className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316]/50 transition-all cursor-pointer">
-                  <MessageCircle size={12} />
-                </a>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-mono font-bold text-slate-900 uppercase tracking-widest">Produto</h4>
-              <ul className="space-y-2">
-                {["Funcionalidades", "Simulador de Metas", "Planos e Preços", "Integrações"].map((item, i) => (
-                  <li key={i}><a href="#" className="text-xs text-slate-500 hover:text-[#F97316] transition-colors font-medium">{item}</a></li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-mono font-bold text-slate-900 uppercase tracking-widest">Suporte</h4>
-              <ul className="space-y-2">
-                {["Central de Ajuda", "FAQ", "Falar com Consultor", "Comunidade"].map((item, i) => (
-                  <li key={i}><a href="#" className="text-xs text-slate-500 hover:text-[#F97316] transition-colors font-medium">{item}</a></li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-mono font-bold text-slate-900 uppercase tracking-widest">Legal</h4>
-              <ul className="space-y-2">
-                {["Termos de Uso", "Privacidade", "Cookies", "Segurança"].map((item, i) => (
-                  <li key={i}><a href="#" className="text-xs text-slate-500 hover:text-[#F97316] transition-colors font-medium">{item}</a></li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="pt-8 border-t border-slate-200/50 flex flex-col md:flex-row items-center justify-center">
-            <div className="text-[10px] font-mono font-bold text-slate-400 tracking-wider">
-              © 2026 SalesClin · CRM Especializado em Alto Ticket
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
 
       {/* Mobile Drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>

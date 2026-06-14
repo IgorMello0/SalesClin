@@ -6,6 +6,7 @@ import {
   Star, ChevronDown, ArrowRight, Calendar, KanbanSquare, Instagram, MessageCircle
 } from 'lucide-react';
 import { SiteNavbar } from '@/components/SiteNavbar';
+import { SiteFooter } from '@/components/SiteFooter';
 
 const MetasPage = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -407,33 +408,7 @@ const MetasPage = () => {
       </section>
 
       {/* FOOTER */}
-      <footer className="py-8 bg-white border-t border-slate-100">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-8">
-            <div className="space-y-4">
-              <img src="/logo-site.png" alt="SalesClin" className="h-8 w-auto" />
-              <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-xs">A infraestrutura comercial definitiva para clínicas de alto ticket.</p>
-              <div className="flex gap-4">
-                <a href="#" className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316] transition-all"><Instagram size={14} /></a>
-                <a href="#" className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#F97316] hover:border-[#F97316] transition-all"><MessageCircle size={14} /></a>
-              </div>
-            </div>
-            {[
-              { title: "Produto", items: ["Funil de Vendas", "Agenda Inteligente", "Engenharia de Metas", "Planos"] },
-              { title: "Suporte", items: ["Central de Ajuda", "FAQ", "Falar com Consultor"] },
-              { title: "Legal", items: ["Termos de Uso", "Privacidade", "Segurança"] },
-            ].map((col, i) => (
-              <div key={i} className="space-y-4">
-                <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">{col.title}</h4>
-                <ul className="space-y-2">{col.items.map((item, j) => <li key={j}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>)}</ul>
-              </div>
-            ))}
-          </div>
-          <div className="pt-6 border-t border-slate-50 text-center">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">© 2026 SalesClin · CRM Especializado em Alto Ticket</div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };

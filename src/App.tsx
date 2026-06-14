@@ -26,7 +26,6 @@ import Catalogs from "./pages/Catalogs";
 import CatalogDetail from "./pages/CatalogDetail";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
-import DentalTest from "./pages/DentalTest";
 import Leads from "./pages/Leads";
 import SalesFunnel from "./pages/SalesFunnel";
 import Goals from "./pages/Goals";
@@ -84,7 +83,6 @@ const App = () => (
                   />
                   <Route path="profile" element={<Profile />} />
                   <Route path="contracts" element={<ProtectedRoute moduleCode="contratos" moduleName="Contratos"><ContractSignature /></ProtectedRoute>} />
-                  <Route path="dental-test" element={<DentalTest />} />
                   <Route path="sales-funnel" element={<ProtectedRoute moduleCode="funnel" moduleName="Comercial"><SalesFunnel /></ProtectedRoute>} />
                   <Route path="metas" element={<ProtectedRoute moduleCode="metas" moduleName="Metas"><Goals /></ProtectedRoute>} />
                   <Route path="tasks" element={<ProtectedRoute moduleCode="tarefas" moduleName="Tarefas"><Tasks /></ProtectedRoute>} />

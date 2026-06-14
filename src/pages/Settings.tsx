@@ -12,17 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { 
-  Settings as SettingsIcon, 
-  Building, 
+  Settings as SettingsIcon,
+  Building,
   Plus,
   Trash2,
-  Clock,
-  Lock,
   Users,
-  Tag,
-  Monitor,
-  LayoutTemplate,
-  PanelLeft,
   Eye,
   EyeOff
 } from 'lucide-react';
@@ -201,7 +195,6 @@ const EquipeView = () => {
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
   const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
-  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const loadRoles = async () => {
     try {

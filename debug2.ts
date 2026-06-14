@@ -1,1 +1,0 @@
-import { prisma } from './server/prisma'; async function run() { const users = await prisma.usuario.findMany({ select: { id: true, name: true, email: true, role: true } }); console.log('Usuarios:', users); const profs = await prisma.professional.findMany({ select: { id: true, name: true, email: true } }); console.log('Profs:', profs); } run();
