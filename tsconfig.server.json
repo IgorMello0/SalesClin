@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "strict": false,
     "resolveJsonModule": true,
-    "outDir": "./dist",
+    "outDir": "./dist-server",
     "rootDir": "./server"
   },
   "include": ["server/**/*"],
