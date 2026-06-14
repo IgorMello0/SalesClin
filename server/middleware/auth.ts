@@ -36,7 +36,7 @@ export function auth(required = true) {
         // Verifica se o usuário tem permissão para acessar esta clínica
         if (payload.allowedCompanies && payload.allowedCompanies.includes(id)) {
           payload.companyId = id
-        } else if (payload.type !== 'admin') {
+        } else if ((payload.type as string) !== 'admin') {
           // Bloqueia a troca se a clínica não estiver na lista (a menos que seja super admin)
           return res.status(403).json(createErrorResponse('Acesso negado a esta clínica', 403))
         } else {
