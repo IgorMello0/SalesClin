@@ -9,7 +9,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json .npmrc ./
 COPY prisma ./prisma/
-RUN npm ci && npx prisma generate
+RUN npm ci --legacy-peer-deps && npx prisma generate
 
 COPY . .
 
@@ -34,7 +34,7 @@ COPY package.json package-lock.json .npmrc ./
 COPY prisma ./prisma/
 
 # Apenas dependências de produção + Prisma client
-RUN npm ci --omit=dev --ignore-scripts && npx prisma generate
+RUN npm ci --omit=dev --ignore-scripts --legacy-peer-deps && npx prisma generate
 
 
 # ═══ STAGE 3: Production Runtime ═══

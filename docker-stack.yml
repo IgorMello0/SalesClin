@@ -14,7 +14,7 @@ services:
   app:
     image: sellclin:latest
     networks:
-      - traefik-public
+      - network_public
     volumes:
       # Bind mount: arquivos persistem em /opt/docker/data/sellclin/uploads
       # mesmo ao recriar ou atualizar o container
@@ -74,8 +74,8 @@ services:
 # ─── IMPORTANTE ───────────────────────────────────────────────
 # Verifique o nome da rede Traefik na sua VPS com:
 #   docker network ls | grep -i traefik
-# Se o nome for diferente de "traefik-public", altere abaixo.
+# Se o nome for diferente de "network_public", altere abaixo.
 # ──────────────────────────────────────────────────────────────
 networks:
-  traefik-public:
+  network_public:
     external: true
