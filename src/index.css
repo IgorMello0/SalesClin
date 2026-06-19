@@ -118,28 +118,32 @@
    DARK MODE — CSS Variable overrides
    ======================================== */
 .dark {
-  --color-background: hsl(222, 47%, 11%);
-  --color-foreground: hsl(210, 40%, 98%);
-  --color-card: hsl(222, 47%, 11%);
-  --color-card-foreground: hsl(210, 40%, 98%);
-  --color-popover: hsl(222, 47%, 11%);
-  --color-popover-foreground: hsl(210, 40%, 98%);
-  --color-primary: hsl(210, 40%, 98%);
-  --color-primary-foreground: hsl(222, 47%, 11%);
-  --color-primary-container: hsl(217, 33%, 17%);
+  --color-background: hsl(222, 43%, 8%);
+  --color-foreground: hsl(214, 32%, 94%);
+  --color-card: hsl(222, 39%, 11%);
+  --color-card-foreground: hsl(214, 32%, 94%);
+  --color-popover: hsl(222, 39%, 11%);
+  --color-popover-foreground: hsl(214, 32%, 94%);
+  --color-primary: hsl(214, 84%, 64%);
+  --color-primary-foreground: hsl(222, 47%, 8%);
+  --color-primary-container: hsl(221, 39%, 16%);
   --color-secondary: hsl(25, 95%, 53%);
   --color-secondary-foreground: hsl(0, 0%, 100%);
-  --color-muted: hsl(217, 33%, 17%);
-  --color-muted-foreground: hsl(215, 16%, 47%);
-  --color-accent: hsl(217, 91%, 60%);
+  --color-muted: hsl(221, 31%, 15%);
+  --color-muted-foreground: hsl(218, 17%, 68%);
+  --color-accent: hsl(198, 93%, 60%);
   --color-accent-foreground: hsl(0, 0%, 100%);
-  --color-destructive: hsl(0, 62.8%, 30.6%);
+  --color-destructive: hsl(0, 72%, 52%);
   --color-destructive-foreground: hsl(210, 40%, 98%);
-  --color-border: hsl(217, 33%, 17%);
-  --color-input: hsl(217, 33%, 17%);
-  --color-ring: hsl(212.7, 26.8%, 83.9%);
-  --color-sidebar-background: hsl(222, 47%, 11%);
-  --color-sidebar-foreground: hsl(210, 40%, 98%);
+  --color-border: hsl(219, 27%, 21%);
+  --color-input: hsl(219, 27%, 18%);
+  --color-ring: hsl(214, 84%, 64%);
+  --color-on-surface: hsl(214, 32%, 94%);
+  --color-on-surface-variant: hsl(218, 17%, 68%);
+  --color-outline-variant: hsl(219, 27%, 21%);
+  --color-sidebar-background: hsl(222, 43%, 8%);
+  --color-sidebar-foreground: hsl(214, 32%, 94%);
+  --color-primary-hover: hsl(214, 84%, 70%);
 }
 
 /* ========================================
@@ -157,9 +161,15 @@
 }
 
 .dark .glass-card {
-  background: rgba(30, 41, 59, 0.60);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 18px 48px 0 rgba(0, 0, 0, 0.28);
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.14), transparent 32rem),
+    linear-gradient(180deg, hsl(222, 43%, 9%) 0%, hsl(222, 43%, 7%) 100%);
 }
 
 /* Hover card effect */
@@ -542,8 +552,16 @@ h1, h2, h3, h4, h5, h6 {
 .bg-grid-dark {
   background-size: 60px 60px;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
+}
+
+.dark .bg-grid-dark {
+  background-color: hsl(222, 43%, 8%);
+  background-image:
+    radial-gradient(circle at center, rgba(148, 163, 184, 0.22) 1px, transparent 1.2px),
+    radial-gradient(circle at 20% 10%, rgba(37, 99, 235, 0.16), transparent 28rem);
+  background-size: 34px 34px, auto;
 }
 
 /* ========================================
