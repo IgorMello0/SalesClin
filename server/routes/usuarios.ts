@@ -66,25 +66,35 @@ router.post('/onboarding/complete', auth(), async (req, res) => {
 
 router.get('/', auth(), async (req, res) => {
   try {
-    // Somente o profissional pode listar/gerenciar a equipe completa neste contexto
-    if (req.user?.type !== 'profissional') {
-      return res.status(403).json(createErrorResponse('Acesso exclusivo ao profissional', 403))
+    // Lista a equipe da clinica ativa para seletores e telas de gestao.
+    let ownedCompanyIds: number[] = []
+
+    if (req.user?.type !== 'profissional' && req.user?.type !== 'usuario') {
+      return res.status(403).json(createErrorResponse('Tipo de usuario sem acesso a equipe', 403))
     }
 
-    // Buscar profissional com TODAS as empresas que ele possui
-    const professional = await prisma.professional.findUnique({
-      where: { id: req.user.id },
-      include: { ownedCompanies: true }
-    })
+    if (req.user?.type === 'usuario') {
+      if (!req.user.companyId) {
+        return res.status(400).json(createErrorResponse('Clinica nao definida', 400))
+      }
 
-    if (!professional || !professional.companyId) {
-      return res.status(400).json(createErrorResponse('Profissional não possui empresa associada', 400))
-    }
+      ownedCompanyIds = [req.user.companyId]
+    } else {
+      // Buscar profissional com TODAS as empresas que ele possui
+      const professional = await prisma.professional.findUnique({
+        where: { id: req.user.id },
+        include: { ownedCompanies: true }
+      })
 
-    // Coletar todos os IDs de empresa que o profissional controla
-    const ownedCompanyIds = professional.ownedCompanies.map(c => c.id);
-    if (professional.companyId && !ownedCompanyIds.includes(professional.companyId)) {
-      ownedCompanyIds.push(professional.companyId);
+      if (!professional || !professional.companyId) {
+        return res.status(400).json(createErrorResponse('Profissional nao possui empresa associada', 400))
+      }
+
+      // Coletar todos os IDs de empresa que o profissional controla
+      ownedCompanyIds = professional.ownedCompanies.map(c => c.id);
+      if (professional.companyId && !ownedCompanyIds.includes(professional.companyId)) {
+        ownedCompanyIds.push(professional.companyId);
+      }
     }
 
     if (ownedCompanyIds.length === 0) {

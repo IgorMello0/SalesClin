@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { createErrorResponse } from '../utils/response.js'
+import { prisma } from '../prisma.js'
 
 export type AuthUser = {
   id: number
@@ -16,7 +17,7 @@ declare module 'express-serve-static-core' {
 }
 
 export function auth(required = true) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const header = req.headers.authorization
     const token = header?.startsWith('Bearer ') ? header.substring(7) : undefined
 
@@ -28,6 +29,51 @@ export function auth(required = true) {
     try {
       const secret = process.env.JWT_SECRET || 'dev-secret'
       const payload = jwt.verify(token, secret) as AuthUser & { allowedCompanies?: number[] }
+
+      if (!payload.companyId || !payload.allowedCompanies?.length) {
+        if (payload.type === 'profissional') {
+          const professional = await prisma.professional.findUnique({
+            where: { id: payload.id },
+            select: {
+              companyId: true,
+              ownedCompanies: { select: { id: true } },
+            },
+          })
+
+          const allowedCompanies = [
+            ...(professional?.companyId ? [professional.companyId] : []),
+            ...(professional?.ownedCompanies.map(company => company.id) || []),
+          ]
+
+          payload.allowedCompanies = Array.from(new Set([
+            ...(payload.allowedCompanies || []),
+            ...allowedCompanies,
+          ]))
+          payload.companyId = payload.companyId || professional?.companyId || payload.allowedCompanies[0] || null
+        } else if (payload.type === 'usuario') {
+          const user = await prisma.usuario.findUnique({
+            where: { id: payload.id },
+            select: {
+              companyId: true,
+              companyAccess: {
+                where: { isActive: true },
+                select: { companyId: true },
+              },
+            },
+          })
+
+          const allowedCompanies = [
+            ...(user?.companyId ? [user.companyId] : []),
+            ...(user?.companyAccess.map(access => access.companyId) || []),
+          ]
+
+          payload.allowedCompanies = Array.from(new Set([
+            ...(payload.allowedCompanies || []),
+            ...allowedCompanies,
+          ]))
+          payload.companyId = payload.companyId || user?.companyId || payload.allowedCompanies[0] || null
+        }
+      }
       
       // Se o frontend solicitar troca de contexto (clínica)
       const targetCompanyId = req.headers['x-company-id']
