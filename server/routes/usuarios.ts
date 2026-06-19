@@ -4,6 +4,7 @@ import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 
 export const router = Router()
 
@@ -25,7 +26,7 @@ router.post('/login', async (req, res) => {
 
   const token = jwt.sign({ 
     id: user.id, 
-    role: user.role?.name, 
+    role: user.role?.value || user.role?.name, 
     companyId: user.companyId, 
     type: 'usuario',
     allowedCompanies 
@@ -168,13 +169,24 @@ router.post('/', auth(), async (req, res) => {
     }
 
     // Usar o companyId do usuário criador
+    await ensureCompanyDefaults(prisma, companyId, professional.id)
+    const defaultRole = await prisma.role.findUnique({
+      where: {
+        companyId_value: {
+          companyId: primaryCompanyId,
+          value: 'comercial',
+        },
+      },
+    })
+    const roleId = req.body.roleId || defaultRole?.id || null
+
     const created = await prisma.usuario.create({ 
       data: { 
         companyId: primaryCompanyId,
         name, 
         email, 
         passwordHash, 
-        roleId: req.body.roleId || null, 
+        roleId, 
         isActive: isActive !== undefined ? isActive : true 
       },
       include: { company: true, role: true }
@@ -351,5 +363,3 @@ router.delete('/:id', auth(), async (req, res) => {
     res.status(500).json(createErrorResponse(error.message || 'Erro ao deletar usuário', 500))
   }
 })
-
-

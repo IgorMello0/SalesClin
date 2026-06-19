@@ -29,6 +29,8 @@ import { router as tasksRouter } from './routes/tasks.js'
 import { router as campaignsRouter } from './routes/campaigns.js'
 import { router as authRouter } from './routes/auth.js'
 import { createErrorResponse } from './utils/response.js'
+import { prisma } from './prisma.js'
+import { bootstrapSystemDefaults } from './bootstrap/defaults.js'
 import path from 'path'
 
 const app = express()
@@ -78,15 +80,23 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 })
 
 const port = process.env.PORT || 4000
-// No Vercel (serverless), o app é exportado sem listen.
-// Em todos os outros ambientes (Docker, dev local), o servidor escuta normalmente.
-if (!process.env.VERCEL) {
+
+async function startServer() {
+  await bootstrapSystemDefaults(prisma)
+
   app.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`[server] listening on http://localhost:${port}`)
   })
 }
+// No Vercel (serverless), o app é exportado sem listen.
+// Em todos os outros ambientes (Docker, dev local), o servidor escuta normalmente.
+if (!process.env.VERCEL) {
+  startServer().catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error('[server] failed to start:', error)
+    process.exit(1)
+  })
+}
 
 export default app
-
-

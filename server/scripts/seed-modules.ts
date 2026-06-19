@@ -1,123 +1,33 @@
+import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import { bootstrapSystemDefaults } from '../bootstrap/defaults.js'
 
 const prisma = new PrismaClient()
 
-const modules = [
-  {
-    code: 'dashboard',
-    name: 'Dashboard',
-    description: 'Visão geral e métricas do sistema',
-    icon: 'LayoutDashboard',
-  },
-  {
-    code: 'agendamentos',
-    name: 'Agendamentos',
-    description: 'Gerenciamento de agendamentos',
-    icon: 'Calendar',
-  },
-  {
-    code: 'clientes',
-    name: 'Clientes',
-    description: 'Cadastro e gestão de clientes',
-    icon: 'Users',
-  },
-  {
-    code: 'relatorios',
-    name: 'Relatórios',
-    description: 'Visualização de relatórios e análises',
-    icon: 'BarChart3',
-  },
-  {
-    code: 'pagamentos',
-    name: 'Pagamentos',
-    description: 'Gestão financeira e pagamentos',
-    icon: 'DollarSign',
-  },
-  {
-    code: 'conversas',
-    name: 'Conversas',
-    description: 'Chat e mensagens com clientes',
-    icon: 'MessageCircle',
-  },
-  {
-    code: 'catalogos',
-    name: 'Catálogos',
-    description: 'Gerenciamento de serviços e produtos',
-    icon: 'Package',
-  },
-  {
-    code: 'contratos',
-    name: 'Assinatura de Contratos',
-    description: 'Contratos e documentos',
-    icon: 'FileText',
-  },
-  {
-    code: 'test',
-    name: 'Teste (Odonto)',
-    description: 'Módulo de testes odontológicos',
-    icon: 'TestTube',
-  },
-  {
-    code: 'funnel',
-    name: 'Funil de Vendas',
-    description: 'Gestão de funil de vendas e conversão',
-    icon: 'Filter',
-  },
-  {
-    code: 'metas',
-    name: 'Metas',
-    description: 'Engenharia reversa e simulador de metas',
-    icon: 'TrendingUp',
-  },
-  {
-    code: 'tarefas',
-    name: 'Tarefas',
-    description: 'Gestão de tarefas, prazos e alertas',
-    icon: 'CheckSquare',
-  },
-]
-
 async function main() {
-  console.log('🌱 Iniciando seed dos módulos...')
+  console.log('[seed] Inicializando modulos, cargos e permissoes padrao...')
 
-  for (const module of modules) {
-    const exists = await prisma.module.findUnique({
-      where: { code: module.code },
-    })
+  await bootstrapSystemDefaults(prisma)
 
-    if (exists) {
-      console.log(`✓ Módulo "${module.name}" já existe, atualizando...`)
-      await prisma.module.update({
-        where: { code: module.code },
-        data: module,
-      })
-    } else {
-      console.log(`✓ Criando módulo "${module.name}"...`)
-      await prisma.module.create({
-        data: module,
-      })
-    }
-  }
+  const [modulesCount, rolesCount, rolePermissionsCount, professionalPermissionsCount] = await Promise.all([
+    prisma.module.count(),
+    prisma.role.count(),
+    prisma.rolePermission.count(),
+    prisma.professionalPermission.count(),
+  ])
 
-  console.log('✅ Seed dos módulos concluído!')
-  
-  // Mostrar todos os módulos
-  const allModules = await prisma.module.findMany({
-    orderBy: { id: 'asc' },
-  })
-  
-  console.log('\n📋 Módulos cadastrados:')
-  allModules.forEach((m) => {
-    console.log(`  - ${m.name} (${m.code})`)
-  })
+  console.log('[seed] Concluido.')
+  console.log(`[seed] modules: ${modulesCount}`)
+  console.log(`[seed] roles: ${rolesCount}`)
+  console.log(`[seed] role_permissions: ${rolePermissionsCount}`)
+  console.log(`[seed] professional_permissions: ${professionalPermissionsCount}`)
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Erro ao executar seed:', e)
+  .catch((error) => {
+    console.error('[seed] Erro ao executar seed:', error)
     process.exit(1)
   })
   .finally(async () => {
     await prisma.$disconnect()
   })
-

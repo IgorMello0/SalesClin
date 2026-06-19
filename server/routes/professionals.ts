@@ -4,6 +4,7 @@ import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 
 export const router = Router()
 
@@ -262,8 +263,14 @@ router.post('/', async (req, res) => {
       where: { id: empresa.id },
       data: { ownerId: created.id }
     })
+    await ensureCompanyDefaults(prisma, empresa.id, created.id)
     
-    const token = jwt.sign({ id: created.id, type: 'profissional' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+    const token = jwt.sign({
+      id: created.id,
+      companyId: empresa.id,
+      type: 'profissional',
+      allowedCompanies: [empresa.id],
+    }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
     console.log('[Signup] Cadastro bem-sucedido:', email)
     
     res.status(201).json(createSuccessResponse({ 
@@ -372,5 +379,3 @@ router.get('/:id/clientes', auth(false), async (req, res) => {
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
-
-

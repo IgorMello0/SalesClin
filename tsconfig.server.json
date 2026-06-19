@@ -13,7 +13,12 @@
     "rootDir": "./server"
   },
   "include": ["server/**/*"],
-  "exclude": ["node_modules", "dist", "server/scripts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "server/scripts/create-admin.ts",
+    "server/scripts/make-admin.ts",
+    "server/scripts/make-professional-admin.ts",
+    "server/scripts/migrate-roles.ts"
+  ]
 }
-
-

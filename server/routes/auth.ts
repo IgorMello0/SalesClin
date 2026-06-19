@@ -5,6 +5,7 @@ import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
 import fs from 'fs'
 import path from 'path'
+import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 
 export const router = Router()
 
@@ -115,6 +116,30 @@ router.post('/google', async (req, res) => {
     }
 
     // ── 4. Montar resposta (mesma estrutura do login normal) ──
+    if (!professional.companyId) {
+      const companyName = `Empresa de ${professional.name || email.split('@')[0]}`
+      const company = await prisma.empresa.create({
+        data: {
+          name: companyName,
+          ownerId: professional.id,
+          isActive: true,
+        }
+      })
+
+      professional = await prisma.professional.update({
+        where: { id: professional.id },
+        data: {
+          companyId: company.id,
+          companyName,
+        },
+        include: { company: true, ownedCompanies: true }
+      })
+
+      await ensureCompanyDefaults(prisma, company.id, professional.id)
+    } else {
+      await ensureCompanyDefaults(prisma, professional.companyId, professional.id)
+    }
+
     const availableCompanies = professional.ownedCompanies.length > 0
       ? professional.ownedCompanies.map(c => ({ id: c.id, name: c.name }))
       : (professional.company ? [{ id: professional.company.id, name: professional.company.name }] : [])

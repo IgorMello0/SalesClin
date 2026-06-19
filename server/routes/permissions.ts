@@ -153,6 +153,12 @@ router.get('/user/:id', auth(), async (req, res) => {
       include: { module: true },
     })
 
+    const rolePermissions = user.roleId
+      ? await prisma.rolePermission.findMany({
+          where: { roleId: user.roleId },
+        })
+      : []
+
     // Se for profissional, buscar suas próprias permissões para filtrar
     let professionalPermissions: any[] = []
     if (isProfessional) {
@@ -171,6 +177,7 @@ router.get('/user/:id', auth(), async (req, res) => {
     // Mapear permissões (usuário só pode ter acesso aos módulos que o profissional tem)
     const permissionsMap = allModules.map((module) => {
       const userPermission = permissions.find((p) => p.moduleId === module.id)
+      const rolePermission = rolePermissions.find((p) => p.moduleId === module.id)
       
       // Se for profissional, verificar se ele tem acesso ao módulo
       if (isProfessional) {
@@ -182,7 +189,7 @@ router.get('/user/:id', auth(), async (req, res) => {
           moduleCode: module.code,
           moduleName: module.name,
           moduleIcon: module.icon,
-          hasAccess: userPermission?.hasAccess ?? false,
+          hasAccess: userPermission?.hasAccess ?? rolePermission?.hasAccess ?? true,
           canEdit: professionalHasAccess, // Só pode editar se o profissional tem acesso
         }
       }
@@ -192,7 +199,7 @@ router.get('/user/:id', auth(), async (req, res) => {
         moduleCode: module.code,
         moduleName: module.name,
         moduleIcon: module.icon,
-        hasAccess: userPermission?.hasAccess ?? false,
+        hasAccess: userPermission?.hasAccess ?? rolePermission?.hasAccess ?? true,
         canEdit: true,
       }
     })
@@ -356,18 +363,44 @@ router.get('/my-permissions', auth(), async (req, res) => {
       })
     } else if (req.user.type === 'usuario') {
       // Buscar permissões do usuário
+      const allModules = await prisma.module.findMany({
+        where: { isActive: true },
+        orderBy: { id: 'asc' },
+      })
+
+      const user = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: {
+          role: {
+            include: { permissions: true },
+          },
+          companyAccess: {
+            where: req.user.companyId ? { companyId: req.user.companyId } : undefined,
+            include: {
+              role: {
+                include: { permissions: true },
+              },
+            },
+          },
+        },
+      })
+
+      const activeAccess = user?.companyAccess?.[0]
+      const rolePermissions = activeAccess?.role?.permissions || user?.role?.permissions || []
       const userPermissions = await prisma.userPermission.findMany({
         where: { userId: req.user.id },
-        include: { module: true },
       })
-      
-      permissions = userPermissions
-        .filter((p) => p.hasAccess)
-        .map((p) => ({
-          moduleCode: p.module.code,
-          moduleName: p.module.name,
-          hasAccess: true,
-        }))
+
+      permissions = allModules.map((module) => {
+        const individual = userPermissions.find((p) => p.moduleId === module.id)
+        const rolePermission = rolePermissions.find((p) => p.moduleId === module.id)
+
+        return {
+          moduleCode: module.code,
+          moduleName: module.name,
+          hasAccess: individual?.hasAccess ?? rolePermission?.hasAccess ?? true,
+        }
+      })
     }
 
     res.json(createSuccessResponse(permissions))
@@ -376,4 +409,3 @@ router.get('/my-permissions', auth(), async (req, res) => {
     res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar permissões', 500))
   }
 })
-

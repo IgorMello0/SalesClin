@@ -14,7 +14,8 @@
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:pull": "prisma db pull",
     "create-admin": "ts-node server/scripts/create-admin.ts",
-    "seed:modules": "tsx server/scripts/seed-modules.ts",
+    "seed:modules": "node dist-server/scripts/seed-modules.js",
+    "seed:modules:dev": "tsx server/scripts/seed-modules.ts",
     "make-admin": "tsx server/scripts/make-admin.ts"
   },
   "dependencies": {
