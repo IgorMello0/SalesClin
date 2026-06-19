@@ -7,7 +7,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY package.json package-lock.json .npmrc ./
+COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 RUN npm ci --legacy-peer-deps && npx prisma generate
 
@@ -30,7 +30,7 @@ RUN npx tsc -p tsconfig.server.json --outDir dist-server
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json .npmrc ./
+COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 
 # Apenas dependências de produção + Prisma client
