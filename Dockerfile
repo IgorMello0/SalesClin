@@ -34,7 +34,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 
 # Apenas dependências de produção + Prisma client
-RUN npm ci --omit=dev --ignore-scripts --legacy-peer-deps && npx prisma generate
+RUN npm ci --omit=dev --ignore-scripts --legacy-peer-deps && npx prisma@6.18.0 generate
 
 
 # ═══ STAGE 3: Production Runtime ═══
