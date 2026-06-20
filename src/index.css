@@ -172,6 +172,74 @@
     linear-gradient(180deg, hsl(222, 43%, 9%) 0%, hsl(222, 43%, 7%) 100%);
 }
 
+/* Dark mode compatibility for older light-only utility classes. */
+.dark [class~="bg-white"],
+.dark [class~="bg-slate-50"],
+.dark [class~="bg-gray-50"],
+.dark [class~="bg-slate-50/30"],
+.dark [class~="bg-slate-50/50"],
+.dark [class~="bg-white/50"],
+.dark [class~="bg-white/60"],
+.dark [class~="bg-white/80"] {
+  background-color: var(--color-card) !important;
+}
+
+.dark [class~="bg-slate-100"],
+.dark [class~="bg-gray-100"],
+.dark [class~="bg-slate-100/50"],
+.dark [class~="bg-muted/50"] {
+  background-color: var(--color-muted) !important;
+}
+
+.dark [class~="border-slate-50"],
+.dark [class~="border-slate-100"],
+.dark [class~="border-slate-100/40"],
+.dark [class~="border-slate-100/50"],
+.dark [class~="border-slate-200"],
+.dark [class~="border-gray-100"],
+.dark [class~="border-gray-200"] {
+  border-color: var(--color-border) !important;
+}
+
+.dark [class~="border-b-slate-100/50"],
+.dark [class~="border-t-slate-100"],
+.dark [class~="border-t-slate-100/50"] {
+  border-color: var(--color-border) !important;
+}
+
+.dark [class~="text-slate-900"],
+.dark [class~="text-slate-800"],
+.dark [class~="text-slate-700"],
+.dark [class~="text-gray-900"],
+.dark [class~="text-gray-800"],
+.dark [class~="text-gray-700"] {
+  color: var(--color-foreground) !important;
+}
+
+.dark [class~="text-slate-600"],
+.dark [class~="text-slate-500"],
+.dark [class~="text-slate-400"],
+.dark [class~="text-gray-600"],
+.dark [class~="text-gray-500"],
+.dark [class~="text-gray-400"] {
+  color: var(--color-muted-foreground) !important;
+}
+
+.dark [class~="hover:bg-slate-50"]:hover,
+.dark [class~="hover:bg-slate-50/50"]:hover,
+.dark [class~="hover:bg-slate-100"]:hover,
+.dark [class~="hover:bg-gray-50"]:hover,
+.dark [class~="hover:bg-gray-100"]:hover {
+  background-color: var(--color-muted) !important;
+}
+
+.dark [class~="hover:text-slate-700"]:hover,
+.dark [class~="hover:text-slate-800"]:hover,
+.dark [class~="hover:text-gray-700"]:hover,
+.dark [class~="hover:text-gray-800"]:hover {
+  color: var(--color-foreground) !important;
+}
+
 /* Hover card effect */
 .hover-card {
   transition: all 0.3s ease-in-out;
