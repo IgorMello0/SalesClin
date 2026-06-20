@@ -335,7 +335,7 @@ const Clients = () => {
                 <span className="sm:hidden">Novo</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-3xl bg-white p-0">
+            <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-3xl bg-card p-0">
               <div className="relative p-6 bg-[#0B1525] border-b border-[#0B1525] overflow-hidden shrink-0 rounded-t-3xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
                 <DialogTitle className="text-xl font-bold text-white font-headline relative z-10">
@@ -353,7 +353,7 @@ const Clients = () => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Ex: João da Silva"
-                    className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                    className="h-11 rounded-xl bg-muted/40 border-border focus-visible:ring-secondary/30"
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -364,7 +364,7 @@ const Clients = () => {
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
                       placeholder="(11) 99999-9999"
-                      className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                      className="h-11 rounded-xl bg-muted/40 border-border focus-visible:ring-secondary/30"
                     />
                   </div>
                   <div className="space-y-2">
@@ -375,7 +375,7 @@ const Clients = () => {
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="email@exemplo.com"
-                      className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                      className="h-11 rounded-xl bg-muted/40 border-border focus-visible:ring-secondary/30"
                     />
                   </div>
                 </div>
@@ -386,12 +386,12 @@ const Clients = () => {
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     placeholder="Informações adicionais..."
-                    className="h-11 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-secondary/30"
+                    className="h-11 rounded-xl bg-muted/40 border-border focus-visible:ring-secondary/30"
                   />
                 </div>
               </div>
-              <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 rounded-b-3xl">
-                <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold text-slate-500 hover:bg-slate-200 h-11 px-6">
+              <div className="p-5 border-t border-border bg-muted/30 flex justify-end gap-3 rounded-b-3xl">
+                <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold text-muted-foreground hover:bg-muted h-11 px-6">
                   Cancelar
                 </Button>
                 <Button onClick={handleSave} className="bg-primary hover:bg-primary/90 text-white rounded-xl font-bold h-11 px-6 shadow-sm">
@@ -464,7 +464,7 @@ const Clients = () => {
 
       {/* Clients Table Area */}
       <div className="premium-card overflow-hidden rounded-3xl border-0 shadow-sm">
-        <div className="p-6 border-b border-slate-100/50 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-6 border-b border-border bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h3 className="text-lg font-bold text-primary font-headline flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">list_alt</span>
             Lista de Pacientes
@@ -473,14 +473,14 @@ const Clients = () => {
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
             <Input
               placeholder="Buscar por nome, email ou telefone..."
-              className="pl-10 bg-white border-slate-200 focus-visible:ring-secondary/20 transition-all rounded-xl h-11 shadow-sm"
+              className="pl-10 bg-card border-border focus-visible:ring-secondary/20 transition-all rounded-xl h-11 shadow-sm"
               value={searchDebounce}
               onChange={(e) => setSearchDebounce(e.target.value)}
             />
           </div>
         </div>
         
-        <div id="clients-table" className="p-0 overflow-hidden bg-white">
+        <div id="clients-table" className="p-0 overflow-hidden bg-card">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <span className="material-symbols-outlined text-secondary text-4xl animate-spin mb-3">progress_activity</span>
@@ -490,7 +490,7 @@ const Clients = () => {
             // Mobile View
             <div className="space-y-3 p-4">
               {filteredClients.map((client) => (
-                <div key={client.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30">
+                <div key={client.id} className="p-4 rounded-2xl border border-border bg-muted/30">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10">
@@ -510,7 +510,7 @@ const Clients = () => {
                     </div>
                   </div>
                   
-                  <div className="space-y-2 mt-4 pt-3 border-t border-slate-100">
+                  <div className="space-y-2 mt-4 pt-3 border-t border-border">
                     {client.phone && (
                       <div className="flex items-center gap-2 text-slate-500 text-xs font-medium">
                         <span className="material-symbols-outlined text-[14px]">phone</span>
@@ -519,7 +519,7 @@ const Clients = () => {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100">
+                  <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-border">
                     <Button variant="outline" size="sm" onClick={() => handleOpenDialog(client)} className="flex-1 h-8 rounded-lg text-[10px] font-bold">
                       <span className="material-symbols-outlined text-[14px] mr-1">edit</span> Editar
                     </Button>
@@ -534,8 +534,8 @@ const Clients = () => {
             // Desktop View
             <div className="w-full">
               <Table className="w-full">
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow className="hover:bg-transparent border-b-slate-100/50">
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="hover:bg-transparent border-b-border">
                     <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 px-6">Paciente</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12">Contato</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 text-center">Status</TableHead>
@@ -545,7 +545,7 @@ const Clients = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredClients.map((client) => (
-                    <TableRow key={client.id} className="hover:bg-slate-50/50 border-b-slate-100/50 transition-colors">
+                    <TableRow key={client.id} className="hover:bg-muted/30 border-b-border transition-colors">
                       <TableCell className="px-6 py-4">
                         <div className="flex items-center space-x-3">
                           <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 flex-shrink-0">
@@ -567,13 +567,13 @@ const Clients = () => {
                       <TableCell className="py-4">
                         <div className="space-y-1">
                           {client.phone && (
-                            <div className="flex items-center text-xs font-bold text-slate-600 gap-1.5">
+                            <div className="flex items-center text-xs font-bold text-foreground gap-1.5">
                               <span className="material-symbols-outlined text-[14px] text-slate-400">phone</span>
                               {client.phone}
                             </div>
                           )}
                           {client.email && (
-                            <div className="flex items-center text-[10px] text-slate-500 gap-1.5">
+                            <div className="flex items-center text-[10px] text-muted-foreground gap-1.5">
                               <span className="material-symbols-outlined text-[12px] text-slate-400">mail</span>
                               {client.email}
                             </div>
@@ -589,7 +589,7 @@ const Clients = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center py-4">
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground font-bold text-xs">
                           {client.totalAppointments}
                         </span>
                       </TableCell>
@@ -604,12 +604,12 @@ const Clients = () => {
                             <span className="material-symbols-outlined text-[16px]">query_stats</span>
                             Dossiê
                           </Button>
-                          <div className="w-[1px] h-4 bg-slate-200 mx-1"></div>
+                          <div className="w-[1px] h-4 bg-border mx-1"></div>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleOpenDialog(client)}
-                            className="h-9 w-9 p-0 text-slate-400 hover:text-primary hover:bg-slate-100 rounded-lg"
+                            className="h-9 w-9 p-0 text-muted-foreground hover:text-primary hover:bg-muted rounded-lg"
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </Button>
@@ -617,7 +617,7 @@ const Clients = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(client.id)}
-                            className="h-9 w-9 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                            className="h-9 w-9 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg"
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </Button>
@@ -632,8 +632,8 @@ const Clients = () => {
           
           {filteredClients.length === 0 && !isLoading && (
             <div className="text-center py-16 px-4">
-              <span className="material-symbols-outlined text-4xl text-slate-200 mb-2">sentiment_dissatisfied</span>
-              <p className="text-sm font-bold text-slate-500">
+              <span className="material-symbols-outlined text-4xl text-muted mb-2">sentiment_dissatisfied</span>
+              <p className="text-sm font-bold text-muted-foreground">
                 {searchQuery ? 'Nenhum paciente encontrado com essa busca.' : 'Nenhum paciente cadastrado.'}
               </p>
             </div>
