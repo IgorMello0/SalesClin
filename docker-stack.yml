@@ -21,11 +21,11 @@ services:
       - /opt/docker/data/sellclin/uploads:/app/uploads
     environment:
       # ─── Banco de Dados ───
-      - DATABASE_URL=${DATABASE_URL}
-      - DIRECT_URL=${DIRECT_URL}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL precisa estar definido no .env antes do deploy}
+      - DIRECT_URL=${DIRECT_URL:?DIRECT_URL precisa estar definido no .env antes do deploy}
       # ─── Autenticação ───
-      - JWT_SECRET=${JWT_SECRET}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET precisa estar definido no .env antes do deploy}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID precisa estar definido no .env antes do deploy}
       # ─── Runtime ───
       - NODE_ENV=production
       - PORT=4000
