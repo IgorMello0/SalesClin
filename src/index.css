@@ -478,6 +478,80 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Authenticated app dark surfaces. Keep this late in the file so legacy
+   light utilities cannot punch white panels through the dark shell. */
+.dark .premium-card,
+.dark [class~="bg-card"],
+.dark [class~="bg-background"],
+.dark [class~="bg-popover"] {
+  background-color: var(--color-card) !important;
+  color: var(--color-card-foreground) !important;
+}
+
+.dark .premium-card [class~="bg-muted"],
+.dark .premium-card [class~="bg-muted/20"],
+.dark .premium-card [class~="bg-muted/30"],
+.dark .premium-card [class~="bg-muted/40"],
+.dark .premium-card [class~="bg-muted/50"],
+.dark [class~="bg-slate-50/95"],
+.dark [class~="bg-slate-100/80"],
+.dark [class~="bg-white/90"],
+.dark [class~="bg-white/95"] {
+  background-color: color-mix(in srgb, var(--color-muted) 72%, transparent) !important;
+}
+
+.dark [class~="bg-primary/95"] {
+  background-color: var(--color-card) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-foreground) !important;
+}
+
+.dark table,
+.dark thead,
+.dark tbody,
+.dark tr,
+.dark th,
+.dark td {
+  background-color: transparent !important;
+  border-color: var(--color-border) !important;
+}
+
+.dark .premium-card thead,
+.dark .premium-card [class~="bg-muted/30"] {
+  background-color: var(--color-muted) !important;
+}
+
+.dark .premium-card tbody,
+.dark .premium-card td,
+.dark .premium-card [id$="-table"] {
+  background-color: var(--color-card) !important;
+}
+
+.dark input,
+.dark textarea,
+.dark select,
+.dark [role="combobox"] {
+  background-color: var(--color-muted) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-foreground) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--color-muted-foreground) !important;
+}
+
+.dark [class~="from-card"] {
+  --tw-gradient-from: var(--color-card) !important;
+}
+
+.dark [class~="to-slate-50/50"],
+.dark [class~="to-slate-50"],
+.dark [class~="to-white"],
+.dark [class~="to-white/50"] {
+  --tw-gradient-to: var(--color-card) !important;
+}
+
 /* Safe area padding for notched phones */
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-bottom {
