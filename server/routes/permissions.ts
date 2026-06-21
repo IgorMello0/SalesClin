@@ -3,8 +3,23 @@ import { prisma } from '../prisma.js'
 import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { logAudit } from '../utils/audit.js'
+import { getCompanyModuleEntitlements, OPERATIONAL_SUBSCRIPTION_STATUSES, ALWAYS_ALLOWED_MODULES } from '../services/billing.js'
 
 export const router = Router()
+
+async function getPlanPermissionContext(companyId?: number | null) {
+  const entitlements = await getCompanyModuleEntitlements(companyId)
+  const statusAllowsUsage = OPERATIONAL_SUBSCRIPTION_STATUSES.has(entitlements.subscriptionStatus)
+
+  return {
+    planCode: entitlements.planCode,
+    subscriptionStatus: entitlements.subscriptionStatus,
+    canAccessModule(moduleCode: string) {
+      if (ALWAYS_ALLOWED_MODULES.has(moduleCode)) return true
+      return statusAllowsUsage && entitlements.moduleCodes.has(moduleCode)
+    },
+  }
+}
 
 // ==================== PERMISSÕES DE PROFISSIONAIS ====================
 
@@ -310,6 +325,87 @@ router.put('/user/:id', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[Permissions] Erro ao atualizar permissões do usuário:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar permissões', 500))
+  }
+})
+
+router.get('/my-permissions', auth(), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json(createErrorResponse('Nao autenticado', 401))
+    }
+
+    const planContext = await getPlanPermissionContext(req.user.companyId)
+    const allModules = await prisma.module.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+    })
+
+    const withPlan = (module: { code: string; name: string }, internalHasAccess: boolean) => {
+      const planHasAccess = planContext.canAccessModule(module.code)
+      return {
+        moduleCode: module.code,
+        moduleName: module.name,
+        hasAccess: internalHasAccess && planHasAccess,
+        blockedByPlan: !planHasAccess,
+        planCode: planContext.planCode,
+        subscriptionStatus: planContext.subscriptionStatus,
+      }
+    }
+
+    if (req.user.role === 'admin') {
+      return res.json(createSuccessResponse(allModules.map((module) => withPlan(module, true))))
+    }
+
+    if (req.user.type === 'profissional') {
+      const profPermissions = await prisma.professionalPermission.findMany({
+        where: { professionalId: req.user.id },
+      })
+
+      const permissions = allModules.map((module) => {
+        const perm = profPermissions.find((permission) => permission.moduleId === module.id)
+        return withPlan(module, perm?.hasAccess ?? true)
+      })
+
+      return res.json(createSuccessResponse(permissions))
+    }
+
+    if (req.user.type === 'usuario') {
+      const user = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: {
+          role: {
+            include: { permissions: true },
+          },
+          companyAccess: {
+            where: req.user.companyId ? { companyId: req.user.companyId } : undefined,
+            include: {
+              role: {
+                include: { permissions: true },
+              },
+            },
+          },
+        },
+      })
+
+      const activeAccess = user?.companyAccess?.[0]
+      const rolePermissions = activeAccess?.role?.permissions || user?.role?.permissions || []
+      const userPermissions = await prisma.userPermission.findMany({
+        where: { userId: req.user.id },
+      })
+
+      const permissions = allModules.map((module) => {
+        const individual = userPermissions.find((permission) => permission.moduleId === module.id)
+        const rolePermission = rolePermissions.find((permission) => permission.moduleId === module.id)
+        return withPlan(module, individual?.hasAccess ?? rolePermission?.hasAccess ?? true)
+      })
+
+      return res.json(createSuccessResponse(permissions))
+    }
+
+    return res.json(createSuccessResponse([]))
+  } catch (error: any) {
+    console.error('[Permissions] Erro ao buscar permissoes do usuario logado:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar permissoes', 500))
   }
 })
 

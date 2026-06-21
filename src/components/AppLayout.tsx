@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
 import { AppTopNavbar } from '@/components/AppTopNavbar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { BillingBanner } from '@/components/BillingBanner';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { ProductTour } from '@/components/onboarding/ProductTour';
 
@@ -33,6 +34,7 @@ const AppLayout = () => {
         <ProductTour />
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+          <BillingBanner />
           {/* Main content area */}
           {isFullScreen ? (
             <div className="flex-1 overflow-hidden">
@@ -56,6 +58,7 @@ const AppLayout = () => {
       <ProductTour />
       {/* Top Navbar */}
       <AppTopNavbar />
+      <BillingBanner />
 
       {/* Main content area */}
       {isFullScreen ? (

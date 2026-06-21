@@ -2,10 +2,12 @@ import { useNavigate } from 'react-router-dom';
 
 interface ModuleBlockedPageProps {
   moduleName?: string;
+  reason?: 'permission' | 'plan';
 }
 
-export function ModuleBlockedPage({ moduleName }: ModuleBlockedPageProps) {
+export function ModuleBlockedPage({ moduleName, reason = 'permission' }: ModuleBlockedPageProps) {
   const navigate = useNavigate();
+  const isPlanBlocked = reason === 'plan';
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 animate-in fade-in zoom-in-95 duration-500">
@@ -37,8 +39,9 @@ export function ModuleBlockedPage({ moduleName }: ModuleBlockedPageProps) {
 
         {/* Description */}
         <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed max-w-md mx-auto">
-          Você não tem permissão para acessar este módulo do sistema.
-          Entre em contato com o administrador da sua clínica para solicitar a liberação.
+          {isPlanBlocked
+            ? 'Este módulo não está incluído no plano da clínica. Para liberar, revise a assinatura ou altere o plano contratado.'
+            : 'Você não tem permissão para acessar este módulo do sistema. Entre em contato com o administrador da sua clínica para solicitar a liberação.'}
         </p>
 
         {/* Actions */}
@@ -55,7 +58,7 @@ export function ModuleBlockedPage({ moduleName }: ModuleBlockedPageProps) {
             className="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
           >
             <span className="material-symbols-outlined text-lg">settings</span>
-            Configurações
+            {isPlanBlocked ? 'Ver plano' : 'Configurações'}
           </button>
         </div>
 
@@ -63,7 +66,9 @@ export function ModuleBlockedPage({ moduleName }: ModuleBlockedPageProps) {
         <div className="pt-4">
           <div className="inline-flex items-center gap-2 text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-100 dark:border-slate-700/50">
             <span className="material-symbols-outlined text-sm">info</span>
-            Cada módulo pode ser liberado individualmente pelo administrador
+            {isPlanBlocked
+              ? 'As permissões internas nunca liberam módulos fora do plano contratado'
+              : 'Cada módulo pode ser liberado individualmente pelo administrador'}
           </div>
         </div>
       </div>

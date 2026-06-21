@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { professionalsApi, permissionsApi, usuariosApi, authApi } from '@/lib/api';
+import { professionalsApi, permissionsApi, usuariosApi, authApi, type ModulePermission } from '@/lib/api';
 
 interface CompanyAccess {
   id: number;
@@ -21,11 +21,7 @@ interface Professional {
   onboardingCompleted?: boolean;
 }
 
-interface Permission {
-  moduleCode: string;
-  moduleName: string;
-  hasAccess: boolean;
-}
+type Permission = ModulePermission;
 
 interface AuthContextType {
   professional: Professional | null;

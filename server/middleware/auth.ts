@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { createErrorResponse } from '../utils/response.js'
 import { prisma } from '../prisma.js'
+import { canCompanyAccessModule } from '../services/billing.js'
 
 export type AuthUser = {
   id: number
@@ -119,11 +120,6 @@ export function requireModule(moduleCode: string) {
         return res.status(401).json(createErrorResponse('Não autenticado', 401))
       }
 
-      // Admin tem acesso a tudo
-      if (req.user.role === 'admin') {
-        return next()
-      }
-
       // Importar prisma aqui para evitar circular dependency
       const { prisma } = await import('../prisma.js')
 
@@ -134,6 +130,18 @@ export function requireModule(moduleCode: string) {
 
       if (!module) {
         console.warn(`[Auth] Módulo "${moduleCode}" não encontrado no banco. Liberando acesso por padrão.`)
+        return next()
+      }
+
+      const planAccess = await canCompanyAccessModule(req.user.companyId, moduleCode)
+      if (!planAccess.hasAccess) {
+        return res.status(403).json(
+          createErrorResponse('Este modulo nao esta incluido no plano da clinica', 403)
+        )
+      }
+
+      // Admin tem acesso a todos os modulos liberados pelo plano
+      if (req.user.role === 'admin') {
         return next()
       }
 

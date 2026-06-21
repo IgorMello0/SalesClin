@@ -1,8 +1,147 @@
 import { Router } from 'express';
 import { prisma } from '../prisma.js';
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js';
+import {
+  getPeriodEndForCycle,
+  getProductIdForPlan,
+  isBillingCycle,
+  isPlanCode,
+  markWebhookEventProcessed,
+  verifyAbacateWebhookSignature,
+  type BillingCycle,
+  type PlanCode,
+} from '../services/billing.js';
 
 export const router = Router();
+
+function planAndCycleFromProductId(productId?: string | null) {
+  if (!productId) return null;
+
+  for (const planCode of ['start', 'pro'] as PlanCode[]) {
+    for (const billingCycle of ['monthly', 'yearly'] as BillingCycle[]) {
+      if (productId === getProductIdForPlan(planCode, billingCycle)) {
+        return { planCode, billingCycle };
+      }
+    }
+  }
+
+  return null;
+}
+
+function companyIdFromExternalId(externalId?: string | null) {
+  const match = externalId?.match(/^sellclin-(\d+)-/);
+  return match ? Number(match[1]) : null;
+}
+
+function normalizeAbacateStatus(eventName: string, payloadStatus?: string | null) {
+  const event = eventName.toLowerCase();
+  const status = payloadStatus?.toLowerCase() || '';
+
+  if (event.includes('cancel') || status.includes('cancel')) return 'canceled';
+  if (event.includes('expired') || status.includes('expired')) return 'expired';
+  if (event.includes('failed') || event.includes('refused') || status.includes('failed') || status.includes('refused')) {
+    return 'payment_pending';
+  }
+  if (event.includes('trial_started')) return 'active';
+  if (event.includes('completed') || event.includes('renewed') || status === 'active' || status === 'paid') {
+    return 'active';
+  }
+
+  return 'payment_pending';
+}
+
+router.post('/abacate-pay', async (req, res) => {
+  try {
+    const expectedSecret = process.env.ABACATEPAY_WEBHOOK_SECRET;
+    const querySecret = typeof req.query.webhookSecret === 'string' ? req.query.webhookSecret : undefined;
+
+    if (expectedSecret && querySecret !== expectedSecret) {
+      return res.status(401).json(createErrorResponse('Webhook nao autorizado', 401));
+    }
+
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body || {});
+    const signature = req.headers['x-webhook-signature'];
+    const signatureValue = Array.isArray(signature) ? signature[0] : signature;
+
+    if (!verifyAbacateWebhookSignature(rawBody, signatureValue)) {
+      return res.status(401).json(createErrorResponse('Assinatura invalida', 401));
+    }
+
+    const body = req.body || {};
+    const eventId = body.id || body.eventId;
+    const eventName = body.event || body.type || body.eventType || 'unknown';
+
+    if (!eventId) {
+      return res.status(400).json(createErrorResponse('Evento sem id', 400));
+    }
+
+    const alreadyProcessed = await prisma.billingWebhookEvent.findUnique({
+      where: { eventId },
+    });
+
+    if (alreadyProcessed) {
+      return res.json(createSuccessResponse({ received: true, duplicate: true }));
+    }
+
+    const data = body.data || {};
+    const subscription = data.subscription || data;
+    const checkout = data.checkout || {};
+    const payment = data.payment || {};
+    const itemProductId = checkout.items?.[0]?.id || subscription.items?.[0]?.id;
+    const metadata = checkout.metadata || subscription.metadata || body.metadata || {};
+    const parsedCompanyId = Number(metadata.companyId);
+    const companyId = Number.isFinite(parsedCompanyId) && parsedCompanyId > 0
+      ? parsedCompanyId
+      : companyIdFromExternalId(checkout.externalId || payment.externalId || subscription.externalId || body.externalId);
+    const productMatch = planAndCycleFromProductId(itemProductId);
+    const planCode = metadata.planCode || productMatch?.planCode;
+    const billingCycle = metadata.billingCycle || productMatch?.billingCycle;
+
+    if (!companyId) {
+      return res.status(400).json(createErrorResponse('Evento sem clinica vinculada', 400));
+    }
+
+    const normalizedStatus = normalizeAbacateStatus(eventName, subscription.status || checkout.status || payment.status);
+    const resolvedPlanCode = isPlanCode(planCode) ? planCode : undefined;
+    const resolvedBillingCycle = isBillingCycle(billingCycle) ? billingCycle : undefined;
+    const subscriptionId = subscription.id || data.subscriptionId || body.subscriptionId || null;
+    const checkoutId = checkout.id || data.checkoutId || body.checkoutId || null;
+    const trialEndsAt = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : undefined;
+    const canceledAt = subscription.canceledAt
+      ? new Date(subscription.canceledAt)
+      : normalizedStatus === 'canceled'
+        ? new Date()
+        : undefined;
+
+    await prisma.companySubscription.update({
+      where: { companyId },
+      data: {
+        ...(resolvedPlanCode ? { planCode: resolvedPlanCode } : {}),
+        ...(resolvedBillingCycle ? { billingCycle: resolvedBillingCycle } : {}),
+        status: normalizedStatus,
+        ...(trialEndsAt ? { trialEndsAt } : {}),
+        currentPeriodEndsAt: normalizedStatus === 'active' ? getPeriodEndForCycle(resolvedBillingCycle || 'monthly') : undefined,
+        abacateSubscriptionId: subscriptionId,
+        abacateCheckoutId: checkoutId,
+        canceledAt,
+      },
+    });
+
+    if (resolvedPlanCode) {
+      await prisma.empresa.update({
+        where: { id: companyId },
+        data: { plan: resolvedPlanCode },
+      });
+    }
+
+    await markWebhookEventProcessed(eventId, eventName, body);
+
+    return res.json(createSuccessResponse({ received: true }));
+  } catch (error: any) {
+    console.error('[Webhook/AbacatePay] Erro:', error);
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao processar webhook', 500));
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 // Helpers

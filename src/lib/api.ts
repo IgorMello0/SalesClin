@@ -14,6 +14,31 @@ export interface ApiResponse<T> {
   }
 }
 
+export interface ModulePermission {
+  moduleId?: number
+  moduleCode: string
+  moduleName: string
+  moduleIcon?: string
+  hasAccess: boolean
+  blockedByPlan?: boolean
+  planCode?: string
+  subscriptionStatus?: string
+  canEdit?: boolean
+}
+
+export interface BillingStatus {
+  planCode: string
+  billingCycle: 'monthly' | 'yearly'
+  status: string
+  trialEndsAt: string
+  currentPeriodEndsAt?: string | null
+  daysRemaining: number
+  modules: Array<{ code: string; name: string; icon?: string | null }>
+  abacateSubscriptionId?: string | null
+  abacateCheckoutId?: string | null
+  checkoutUrl?: string | null
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -259,19 +284,36 @@ export const modulesApi = {
 export const permissionsApi = {
   // Permissões de profissionais
   getProfessionalPermissions: async (professionalId: number) => 
-    apiRequest<Array<{ moduleId: number; moduleCode: string; moduleName: string; moduleIcon?: string; hasAccess: boolean }>>(`/permissions/professional/${professionalId}`),
+    apiRequest<Array<ModulePermission>>(`/permissions/professional/${professionalId}`),
   updateProfessionalPermissions: async (professionalId: number, permissions: Array<{ moduleId: number; hasAccess: boolean }>) => 
     apiRequest<any>(`/permissions/professional/${professionalId}`, { method: 'PUT', body: JSON.stringify({ permissions }) }),
   
   // Permissões de usuários
   getUserPermissions: async (userId: number) => 
-    apiRequest<Array<{ moduleId: number; moduleCode: string; moduleName: string; moduleIcon?: string; hasAccess: boolean; canEdit?: boolean }>>(`/permissions/user/${userId}`),
+    apiRequest<Array<ModulePermission>>(`/permissions/user/${userId}`),
   updateUserPermissions: async (userId: number, permissions: Array<{ moduleId: number; hasAccess: boolean }>) => 
     apiRequest<any>(`/permissions/user/${userId}`, { method: 'PUT', body: JSON.stringify({ permissions }) }),
   
   // Minhas permissões (usuário logado)
   getMyPermissions: async () => 
-    apiRequest<Array<{ moduleCode: string; moduleName: string; hasAccess: boolean }>>('/permissions/my-permissions'),
+    apiRequest<Array<ModulePermission>>('/permissions/my-permissions'),
+}
+
+export const billingApi = {
+  getStatus: async () => apiRequest<BillingStatus>('/billing/status'),
+  selectPlan: async (planCode: string, billingCycle: 'monthly' | 'yearly' = 'monthly') =>
+    apiRequest<{ planCode: string; billingCycle: string; status: string }>('/billing/select-plan', {
+      method: 'POST',
+      body: JSON.stringify({ planCode, billingCycle }),
+    }),
+  createCheckout: async (planCode?: string, billingCycle?: 'monthly' | 'yearly') =>
+    apiRequest<{ checkoutId?: string | null; checkoutUrl: string }>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ planCode, billingCycle }),
+    }),
+  cancelTrial: async () => apiRequest<{ planCode: string; status: string; canceledAt?: string | null }>('/billing/cancel-trial', {
+    method: 'POST',
+  }),
 }
 
 // -- Módulo de Empresas movido para o final do arquivo --

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SiteFooter } from '@/components/SiteFooter';
+import { billingApi } from '@/lib/api';
 import { 
   Check, ArrowRight, ShieldCheck, Zap, Sparkles, 
   Lock, CreditCard, Award, HeartHandshake, CheckCircle2, ChevronRight,
@@ -71,7 +72,19 @@ const SelectPlan = () => {
     }
   }, [isActivating]);
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
+    if (selectedPlan !== 'enterprise' && localStorage.getItem('token')) {
+      const response = await billingApi.selectPlan(selectedPlan);
+      if (!response.success) {
+        toast({
+          title: 'Não foi possível selecionar o plano',
+          description: response.error?.message || 'Tente novamente em instantes.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setIsActivating(true);
   };
 

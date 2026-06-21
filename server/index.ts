@@ -28,6 +28,7 @@ import { router as notificationsRouter } from './routes/notifications.js'
 import { router as tasksRouter } from './routes/tasks.js'
 import { router as campaignsRouter } from './routes/campaigns.js'
 import { router as authRouter } from './routes/auth.js'
+import { router as billingRouter } from './routes/billing.js'
 import { createErrorResponse } from './utils/response.js'
 import { prisma } from './prisma.js'
 import { bootstrapSystemDefaults } from './bootstrap/defaults.js'
@@ -35,7 +36,12 @@ import path from 'path'
 
 const app = express()
 app.use(cors())
-app.use(json({ limit: '20mb' }))
+app.use(json({
+  limit: '20mb',
+  verify: (req, _res, buffer) => {
+    ;(req as express.Request & { rawBody?: string }).rawBody = buffer.toString('utf8')
+  },
+}))
 app.use(urlencoded({ limit: '20mb', extended: true }))
 
 app.get('/api/health', (_req, res) => {
@@ -68,6 +74,7 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/tasks', tasksRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/auth', authRouter)
+app.use('/api/billing', billingRouter)
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))

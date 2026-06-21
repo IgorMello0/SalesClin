@@ -371,6 +371,7 @@ model Empresa {
   messageCampaigns     MessageCampaign[]
   tasks                Task[]
   notifications        Notification[]
+  subscription         CompanySubscription?
 
   @@map("empresas")
 }
@@ -495,8 +496,66 @@ model Module {
   professionalPermissions ProfessionalPermission[]
   rolePermissions         RolePermission[]
   userPermissions         UserPermission[]
+  planModules             PlanModule[]
 
   @@map("modules")
+}
+
+model Plan {
+  code          String                @id
+  name          String
+  description   String?
+  priceCents    Int?                  @map("price_cents")
+  isActive      Boolean               @default(true) @map("is_active")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  modules       PlanModule[]
+  subscriptions CompanySubscription[]
+
+  @@map("plans")
+}
+
+model PlanModule {
+  planCode  String   @map("plan_code")
+  moduleId  Int      @map("module_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  plan      Plan     @relation(fields: [planCode], references: [code], onDelete: Cascade)
+
+  @@id([planCode, moduleId])
+  @@map("plan_modules")
+}
+
+model CompanySubscription {
+  id                    Int       @id @default(autoincrement())
+  companyId             Int       @unique @map("company_id")
+  planCode              String    @map("plan_code")
+  billingCycle          String    @default("monthly") @map("billing_cycle")
+  status                String    @default("trialing")
+  trialEndsAt           DateTime  @map("trial_ends_at")
+  currentPeriodEndsAt   DateTime? @map("current_period_ends_at")
+  abacateSubscriptionId String?   @unique @map("abacate_subscription_id")
+  abacateCheckoutId     String?   @map("abacate_checkout_id")
+  checkoutUrl           String?   @map("checkout_url")
+  canceledAt            DateTime? @map("canceled_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  company               Empresa   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan                  Plan      @relation(fields: [planCode], references: [code])
+
+  @@map("company_subscriptions")
+}
+
+model BillingWebhookEvent {
+  id          Int      @id @default(autoincrement())
+  provider    String   @default("abacate_pay")
+  eventId     String   @unique @map("event_id")
+  eventType   String?  @map("event_type")
+  payload     Json
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("billing_webhook_events")
 }
 
 model ProfessionalPermission {

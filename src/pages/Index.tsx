@@ -35,6 +35,19 @@ const Index = () => {
   const [revenue, setRevenue] = useState(150000);
   const [ticket, setTicket] = useState(5000);
 
+  useEffect(() => {
+    const root = window.document.documentElement;
+    const savedTheme = localStorage.getItem('theme');
+
+    root.classList.remove('dark');
+    root.classList.add('light');
+
+    return () => {
+      root.classList.remove('light', 'dark');
+      root.classList.add(savedTheme === 'dark' ? 'dark' : 'light');
+    };
+  }, []);
+
   const totalSales = Math.round(revenue / ticket);
   const neededLeads = Math.round(totalSales / (0.60 * 0.45));
 

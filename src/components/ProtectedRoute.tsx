@@ -38,7 +38,13 @@ export function ProtectedRoute({ children, moduleCode, moduleName }: ProtectedRo
 
     // Verificar se tem acesso ao módulo
     if (!hasModuleAccess(moduleCode)) {
-      return <ModuleBlockedPage moduleName={moduleName || moduleCode} />;
+      const permission = permissions.find((item) => item.moduleCode === moduleCode);
+      return (
+        <ModuleBlockedPage
+          moduleName={moduleName || moduleCode}
+          reason={permission?.blockedByPlan ? 'plan' : 'permission'}
+        />
+      );
     }
   }
 

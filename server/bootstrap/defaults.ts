@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { ensureCompanySubscription } from '../services/billing.js'
 
 type PrismaExecutor = PrismaClient | Parameters<Parameters<PrismaClient['$transaction']>[0]>[0]
 
@@ -82,6 +83,27 @@ const DEFAULT_ROLES = [
   { name: 'Comercial', value: 'comercial' },
 ]
 
+export const DEFAULT_PLANS = [
+  {
+    code: 'start',
+    name: 'Start',
+    description: 'Plano inicial com todos os modulos operacionais atuais',
+    priceCents: null,
+  },
+  {
+    code: 'pro',
+    name: 'Pro',
+    description: 'Plano completo com Start e modulos premium futuros',
+    priceCents: null,
+  },
+  {
+    code: 'enterprise',
+    name: 'Enterprise',
+    description: 'Plano gerenciado manualmente para operacoes sob consulta',
+    priceCents: null,
+  },
+]
+
 export async function ensureDefaultModules(prisma: PrismaExecutor) {
   for (const module of DEFAULT_MODULES) {
     await prisma.module.upsert({
@@ -97,12 +119,56 @@ export async function ensureDefaultModules(prisma: PrismaExecutor) {
   }
 }
 
+export async function ensureDefaultPlans(prisma: PrismaExecutor) {
+  await ensureDefaultModules(prisma)
+
+  for (const plan of DEFAULT_PLANS) {
+    await prisma.plan.upsert({
+      where: { code: plan.code },
+      update: {
+        name: plan.name,
+        description: plan.description,
+        priceCents: plan.priceCents,
+        isActive: true,
+      },
+      create: plan,
+    })
+  }
+
+  const currentModules = await prisma.module.findMany({
+    where: {
+      isActive: true,
+      code: { in: DEFAULT_MODULES.map((module) => module.code) },
+    },
+    select: { id: true },
+  })
+
+  for (const planCode of ['start', 'pro', 'enterprise']) {
+    for (const module of currentModules) {
+      await prisma.planModule.upsert({
+        where: {
+          planCode_moduleId: {
+            planCode,
+            moduleId: module.id,
+          },
+        },
+        update: {},
+        create: {
+          planCode,
+          moduleId: module.id,
+        },
+      })
+    }
+  }
+}
+
 export async function ensureCompanyDefaults(
   prisma: PrismaExecutor,
   companyId: number,
   professionalId?: number | null
 ) {
-  await ensureDefaultModules(prisma)
+  await ensureDefaultPlans(prisma)
+  await ensureCompanySubscription(prisma, companyId)
 
   const ownerId = professionalId ?? await resolveCompanyOwnerId(prisma, companyId)
   if (!ownerId) return
@@ -151,7 +217,7 @@ export async function ensureCompanyDefaults(
 }
 
 export async function bootstrapSystemDefaults(prisma: PrismaClient) {
-  await ensureDefaultModules(prisma)
+  await ensureDefaultPlans(prisma)
 
   const companies = await prisma.empresa.findMany({
     select: { id: true, ownerId: true },
