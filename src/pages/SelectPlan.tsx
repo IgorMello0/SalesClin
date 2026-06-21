@@ -73,8 +73,13 @@ const SelectPlan = () => {
   }, [isActivating]);
 
   const handleActivate = async () => {
-    if (selectedPlan !== 'enterprise' && localStorage.getItem('token')) {
-      const response = await billingApi.selectPlan(selectedPlan);
+    if (selectedPlan !== 'enterprise') {
+      if (!localStorage.getItem('token')) {
+        navigate('/signup');
+        return;
+      }
+
+      const response = await billingApi.createCheckout(selectedPlan, 'monthly');
       if (!response.success) {
         toast({
           title: 'Não foi possível selecionar o plano',
@@ -83,6 +88,18 @@ const SelectPlan = () => {
         });
         return;
       }
+
+      if (response.data?.checkoutUrl) {
+        window.location.href = response.data.checkoutUrl;
+        return;
+      }
+
+      toast({
+        title: 'Checkout indisponÃ­vel',
+        description: 'A AbacatePay nÃ£o retornou o link de pagamento.',
+        variant: 'destructive',
+      });
+      return;
     }
 
     setIsActivating(true);

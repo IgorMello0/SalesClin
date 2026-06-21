@@ -75,7 +75,7 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
-  const { professional, logout, hasModuleAccess, permissions, switchCompany } = useAuth();
+  const { professional, logout, hasModuleAccess, permissionsLoaded, switchCompany } = useAuth();
   const { isMobileSidebarOpen, setMobileSidebarOpen, isSidebarCollapsed, setSidebarCollapsed } = useLayout();
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,7 +92,7 @@ export function AppSidebar() {
       return false;
     }
 
-    if (permissions.length === 0) return true;
+    if (!permissionsLoaded) return false;
     return hasModuleAccess(item.moduleCode);
   });
 

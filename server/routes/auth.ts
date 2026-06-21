@@ -1,10 +1,10 @@
 import { Router } from 'express'
-import { prisma } from '../prisma.js'
-import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
 import fs from 'fs'
 import path from 'path'
+import { prisma } from '../prisma.js'
+import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 
 export const router = Router()
@@ -12,20 +12,27 @@ export const router = Router()
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID)
 
-// ─── Login com Google para Profissionais ───
+function resolveGooglePhoto(currentPhotoUrl?: string | null, googlePicture?: string | null) {
+  if (currentPhotoUrl?.startsWith('/uploads/')) {
+    const fullPath = path.join(process.cwd(), currentPhotoUrl)
+    return fs.existsSync(fullPath) ? currentPhotoUrl : googlePicture || null
+  }
+
+  return currentPhotoUrl || googlePicture || null
+}
+
 router.post('/google', async (req, res) => {
   try {
     const { credential } = req.body
 
     if (!credential) {
-      return res.status(400).json(createErrorResponse('Token do Google não fornecido', 400))
+      return res.status(400).json(createErrorResponse('Token do Google nao fornecido', 400))
     }
 
     if (!GOOGLE_CLIENT_ID) {
-      return res.status(500).json(createErrorResponse('GOOGLE_CLIENT_ID não configurado no servidor', 500))
+      return res.status(500).json(createErrorResponse('GOOGLE_CLIENT_ID nao configurado no servidor', 500))
     }
 
-    // Verificar o token do Google
     let payload: any
     try {
       const ticket = await googleClient.verifyIdToken({
@@ -34,96 +41,64 @@ router.post('/google', async (req, res) => {
       })
       payload = ticket.getPayload()
     } catch (err: any) {
-      console.error('[Auth Google] Token inválido:', err.message)
-      return res.status(401).json(createErrorResponse('Token do Google inválido ou expirado', 401))
+      console.error('[Auth Google] Token invalido:', err.message)
+      return res.status(401).json(createErrorResponse('Token do Google invalido ou expirado', 401))
     }
 
-    if (!payload || !payload.email) {
-      return res.status(401).json(createErrorResponse('Não foi possível obter o e-mail da conta Google', 401))
+    if (!payload?.email) {
+      return res.status(401).json(createErrorResponse('Nao foi possivel obter o e-mail da conta Google', 401))
     }
 
     const { email, name, sub: googleId, picture } = payload
-
     console.log('[Auth Google] Login attempt:', email)
 
-    // ── 1. Tentar achar profissional pelo googleId ──
     let professional = await prisma.professional.findFirst({
       where: { googleId },
-      include: { company: true, ownedCompanies: true }
+      include: { company: true, ownedCompanies: true },
     })
 
     if (professional) {
-      // Se achou pelo googleId, verificar se a foto física local no disco existe. Se não existir, atualizar para a foto do Google!
-      let photoToUse = professional.photoUrl
-      if (photoToUse && photoToUse.startsWith('/uploads/')) {
-        const fullPath = path.join(process.cwd(), photoToUse)
-        if (!fs.existsSync(fullPath)) {
-          professional = await prisma.professional.update({
-            where: { id: professional.id },
-            data: { photoUrl: picture || null },
-            include: { company: true, ownedCompanies: true }
-          })
-        }
-      }
-    }
-
-    // ── 2. Se não achou pelo googleId, tentar pelo e-mail ──
-    if (!professional) {
-      professional = await prisma.professional.findUnique({
-        where: { email },
-        include: { company: true, ownedCompanies: true }
-      })
-
-      // Se achou pelo e-mail, vincular o googleId e a foto
-      if (professional) {
-        let photoToUse = professional.photoUrl
-        if (photoToUse && photoToUse.startsWith('/uploads/')) {
-          const fullPath = path.join(process.cwd(), photoToUse)
-          if (!fs.existsSync(fullPath)) {
-            photoToUse = picture || null
-          }
-        } else if (!photoToUse) {
-          photoToUse = picture || null
-        }
-
+      const photoUrl = resolveGooglePhoto(professional.photoUrl, picture)
+      if (photoUrl !== professional.photoUrl) {
         professional = await prisma.professional.update({
           where: { id: professional.id },
-          data: { 
-            googleId, 
-            authProvider: professional.authProvider || 'local',
-            photoUrl: photoToUse
-          },
-          include: { company: true, ownedCompanies: true }
+          data: { photoUrl },
+          include: { company: true, ownedCompanies: true },
         })
       }
     }
 
-    // ── 3. Se ainda não existe, criar conta nova ──
     if (!professional) {
-      professional = await prisma.professional.create({
-        data: {
-          name: name || email.split('@')[0],
-          email,
-          passwordHash: '', // Sem senha — login é via Google
-          googleId,
-          authProvider: 'google',
-          photoUrl: picture || null,
-          onboardingCompleted: false,
-        },
-        include: { company: true, ownedCompanies: true }
+      professional = await prisma.professional.findUnique({
+        where: { email },
+        include: { company: true, ownedCompanies: true },
       })
-      console.log('[Auth Google] Novo profissional criado:', email)
+
+      if (professional) {
+        professional = await prisma.professional.update({
+          where: { id: professional.id },
+          data: {
+            googleId,
+            authProvider: professional.authProvider || 'local',
+            photoUrl: resolveGooglePhoto(professional.photoUrl, picture),
+          },
+          include: { company: true, ownedCompanies: true },
+        })
+      }
     }
 
-    // ── 4. Montar resposta (mesma estrutura do login normal) ──
+    if (!professional) {
+      return res.status(403).json(createErrorResponse('Cadastro com Google exige checkout. Escolha um plano antes de criar a conta.', 403))
+    }
+
     if (!professional.companyId) {
-      const companyName = `Empresa de ${professional.name || email.split('@')[0]}`
+      const companyName = `Empresa de ${professional.name || name || email.split('@')[0]}`
       const company = await prisma.empresa.create({
         data: {
           name: companyName,
           ownerId: professional.id,
           isActive: true,
-        }
+        },
       })
 
       professional = await prisma.professional.update({
@@ -132,7 +107,7 @@ router.post('/google', async (req, res) => {
           companyId: company.id,
           companyName,
         },
-        include: { company: true, ownedCompanies: true }
+        include: { company: true, ownedCompanies: true },
       })
 
       await ensureCompanyDefaults(prisma, company.id, professional.id)
@@ -150,7 +125,7 @@ router.post('/google', async (req, res) => {
       id: professional.id,
       companyId: professional.companyId,
       type: 'profissional',
-      allowedCompanies
+      allowedCompanies,
     }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
 
     console.log('[Auth Google] Login bem-sucedido:', email)
@@ -167,10 +142,10 @@ router.post('/google', async (req, res) => {
         onboardingCompleted: professional.onboardingCompleted,
         company: professional.company ? {
           id: professional.company.id,
-          name: professional.company.name
+          name: professional.company.name,
         } : null,
-        companies: availableCompanies
-      }
+        companies: availableCompanies,
+      },
     }))
   } catch (error: any) {
     console.error('[Auth Google] Erro:', error)

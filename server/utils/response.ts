@@ -8,8 +8,8 @@ export function createSuccessResponse<T>(data: T, pagination?: Pagination) {
   return { success: true, data, pagination }
 }
 
-export function createErrorResponse(message: string, code?: number) {
-  return { success: false, error: { message, code } }
+export function createErrorResponse(message: string, code?: number, details?: Record<string, unknown>) {
+  return { success: false, error: { message, code, ...(details || {}) } }
 }
 
 export function parsePagination(query: any) {
@@ -19,5 +19,4 @@ export function parsePagination(query: any) {
   const take = pageSize
   return { page, pageSize, skip, take }
 }
-
 

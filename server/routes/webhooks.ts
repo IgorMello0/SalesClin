@@ -1,12 +1,16 @@
 import { Router } from 'express';
 import { prisma } from '../prisma.js';
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js';
+import { ensureCompanyDefaults } from '../bootstrap/defaults.js';
 import {
+  activateBillingAddon,
+  addDays,
   getPeriodEndForCycle,
   getProductIdForPlan,
   isBillingCycle,
   isPlanCode,
   markWebhookEventProcessed,
+  TRIAL_DAYS,
   verifyAbacateWebhookSignature,
   type BillingCycle,
   type PlanCode,
@@ -33,6 +37,16 @@ function companyIdFromExternalId(externalId?: string | null) {
   return match ? Number(match[1]) : null;
 }
 
+function pendingSignupIdFromExternalId(externalId?: string | null) {
+  const match = externalId?.match(/^sellclin-signup-(\d+)-/);
+  return match ? Number(match[1]) : null;
+}
+
+function billingAddonIdFromExternalId(externalId?: string | null) {
+  const match = externalId?.match(/^sellclin-addon-(\d+)-/);
+  return match ? Number(match[1]) : null;
+}
+
 function normalizeAbacateStatus(eventName: string, payloadStatus?: string | null) {
   const event = eventName.toLowerCase();
   const status = payloadStatus?.toLowerCase() || '';
@@ -42,12 +56,144 @@ function normalizeAbacateStatus(eventName: string, payloadStatus?: string | null
   if (event.includes('failed') || event.includes('refused') || status.includes('failed') || status.includes('refused')) {
     return 'payment_pending';
   }
-  if (event.includes('trial_started')) return 'active';
+  if (event.includes('trial_started') || status === 'trialing') return 'trialing';
   if (event.includes('completed') || event.includes('renewed') || status === 'active' || status === 'paid') {
     return 'active';
   }
 
   return 'payment_pending';
+}
+
+async function activatePendingSignup(params: {
+  pendingSignupId: number
+  normalizedStatus: string
+  planCode?: PlanCode
+  billingCycle?: BillingCycle
+  subscriptionId?: string | null
+  checkoutId?: string | null
+}) {
+  const pending = await prisma.pendingSignup.findUnique({
+    where: { id: params.pendingSignupId },
+  });
+
+  if (!pending) {
+    throw new Error('Cadastro pendente nao encontrado.');
+  }
+
+  if (pending.status === 'completed' && pending.companyId && pending.professionalId) {
+    return {
+      pendingSignupId: pending.id,
+      companyId: pending.companyId,
+      professionalId: pending.professionalId,
+      alreadyCompleted: true,
+    };
+  }
+
+  if (!['trialing', 'active'].includes(params.normalizedStatus)) {
+    await prisma.pendingSignup.update({
+      where: { id: pending.id },
+      data: {
+        status: params.normalizedStatus,
+        abacateCheckoutId: params.checkoutId || pending.abacateCheckoutId,
+      },
+    });
+
+    return {
+      pendingSignupId: pending.id,
+      status: params.normalizedStatus,
+      activated: false,
+    };
+  }
+
+  const existingProfessional = await prisma.professional.findUnique({
+    where: { email: pending.email },
+    include: { company: true },
+  });
+
+  if (existingProfessional) {
+    await prisma.pendingSignup.update({
+      where: { id: pending.id },
+      data: {
+        status: 'completed',
+        professionalId: existingProfessional.id,
+        companyId: existingProfessional.companyId,
+        completedAt: new Date(),
+      },
+    });
+
+    return {
+      pendingSignupId: pending.id,
+      companyId: existingProfessional.companyId,
+      professionalId: existingProfessional.id,
+      alreadyCompleted: true,
+    };
+  }
+
+  const planCode = params.planCode || (isPlanCode(pending.planCode) ? pending.planCode : 'start');
+  const billingCycle = params.billingCycle || (isBillingCycle(pending.billingCycle) ? pending.billingCycle : 'monthly');
+  const trialEndsAt = addDays(new Date(), TRIAL_DAYS);
+
+  return prisma.$transaction(async (tx) => {
+    const company = await tx.empresa.create({
+      data: {
+        name: pending.companyName || `Empresa de ${pending.name}`,
+        plan: planCode,
+        isActive: true,
+      },
+    });
+
+    const professional = await tx.professional.create({
+      data: {
+        name: pending.name,
+        email: pending.email,
+        passwordHash: pending.passwordHash,
+        phone: pending.phone,
+        specialization: pending.specialization,
+        companyId: company.id,
+        companyName: pending.companyName,
+        authProvider: 'local',
+      },
+    });
+
+    await tx.empresa.update({
+      where: { id: company.id },
+      data: { ownerId: professional.id },
+    });
+
+    await ensureCompanyDefaults(tx, company.id, professional.id);
+
+    await tx.companySubscription.update({
+      where: { companyId: company.id },
+      data: {
+        planCode,
+        billingCycle,
+        status: params.normalizedStatus,
+        trialEndsAt,
+        currentPeriodEndsAt: params.normalizedStatus === 'active' ? getPeriodEndForCycle(billingCycle) : null,
+        abacateSubscriptionId: params.subscriptionId || null,
+        abacateCheckoutId: params.checkoutId || pending.abacateCheckoutId,
+        checkoutUrl: pending.checkoutUrl,
+      },
+    });
+
+    await tx.pendingSignup.update({
+      where: { id: pending.id },
+      data: {
+        status: 'completed',
+        companyId: company.id,
+        professionalId: professional.id,
+        completedAt: new Date(),
+        abacateCheckoutId: params.checkoutId || pending.abacateCheckoutId,
+      },
+    });
+
+    return {
+      pendingSignupId: pending.id,
+      companyId: company.id,
+      professionalId: professional.id,
+      activated: true,
+    };
+  });
 }
 
 router.post('/abacate-pay', async (req, res) => {
@@ -89,6 +235,14 @@ router.post('/abacate-pay', async (req, res) => {
     const payment = data.payment || {};
     const itemProductId = checkout.items?.[0]?.id || subscription.items?.[0]?.id;
     const metadata = checkout.metadata || subscription.metadata || body.metadata || {};
+    const parsedPendingSignupId = Number(metadata.pendingSignupId);
+    const pendingSignupId = Number.isFinite(parsedPendingSignupId) && parsedPendingSignupId > 0
+      ? parsedPendingSignupId
+      : pendingSignupIdFromExternalId(checkout.externalId || payment.externalId || subscription.externalId || body.externalId);
+    const parsedBillingAddonId = Number(metadata.billingAddonId);
+    const billingAddonId = Number.isFinite(parsedBillingAddonId) && parsedBillingAddonId > 0
+      ? parsedBillingAddonId
+      : billingAddonIdFromExternalId(checkout.externalId || payment.externalId || subscription.externalId || body.externalId);
     const parsedCompanyId = Number(metadata.companyId);
     const companyId = Number.isFinite(parsedCompanyId) && parsedCompanyId > 0
       ? parsedCompanyId
@@ -97,15 +251,46 @@ router.post('/abacate-pay', async (req, res) => {
     const planCode = metadata.planCode || productMatch?.planCode;
     const billingCycle = metadata.billingCycle || productMatch?.billingCycle;
 
-    if (!companyId) {
-      return res.status(400).json(createErrorResponse('Evento sem clinica vinculada', 400));
-    }
-
     const normalizedStatus = normalizeAbacateStatus(eventName, subscription.status || checkout.status || payment.status);
     const resolvedPlanCode = isPlanCode(planCode) ? planCode : undefined;
     const resolvedBillingCycle = isBillingCycle(billingCycle) ? billingCycle : undefined;
     const subscriptionId = subscription.id || data.subscriptionId || body.subscriptionId || null;
     const checkoutId = checkout.id || data.checkoutId || body.checkoutId || null;
+
+    if (pendingSignupId) {
+      const activation = await activatePendingSignup({
+        pendingSignupId,
+        normalizedStatus,
+        planCode: resolvedPlanCode,
+        billingCycle: resolvedBillingCycle,
+        subscriptionId,
+        checkoutId,
+      });
+
+      await markWebhookEventProcessed(eventId, eventName, body);
+      return res.json(createSuccessResponse({ received: true, signup: activation }));
+    }
+
+    if (billingAddonId) {
+      const addonBillingCycle = isBillingCycle(metadata.billingCycle) ? metadata.billingCycle : resolvedBillingCycle;
+      const quantity = Number(metadata.quantity || checkout.items?.[0]?.quantity || subscription.items?.[0]?.quantity || 1);
+      const addonActivation = await activateBillingAddon({
+        billingAddonId,
+        normalizedStatus,
+        subscriptionId,
+        checkoutId,
+        billingCycle: addonBillingCycle,
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      });
+
+      await markWebhookEventProcessed(eventId, eventName, body);
+      return res.json(createSuccessResponse({ received: true, addon: addonActivation }));
+    }
+
+    if (!companyId) {
+      return res.status(400).json(createErrorResponse('Evento sem clinica vinculada', 400));
+    }
+
     const trialEndsAt = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : undefined;
     const canceledAt = subscription.canceledAt
       ? new Date(subscription.canceledAt)

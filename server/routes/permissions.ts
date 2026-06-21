@@ -409,6 +409,7 @@ router.get('/my-permissions', auth(), async (req, res) => {
   }
 })
 
+/*
 // ==================== MINHAS PERMISSÕES ====================
 
   // Obter permissões do usuário logado
@@ -505,3 +506,4 @@ router.get('/my-permissions', auth(), async (req, res) => {
     res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar permissões', 500))
   }
 })
+*/

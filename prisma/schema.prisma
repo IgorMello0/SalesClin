@@ -51,6 +51,7 @@ model Professional {
   createdTasks        Task[]                   @relation("CreatedTasks")
   notifications       Notification[]
   messageCampaigns    MessageCampaign[]
+  billingAddons       BillingAddon[]
 
   @@map("professionals")
 }
@@ -372,6 +373,7 @@ model Empresa {
   tasks                Task[]
   notifications        Notification[]
   subscription         CompanySubscription?
+  billingAddons        BillingAddon[]
 
   @@map("empresas")
 }
@@ -547,6 +549,28 @@ model CompanySubscription {
   @@map("company_subscriptions")
 }
 
+model PendingSignup {
+  id                Int       @id @default(autoincrement())
+  name              String
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  phone             String?
+  specialization    String?
+  companyName       String?   @map("company_name")
+  planCode          String    @map("plan_code")
+  billingCycle      String    @default("monthly") @map("billing_cycle")
+  status            String    @default("pending")
+  abacateCheckoutId String?   @unique @map("abacate_checkout_id")
+  checkoutUrl       String?   @map("checkout_url")
+  companyId         Int?      @map("company_id")
+  professionalId    Int?      @map("professional_id")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("pending_signups")
+}
+
 model BillingWebhookEvent {
   id          Int      @id @default(autoincrement())
   provider    String   @default("abacate_pay")
@@ -556,6 +580,28 @@ model BillingWebhookEvent {
   processedAt DateTime @default(now()) @map("processed_at")
 
   @@map("billing_webhook_events")
+}
+
+model BillingAddon {
+  id                    Int          @id @default(autoincrement())
+  ownerProfessionalId   Int          @map("owner_professional_id")
+  targetCompanyId       Int?         @map("target_company_id")
+  addonCode             String       @map("addon_code")
+  quantity              Int          @default(1)
+  billingCycle          String       @default("monthly") @map("billing_cycle")
+  status                String       @default("payment_pending")
+  abacateSubscriptionId String?      @unique @map("abacate_subscription_id")
+  abacateCheckoutId     String?      @unique @map("abacate_checkout_id")
+  checkoutUrl           String?      @map("checkout_url")
+  currentPeriodEndsAt   DateTime?    @map("current_period_ends_at")
+  canceledAt            DateTime?    @map("canceled_at")
+  activatedAt           DateTime?    @map("activated_at")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+  owner                 Professional @relation(fields: [ownerProfessionalId], references: [id], onDelete: Cascade)
+  targetCompany         Empresa?     @relation(fields: [targetCompanyId], references: [id], onDelete: Cascade)
+
+  @@map("billing_addons")
 }
 
 model ProfessionalPermission {

@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { prisma } from '../prisma.js'
 import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
+import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
+import { getBillingUsage } from '../services/billing.js'
 
 export const router = Router()
 
@@ -286,6 +288,16 @@ router.post('/', auth(), async (req, res) => {
       return res.status(403).json(createErrorResponse('Apenas proprietários podem criar clínicas', 403))
     }
 
+    const usage = await getBillingUsage(req.user.id, req.user.companyId)
+    if (!usage.clinics.canCreate) {
+      return res.status(402).json(createErrorResponse('Limite de clinicas do plano atingido.', 402, {
+        limitType: 'clinics',
+        addonCode: 'extra_clinic',
+        used: usage.clinics.used,
+        limit: usage.clinics.limit,
+      }))
+    }
+
     const { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } = req.body
     
     const created = await prisma.empresa.create({ 
@@ -301,6 +313,7 @@ router.post('/', auth(), async (req, res) => {
         ownerId: req.user.id // Vincula a empresa ao dono que está criando
       } 
     })
+    await ensureCompanyDefaults(prisma, created.id, req.user.id)
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {
     console.error('[Empresas] Erro ao criar empresa:', error)
@@ -345,5 +358,3 @@ router.delete('/:id', auth(), async (req, res) => {
   await prisma.empresa.delete({ where: { id } })
   res.json(createSuccessResponse({ id }))
 })
-
-

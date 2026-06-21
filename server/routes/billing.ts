@@ -3,13 +3,58 @@ import { auth, requireCompany } from '../middleware/auth.js'
 import { prisma } from '../prisma.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import {
+  createAddonCheckout,
   createAbacateSubscriptionCheckout,
+  createPendingSignupCheckout,
+  getBillingUsage,
   getCompanyBillingStatus,
+  isAddonCode,
   isBillingCycle,
   isPlanCode,
 } from '../services/billing.js'
 
 export const router = Router()
+
+router.post('/signup-checkout', async (req, res) => {
+  try {
+    const { name, email, password, phone, specialization, companyName } = req.body || {}
+    const requestedPlanCode = req.body?.planCode
+    const requestedBillingCycle = req.body?.billingCycle || 'monthly'
+
+    if (!name || !email || !password || !phone || !specialization) {
+      return res.status(400).json(createErrorResponse('Nome, email, telefone, especialidade e senha sao obrigatorios', 400))
+    }
+
+    if (String(password).length < 6) {
+      return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
+    }
+
+    if (!isPlanCode(requestedPlanCode) || requestedPlanCode === 'enterprise') {
+      return res.status(400).json(createErrorResponse('Plano invalido para checkout automatico', 400))
+    }
+
+    if (!isBillingCycle(requestedBillingCycle)) {
+      return res.status(400).json(createErrorResponse('Ciclo de cobranca invalido', 400))
+    }
+
+    const checkout = await createPendingSignupCheckout({
+      name,
+      email,
+      password,
+      phone,
+      specialization,
+      companyName,
+      planCode: requestedPlanCode,
+      billingCycle: requestedBillingCycle,
+    })
+
+    return res.status(201).json(createSuccessResponse(checkout))
+  } catch (error: any) {
+    console.error('[Billing] Erro ao criar checkout de cadastro:', error)
+    const status = error.message?.includes('Email ja cadastrado') ? 400 : 500
+    return res.status(status).json(createErrorResponse(error.message || 'Erro ao criar checkout de cadastro', status))
+  }
+})
 
 router.get('/status', auth(), requireCompany, async (req, res) => {
   try {
@@ -19,6 +64,20 @@ router.get('/status', auth(), requireCompany, async (req, res) => {
   } catch (error: any) {
     console.error('[Billing] Erro ao buscar status:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar assinatura', 500))
+  }
+})
+
+router.get('/usage', auth(), requireCompany, async (req, res) => {
+  try {
+    if (req.user?.type !== 'profissional') {
+      return res.status(403).json(createErrorResponse('Apenas profissionais podem consultar limites da conta', 403))
+    }
+
+    const usage = await getBillingUsage(req.user.id, req.user.companyId)
+    return res.json(createSuccessResponse(usage))
+  } catch (error: any) {
+    console.error('[Billing] Erro ao buscar uso:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar limites', 500))
   }
 })
 
@@ -47,6 +106,40 @@ router.post('/checkout', auth(), requireCompany, async (req, res) => {
   } catch (error: any) {
     console.error('[Billing] Erro ao criar checkout:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao criar checkout', 500))
+  }
+})
+
+router.post('/addon-checkout', auth(), requireCompany, async (req, res) => {
+  try {
+    if (req.user?.type !== 'profissional') {
+      return res.status(403).json(createErrorResponse('Apenas profissionais podem contratar extras', 403))
+    }
+
+    const requestedAddonCode = req.body?.addonCode
+    const requestedBillingCycle = req.body?.billingCycle
+    const targetCompanyId = req.body?.targetCompanyId ? Number(req.body.targetCompanyId) : req.user.companyId
+    const quantity = req.body?.quantity ? Number(req.body.quantity) : 1
+
+    if (!isAddonCode(requestedAddonCode)) {
+      return res.status(400).json(createErrorResponse('Extra invalido', 400))
+    }
+
+    if (requestedBillingCycle && !isBillingCycle(requestedBillingCycle)) {
+      return res.status(400).json(createErrorResponse('Ciclo de cobranca invalido', 400))
+    }
+
+    const checkout = await createAddonCheckout({
+      ownerProfessionalId: req.user.id,
+      addonCode: requestedAddonCode,
+      targetCompanyId: requestedAddonCode === 'extra_user' ? targetCompanyId : null,
+      billingCycle: isBillingCycle(requestedBillingCycle) ? requestedBillingCycle : undefined,
+      quantity,
+    })
+
+    return res.status(201).json(createSuccessResponse(checkout))
+  } catch (error: any) {
+    console.error('[Billing] Erro ao criar checkout de extra:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao criar checkout de extra', 500))
   }
 })
 

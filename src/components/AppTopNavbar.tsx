@@ -80,7 +80,7 @@ const menuItems = [
 ];
 
 export function AppTopNavbar() {
-  const { logout, hasModuleAccess, permissions, professional, switchCompany } = useAuth();
+  const { logout, hasModuleAccess, permissionsLoaded, professional, switchCompany } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -111,16 +111,13 @@ export function AppTopNavbar() {
     
     // Regra de Permissão Modular
     // Se tivermos permissões carregadas, verificamos o acesso
-    if (permissions.length > 0) {
-      return hasModuleAccess(item.moduleCode);
-    }
-    
-    return true;
+    if (!permissionsLoaded) return false;
+    return hasModuleAccess(item.moduleCode);
   });
 
   // Verifica se um item está bloqueado por permissão (usado apenas em casos específicos se necessário)
   const isModuleBlocked = (moduleCode: string): boolean => {
-    if (permissions.length === 0) return false;
+    if (!permissionsLoaded) return false;
     return !hasModuleAccess(moduleCode);
   };
 

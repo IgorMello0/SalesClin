@@ -5,6 +5,7 @@ import { createErrorResponse, createSuccessResponse, parsePagination } from '../
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
+import { assertCanAddUserToCompany, BillingLimitError } from '../services/billing.js'
 
 export const router = Router()
 
@@ -179,6 +180,27 @@ router.post('/', auth(), async (req, res) => {
     }
 
     // Usar o companyId do usuário criador
+    const targetCompanyIds = Array.isArray(companyIds) && companyIds.length > 0
+      ? Array.from(new Set(companyIds.map((id: any) => Number(id)).filter(Boolean)))
+      : [companyId]
+
+    for (const targetCompanyId of targetCompanyIds) {
+      try {
+        await assertCanAddUserToCompany(professional.id, targetCompanyId)
+      } catch (error: any) {
+        if (error instanceof BillingLimitError) {
+          return res.status(error.status).json(createErrorResponse(error.message, error.status, {
+            limitType: error.limitType,
+            addonCode: error.addonCode,
+            used: error.used,
+            limit: error.limit,
+            targetCompanyId,
+          }))
+        }
+        throw error
+      }
+    }
+
     await ensureCompanyDefaults(prisma, companyId, professional.id)
     const defaultRole = await prisma.role.findUnique({
       where: {
@@ -300,6 +322,29 @@ router.put('/:id', auth(), async (req, res) => {
       const validCompanyIds = companyIds.filter(id => ownedCompanyIds.includes(id));
       
       if (validCompanyIds.length > 0) {
+        const existingCompanyIds = Array.from(new Set([
+          ...(usuario.companyId ? [usuario.companyId] : []),
+          ...usuario.companyAccess.filter((access) => access.isActive).map((access) => access.companyId),
+        ]))
+
+        for (const cId of validCompanyIds) {
+          if (!existingCompanyIds.includes(cId) && isActive !== false) {
+            try {
+              await assertCanAddUserToCompany(professional.id, cId, id)
+            } catch (error: any) {
+              if (error instanceof BillingLimitError) {
+                return res.status(error.status).json(createErrorResponse(error.message, error.status, {
+                  limitType: error.limitType,
+                  addonCode: error.addonCode,
+                  used: error.used,
+                  limit: error.limit,
+                  targetCompanyId: cId,
+                }))
+              }
+              throw error
+            }
+          }
+        }
         // Exclui acessos antigos apenas nas clínicas da rede desse dono
         await prisma.userCompanyAccess.deleteMany({
           where: { userId: id, companyId: { in: ownedCompanyIds } }

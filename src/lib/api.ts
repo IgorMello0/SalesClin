@@ -39,6 +39,42 @@ export interface BillingStatus {
   checkoutUrl?: string | null
 }
 
+export type BillingCycle = 'monthly' | 'yearly'
+export type PublicPlanCode = 'start' | 'pro'
+export type BillingAddonCode = 'extra_clinic' | 'extra_user'
+
+export interface BillingUsage {
+  planCode: string
+  billingCycle: BillingCycle
+  subscriptionStatus: string
+  clinics: {
+    used: number
+    baseLimit: number | null
+    extraQuantity: number
+    limit: number | null
+    canCreate: boolean
+  }
+  users: {
+    companyId: number
+    used: number
+    baseLimit: number | null
+    extraQuantity: number
+    limit: number | null
+    canCreate: boolean
+  }
+}
+
+export interface SignupCheckoutPayload {
+  name: string
+  email: string
+  password: string
+  phone: string
+  specialization: string
+  companyName?: string
+  planCode: PublicPlanCode
+  billingCycle: BillingCycle
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -301,15 +337,31 @@ export const permissionsApi = {
 
 export const billingApi = {
   getStatus: async () => apiRequest<BillingStatus>('/billing/status'),
-  selectPlan: async (planCode: string, billingCycle: 'monthly' | 'yearly' = 'monthly') =>
+  getUsage: async () => apiRequest<BillingUsage>('/billing/usage'),
+  selectPlan: async (planCode: string, billingCycle: BillingCycle = 'monthly') =>
     apiRequest<{ planCode: string; billingCycle: string; status: string }>('/billing/select-plan', {
       method: 'POST',
       body: JSON.stringify({ planCode, billingCycle }),
     }),
-  createCheckout: async (planCode?: string, billingCycle?: 'monthly' | 'yearly') =>
+  createCheckout: async (planCode?: string, billingCycle?: BillingCycle) =>
     apiRequest<{ checkoutId?: string | null; checkoutUrl: string }>('/billing/checkout', {
       method: 'POST',
       body: JSON.stringify({ planCode, billingCycle }),
+    }),
+  createSignupCheckout: async (payload: SignupCheckoutPayload) =>
+    apiRequest<{ pendingSignupId: number; checkoutId?: string | null; checkoutUrl: string }>('/billing/signup-checkout', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  createAddonCheckout: async (payload: {
+    addonCode: BillingAddonCode
+    targetCompanyId?: number | null
+    billingCycle?: BillingCycle
+    quantity?: number
+  }) =>
+    apiRequest<{ billingAddonId: number; checkoutId?: string | null; checkoutUrl: string }>('/billing/addon-checkout', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
   cancelTrial: async () => apiRequest<{ planCode: string; status: string; canceledAt?: string | null }>('/billing/cancel-trial', {
     method: 'POST',

@@ -207,6 +207,8 @@ router.get('/:id', auth(false), async (req, res) => {
 // Criar (signup público - cria nova empresa)
 router.post('/', async (req, res) => {
   try {
+    return res.status(403).json(createErrorResponse('Cadastro publico exige checkout. Use /api/billing/signup-checkout.', 403))
+
     const { name, email, password, phone, specialization, companyName, logoUrl, contractType } = req.body
     
     if (!name || !email || !password) {

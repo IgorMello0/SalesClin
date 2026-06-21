@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, moduleCode, moduleName }: ProtectedRouteProps) {
-  const { professional, hasModuleAccess, permissions, isLoading } = useAuth();
+  const { professional, hasModuleAccess, permissions, permissionsLoaded, isLoading } = useAuth();
 
   // Aguardar carregamento
   if (isLoading) {
@@ -28,7 +28,7 @@ export function ProtectedRoute({ children, moduleCode, moduleName }: ProtectedRo
   // Se um módulo foi especificado, verificar permissão
   if (moduleCode) {
     // Aguardar permissões serem carregadas
-    if (permissions.length === 0) {
+    if (!permissionsLoaded) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

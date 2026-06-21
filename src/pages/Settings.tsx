@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
-import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi } from '@/lib/api';
+import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, type BillingUsage } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 
@@ -195,6 +195,8 @@ const EquipeView = () => {
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
   const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
+  const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
+  const [buyingUserExtra, setBuyingUserExtra] = useState(false);
 
   const loadRoles = async () => {
     try {
@@ -228,11 +230,42 @@ const EquipeView = () => {
     }
   };
 
+  const loadBillingUsage = async () => {
+    try {
+      const res = await billingApi.getUsage();
+      if (res.success && res.data) setBillingUsage(res.data);
+    } catch (e) {
+      console.error('Erro ao carregar limites de billing:', e);
+    }
+  };
+
   useEffect(() => {
     loadTeam();
     loadRoles();
     loadClinicas();
+    loadBillingUsage();
   }, []);
+
+  const handleBuyUserExtra = async () => {
+    setBuyingUserExtra(true);
+    try {
+      const res = await billingApi.createAddonCheckout({
+        addonCode: 'extra_user',
+        targetCompanyId: billingUsage?.users.companyId || professional?.companyId,
+        billingCycle: billingUsage?.billingCycle,
+        quantity: 1,
+      });
+      if (res.success && res.data?.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+        return;
+      }
+      throw new Error(res.error?.message || 'Nao foi possivel abrir o checkout.');
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setBuyingUserExtra(false);
+    }
+  };
 
   const handleAddMember = async () => {
     if (!newMember.name || !newMember.email || !newMember.password) {
@@ -254,6 +287,7 @@ const EquipeView = () => {
         setIsAdding(false);
         setNewMember({ name: '', email: '', password: '', roleId: '', companyIds: [] });
         loadTeam();
+        loadBillingUsage();
       } else {
         throw new Error(res.error?.message || 'Erro ao adicionar');
       }
@@ -269,6 +303,7 @@ const EquipeView = () => {
         toast({ title: 'Sucesso', description: 'Membro removido da equipe.' });
         if (selectedUserId === id) setSelectedUserId(null);
         loadTeam();
+        loadBillingUsage();
       }
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
@@ -411,10 +446,23 @@ const EquipeView = () => {
       </div>
 
       <div className="flex justify-between items-center">
-        <h3 className="font-medium text-sm">Funcionários ({team.length})</h3>
-        <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
-          <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : 'Novo Funcionário'}
-        </Button>
+        <div>
+          <h3 className="font-medium text-sm">Funcionários ({team.length})</h3>
+          {billingUsage && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {billingUsage.users.used} / {billingUsage.users.limit ?? 'ilimitado'} usuários nesta clínica
+            </p>
+          )}
+        </div>
+        {billingUsage && !billingUsage.users.canCreate ? (
+          <Button size="sm" onClick={handleBuyUserExtra} disabled={buyingUserExtra}>
+            <Plus className="w-4 h-4 mr-2" /> {buyingUserExtra ? 'Abrindo...' : 'Comprar usuário extra'}
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+            <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : 'Novo Funcionário'}
+          </Button>
+        )}
       </div>
       
       {isAdding && (
@@ -1081,6 +1129,8 @@ const ClinicasView = () => {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newClinica, setNewClinica] = useState({ name: '', domain: '', whatsapp: '' });
+  const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
+  const [buyingClinicExtra, setBuyingClinicExtra] = useState(false);
   
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState({ name: '', domain: '', whatsapp: '', openHour: '08:00', closeHour: '20:00' });
@@ -1100,9 +1150,39 @@ const ClinicasView = () => {
     }
   };
 
+  const loadBillingUsage = async () => {
+    try {
+      const res = await billingApi.getUsage();
+      if (res.success && res.data) setBillingUsage(res.data);
+    } catch (e) {
+      console.error('Erro ao carregar limites de billing:', e);
+    }
+  };
+
   useEffect(() => {
     loadClinicas();
+    loadBillingUsage();
   }, []);
+
+  const handleBuyClinicExtra = async () => {
+    setBuyingClinicExtra(true);
+    try {
+      const res = await billingApi.createAddonCheckout({
+        addonCode: 'extra_clinic',
+        billingCycle: billingUsage?.billingCycle,
+        quantity: 1,
+      });
+      if (res.success && res.data?.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+        return;
+      }
+      throw new Error(res.error?.message || 'Nao foi possivel abrir o checkout.');
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setBuyingClinicExtra(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newClinica.name) {
@@ -1121,6 +1201,7 @@ const ClinicasView = () => {
         setIsAdding(false);
         setNewClinica({ name: '', domain: '', whatsapp: '' });
         loadClinicas();
+        loadBillingUsage();
         
         // Timeout para atualizar a página e o token JWT ler a nova clínica
         setTimeout(() => {
@@ -1171,10 +1252,21 @@ const ClinicasView = () => {
         <div>
           <h3 className="text-lg font-bold">Minhas Clínicas</h3>
           <p className="text-sm text-muted-foreground">Gerencie as filiais da sua rede (Multi-Tenancy)</p>
+          {billingUsage && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {billingUsage.clinics.used} / {billingUsage.clinics.limit ?? 'ilimitado'} clínicas no plano
+            </p>
+          )}
         </div>
-        <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"}>
-          {isAdding ? "Cancelar" : <><Plus className="w-4 h-4 mr-2" /> Nova Clínica</>}
-        </Button>
+        {billingUsage && !billingUsage.clinics.canCreate ? (
+          <Button onClick={handleBuyClinicExtra} disabled={buyingClinicExtra}>
+            <Plus className="w-4 h-4 mr-2" /> {buyingClinicExtra ? 'Abrindo...' : 'Comprar clínica extra'}
+          </Button>
+        ) : (
+          <Button onClick={() => setIsAdding(!isAdding)} variant={isAdding ? "outline" : "default"}>
+            {isAdding ? "Cancelar" : <><Plus className="w-4 h-4 mr-2" /> Nova Clínica</>}
+          </Button>
+        )}
       </div>
 
       {isAdding && (

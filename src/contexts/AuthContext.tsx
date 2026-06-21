@@ -26,6 +26,7 @@ type Permission = ModulePermission;
 interface AuthContextType {
   professional: Professional | null;
   permissions: Permission[];
+  permissionsLoaded: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: (credential: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -43,10 +44,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [professional, setProfessional] = useState<Professional | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Carregar permissões do usuário logado
   const loadPermissions = async () => {
+    setPermissionsLoaded(false);
     try {
       const response = await permissionsApi.getMyPermissions();
       if (response.success && response.data) {
@@ -55,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('[Auth] Error loading permissions:', error);
+    } finally {
+      setPermissionsLoaded(true);
     }
   };
 
@@ -130,13 +135,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasModuleAccess = (moduleCode: string): boolean => {
     // Se não há permissões carregadas, por padrão liberamos para evitar instabilidade
     // O backend fará a validação final de qualquer forma
-    if (permissions.length === 0) return true;
+    if (!permissionsLoaded) return false;
     
     const permission = permissions.find((p) => p.moduleCode === moduleCode);
     
     // Se a permissão não foi encontrada na lista, liberamos por padrão
     // Se foi encontrada, respeitamos o campo hasAccess
-    return permission ? permission.hasAccess : true;
+    return permission ? permission.hasAccess : false;
   };
 
   useEffect(() => {
@@ -155,7 +160,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Se houver erro ao parsear, limpar dados inválidos
         localStorage.removeItem('professional');
         localStorage.removeItem('token');
+        setPermissionsLoaded(true);
       }
+    } else {
+      setPermissionsLoaded(true);
     }
     setIsLoading(false);
   }, []);
@@ -398,6 +406,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setProfessional(null);
     setPermissions([]);
+    setPermissionsLoaded(false);
     localStorage.removeItem('professional');
     localStorage.removeItem('token');
     localStorage.removeItem('userType');
@@ -408,6 +417,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       professional,
       permissions,
+      permissionsLoaded,
       login,
       loginWithGoogle,
       logout,

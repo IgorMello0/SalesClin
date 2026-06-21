@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import type { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 import { prisma } from '../prisma.js'
 
 type PrismaExecutor = PrismaClient | Parameters<Parameters<PrismaClient['$transaction']>[0]>[0]
@@ -7,11 +8,36 @@ type PrismaExecutor = PrismaClient | Parameters<Parameters<PrismaClient['$transa
 export const TRIAL_DAYS = 15
 export const PLAN_CODES = ['start', 'pro', 'enterprise'] as const
 export const BILLING_CYCLES = ['monthly', 'yearly'] as const
+export const ADDON_CODES = ['extra_clinic', 'extra_user'] as const
 export type PlanCode = typeof PLAN_CODES[number]
 export type BillingCycle = typeof BILLING_CYCLES[number]
+export type AddonCode = typeof ADDON_CODES[number]
 
 export const OPERATIONAL_SUBSCRIPTION_STATUSES = new Set(['trialing', 'active'])
 export const ALWAYS_ALLOWED_MODULES = new Set(['dashboard'])
+
+export class BillingLimitError extends Error {
+  status = 402
+  limitType: 'clinics' | 'users'
+  addonCode: AddonCode
+  used: number
+  limit: number | null
+
+  constructor(input: {
+    message: string
+    limitType: 'clinics' | 'users'
+    addonCode: AddonCode
+    used: number
+    limit: number | null
+  }) {
+    super(input.message)
+    this.name = 'BillingLimitError'
+    this.limitType = input.limitType
+    this.addonCode = input.addonCode
+    this.used = input.used
+    this.limit = input.limit
+  }
+}
 
 export function isPlanCode(value: unknown): value is PlanCode {
   return typeof value === 'string' && PLAN_CODES.includes(value as PlanCode)
@@ -19,6 +45,10 @@ export function isPlanCode(value: unknown): value is PlanCode {
 
 export function isBillingCycle(value: unknown): value is BillingCycle {
   return typeof value === 'string' && BILLING_CYCLES.includes(value as BillingCycle)
+}
+
+export function isAddonCode(value: unknown): value is AddonCode {
+  return typeof value === 'string' && ADDON_CODES.includes(value as AddonCode)
 }
 
 export function addDays(date: Date, days: number) {
@@ -193,6 +223,331 @@ export function getProductIdForPlan(planCode: PlanCode, billingCycle: BillingCyc
   return undefined
 }
 
+export function getProductIdForAddon(addonCode: AddonCode, billingCycle: BillingCycle) {
+  if (addonCode === 'extra_clinic') {
+    return billingCycle === 'yearly'
+      ? process.env.ABACATEPAY_EXTRA_CLINIC_YEARLY_PRODUCT_ID
+      : process.env.ABACATEPAY_EXTRA_CLINIC_MONTHLY_PRODUCT_ID
+  }
+
+  if (addonCode === 'extra_user') {
+    return billingCycle === 'yearly'
+      ? process.env.ABACATEPAY_EXTRA_USER_YEARLY_PRODUCT_ID
+      : process.env.ABACATEPAY_EXTRA_USER_MONTHLY_PRODUCT_ID
+  }
+
+  return undefined
+}
+
+export function getPlanBaseLimits(planCode?: string | null) {
+  if (planCode === 'enterprise') {
+    return {
+      clinicLimit: null as number | null,
+      usersPerClinicLimit: null as number | null,
+    }
+  }
+
+  if (planCode === 'pro') {
+    return {
+      clinicLimit: 3,
+      usersPerClinicLimit: 10,
+    }
+  }
+
+  return {
+    clinicLimit: 1,
+    usersPerClinicLimit: 5,
+  }
+}
+
+async function getOwnedClinicIds(ownerProfessionalId: number) {
+  const professional = await prisma.professional.findUnique({
+    where: { id: ownerProfessionalId },
+    select: {
+      companyId: true,
+      ownedCompanies: {
+        where: { isActive: true },
+        select: { id: true },
+      },
+    },
+  })
+
+  if (!professional) {
+    throw new Error('Profissional nao encontrado.')
+  }
+
+  return Array.from(new Set([
+    ...(professional.companyId ? [professional.companyId] : []),
+    ...professional.ownedCompanies.map((company) => company.id),
+  ]))
+}
+
+async function countActiveUsersForCompany(companyId: number, excludeUserId?: number | null) {
+  return prisma.usuario.count({
+    where: {
+      isActive: true,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+      OR: [
+        { companyId },
+        {
+          companyAccess: {
+            some: {
+              companyId,
+              isActive: true,
+            },
+          },
+        },
+      ],
+    },
+  })
+}
+
+async function sumActiveAddons(input: {
+  ownerProfessionalId: number
+  addonCode: AddonCode
+  targetCompanyId?: number | null
+}) {
+  const result = await prisma.billingAddon.aggregate({
+    where: {
+      ownerProfessionalId: input.ownerProfessionalId,
+      addonCode: input.addonCode,
+      status: { in: Array.from(OPERATIONAL_SUBSCRIPTION_STATUSES) },
+      targetCompanyId: input.targetCompanyId ?? null,
+    },
+    _sum: { quantity: true },
+  })
+
+  return result._sum.quantity || 0
+}
+
+export async function getBillingUsage(ownerProfessionalId: number, activeCompanyId?: number | null) {
+  const ownedClinicIds = await getOwnedClinicIds(ownerProfessionalId)
+  const targetCompanyId = activeCompanyId && ownedClinicIds.includes(activeCompanyId)
+    ? activeCompanyId
+    : ownedClinicIds[0] || null
+
+  if (!targetCompanyId) {
+    throw new Error('Clinica ativa nao encontrada.')
+  }
+
+  const billingStatus = await getCompanyBillingStatus(targetCompanyId)
+  const baseLimits = getPlanBaseLimits(billingStatus.planCode)
+  const [clinicExtraQuantity, userExtraQuantity, usersUsed] = await Promise.all([
+    sumActiveAddons({ ownerProfessionalId, addonCode: 'extra_clinic' }),
+    sumActiveAddons({ ownerProfessionalId, addonCode: 'extra_user', targetCompanyId }),
+    countActiveUsersForCompany(targetCompanyId),
+  ])
+
+  const clinicLimit = baseLimits.clinicLimit === null ? null : baseLimits.clinicLimit + clinicExtraQuantity
+  const usersPerClinicLimit = baseLimits.usersPerClinicLimit === null ? null : baseLimits.usersPerClinicLimit + userExtraQuantity
+
+  return {
+    planCode: billingStatus.planCode,
+    billingCycle: billingStatus.billingCycle,
+    subscriptionStatus: billingStatus.status,
+    clinics: {
+      used: ownedClinicIds.length,
+      baseLimit: baseLimits.clinicLimit,
+      extraQuantity: clinicExtraQuantity,
+      limit: clinicLimit,
+      canCreate: clinicLimit === null || ownedClinicIds.length < clinicLimit,
+    },
+    users: {
+      companyId: targetCompanyId,
+      used: usersUsed,
+      baseLimit: baseLimits.usersPerClinicLimit,
+      extraQuantity: userExtraQuantity,
+      limit: usersPerClinicLimit,
+      canCreate: usersPerClinicLimit === null || usersUsed < usersPerClinicLimit,
+    },
+  }
+}
+
+export async function assertCanCreateClinic(ownerProfessionalId: number) {
+  const usage = await getBillingUsage(ownerProfessionalId)
+  if (!usage.clinics.canCreate) {
+    throw new BillingLimitError({
+      message: 'Limite de clinicas do plano atingido.',
+      limitType: 'clinics',
+      addonCode: 'extra_clinic',
+      used: usage.clinics.used,
+      limit: usage.clinics.limit,
+    })
+  }
+
+  return usage
+}
+
+export async function assertCanAddUserToCompany(
+  ownerProfessionalId: number,
+  companyId: number,
+  excludeUserId?: number | null
+) {
+  const ownerClinicIds = await getOwnedClinicIds(ownerProfessionalId)
+  if (!ownerClinicIds.includes(companyId)) {
+    throw new Error('Clinica alvo nao pertence ao profissional.')
+  }
+
+  const usage = await getBillingUsage(ownerProfessionalId, companyId)
+  const used = await countActiveUsersForCompany(companyId, excludeUserId)
+  const limit = usage.users.limit
+  if (limit !== null && used >= limit) {
+    throw new BillingLimitError({
+      message: 'Limite de usuarios do plano atingido nesta clinica.',
+      limitType: 'users',
+      addonCode: 'extra_user',
+      used,
+      limit,
+    })
+  }
+
+  return usage
+}
+
+export async function createAddonCheckout(input: {
+  ownerProfessionalId: number
+  addonCode: AddonCode
+  targetCompanyId?: number | null
+  billingCycle?: BillingCycle
+  quantity?: number
+}) {
+  const ownerClinicIds = await getOwnedClinicIds(input.ownerProfessionalId)
+  const activeCompanyId = input.targetCompanyId || ownerClinicIds[0]
+
+  if (!activeCompanyId) {
+    throw new Error('Clinica ativa nao encontrada.')
+  }
+
+  if (input.addonCode === 'extra_user' && !input.targetCompanyId) {
+    throw new Error('Extra de usuario exige uma clinica alvo.')
+  }
+
+  if (input.targetCompanyId && !ownerClinicIds.includes(input.targetCompanyId)) {
+    throw new Error('Clinica alvo nao pertence ao profissional.')
+  }
+
+  const usage = await getBillingUsage(input.ownerProfessionalId, activeCompanyId)
+  const billingCycle = input.billingCycle || (isBillingCycle(usage.billingCycle) ? usage.billingCycle : 'monthly')
+  const productId = getProductIdForAddon(input.addonCode, billingCycle)
+  const apiKey = process.env.ABACATEPAY_API_KEY
+  const quantity = Math.max(1, Math.min(Number(input.quantity || 1), 50))
+
+  if (!apiKey || !productId) {
+    throw new Error('Configuracao da Abacate Pay incompleta para criar checkout de extra.')
+  }
+
+  const addon = await prisma.billingAddon.create({
+    data: {
+      ownerProfessionalId: input.ownerProfessionalId,
+      targetCompanyId: input.addonCode === 'extra_user' ? input.targetCompanyId || activeCompanyId : null,
+      addonCode: input.addonCode,
+      quantity,
+      billingCycle,
+      status: 'payment_pending',
+    },
+  })
+
+  const appUrl = getPublicAppUrl()
+  const externalId = `sellclin-addon-${addon.id}-${Date.now()}`
+  const baseUrl = process.env.ABACATEPAY_API_BASE_URL || 'https://api.abacatepay.com/v2'
+
+  const payload = {
+    items: [{ id: productId, quantity }],
+    externalId,
+    returnUrl: `${appUrl}/settings?billing=addon-return`,
+    completionUrl: `${appUrl}/settings?billing=addon-success`,
+    methods: ['CARD'],
+    metadata: {
+      billingAddonId: String(addon.id),
+      ownerProfessionalId: String(input.ownerProfessionalId),
+      addonCode: input.addonCode,
+      targetCompanyId: input.addonCode === 'extra_user' ? String(input.targetCompanyId || activeCompanyId) : '',
+      billingCycle,
+      quantity: String(quantity),
+    },
+  }
+
+  const response = await fetch(`${baseUrl}/subscriptions/create`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const body = await response.json().catch(() => ({}))
+
+  if (!response.ok || body?.success === false) {
+    const message = body?.error?.message || body?.error || 'Nao foi possivel criar checkout de extra na Abacate Pay.'
+    throw new Error(message)
+  }
+
+  const data = body?.data || body
+  const checkoutId = data?.id || data?.checkoutId || null
+  const checkoutUrl = data?.url || data?.checkoutUrl || data?.paymentUrl || null
+
+  if (!checkoutUrl) {
+    throw new Error('A Abacate Pay nao retornou a URL do checkout de extra.')
+  }
+
+  await prisma.billingAddon.update({
+    where: { id: addon.id },
+    data: {
+      abacateCheckoutId: checkoutId,
+      checkoutUrl,
+    },
+  })
+
+  return {
+    billingAddonId: addon.id,
+    checkoutId,
+    checkoutUrl,
+  }
+}
+
+export async function activateBillingAddon(input: {
+  billingAddonId: number
+  normalizedStatus: string
+  subscriptionId?: string | null
+  checkoutId?: string | null
+  billingCycle?: BillingCycle
+  quantity?: number | null
+}) {
+  const addon = await prisma.billingAddon.findUnique({
+    where: { id: input.billingAddonId },
+  })
+
+  if (!addon) {
+    throw new Error('Extra de billing nao encontrado.')
+  }
+
+  const isOperational = OPERATIONAL_SUBSCRIPTION_STATUSES.has(input.normalizedStatus)
+  const data = {
+    status: input.normalizedStatus,
+    ...(input.subscriptionId ? { abacateSubscriptionId: input.subscriptionId } : {}),
+    ...(input.checkoutId ? { abacateCheckoutId: input.checkoutId } : {}),
+    ...(input.billingCycle ? { billingCycle: input.billingCycle } : {}),
+    ...(input.quantity && input.quantity > 0 ? { quantity: input.quantity } : {}),
+    ...(isOperational ? { activatedAt: addon.activatedAt || new Date() } : {}),
+    ...(input.normalizedStatus === 'active' ? { currentPeriodEndsAt: getPeriodEndForCycle(input.billingCycle || (isBillingCycle(addon.billingCycle) ? addon.billingCycle : 'monthly')) } : {}),
+    ...(input.normalizedStatus === 'canceled' ? { canceledAt: new Date() } : {}),
+  }
+
+  const updated = await prisma.billingAddon.update({
+    where: { id: addon.id },
+    data,
+  })
+
+  return {
+    billingAddonId: updated.id,
+    addonCode: updated.addonCode,
+    targetCompanyId: updated.targetCompanyId,
+    quantity: updated.quantity,
+    status: updated.status,
+  }
+}
+
 export async function createAbacateSubscriptionCheckout(
   companyId: number,
   planCode: PlanCode,
@@ -278,6 +633,119 @@ export async function createAbacateSubscriptionCheckout(
   })
 
   return {
+    checkoutId,
+    checkoutUrl,
+  }
+}
+
+export async function createPendingSignupCheckout(input: {
+  name: string
+  email: string
+  password: string
+  phone?: string | null
+  specialization?: string | null
+  companyName?: string | null
+  planCode: PlanCode
+  billingCycle: BillingCycle
+}) {
+  if (input.planCode === 'enterprise') {
+    throw new Error('O plano Enterprise e gerenciado manualmente.')
+  }
+
+  const apiKey = process.env.ABACATEPAY_API_KEY
+  const productId = getProductIdForPlan(input.planCode, input.billingCycle)
+
+  if (!apiKey || !productId) {
+    throw new Error('Configuracao da Abacate Pay incompleta para criar checkout.')
+  }
+
+  const email = input.email.trim().toLowerCase()
+  const existingProfessional = await prisma.professional.findUnique({ where: { email } })
+  if (existingProfessional) {
+    throw new Error('Email ja cadastrado.')
+  }
+
+  const passwordHash = await bcrypt.hash(input.password, 10)
+  const pending = await prisma.pendingSignup.upsert({
+    where: { email },
+    update: {
+      name: input.name.trim(),
+      passwordHash,
+      phone: input.phone || null,
+      specialization: input.specialization || null,
+      companyName: input.companyName || null,
+      planCode: input.planCode,
+      billingCycle: input.billingCycle,
+      status: 'pending',
+      abacateCheckoutId: null,
+      checkoutUrl: null,
+      completedAt: null,
+    },
+    create: {
+      name: input.name.trim(),
+      email,
+      passwordHash,
+      phone: input.phone || null,
+      specialization: input.specialization || null,
+      companyName: input.companyName || null,
+      planCode: input.planCode,
+      billingCycle: input.billingCycle,
+      status: 'pending',
+    },
+  })
+
+  const appUrl = getPublicAppUrl()
+  const externalId = `sellclin-signup-${pending.id}-${Date.now()}`
+  const baseUrl = process.env.ABACATEPAY_API_BASE_URL || 'https://api.abacatepay.com/v2'
+
+  const payload = {
+    items: [{ id: productId, quantity: 1 }],
+    externalId,
+    returnUrl: `${appUrl}/login?signup=return`,
+    completionUrl: `${appUrl}/login?signup=success`,
+    methods: ['CARD'],
+    metadata: {
+      pendingSignupId: String(pending.id),
+      planCode: input.planCode,
+      billingCycle: input.billingCycle,
+      email,
+    },
+  }
+
+  const response = await fetch(`${baseUrl}/subscriptions/create`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const body = await response.json().catch(() => ({}))
+
+  if (!response.ok || body?.success === false) {
+    const message = body?.error?.message || body?.error || 'Nao foi possivel criar checkout na Abacate Pay.'
+    throw new Error(message)
+  }
+
+  const data = body?.data || body
+  const checkoutId = data?.id || data?.checkoutId || null
+  const checkoutUrl = data?.url || data?.checkoutUrl || data?.paymentUrl || null
+
+  if (!checkoutUrl) {
+    throw new Error('A Abacate Pay nao retornou a URL do checkout.')
+  }
+
+  await prisma.pendingSignup.update({
+    where: { id: pending.id },
+    data: {
+      abacateCheckoutId: checkoutId,
+      checkoutUrl,
+    },
+  })
+
+  return {
+    pendingSignupId: pending.id,
     checkoutId,
     checkoutUrl,
   }
