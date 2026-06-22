@@ -14,7 +14,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Settings as SettingsIcon,
   Building,
+  Clock,
+  LayoutTemplate,
+  Lock,
+  Monitor,
+  PanelLeft,
   Plus,
+  Tag,
   Trash2,
   Users,
   Eye,
