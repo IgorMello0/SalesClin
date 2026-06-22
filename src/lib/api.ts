@@ -174,6 +174,12 @@ export const dashboardApi = {
 export const authApi = {
   loginWithGoogle: async (credential: string) =>
     apiRequest<{ token: string; professional: any }>('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
+  resendVerification: async (email: string) =>
+    apiRequest<{ sent?: boolean; alreadyVerified?: boolean }>('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
+  verifyEmail: async (token: string) =>
+    apiRequest<{ verified: boolean }>(`/auth/verify-email?token=${encodeURIComponent(token)}`),
+  acceptTeamInvite: async (token: string, password: string) =>
+    apiRequest<{ accepted: boolean }>('/auth/team-invite/accept', { method: 'POST', body: JSON.stringify({ token, password }) }),
 }
 
 // Profissionais
@@ -181,7 +187,7 @@ export const professionalsApi = {
   login: async (email: string, password: string) => 
     apiRequest<{ token: string; professional: any }>('/profissionais/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   signup: async (data: { name: string; email: string; password: string; phone?: string; specialization?: string }) => 
-    apiRequest<{ token: string; professional: any }>('/profissionais', { method: 'POST', body: JSON.stringify(data) }),
+    apiRequest<{ token?: string; professional: any; requiresEmailVerification?: boolean; email?: string }>('/profissionais', { method: 'POST', body: JSON.stringify(data) }),
   completeOnboarding: async (data: any) => apiRequest<any>('/profissionais/onboarding/complete', { method: 'POST', body: JSON.stringify(data) }),
   getMe: async () => apiRequest<any>('/profissionais/me'),
   updateMe: async (data: any) => apiRequest<any>('/profissionais/me', { method: 'PUT', body: JSON.stringify(data) }),
@@ -403,6 +409,13 @@ export const empresasApi = {
   getWhatsappStatus: async () => apiRequest<any>('/empresas/my-company/whatsapp/status'),
   disconnectWhatsapp: async () => apiRequest<any>('/empresas/my-company/whatsapp/disconnect', { method: 'POST' }),
   restartWhatsapp: async () => apiRequest<any>('/empresas/my-company/whatsapp/restart', { method: 'POST' }),
+}
+
+export const googleCalendarApi = {
+  status: async () => apiRequest<any>('/google-calendar/status'),
+  connect: async () => apiRequest<{ url: string }>('/google-calendar/connect'),
+  disconnect: async () => apiRequest<any>('/google-calendar/disconnect', { method: 'POST' }),
+  resync: async () => apiRequest<any>('/google-calendar/resync', { method: 'POST' }),
 }
 
 // Configuração de Funis

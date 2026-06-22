@@ -3,9 +3,15 @@ import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
 import fs from 'fs'
 import path from 'path'
+import bcrypt from 'bcryptjs'
 import { prisma } from '../prisma.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
+import {
+  consumeEmailToken,
+  EMAIL_TOKEN_TYPES,
+  sendVerificationEmail,
+} from '../services/email-verification.js'
 
 export const router = Router()
 
@@ -20,6 +26,101 @@ function resolveGooglePhoto(currentPhotoUrl?: string | null, googlePicture?: str
 
   return currentPhotoUrl || googlePicture || null
 }
+
+router.get('/verify-email', async (req, res) => {
+  try {
+    const token = typeof req.query.token === 'string' ? req.query.token : ''
+    if (!token) return res.status(400).json(createErrorResponse('Token ausente', 400))
+
+    const record = await consumeEmailToken(token, EMAIL_TOKEN_TYPES.verification)
+
+    if (record.professionalId) {
+      await prisma.professional.update({
+        where: { id: record.professionalId },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      })
+    } else if (record.userId) {
+      await prisma.usuario.update({
+        where: { id: record.userId },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      })
+    } else {
+      return res.status(400).json(createErrorResponse('Token sem conta vinculada', 400))
+    }
+
+    return res.json(createSuccessResponse({ verified: true }))
+  } catch (error: any) {
+    return res.status(400).json(createErrorResponse(error.message || 'Nao foi possivel verificar o e-mail', 400))
+  }
+})
+
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').toLowerCase().trim()
+    if (!email) return res.status(400).json(createErrorResponse('E-mail obrigatorio', 400))
+
+    const professional = await prisma.professional.findUnique({ where: { email } })
+    if (professional) {
+      if (professional.emailVerified) return res.json(createSuccessResponse({ alreadyVerified: true }))
+      await sendVerificationEmail({
+        email: professional.email,
+        name: professional.name,
+        professionalId: professional.id,
+      })
+      return res.json(createSuccessResponse({ sent: true }))
+    }
+
+    const user = await prisma.usuario.findUnique({ where: { email } })
+    if (user) {
+      if (user.emailVerified) return res.json(createSuccessResponse({ alreadyVerified: true }))
+      await sendVerificationEmail({
+        email: user.email,
+        name: user.name,
+        userId: user.id,
+      })
+      return res.json(createSuccessResponse({ sent: true }))
+    }
+
+    return res.json(createSuccessResponse({ sent: true }))
+  } catch (error: any) {
+    console.error('[Auth] Erro ao reenviar verificacao:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao reenviar e-mail', 500))
+  }
+})
+
+router.post('/team-invite/accept', async (req, res) => {
+  try {
+    const token = String(req.body?.token || '')
+    const password = String(req.body?.password || '')
+
+    if (!token) return res.status(400).json(createErrorResponse('Token ausente', 400))
+    if (password.length < 6) return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
+
+    const record = await consumeEmailToken(token, EMAIL_TOKEN_TYPES.teamInvite)
+    if (!record.userId) return res.status(400).json(createErrorResponse('Convite sem usuario vinculado', 400))
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    await prisma.usuario.update({
+      where: { id: record.userId },
+      data: {
+        passwordHash,
+        isActive: true,
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+      },
+    })
+
+    return res.json(createSuccessResponse({ accepted: true }))
+  } catch (error: any) {
+    return res.status(400).json(createErrorResponse(error.message || 'Nao foi possivel aceitar o convite', 400))
+  }
+})
 
 router.post('/google', async (req, res) => {
   try {
@@ -59,10 +160,14 @@ router.post('/google', async (req, res) => {
 
     if (professional) {
       const photoUrl = resolveGooglePhoto(professional.photoUrl, picture)
-      if (photoUrl !== professional.photoUrl) {
+      const shouldVerifyEmail = !professional.emailVerified
+      if (photoUrl !== professional.photoUrl || shouldVerifyEmail) {
         professional = await prisma.professional.update({
           where: { id: professional.id },
-          data: { photoUrl },
+          data: {
+            photoUrl,
+            ...(shouldVerifyEmail ? { emailVerified: true, emailVerifiedAt: new Date() } : {}),
+          },
           include: { company: true, ownedCompanies: true },
         })
       }
@@ -81,6 +186,8 @@ router.post('/google', async (req, res) => {
             googleId,
             authProvider: professional.authProvider || 'local',
             photoUrl: resolveGooglePhoto(professional.photoUrl, picture),
+            emailVerified: true,
+            emailVerifiedAt: professional.emailVerifiedAt || new Date(),
           },
           include: { company: true, ownedCompanies: true },
         })

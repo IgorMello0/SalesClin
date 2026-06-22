@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 import { assertCanAddUserToCompany, BillingLimitError } from '../services/billing.js'
+import { sendTeamInviteEmail } from '../services/email-verification.js'
 
 export const router = Router()
 
@@ -16,6 +17,10 @@ router.post('/login', async (req, res) => {
     include: { company: true, role: true, companyAccess: { include: { company: true, role: true } } }
   })
   if (!user) return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
+  if (!user.isActive || !user.emailVerified) {
+    return res.status(403).json(createErrorResponse('Aceite o convite enviado para seu e-mail antes de acessar.', 403))
+  }
+
   const ok = await bcrypt.compare(password, user.passwordHash)
   if (!ok) return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
   
@@ -150,17 +155,13 @@ router.post('/', auth(), async (req, res) => {
     
     const companyId = professional.companyId;
 
-    const { name, email, password, role, isActive, companyIds } = req.body
+    const { name, email, role, isActive, companyIds } = req.body
     
     console.log('[Usuarios] Dados recebidos:', { name, email, role, isActive, companyIds })
     
     // Validações
-    if (!name || !email || !password) {
-      return res.status(400).json(createErrorResponse('Nome, email e senha são obrigatórios', 400))
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
+    if (!name || !email) {
+      return res.status(400).json(createErrorResponse('Nome e email sao obrigatorios', 400))
     }
 
     // Verificar se email já existe
@@ -169,8 +170,6 @@ router.post('/', auth(), async (req, res) => {
       return res.status(400).json(createErrorResponse('Email já cadastrado', 400))
     }
 
-    const passwordHash = await bcrypt.hash(password, 10)
-    
     console.log('[Usuarios] Tentando criar usuário para empresa ID:', companyId)
     
     // Definir clinica principal
@@ -217,9 +216,11 @@ router.post('/', auth(), async (req, res) => {
         companyId: primaryCompanyId,
         name, 
         email, 
-        passwordHash, 
+        passwordHash: '',
         roleId, 
-        isActive: isActive !== undefined ? isActive : true 
+        isActive: false,
+        emailVerified: false,
+        emailVerifiedAt: null,
       },
       include: { company: true, role: true }
     })
@@ -248,6 +249,13 @@ router.post('/', auth(), async (req, res) => {
       });
     }
     
+    await sendTeamInviteEmail({
+      email: created.email,
+      name: created.name,
+      companyName: created.company?.name,
+      userId: created.id,
+    })
+
     console.log('[Usuarios] Usuário criado com sucesso:', created.id)
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {

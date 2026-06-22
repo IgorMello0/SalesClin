@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { authApi } from '@/lib/api';
 import { 
   Loader2, Mail, Lock, ArrowRight, Check, Eye, EyeOff, 
   Calendar, Filter, TrendingUp, DollarSign, MessageSquare, 
@@ -36,6 +37,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeBadge, setActiveBadge] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,12 +57,25 @@ const Login = () => {
       });
       navigate('/dashboard');
     } else {
+      const message = result.error || 'E-mail ou senha incorretos.';
+      setUnverifiedEmail(message.toLowerCase().includes('verifique seu e-mail') ? email : '');
       toast({ 
         title: 'Verifique seus dados', 
-        description: result.error || 'E-mail ou senha incorretos.', 
+        description: message,
         variant: 'destructive' 
       });
     }
+  };
+
+  const handleResendVerification = async () => {
+    const response = await authApi.resendVerification(unverifiedEmail);
+    toast({
+      title: response.success ? 'E-mail enviado' : 'Não foi possível reenviar',
+      description: response.success
+        ? 'Confira sua caixa de entrada e a pasta de spam.'
+        : response.error?.message || 'Tente novamente em instantes.',
+      variant: response.success ? 'default' : 'destructive',
+    });
   };
 
   return (
@@ -353,6 +368,16 @@ const Login = () => {
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               {isLoading ? 'Acessando...' : 'Acessar painel'}
             </motion.button>
+
+            {unverifiedEmail && (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                className="w-full text-center text-xs font-bold text-[#F97316] hover:underline"
+              >
+                Reenviar e-mail de verificação
+              </button>
+            )}
 
             {/* Terms Consent and Back Link */}
             <div className="space-y-4 pt-2">

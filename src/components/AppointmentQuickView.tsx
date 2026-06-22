@@ -250,6 +250,13 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
                     Dr(a). {profName}
                   </p>
                 </div>
+
+                {data.googleSyncStatus && !['synced', 'not_synced', 'deleted'].includes(data.googleSyncStatus) && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 flex gap-2">
+                    <span className="material-symbols-outlined text-[15px]">sync_problem</span>
+                    <span>{data.googleSyncError || 'Sincronizacao com Google Calendar pendente.'}</span>
+                  </div>
+                )}
               </div>
 
               {/* Observações */}

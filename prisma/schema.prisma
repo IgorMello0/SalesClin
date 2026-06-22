@@ -29,6 +29,8 @@ model Professional {
   onboardingData      Json?                    @map("onboarding_data")
   googleId            String?                  @unique @map("google_id")
   authProvider        String?                  @default("local") @map("auth_provider")
+  emailVerified       Boolean                  @default(true) @map("email_verified")
+  emailVerifiedAt     DateTime?                @map("email_verified_at")
   appointments        Appointment[]
   auditLogs           AuditLog[]
   catalogItems        CatalogItem[]
@@ -197,6 +199,10 @@ model Appointment {
   endTime         DateTime          @map("end_time")
   status          AppointmentStatus @default(agendado)
   notes           String?
+  googleEventId   String?           @map("google_event_id")
+  googleCalendarId String?          @map("google_calendar_id")
+  googleSyncStatus GoogleCalendarSyncStatus @default(not_synced) @map("google_sync_status")
+  googleSyncError String?           @map("google_sync_error")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   leadId          Int?              @map("lead_id")
@@ -374,8 +380,29 @@ model Empresa {
   notifications        Notification[]
   subscription         CompanySubscription?
   billingAddons        BillingAddon[]
+  googleCalendarConnection GoogleCalendarConnection?
 
   @@map("empresas")
+}
+
+model GoogleCalendarConnection {
+  id           Int       @id @default(autoincrement())
+  companyId    Int       @unique @map("company_id")
+  googleEmail  String?   @map("google_email")
+  calendarId   String    @default("primary") @map("calendar_id")
+  accessToken  String?   @map("access_token") @db.Text
+  refreshToken String?   @map("refresh_token") @db.Text
+  scope        String?
+  tokenType    String?   @map("token_type")
+  expiryDate   BigInt?   @map("expiry_date")
+  status       String    @default("connected")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  lastError    String?   @map("last_error")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  company      Empresa   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("google_calendar_connections")
 }
 
 model UserCompanyAccess {
@@ -404,6 +431,8 @@ model Usuario {
   googleId               String?             @unique @map("google_id")
   authProvider           String?             @default("local") @map("auth_provider")
   onboardingCompleted    Boolean             @default(false) @map("onboarding_completed")
+  emailVerified          Boolean             @default(true) @map("email_verified")
+  emailVerifiedAt        DateTime?           @map("email_verified_at")
   createdAt              DateTime            @default(now()) @map("created_at")
   updatedAt              DateTime            @updatedAt @map("updated_at")
   
@@ -418,6 +447,22 @@ model Usuario {
   notifications          Notification[]      @relation("UserNotifications")
 
   @@map("usuarios")
+}
+
+model EmailVerificationToken {
+  id             Int       @id @default(autoincrement())
+  email          String
+  tokenHash      String    @unique @map("token_hash")
+  type           String
+  professionalId Int?      @map("professional_id")
+  userId         Int?      @map("user_id")
+  expiresAt      DateTime  @map("expires_at")
+  usedAt         DateTime? @map("used_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([email, type, usedAt])
+  @@map("email_verification_tokens")
 }
 
 model AgenteIa {
@@ -730,6 +775,14 @@ enum AppointmentStatus {
   confirmado
   cancelado
   concluido
+}
+
+enum GoogleCalendarSyncStatus {
+  not_synced
+  synced
+  pending
+  error
+  deleted
 }
 
 enum AppointmentLogAction {

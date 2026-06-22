@@ -5,6 +5,7 @@ import { createErrorResponse, createSuccessResponse, parsePagination } from '../
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
+import { sendVerificationEmail } from '../services/email-verification.js'
 
 export const router = Router()
 
@@ -28,6 +29,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
     }
     
+    if (!professional.emailVerified) {
+      return res.status(403).json(createErrorResponse('Verifique seu e-mail antes de acessar. Enviamos um link de confirmação para sua caixa de entrada.', 403))
+    }
+
     const ok = await bcrypt.compare(password, professional.passwordHash)
     if (!ok) {
       console.log('[Login] Senha incorreta para:', email)
@@ -253,7 +258,9 @@ router.post('/', async (req, res) => {
         companyId: empresa.id,
         companyName, 
         logoUrl, 
-        contractType 
+        contractType,
+        emailVerified: false,
+        emailVerifiedAt: null,
       },
       include: {
         company: true
@@ -266,17 +273,18 @@ router.post('/', async (req, res) => {
       data: { ownerId: created.id }
     })
     await ensureCompanyDefaults(prisma, empresa.id, created.id)
-    
-    const token = jwt.sign({
-      id: created.id,
-      companyId: empresa.id,
-      type: 'profissional',
-      allowedCompanies: [empresa.id],
-    }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+
+    await sendVerificationEmail({
+      email: created.email,
+      name: created.name,
+      professionalId: created.id,
+    })
+
     console.log('[Signup] Cadastro bem-sucedido:', email)
     
     res.status(201).json(createSuccessResponse({ 
-      token, 
+      requiresEmailVerification: true,
+      email: created.email,
       professional: { 
         id: created.id.toString(), 
         name: created.name, 

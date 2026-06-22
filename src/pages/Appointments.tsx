@@ -55,6 +55,8 @@ const Appointments = () => {
           status: apt.status || "agendado",
           duration: Math.round((new Date(apt.endTime).getTime() - new Date(apt.startTime).getTime()) / 60000),
           leadStatus: apt.lead?.status || null,
+          googleSyncStatus: apt.googleSyncStatus,
+          googleSyncError: apt.googleSyncError,
         }));
         setAppointments(mapped);
       }
@@ -107,6 +109,19 @@ const Appointments = () => {
       case 'concluido':  return { bg: 'bg-sky-500/10 border-sky-500/20 text-sky-600',         dot: 'bg-sky-500',     label: 'Concluído' };
       default:           return { bg: 'bg-slate-100 border-slate-200 text-slate-600',          dot: 'bg-slate-400',   label: effectiveStatus };
     }
+  };
+
+  const getGoogleSyncBadge = (apt: any) => {
+    if (!apt?.googleSyncStatus || ['synced', 'not_synced', 'deleted'].includes(apt.googleSyncStatus)) return null;
+    const isError = apt.googleSyncStatus === 'error';
+    return (
+      <span
+        title={isError ? (apt.googleSyncError || 'Falha ao sincronizar com Google Calendar') : 'Sincronizacao pendente com Google Calendar'}
+        className={`material-symbols-outlined text-[13px] ${isError ? 'text-red-500' : 'text-amber-500'}`}
+      >
+        {isError ? 'sync_problem' : 'sync'}
+      </span>
+    );
   };
 
   const handleCheckApt = async (aptId: number) => {
@@ -364,7 +379,7 @@ const Appointments = () => {
 
                         const topOffset = ((h - 7) * 64) + ((m / 60) * 64);
                         const height = (apt.duration / 60) * 64;
-                        const st = getStatusConfig(apt.status);
+                        const st = getStatusConfig(apt);
 
                         // Calcula o horário de término para exibição
                         const endTime = new Date(apt.date.getTime() + apt.duration * 60000);
@@ -381,6 +396,7 @@ const Appointments = () => {
                                 <div className="flex items-center gap-1.5">
                                   <span className={`w-2 h-2 rounded-full ${st.dot} shrink-0`} />
                                   <span className="font-bold text-sm leading-none">{apt.clientName}</span>
+                                  {getGoogleSyncBadge(apt)}
                                 </div>
                                 {height > 40 && (
                                   <span className="text-xs opacity-80 ml-3.5 leading-tight">{apt.service}</span>
@@ -466,6 +482,7 @@ const Appointments = () => {
                                   <div className="flex items-center gap-1">
                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot} shrink-0`} />
                                     <span className="font-bold truncate leading-none">{apt.clientName}</span>
+                                    {getGoogleSyncBadge(apt)}
                                   </div>
                                   {height > 35 && (
                                     <div className="opacity-70 truncate mt-1 pl-2.5 leading-none">{apt.service}</div>
@@ -505,14 +522,14 @@ const Appointments = () => {
                           </div>
                           <div className="space-y-0.5">
                             {dateApts.slice(0, 3).map((apt) => {
-                              const st = getStatusConfig(apt.status);
+                              const st = getStatusConfig(apt);
                               return (
                                 <div 
                                   key={apt.id} 
                                   className={`text-[10px] px-1.5 py-0.5 rounded border truncate cursor-pointer hover:opacity-80 transition-opacity ${st.bg}`}
                                   onClick={(e) => { e.stopPropagation(); setQuickViewAptId(apt.id); }}
                                 >
-                                  <span className="font-bold">{apt.time}</span> {apt.clientName}
+                                  <span className="font-bold">{apt.time}</span> {apt.clientName} {getGoogleSyncBadge(apt)}
                                 </div>
                               );
                             })}

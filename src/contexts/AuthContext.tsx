@@ -30,7 +30,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: (credential: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  signup: (data: Omit<Professional, 'id'> & { password: string }) => Promise<{ success: boolean; error?: string }>;
+  signup: (data: Omit<Professional, 'id'> & { password: string }) => Promise<{ success: boolean; error?: string; requiresEmailVerification?: boolean; email?: string }>;
   hasModuleAccess: (moduleCode: string) => boolean;
   isLoading: boolean;
   loadPermissions: () => Promise<void>;
@@ -178,8 +178,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let response = await professionalsApi.login(email, password);
       console.log('[Auth] Professional login response:', response);
       
-      // Se falhar, tentar login como usuário
-      if (!response.success) {
+      // Se falhar por credencial comum, tentar login como usuario.
+      // Erros 403 indicam conta pendente/bloqueada e preservam a mensagem original.
+      if (!response.success && response.error?.code !== 403) {
         console.log('[Auth] Professional login failed, trying user login...');
         response = await usuariosApi.login(email, password);
         console.log('[Auth] User login response:', response);
@@ -311,7 +312,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signup = async (data: Omit<Professional, 'id'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
+  const signup = async (data: Omit<Professional, 'id'> & { password: string }): Promise<{ success: boolean; error?: string; requiresEmailVerification?: boolean; email?: string }> => {
     setIsLoading(true);
     
     try {
@@ -326,8 +327,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] Signup response:', response);
       
       if (response.success && response.data) {
-        const { token, professional: profData } = response.data;
+        const { token, professional: profData, requiresEmailVerification } = response.data as any;
         
+        if (requiresEmailVerification) {
+          setIsLoading(false);
+          return {
+            success: true,
+            requiresEmailVerification: true,
+            email: response.data.email || data.email,
+          };
+        }
+
         if (!profData || !token) {
           console.error('[Auth] Missing data in response:', response);
           setIsLoading(false);

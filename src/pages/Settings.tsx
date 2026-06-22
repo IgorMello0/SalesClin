@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
-import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, type BillingUsage } from '@/lib/api';
+import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, googleCalendarApi, type BillingUsage } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 
@@ -188,7 +188,7 @@ const EquipeView = () => {
   const [clinicas, setClinicas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newMember, setNewMember] = useState({ name: '', email: '', password: '', roleId: '', companyIds: [] as number[] });
+  const [newMember, setNewMember] = useState({ name: '', email: '', roleId: '', companyIds: [] as number[] });
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
@@ -268,8 +268,8 @@ const EquipeView = () => {
   };
 
   const handleAddMember = async () => {
-    if (!newMember.name || !newMember.email || !newMember.password) {
-      toast({ title: 'Atenção', description: 'Preencha nome, email e senha.', variant: 'destructive' });
+    if (!newMember.name || !newMember.email) {
+      toast({ title: 'Atenção', description: 'Preencha nome e e-mail.', variant: 'destructive' });
       return;
     }
     
@@ -277,15 +277,14 @@ const EquipeView = () => {
       const res = await usuariosApi.create({
         name: newMember.name,
         email: newMember.email,
-        password: newMember.password,
         roleId: newMember.roleId ? Number(newMember.roleId) : null,
         isActive: true,
         companyIds: newMember.companyIds.length > 0 ? newMember.companyIds : undefined,
       });
       if (res.success) {
-        toast({ title: 'Sucesso', description: `${newMember.name} adicionado(a) à equipe!` });
+        toast({ title: 'Convite enviado', description: `${newMember.name} receberá um e-mail para definir a senha.` });
         setIsAdding(false);
-        setNewMember({ name: '', email: '', password: '', roleId: '', companyIds: [] });
+        setNewMember({ name: '', email: '', roleId: '', companyIds: [] });
         loadTeam();
         loadBillingUsage();
       } else {
@@ -478,25 +477,6 @@ const EquipeView = () => {
               <Input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} placeholder="maria@clinica.com" />
             </div>
             <div className="space-y-2">
-              <Label>Senha</Label>
-              <div className="relative">
-                <Input 
-                  type={showNewMemberPassword ? "text" : "password"} 
-                  value={newMember.password} 
-                  onChange={e => setNewMember({...newMember, password: e.target.value})} 
-                  placeholder="Mínimo 6 caracteres" 
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewMemberPassword(!showNewMemberPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showNewMemberPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
               <Label>Cargo / Função</Label>
               <Select value={newMember.roleId} onValueChange={v => setNewMember({...newMember, roleId: v})}>
                 <SelectTrigger className="h-9 text-sm bg-background">
@@ -538,7 +518,7 @@ const EquipeView = () => {
             )}
           </div>
           <div className="flex justify-end pt-2">
-            <Button onClick={handleAddMember}>Adicionar à Equipe</Button>
+            <Button onClick={handleAddMember}>Enviar convite</Button>
           </div>
         </div>
       )}
@@ -1626,6 +1606,161 @@ const WhatsAppStatusManager = () => {
   );
 };
 
+const GoogleCalendarView = () => {
+  const { toast } = useToast();
+  const [status, setStatus] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isWorking, setIsWorking] = useState(false);
+
+  const loadStatus = async () => {
+    try {
+      setIsLoading(true);
+      const res = await googleCalendarApi.status();
+      if (res.success) {
+        setStatus(res.data);
+      } else {
+        throw new Error(res.error?.message || 'Nao foi possivel consultar o Google Calendar');
+      }
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStatus();
+    const params = new URLSearchParams(window.location.search);
+    const calendarResult = params.get('googleCalendar');
+    if (calendarResult === 'connected') {
+      toast({ title: 'Google Calendar conectado', description: 'A agenda da clinica ja pode ser sincronizada.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (calendarResult === 'error') {
+      toast({ title: 'Erro no Google Calendar', description: 'Nao foi possivel concluir a conexao.', variant: 'destructive' });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleConnect = async () => {
+    setIsWorking(true);
+    try {
+      const res = await googleCalendarApi.connect();
+      if (res.success && res.data?.url) {
+        window.location.href = res.data.url;
+        return;
+      }
+      throw new Error(res.error?.message || 'Nao foi possivel iniciar a conexao');
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      setIsWorking(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Desconectar o Google Calendar desta clinica? Os agendamentos continuam no SalesClin.')) return;
+    setIsWorking(true);
+    try {
+      const res = await googleCalendarApi.disconnect();
+      if (!res.success) throw new Error(res.error?.message || 'Erro ao desconectar');
+      toast({ title: 'Google Calendar desconectado', description: 'A agenda interna continua funcionando normalmente.' });
+      await loadStatus();
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const handleResync = async () => {
+    setIsWorking(true);
+    try {
+      const res = await googleCalendarApi.resync();
+      if (!res.success) throw new Error(res.error?.message || 'Erro ao sincronizar');
+      toast({
+        title: 'Sincronizacao concluida',
+        description: `${res.data.synced || 0} agendamentos sincronizados. ${res.data.failed || 0} pendentes.`,
+      });
+      await loadStatus();
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-8 text-center"><span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span></div>;
+  }
+
+  const connected = !!status?.connected;
+  const hasError = status?.status === 'error';
+
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className={`p-4 rounded-2xl text-sm border flex items-start gap-3 shadow-sm ${
+        connected
+          ? hasError
+            ? 'bg-amber-50 border-amber-200 text-amber-800'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+          : 'bg-slate-50 border-slate-200 text-slate-700'
+      }`}>
+        <span className="material-symbols-outlined flex-shrink-0 mt-0.5">
+          {connected ? (hasError ? 'sync_problem' : 'event_available') : 'calendar_month'}
+        </span>
+        <div className="leading-relaxed">
+          <strong className="block mb-0.5 font-bold">
+            {connected ? 'Google Calendar conectado' : 'Google Calendar desconectado'}
+          </strong>
+          {connected
+            ? `Agenda conectada: ${status.googleEmail || status.calendarId || 'Google Calendar'}`
+            : 'Conecte uma agenda Google da clinica para espelhar os agendamentos criados no SalesClin.'}
+        </div>
+      </div>
+
+      {connected && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ultima sincronizacao</p>
+            <p className="text-sm font-bold text-slate-800 mt-1">
+              {status.lastSyncAt ? new Date(status.lastSyncAt).toLocaleString('pt-BR') : 'Ainda nao sincronizou'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pendencias</p>
+            <p className="text-sm font-bold text-slate-800 mt-1">{status.pendingCount || 0} agendamentos</p>
+          </div>
+        </div>
+      )}
+
+      {hasError && status?.lastError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          {status.lastError}
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        {!connected ? (
+          <Button onClick={handleConnect} disabled={isWorking} className="font-bold">
+            <span className="material-symbols-outlined text-sm mr-2">add_link</span>
+            Conectar Google Calendar
+          </Button>
+        ) : (
+          <>
+            <Button onClick={handleResync} disabled={isWorking} className="font-bold">
+              <span className="material-symbols-outlined text-sm mr-2">sync</span>
+              Sincronizar novamente
+            </Button>
+            <Button onClick={handleDisconnect} disabled={isWorking} variant="outline" className="font-bold">
+              <span className="material-symbols-outlined text-sm mr-2">link_off</span>
+              Desconectar
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const WhatsAppView = () => {
   const { toast } = useToast();
   const { professional } = useAuth();
@@ -1703,10 +1838,6 @@ const WhatsAppView = () => {
         </div>
       </div>
 
-      {data.whatsappProvider === 'evolution' && data.evolutionApiUrl && data.apiKey && data.evolutionInstance && (
-        <WhatsAppStatusManager key={`${data.evolutionApiUrl}-${data.evolutionInstance}`} />
-      )}
-
       <div className="space-y-6">
         <div className="space-y-3">
           <Label>Provedor de WhatsApp</Label>
@@ -1719,7 +1850,7 @@ const WhatsAppView = () => {
                 <div className="font-bold text-sm text-emerald-700">Evolution API</div>
                 {data.whatsappProvider === 'evolution' && <div className="w-3 h-3 rounded-full bg-emerald-500" />}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">Conecta seu número via QR Code usando uma instância Evolution (Não-oficial).</div>
+              <div className="text-xs text-muted-foreground mt-1">Usa uma instância Evolution já conectada para disparos e captura de mensagens.</div>
             </div>
 
             <div 
@@ -1997,6 +2128,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   'Minhas Clínicas': ClinicasView,
   'Meu Negócio': InfoNegocioView,
   'Aparência': AparenciaView,
+  'Google Calendar': GoogleCalendarView,
   'Integração WhatsApp': WhatsAppView,
 };
 
@@ -2033,6 +2165,7 @@ const Settings = () => {
       items: [
         ...(isOwner ? [
           { name: 'Minhas Clínicas', description: 'Crie e gerencie sua rede de clínicas' },
+          { name: 'Google Calendar', description: 'Sincronize a agenda da clínica' },
           { name: 'Integração WhatsApp', description: 'Configure API para disparos em massa' },
         ] : []),
       ]

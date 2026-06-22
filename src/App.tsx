@@ -11,6 +11,8 @@ import { LayoutProvider } from "./contexts/LayoutContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import VerifyEmail from "./pages/VerifyEmail";
+import AcceptInvite from "./pages/AcceptInvite";
 import SelectPlan from "./pages/SelectPlan";
 import Dashboard from "./pages/Dashboard";
 import Appointments from "./pages/Appointments";
@@ -54,6 +56,8 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/accept-invite" element={<AcceptInvite />} />
                 <Route path="/select-plan" element={<SelectPlan />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/funcionalidades/funil" element={<FunilPage />} />

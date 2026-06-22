@@ -3,6 +3,7 @@ import { prisma } from '../prisma.js'
 import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import { logAudit } from '../utils/audit.js'
+import { deleteAppointmentFromGoogle, syncAppointmentToGoogle } from '../services/google-calendar.js'
 
 export const router = Router()
 
@@ -222,12 +223,15 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
         endTime: new Date(endTime), 
         status: status || 'agendado', 
         notes 
-      }
+      },
+      include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
     })
+
+    const synced = await syncAppointmentToGoogle(created.id)
     
     logAudit(req.user.id, 'CRIAR_AGENDAMENTO', 'Appointment', created.id)
     
-    res.status(201).json(createSuccessResponse(created))
+    res.status(201).json(createSuccessResponse(synced || created))
   } catch (error: any) {
     console.error('[Appointments] Erro ao criar agendamento:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar agendamento', 500))
@@ -256,7 +260,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     if (!canEdit) return res.status(403).json(createErrorResponse('Acesso negado', 403));
 
     // Overbooking Validation
-    const conflicting = await prisma.appointment.findFirst({
+    const conflicting = startTime && endTime ? await prisma.appointment.findFirst({
       where: {
         professionalId: current.professionalId,
         id: { not: id },
@@ -266,7 +270,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
           { endTime: { gt: new Date(startTime) } }
         ]
       }
-    });
+    }) : null;
 
     if (conflicting) {
       return res.status(409).json(createErrorResponse('Este horário já está ocupado.', 409));
@@ -282,8 +286,10 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
         status, 
         notes 
       },
-      include: { lead: true }
+      include: { lead: true, professional: true, client: true, service: true, appointmentLogs: true, payments: true }
     })
+
+    const synced = await syncAppointmentToGoogle(updated.id)
   
   if (req.user?.type === 'profissional') {
     logAudit(req.user.id, 'ATUALIZAR_AGENDAMENTO', 'Appointment', id)
@@ -304,7 +310,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     });
   }
   
-    res.json(createSuccessResponse(updated))
+    res.json(createSuccessResponse(synced || updated))
   } catch (error: any) {
     console.error('[Appointments] Erro ao atualizar agendamento:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar agendamento', 500))
@@ -313,6 +319,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
 
 router.delete('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
+  await deleteAppointmentFromGoogle(id)
   await prisma.appointment.delete({ where: { id } })
   
   if (req.user?.type === 'profissional') {

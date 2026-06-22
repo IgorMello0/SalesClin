@@ -29,6 +29,7 @@ import { router as tasksRouter } from './routes/tasks.js'
 import { router as campaignsRouter } from './routes/campaigns.js'
 import { router as authRouter } from './routes/auth.js'
 import { router as billingRouter } from './routes/billing.js'
+import { router as googleCalendarRouter } from './routes/google-calendar.js'
 import { createErrorResponse } from './utils/response.js'
 import { prisma } from './prisma.js'
 import { bootstrapSystemDefaults } from './bootstrap/defaults.js'
@@ -75,6 +76,7 @@ app.use('/api/tasks', tasksRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/billing', billingRouter)
+app.use('/api/google-calendar', googleCalendarRouter)
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
