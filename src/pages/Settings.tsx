@@ -2121,20 +2121,26 @@ const WhatsAppView = () => {
 };
 
 // Map of components per setting
+type SettingsItem = {
+  key: string;
+  name: string;
+  description: string;
+};
+
 const ViewsMap: Record<string, React.FC<any>> = {
-  'Serviços': ServicosView,
-  'Equipe': EquipeView,
-  'Cargos': CargosView,
-  'Minhas Clínicas': ClinicasView,
-  'Meu Negócio': InfoNegocioView,
-  'Aparência': AparenciaView,
-  'Google Calendar': GoogleCalendarView,
-  'Integração WhatsApp': WhatsAppView,
+  services: ServicosView,
+  team: EquipeView,
+  roles: CargosView,
+  clinics: ClinicasView,
+  business: InfoNegocioView,
+  appearance: AparenciaView,
+  googleCalendar: GoogleCalendarView,
+  whatsapp: WhatsAppView,
 };
 
 const Settings = () => {
   const { toast } = useToast();
-  const [selectedSetting, setSelectedSetting] = useState<{name: string, description: string} | null>(null);
+  const [selectedSetting, setSelectedSetting] = useState<SettingsItem | null>(null);
 
   const { professional: authUser } = useAuth();
   const isOwner = authUser?.role === 'profissional' || authUser?.role === 'admin';
@@ -2151,11 +2157,11 @@ const Settings = () => {
       title: 'Configurações Gerais',
       icon: SettingsIcon,
       items: [
-        { name: 'Aparência', description: 'Ajuste o menu lateral ou superior' },
-        { name: 'Serviços', description: 'Gerencie os serviços oferecidos' },
+        { key: 'appearance', name: 'Aparência', description: 'Ajuste o menu lateral ou superior' },
+        { key: 'services', name: 'Serviços', description: 'Gerencie os serviços oferecidos' },
         ...(isOwner ? [
-          { name: 'Equipe', description: 'Gerencie membros da equipe e permissões' },
-          { name: 'Cargos', description: 'Gerencie os cargos e funções da equipe' },
+          { key: 'team', name: 'Equipe', description: 'Gerencie membros da equipe e permissões' },
+          { key: 'roles', name: 'Cargos', description: 'Gerencie os cargos e funções da equipe' },
         ] : []),
       ]
     },
@@ -2164,16 +2170,16 @@ const Settings = () => {
       icon: Building,
       items: [
         ...(isOwner ? [
-          { name: 'Minhas Clínicas', description: 'Crie e gerencie sua rede de clínicas' },
-          { name: 'Google Calendar', description: 'Sincronize a agenda da clínica' },
-          { name: 'Integração WhatsApp', description: 'Configure API para disparos em massa' },
+          { key: 'clinics', name: 'Minhas Clínicas', description: 'Crie e gerencie sua rede de clínicas' },
+          { key: 'googleCalendar', name: 'Google Calendar', description: 'Sincronize a agenda da clínica' },
+          { key: 'whatsapp', name: 'Integração WhatsApp', description: 'Configure API para disparos em massa' },
         ] : []),
       ]
     },
   ];
 
   // Define Active View safely
-  const ActiveView = selectedSetting ? (ViewsMap[selectedSetting.name] || null) : null;
+  const ActiveView = selectedSetting ? (ViewsMap[selectedSetting.key] || null) : null;
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8 relative">
@@ -2205,7 +2211,7 @@ const Settings = () => {
               <div className="divide-y">
                 {section.items.map((item) => (
                   <div 
-                    key={item.name}
+                    key={item.key}
                     onClick={() => setSelectedSetting(item)}
                     className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-primary/5 cursor-pointer transition-all gap-3"
                   >
