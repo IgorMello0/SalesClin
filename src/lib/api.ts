@@ -420,6 +420,12 @@ export const googleCalendarApi = {
   resync: async () => apiRequest<any>('/google-calendar/resync', { method: 'POST' }),
 }
 
+export const whatsappMetaApi = {
+  status: async () => apiRequest<any>('/whatsapp/meta/status'),
+  connect: async () => apiRequest<{ url: string }>('/whatsapp/meta/connect'),
+  disconnect: async () => apiRequest<any>('/whatsapp/meta/disconnect', { method: 'POST' }),
+}
+
 // Configuração de Funis
 export const funnelConfigApi = {
   getAll: async () => apiRequest<Array<any>>('/funnel-config'),

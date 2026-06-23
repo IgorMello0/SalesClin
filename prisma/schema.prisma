@@ -355,6 +355,11 @@ model Empresa {
   evolutionInstance    String?             @map("evolution_instance")
   metaToken            String?             @map("meta_token")
   metaPhoneNumberId    String?             @map("meta_phone_number_id")
+  metaWabaId           String?             @map("meta_waba_id")
+  metaBusinessId       String?             @map("meta_business_id")
+  metaPhoneDisplayNumber String?           @map("meta_phone_display_number")
+  metaConnectedAt      DateTime?           @map("meta_connected_at")
+  metaConnectionStatus String?             @map("meta_connection_status")
   webhookToken         String?             @unique @default(uuid()) @map("webhook_token")
   plan                 String?
   openHour             String              @default("08:00") @map("open_hour")

@@ -421,7 +421,8 @@ router.put('/:id', auth(), async (req, res) => {
     const {
       name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour,
       // Campos de integração WhatsApp
-      whatsappProvider, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId
+      whatsappProvider, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId,
+      metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaConnectionStatus
     } = req.body
 
     const data: any = {}
@@ -438,6 +439,13 @@ router.put('/:id', auth(), async (req, res) => {
     if (evolutionInstance !== undefined) data.evolutionInstance = evolutionInstance
     if (metaToken !== undefined) data.metaToken = metaToken
     if (metaPhoneNumberId !== undefined) data.metaPhoneNumberId = metaPhoneNumberId
+    if (metaWabaId !== undefined) data.metaWabaId = metaWabaId
+    if (metaBusinessId !== undefined) data.metaBusinessId = metaBusinessId
+    if (metaPhoneDisplayNumber !== undefined) data.metaPhoneDisplayNumber = metaPhoneDisplayNumber
+    if (metaConnectionStatus !== undefined) {
+      data.metaConnectionStatus = metaConnectionStatus
+      data.metaConnectedAt = metaConnectionStatus === 'connected' ? new Date() : null
+    }
 
     const updated = await prisma.empresa.update({ where: { id }, data })
     res.json(createSuccessResponse(updated))

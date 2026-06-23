@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
-import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, googleCalendarApi, type BillingStatus, type BillingUsage } from '@/lib/api';
+import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, googleCalendarApi, whatsappMetaApi, type BillingStatus, type BillingUsage } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 
@@ -1909,7 +1909,7 @@ const GoogleCalendarView = () => {
   );
 };
 
-const WhatsAppView = () => {
+const LegacyWhatsAppView = () => {
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl text-sm border border-emerald-200/50 dark:border-emerald-800/50 flex items-start gap-3 shadow-sm">
@@ -2296,6 +2296,269 @@ const WhatsAppView = () => {
   );
 };
 
+const MetaWhatsAppManager = () => {
+  const { toast } = useToast();
+  const [status, setStatus] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isWorking, setIsWorking] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [manual, setManual] = useState({ metaPhoneNumberId: '', metaToken: '', metaWabaId: '', metaBusinessId: '', metaPhoneDisplayNumber: '' });
+
+  const loadStatus = async () => {
+    try {
+      setIsLoading(true);
+      const res = await whatsappMetaApi.status();
+      if (!res.success) throw new Error(res.error?.message || 'Nao foi possivel consultar a Meta');
+      setStatus(res.data);
+      setManual({
+        metaPhoneNumberId: res.data?.phoneNumberId || '',
+        metaToken: '',
+        metaWabaId: res.data?.wabaId || '',
+        metaBusinessId: res.data?.businessId || '',
+        metaPhoneDisplayNumber: res.data?.displayPhoneNumber || '',
+      });
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStatus();
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('whatsappMeta');
+    if (result === 'connected') {
+      toast({ title: 'WhatsApp Oficial conectado', description: 'A conta Meta foi vinculada a esta clinica.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (result === 'error') {
+      toast({ title: 'Erro na Meta', description: 'Nao foi possivel concluir a conexao.', variant: 'destructive' });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleConnect = async () => {
+    setIsWorking(true);
+    try {
+      const res = await whatsappMetaApi.connect();
+      if (res.success && res.data?.url) {
+        window.location.href = res.data.url;
+        return;
+      }
+      throw new Error(res.error?.message || 'Nao foi possivel iniciar a conexao com a Meta');
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      setIsWorking(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Desconectar a API Oficial Meta desta clinica? A Evolution, se existir, sera preservada.')) return;
+    setIsWorking(true);
+    try {
+      const res = await whatsappMetaApi.disconnect();
+      if (!res.success) throw new Error(res.error?.message || 'Erro ao desconectar Meta');
+      toast({ title: 'Meta desconectada', description: 'A clinica voltou para Evolution como provedor padrao.' });
+      await loadStatus();
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const handleManualSave = async () => {
+    setIsWorking(true);
+    try {
+      const company = await empresasApi.getMyCompany();
+      if (!company.success || !company.data?.id) throw new Error('Empresa nao encontrada');
+      const res = await empresasApi.update(company.data.id, {
+        whatsappProvider: 'meta',
+        metaPhoneNumberId: manual.metaPhoneNumberId,
+        metaToken: manual.metaToken,
+        metaWabaId: manual.metaWabaId,
+        metaBusinessId: manual.metaBusinessId,
+        metaPhoneDisplayNumber: manual.metaPhoneDisplayNumber,
+        metaConnectionStatus: 'connected',
+      });
+      if (!res.success) throw new Error(res.error?.message || 'Erro ao salvar Meta manualmente');
+      toast({ title: 'Credenciais Meta salvas', description: 'O provedor da clinica agora e API Oficial Meta.' });
+      await loadStatus();
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-8 text-center"><span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span></div>;
+  }
+
+  const connected = !!status?.connected;
+  const configured = !!status?.configured;
+
+  return (
+    <Card className="border border-emerald-500/20 rounded-2xl shadow-sm">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">API Oficial Meta</CardTitle>
+            <CardDescription>Conecte a conta WhatsApp Business da clinica pelo fluxo oficial da Meta.</CardDescription>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+            {connected ? 'Conectado' : configured ? 'Desconectado' : 'Servidor pendente'}
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className={`rounded-2xl border p-4 text-sm ${connected ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : configured ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-xl">{connected ? 'verified' : configured ? 'add_link' : 'settings_alert'}</span>
+            <div className="space-y-1">
+              <p className="font-bold">
+                {connected ? 'WhatsApp Oficial conectado' : configured ? 'Pronto para conectar' : 'Credenciais Meta faltando no servidor'}
+              </p>
+              <p className="text-xs leading-relaxed">
+                {connected
+                  ? `Numero: ${status.displayPhoneNumber || status.phoneNumberId || 'Meta WhatsApp'}. Mensagens e campanhas usam a Cloud API oficial.`
+                  : configured
+                    ? 'O cliente sera direcionado para a Meta para autorizar o numero da propria clinica.'
+                    : 'Defina META_APP_ID, META_APP_SECRET e META_WHATSAPP_CONFIG_ID no ambiente da VPS.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {connected && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-xl border p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Phone Number ID</p>
+              <p className="text-xs font-mono mt-1 break-all">{status.phoneNumberId || '-'}</p>
+            </div>
+            <div className="rounded-xl border p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">WABA</p>
+              <p className="text-xs font-mono mt-1 break-all">{status.wabaId || '-'}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          {!connected ? (
+            <Button onClick={handleConnect} disabled={isWorking || !configured} className="font-bold">
+              <span className="material-symbols-outlined text-sm mr-2">login</span>
+              Conectar com Meta
+            </Button>
+          ) : (
+            <Button onClick={handleDisconnect} disabled={isWorking} variant="outline" className="font-bold">
+              <span className="material-symbols-outlined text-sm mr-2">link_off</span>
+              Desconectar Meta
+            </Button>
+          )}
+          <Button onClick={loadStatus} disabled={isWorking} variant="outline" className="font-bold">
+            <span className="material-symbols-outlined text-sm mr-2">refresh</span>
+            Atualizar
+          </Button>
+        </div>
+
+        <div className="border-t pt-4">
+          <Button type="button" variant="ghost" size="sm" onClick={() => setAdvancedOpen(!advancedOpen)} className="px-0 text-xs font-bold">
+            <span className="material-symbols-outlined text-sm mr-1">{advancedOpen ? 'expand_less' : 'expand_more'}</span>
+            Configuracao avancada manual
+          </Button>
+
+          {advancedOpen && (
+            <div className="mt-3 space-y-3 rounded-2xl border bg-slate-50 p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Phone Number ID</Label>
+                  <Input value={manual.metaPhoneNumberId} onChange={e => setManual({ ...manual, metaPhoneNumberId: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>WABA ID</Label>
+                  <Input value={manual.metaWabaId} onChange={e => setManual({ ...manual, metaWabaId: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Business ID</Label>
+                  <Input value={manual.metaBusinessId} onChange={e => setManual({ ...manual, metaBusinessId: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Numero exibido</Label>
+                  <Input value={manual.metaPhoneDisplayNumber} onChange={e => setManual({ ...manual, metaPhoneDisplayNumber: e.target.value })} />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>Access Token permanente</Label>
+                  <Input type="password" value={manual.metaToken} onChange={e => setManual({ ...manual, metaToken: e.target.value })} placeholder="EAA..." />
+                </div>
+              </div>
+              <Button onClick={handleManualSave} disabled={isWorking || !manual.metaPhoneNumberId || !manual.metaToken} size="sm">
+                Salvar manualmente
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const WhatsAppView = () => {
+  const [provider, setProvider] = useState<'meta' | 'evolution'>('meta');
+
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl text-sm border border-emerald-200/50 dark:border-emerald-800/50 flex items-start gap-3 shadow-sm">
+        <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
+        <div className="leading-relaxed">
+          <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SalesClin</strong>
+          Use a API Oficial Meta para conectar a conta da clinica pelo fluxo oficial, ou mantenha Evolution API como alternativa.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button
+          type="button"
+          onClick={() => setProvider('meta')}
+          className={`text-left p-4 border rounded-2xl transition-all ${provider === 'meta' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500 shadow-sm' : 'bg-background hover:border-emerald-300'}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-emerald-700">API Oficial Meta</p>
+              <p className="text-xs text-muted-foreground mt-1">Recomendado. Suporta Cloud API oficial e coexistencia quando a Meta liberar para o numero.</p>
+            </div>
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">Oficial</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setProvider('evolution')}
+          className={`text-left p-4 border rounded-2xl transition-all ${provider === 'evolution' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500 shadow-sm' : 'bg-background hover:border-emerald-300'}`}
+        >
+          <p className="text-sm font-bold text-emerald-700">Evolution API</p>
+          <p className="text-xs text-muted-foreground mt-1">Alternativa por QR Code usando a instancia central da VPS.</p>
+        </button>
+      </div>
+
+      {provider === 'meta' ? <MetaWhatsAppManager /> : <WhatsAppStatusManager />}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          { icon: 'person_add', title: 'Novo contato', desc: 'Telefone novo vira lead em Novos Leads.' },
+          { icon: 'rule', title: 'Sem duplicar', desc: 'A verificacao usa telefone + clinica.' },
+          { icon: 'forum', title: 'Historico salvo', desc: 'Mensagem e conversa ficam vinculadas ao lead.' },
+        ].map((item) => (
+          <div key={item.title} className="rounded-2xl border border-slate-200/70 dark:border-slate-800 p-4 bg-white/70 dark:bg-slate-900/40">
+            <span className="material-symbols-outlined text-[#F97316] text-xl mb-2 block">{item.icon}</span>
+            <p className="text-sm font-bold text-primary">{item.title}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed mt-1">{item.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Map of components per setting
 type SettingsItem = {
   key: string;
@@ -2353,6 +2616,14 @@ const Settings = () => {
       ]
     },
   ];
+
+  useEffect(() => {
+    const view = new URLSearchParams(window.location.search).get('view');
+    if (!view || selectedSetting) return;
+
+    const item = settingsSections.flatMap(section => section.items).find(setting => setting.key === view);
+    if (item) setSelectedSetting(item);
+  }, [selectedSetting]);
 
   // Define Active View safely
   const ActiveView = selectedSetting ? (ViewsMap[selectedSetting.key] || null) : null;
