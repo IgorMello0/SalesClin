@@ -19,6 +19,7 @@ const AUDIENCE_OPTIONS = [
   { value: 'both', label: 'Leads + Clientes', icon: 'groups', desc: 'Enviar para leads e clientes simultaneamente' },
   { value: 'leads_by_status', label: 'Leads por Etapa', icon: 'filter_alt', desc: 'Filtrar leads por etapa do funil' },
   { value: 'by_tags', label: 'Por Tags', icon: 'tag', desc: 'Filtrar contatos por tags específicas' },
+  { value: 'spreadsheet', label: 'Planilha', icon: 'table_chart', desc: 'Importar contatos por CSV ou TSV' },
 ];
 
 const VARIABLES = [
@@ -39,6 +40,60 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: string }>
   failed: { label: 'Falhou', color: 'bg-red-100 text-red-700', icon: 'error' },
   canceled: { label: 'Cancelada', color: 'bg-slate-100 text-slate-500', icon: 'cancel' },
 };
+
+function splitSpreadsheetLine(line: string, delimiter: string) {
+  const result: string[] = [];
+  let current = '';
+  let insideQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"' && next === '"') {
+      current += '"';
+      i++;
+    } else if (char === '"') {
+      insideQuotes = !insideQuotes;
+    } else if (char === delimiter && !insideQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+function parseSpreadsheetContacts(text: string) {
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+
+  const firstLine = lines[0];
+  const delimiter = firstLine.includes(';') ? ';' : firstLine.includes('\t') ? '\t' : ',';
+  const headers = splitSpreadsheetLine(firstLine, delimiter)
+    .map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  const nameIndex = headers.findIndex(h => ['nome', 'name', 'cliente', 'contato'].includes(h));
+  const phoneIndex = headers.findIndex(h => ['telefone', 'phone', 'whatsapp', 'celular', 'numero'].includes(h));
+
+  if (phoneIndex === -1) return [];
+
+  const seen = new Set<string>();
+  const contacts: Array<{ name: string; phone: string }> = [];
+
+  for (const line of lines.slice(1)) {
+    const columns = splitSpreadsheetLine(line, delimiter);
+    const phone = String(columns[phoneIndex] || '').replace(/\D/g, '');
+    const name = nameIndex >= 0 ? String(columns[nameIndex] || '').trim() : '';
+    if (phone && !seen.has(phone)) {
+      seen.add(phone);
+      contacts.push({ name: name || 'Contato', phone });
+    }
+  }
+
+  return contacts;
+}
 
 export default function Campaigns() {
   const { professional } = useAuth();
@@ -78,6 +133,8 @@ export default function Campaigns() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagTarget, setTagTarget] = useState<'both' | 'leads' | 'clients'>('both');
+  const [spreadsheetContacts, setSpreadsheetContacts] = useState<Array<{ name: string; phone: string }>>([]);
+  const [spreadsheetFileName, setSpreadsheetFileName] = useState('');
 
   const loadCampaigns = useCallback(async () => {
     setIsLoading(true);
@@ -120,6 +177,10 @@ export default function Campaigns() {
   // Preview count when audience changes
   useEffect(() => {
     if (!audienceType || !professional?.id) { setPreviewRecipients(0); return; }
+    if (audienceType === 'spreadsheet') {
+      setPreviewRecipients(spreadsheetContacts.length);
+      return;
+    }
     (async () => {
       try {
         let count = 0;
@@ -158,13 +219,34 @@ export default function Campaigns() {
         setPreviewRecipients(count);
       } catch { setPreviewRecipients(0); }
     })();
-  }, [audienceType, professional?.id, selectedTags, tagTarget]);
+  }, [audienceType, professional?.id, selectedTags, tagTarget, spreadsheetContacts.length]);
 
   const resetForm = () => {
     setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both');
     setMediaUrl(''); setMediaType(''); setMinDelay(180); setMaxDelay(200); setRandomize(false); setVariations([]); setNewVariation('');
-    setAttachments([]);
+    setAttachments([]); setSpreadsheetContacts([]); setSpreadsheetFileName('');
     setIsCreating(false);
+  };
+
+  const handleSpreadsheetFile = async (file?: File | null) => {
+    if (!file) return;
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith('.csv') && !lowerName.endsWith('.tsv') && !lowerName.endsWith('.txt')) {
+      toast({ title: 'Use CSV ou TSV', description: 'Exporte a planilha com colunas nome e telefone.', variant: 'destructive' });
+      return;
+    }
+
+    const text = await file.text();
+    const contacts = parseSpreadsheetContacts(text);
+    if (contacts.length === 0) {
+      toast({ title: 'Nenhum contato encontrado', description: 'A planilha precisa ter uma coluna telefone, whatsapp ou celular.', variant: 'destructive' });
+      return;
+    }
+
+    setSpreadsheetContacts(contacts);
+    setSpreadsheetFileName(file.name);
+    setPreviewRecipients(contacts.length);
+    toast({ title: 'Planilha importada', description: `${contacts.length} contatos com telefone valido.` });
   };
 
   const handleCreate = async () => {
@@ -174,9 +256,16 @@ export default function Campaigns() {
     if (audienceType === 'by_tags' && selectedTags.length === 0) {
       toast({ title: 'Selecione pelo menos uma tag', variant: 'destructive' }); return;
     }
+    if (audienceType === 'spreadsheet' && spreadsheetContacts.length === 0) {
+      toast({ title: 'Importe uma planilha', description: 'Use CSV ou TSV com colunas nome e telefone.', variant: 'destructive' }); return;
+    }
     setIsSending(true);
     try {
-      const audienceFilter = audienceType === 'by_tags' ? { tags: selectedTags, target: tagTarget } : undefined;
+      const audienceFilter = audienceType === 'by_tags'
+        ? { tags: selectedTags, target: tagTarget }
+        : audienceType === 'spreadsheet'
+          ? { source: spreadsheetFileName, contacts: spreadsheetContacts }
+          : undefined;
       
       let finalMediaUrl = null;
       let finalMediaType = null;
@@ -474,6 +563,44 @@ export default function Campaigns() {
                       </div>
                     </div>
                   )}
+                  {audienceType === 'spreadsheet' && (
+                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100/60 space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Arquivo da planilha</label>
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-4">
+                          <input
+                            type="file"
+                            accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+                            onChange={e => handleSpreadsheetFile(e.target.files?.[0])}
+                            className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-primary/90"
+                          />
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            Exporte do Excel/Google Sheets como CSV. Use colunas <strong>nome</strong> e <strong>telefone</strong>.
+                          </p>
+                        </div>
+                      </div>
+
+                      {spreadsheetContacts.length > 0 && (
+                        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800">
+                          <div className="flex items-center gap-2 font-bold">
+                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            {spreadsheetContacts.length} contatos importados de {spreadsheetFileName}
+                          </div>
+                          <div className="mt-2 max-h-24 overflow-y-auto rounded-lg bg-white/70 p-2 text-[11px] text-slate-600">
+                            {spreadsheetContacts.slice(0, 5).map((contact, index) => (
+                              <div key={`${contact.phone}-${index}`} className="flex justify-between gap-3">
+                                <span className="truncate">{contact.name}</span>
+                                <span className="font-mono">{contact.phone}</span>
+                              </div>
+                            ))}
+                            {spreadsheetContacts.length > 5 && (
+                              <div className="pt-1 text-muted-foreground">+ {spreadsheetContacts.length - 5} contatos</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {audienceType && (
                     <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm text-secondary">group</span>
@@ -482,7 +609,17 @@ export default function Campaigns() {
                   )}
                 </div>
                 <div className="flex justify-end">
-                  <Button onClick={() => { if (name && audienceType) setStep(2); else toast({ title: 'Preencha todos os campos', variant: 'destructive' }); }}
+                  <Button onClick={() => {
+                    if (!name || !audienceType) {
+                      toast({ title: 'Preencha todos os campos', variant: 'destructive' });
+                      return;
+                    }
+                    if (audienceType === 'spreadsheet' && spreadsheetContacts.length === 0) {
+                      toast({ title: 'Importe uma planilha', variant: 'destructive' });
+                      return;
+                    }
+                    setStep(2);
+                  }}
                     className="bg-primary text-white rounded-xl px-6 h-10 font-bold">
                     Próximo <span className="material-symbols-outlined text-sm ml-1">chevron_right</span>
                   </Button>

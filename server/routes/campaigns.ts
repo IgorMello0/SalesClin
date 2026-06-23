@@ -218,7 +218,11 @@ router.post('/', auth(false), async (req, res) => {
         variations: variations || null,
         recipients: {
           create: recipients.map(r => {
-            const key = r.sourceType === 'client' ? `client_${r.sourceId}` : `lead_${r.sourceId}`
+            const key = r.sourceType === 'client'
+              ? `client_${r.sourceId}`
+              : r.sourceType === 'lead'
+                ? `lead_${r.sourceId}`
+                : `spreadsheet_${r.phone}`
             const upcomingAppt = upcomingMap.get(key)
             const pastAppt = pastMap.get(key)
             return {
@@ -455,7 +459,7 @@ router.get('/:id/progress', auth(false), async (req, res) => {
 interface RecipientData {
   name: string
   phone: string
-  sourceType: 'lead' | 'client'
+  sourceType: 'lead' | 'client' | 'spreadsheet'
   sourceId: number
 }
 
@@ -468,6 +472,18 @@ async function resolveAudience(
 ): Promise<RecipientData[]> {
   const recipients: RecipientData[] = []
   const phones = new Set<string>() // Evita duplicatas
+
+  if (audienceType === 'spreadsheet' && Array.isArray(audienceFilter?.contacts)) {
+    const contacts = audienceFilter.contacts.slice(0, 5000)
+    for (const contact of contacts) {
+      const phone = String(contact.phone || contact.telefone || '').replace(/\D/g, '')
+      const name = String(contact.name || contact.nome || '').trim() || 'Contato'
+      if (phone && !phones.has(phone)) {
+        phones.add(phone)
+        recipients.push({ name, phone, sourceType: 'spreadsheet', sourceId: 0 })
+      }
+    }
+  }
 
   if (audienceType === 'by_tags' && audienceFilter?.tags?.length) {
     const target = audienceFilter.target || 'both'
