@@ -13,10 +13,11 @@ const PrecosPage = () => {
   const plans = [
     {
       name: "Start",
-      price: "497",
+      price: "197",
+      plan: "start",
       desc: "Ideal para consultórios individuais e clínicas em início de escala.",
       features: [
-        "Até 3 Usuários",
+        "Até 5 Usuários",
         "Gestão de Leads",
         "Funil de Vendas Kanban",
         "Agenda Inteligente",
@@ -28,10 +29,11 @@ const PrecosPage = () => {
     },
     {
       name: "Pro",
-      price: "897",
+      price: "297",
+      plan: "pro",
       desc: "O plano definitivo para clínicas que buscam crescimento agressivo.",
       features: [
-        "Usuários Ilimitados",
+        "Até 10 usuários por clínica",
         "Engenharia de Metas",
         "Integração WhatsApp",
         "Múltiplos Funis",
@@ -45,6 +47,7 @@ const PrecosPage = () => {
     {
       name: "Enterprise",
       price: "Custom",
+      plan: "enterprise",
       desc: "Soluções personalizadas para redes de clínicas e multiclínicas.",
       features: [
         "Multiclínicas",
@@ -144,7 +147,7 @@ const PrecosPage = () => {
                   </div>
 
                   <Link
-                    to="/login"
+                    to={p.price === "Custom" ? "/signup" : `/signup?plan=${p.plan}`}
                     className={`w-full py-5 rounded-2xl text-[11px] font-black uppercase tracking-[0.25em] transition-all duration-500 flex items-center justify-center gap-2 relative z-10 overflow-hidden group/btn ${p.featured ? 'bg-[#F97316] text-white hover:shadow-[0_0_40px_rgba(249,115,22,0.3)] hover:-translate-y-1' : 'bg-slate-50 border border-slate-200 text-[#0F172A] hover:bg-slate-100 hover:border-slate-300'}`}
                   >
                     <span className="relative z-10 flex items-center gap-2">
@@ -178,7 +181,7 @@ const PrecosPage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {[
-                  { feature: "Usuários Simultâneos", start: "3", pro: "Ilimitado", ent: "Ilimitado" },
+                  { feature: "Usuários Simultâneos", start: "5", pro: "10 por clínica", ent: "Ilimitado" },
                   { feature: "Gestão de Leads (Kanban)", start: true, pro: true, ent: true },
                   { feature: "Agenda Inteligente Integrada", start: true, pro: true, ent: true },
                   { feature: "Cálculo de Previsibilidade (Metas)", start: false, pro: true, ent: true },

@@ -75,7 +75,7 @@ const SelectPlan = () => {
   const handleActivate = async () => {
     if (selectedPlan !== 'enterprise') {
       if (!localStorage.getItem('token')) {
-        navigate('/signup');
+        navigate(`/signup?plan=${selectedPlan}`);
         return;
       }
 
@@ -110,10 +110,10 @@ const SelectPlan = () => {
       id: 'start',
       name: "Plano Start",
       badge: "Início de Escala",
-      price: "497",
+      price: "197",
       desc: "Ideal para consultórios individuais e clínicas em início de escala comercial.",
       features: [
-        "Até 3 Usuários ativos",
+        "Até 5 usuários ativos",
         "Gestão avançada de Leads",
         "Funil de Vendas Kanban",
         "Agenda Inteligente",
@@ -128,10 +128,10 @@ const SelectPlan = () => {
       id: 'pro',
       name: "Plano Pro",
       badge: "Mais Popular & Recomendado",
-      price: "897",
+      price: "297",
       desc: "O plano definitivo para clínicas que buscam crescimento agressivo.",
       features: [
-        "Usuários ilimitados para equipe",
+        "Até 10 usuários por clínica",
         "Integração oficial de WhatsApp AI",
         "Múltiplos Funis de vendas",
         "Engenharia de Metas Reversas",
@@ -331,7 +331,7 @@ const SelectPlan = () => {
               <div className="space-y-1">
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Valor da Licença</span>
                 <span className="text-[#0F172A] font-black">
-                  {selectedPlan === 'enterprise' ? 'Sob Consulta' : `R$ ${selectedPlan === 'pro' ? '897' : '497'},00/mês`}
+                  {selectedPlan === 'enterprise' ? 'Sob Consulta' : `R$ ${selectedPlan === 'pro' ? '297' : '197'},00/mês`}
                 </span>
               </div>
             </div>

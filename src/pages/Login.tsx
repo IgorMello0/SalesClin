@@ -231,11 +231,13 @@ const Login = () => {
         >
           {/* Logo */}
           <div className="flex justify-center mb-1">
-            <img 
-              src="/logo-site.png" 
-              alt="SalesClin Logo" 
-              className="h-9 w-auto" 
-            />
+            <Link to="/" aria-label="Voltar para a página inicial" className="inline-flex opacity-95 hover:opacity-100 transition-opacity">
+              <img
+                src="/logo-site.png"
+                alt="SalesClin Logo"
+                className="h-9 w-auto"
+              />
+            </Link>
           </div>
 
           {/* Header */}

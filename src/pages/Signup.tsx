@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { SiteNavbar } from '@/components/SiteNavbar';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -29,20 +29,22 @@ const PLAN_OPTIONS: Array<{
   {
     code: 'start',
     name: 'Start',
-    monthly: 497,
-    yearly: 4970,
+    monthly: 197,
+    yearly: 1970,
     description: 'Para clínicas iniciando a operação comercial.',
   },
   {
     code: 'pro',
     name: 'Pro',
-    monthly: 897,
-    yearly: 8970,
+    monthly: 297,
+    yearly: 2970,
     description: 'Para clínicas que querem escala e automação.',
   },
 ];
 
 const Signup = () => {
+  const [searchParams] = useSearchParams();
+  const initialPlan = searchParams.get('plan') === 'start' ? 'start' : 'pro';
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -51,7 +53,7 @@ const Signup = () => {
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<PublicPlanCode>('pro');
+  const [selectedPlan, setSelectedPlan] = useState<PublicPlanCode>(initialPlan);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [isSubmitting, setIsSubmitting] = useState(false);
 

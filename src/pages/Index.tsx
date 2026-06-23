@@ -385,9 +385,9 @@ const Index = () => {
             className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch"
           >
             {[
-              { name: "Start", price: "497", features: ["Até 3 Usuários", "Gestão de Leads", "Funil de Vendas", "Suporte Individual"], featured: false },
-              { name: "Pro", price: "897", features: ["Usuários Ilimitados", "Integração WhatsApp", "Inteligência de Metas", "Relatórios Custom"], featured: true },
-              { name: "Enterprise", price: "Custom", features: ["Multiclínicas", "API Dedicada", "Treinamento Time", "Gestor de Contas"], featured: false }
+              { name: "Start", price: "197", plan: "start", features: ["Até 5 Usuários", "Gestão de Leads", "Funil de Vendas", "Suporte Individual"], featured: false },
+              { name: "Pro", price: "297", plan: "pro", features: ["Até 10 usuários por clínica", "Integração WhatsApp", "Inteligência de Metas", "Relatórios Custom"], featured: true },
+              { name: "Enterprise", price: "Custom", plan: "enterprise", features: ["Multiclínicas", "API Dedicada", "Treinamento Time", "Gestor de Contas"], featured: false }
             ].map((p, i) => (
               <motion.div 
                 key={i} 
@@ -417,9 +417,9 @@ const Index = () => {
                     ))}
                   </div>
                   
-                  <button className={`w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] transition-all duration-300 ${p.featured ? 'bg-[#F97316] text-white shadow-lg shadow-orange-200 hover:scale-105' : 'bg-[#0F172A] text-white hover:bg-slate-800'}`}>
+                  <Link to={p.price === "Custom" ? "/signup" : `/signup?plan=${p.plan}`} className={`block text-center w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] transition-all duration-300 ${p.featured ? 'bg-[#F97316] text-white shadow-lg shadow-orange-200 hover:scale-105' : 'bg-[#0F172A] text-white hover:bg-slate-800'}`}>
                     {p.price === "Custom" ? "Falar com Time" : "Escolher Plano"}
-                  </button>
+                  </Link>
                 </div>
               </motion.div>
             ))}
