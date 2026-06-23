@@ -12,9 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { 
+  AlertCircle,
   Settings as SettingsIcon,
   Building,
   Clock,
+  CreditCard,
   LayoutTemplate,
   Lock,
   Monitor,
@@ -30,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
-import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, googleCalendarApi, type BillingUsage } from '@/lib/api';
+import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, googleCalendarApi, type BillingStatus, type BillingUsage } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 
@@ -469,7 +471,7 @@ const EquipeView = () => {
           </Button>
         )}
       </div>
-      
+
       {isAdding && (
         <div className="p-4 border rounded-lg bg-muted/50 space-y-4 mb-4">
           <h4 className="font-medium text-sm">Novo Funcionário</h4>
@@ -1116,7 +1118,9 @@ const ClinicasView = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [newClinica, setNewClinica] = useState({ name: '', domain: '', whatsapp: '' });
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [buyingClinicExtra, setBuyingClinicExtra] = useState(false);
+  const [openingPlanCheckout, setOpeningPlanCheckout] = useState(false);
   
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState({ name: '', domain: '', whatsapp: '', openHour: '08:00', closeHour: '20:00' });
@@ -1145,9 +1149,19 @@ const ClinicasView = () => {
     }
   };
 
+  const loadBillingStatus = async () => {
+    try {
+      const res = await billingApi.getStatus();
+      if (res.success && res.data) setBillingStatus(res.data);
+    } catch (e) {
+      console.error('Erro ao carregar assinatura:', e);
+    }
+  };
+
   useEffect(() => {
     loadClinicas();
     loadBillingUsage();
+    loadBillingStatus();
   }, []);
 
   const handleBuyClinicExtra = async () => {
@@ -1167,6 +1181,24 @@ const ClinicasView = () => {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     } finally {
       setBuyingClinicExtra(false);
+    }
+  };
+
+  const handleOpenPlanCheckout = async () => {
+    if (!billingStatus) return;
+
+    setOpeningPlanCheckout(true);
+    try {
+      const res = await billingApi.createCheckout(billingStatus.planCode, billingStatus.billingCycle);
+      if (res.success && res.data?.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+        return;
+      }
+      throw new Error(res.error?.message || 'Nao foi possivel abrir o checkout do plano.');
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setOpeningPlanCheckout(false);
     }
   };
 
@@ -1232,6 +1264,24 @@ const ClinicasView = () => {
     }
   };
 
+  const planLabel = billingStatus?.planCode === 'pro'
+    ? 'Pro'
+    : billingStatus?.planCode === 'enterprise'
+      ? 'Enterprise'
+      : 'Start';
+  const cycleLabel = billingStatus?.billingCycle === 'yearly' ? 'anual' : 'mensal';
+  const subscriptionStatusLabel: Record<string, string> = {
+    trialing: 'Teste gratis',
+    active: 'Plano ativo',
+    expired: 'Teste encerrado',
+    payment_pending: 'Pagamento pendente',
+    canceled: 'Cancelado',
+  };
+  const isSubscriptionBlocked = billingStatus ? ['expired', 'payment_pending', 'canceled'].includes(billingStatus.status) : false;
+  const trialEndsAtLabel = billingStatus?.trialEndsAt
+    ? new Date(billingStatus.trialEndsAt).toLocaleDateString('pt-BR')
+    : null;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex justify-between items-center bg-background border p-4 rounded-xl shadow-sm">
@@ -1254,6 +1304,52 @@ const ClinicasView = () => {
           </Button>
         )}
       </div>
+
+      {billingStatus && (
+        <Card className={isSubscriptionBlocked ? 'border-orange-300 bg-orange-50/70' : 'border-primary/15 bg-primary/5'}>
+          <CardContent className="pt-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className={`rounded-xl p-2 ${isSubscriptionBlocked ? 'bg-orange-100 text-orange-700' : 'bg-primary/10 text-primary'}`}>
+                  {isSubscriptionBlocked ? <AlertCircle className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="font-bold text-foreground">Plano {planLabel}</h4>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isSubscriptionBlocked ? 'bg-orange-200 text-orange-900' : 'bg-primary text-primary-foreground'}`}>
+                      {subscriptionStatusLabel[billingStatus.status] || billingStatus.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Ciclo {cycleLabel}
+                    {billingStatus.status === 'trialing' && ` - teste termina em ${trialEndsAtLabel || 'breve'}`}
+                  </p>
+                  {billingStatus.status === 'trialing' ? (
+                    <p className="text-sm font-medium text-orange-800">
+                      Faltam {Math.max(0, billingStatus.daysRemaining)} dia{billingStatus.daysRemaining === 1 ? '' : 's'}. Depois do teste, o login continua, mas os módulos operacionais ficam bloqueados até ativar o plano.
+                    </p>
+                  ) : isSubscriptionBlocked ? (
+                    <p className="text-sm font-medium text-orange-900">
+                      Esta clínica está sem assinatura ativa. Ative o plano para liberar os módulos operacionais novamente.
+                    </p>
+                  ) : (
+                    <p className="text-sm font-medium text-emerald-700">
+                      Assinatura ativa. Os módulos do plano continuam liberados conforme as permissões internas da equipe.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {billingStatus.status !== 'active' && (
+                <Button onClick={handleOpenPlanCheckout} disabled={openingPlanCheckout} className="w-full lg:w-auto">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  {openingPlanCheckout ? 'Abrindo...' : 'Ativar plano'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isAdding && (
         <Card className="border-primary/20 bg-primary/5 animate-in slide-in-from-top-2">

@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export function BillingBanner() {
   const navigate = useNavigate();
-  const { loadPermissions } = useAuth();
+  const { loadPermissions, professional } = useAuth();
   const { toast } = useToast();
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -24,14 +24,14 @@ export function BillingBanner() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [professional?.companyId]);
 
   if (!status || status.status === 'active') return null;
 
   const isTrial = status.status === 'trialing';
   const isBlocked = ['expired', 'payment_pending', 'canceled'].includes(status.status);
   const message = isTrial
-    ? `Período teste: faltam ${status.daysRemaining} dia${status.daysRemaining === 1 ? '' : 's'}`
+    ? `Período teste: faltam ${status.daysRemaining} dia${status.daysRemaining === 1 ? '' : 's'}. Depois disso, os módulos operacionais ficam bloqueados até ativar o plano.`
     : status.status === 'canceled'
       ? 'Teste cancelado. Ative um plano para liberar os módulos operacionais.'
       : 'Seu período teste terminou. Ative um plano para continuar usando os módulos operacionais.';
