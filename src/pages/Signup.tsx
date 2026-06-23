@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { SiteNavbar } from '@/components/SiteNavbar';
@@ -45,6 +45,11 @@ const PLAN_OPTIONS: Array<{
 const Signup = () => {
   const [searchParams] = useSearchParams();
   const initialPlan = searchParams.get('plan') === 'start' ? 'start' : 'pro';
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
