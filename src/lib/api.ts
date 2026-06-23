@@ -406,7 +406,9 @@ export const empresasApi = {
   create: async (data: any) => apiRequest<any>('/empresas', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) => apiRequest<any>(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/empresas/${id}`, { method: 'DELETE' }),
+  startWhatsappConnection: async () => apiRequest<any>('/empresas/my-company/whatsapp/connect/start', { method: 'POST' }),
   getWhatsappStatus: async () => apiRequest<any>('/empresas/my-company/whatsapp/status'),
+  setupWhatsappWebhook: async () => apiRequest<any>('/empresas/my-company/whatsapp/webhook/setup', { method: 'POST' }),
   disconnectWhatsapp: async () => apiRequest<any>('/empresas/my-company/whatsapp/disconnect', { method: 'POST' }),
   restartWhatsapp: async () => apiRequest<any>('/empresas/my-company/whatsapp/restart', { method: 'POST' }),
 }

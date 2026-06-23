@@ -4,8 +4,31 @@ import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 import { getBillingUsage } from '../services/billing.js'
+import {
+  disconnectCentralWhatsapp,
+  getCentralWhatsappStatus,
+  restartCentralWhatsapp,
+  setupEvolutionWebhookForCompany,
+  startCentralWhatsappConnection,
+} from '../services/whatsapp-integration.js'
 
 export const router = Router()
+
+async function getRequestCompanyId(req: any) {
+  if (req.user?.type === 'profissional') {
+    const prof = await prisma.professional.findUnique({
+      where: { id: req.user.id },
+      select: { companyId: true },
+    })
+    return prof?.companyId || undefined
+  }
+
+  if (req.user?.type === 'usuario') {
+    return req.user.companyId || undefined
+  }
+
+  return undefined
+}
 
 // Obter empresa do profissional logado
 router.get('/my-company', auth(), async (req, res) => {
@@ -39,6 +62,77 @@ router.get('/my-company', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[Empresas] Erro ao buscar minha empresa:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar empresa', 500))
+  }
+})
+
+router.get('/my-company/whatsapp/status', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const status = await getCentralWhatsappStatus(companyId)
+    return res.json(createSuccessResponse(status))
+  } catch (error: any) {
+    console.error('[WhatsApp Status] Erro geral:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar status do WhatsApp', 500))
+  }
+})
+
+router.post('/my-company/whatsapp/connect/start', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const status = await startCentralWhatsappConnection(companyId)
+    return res.json(createSuccessResponse(status))
+  } catch (error: any) {
+    console.error('[WhatsApp Connect] Erro:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao iniciar conexao do WhatsApp', 500))
+  }
+})
+
+router.post('/my-company/whatsapp/webhook/setup', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const company = await prisma.empresa.findUnique({
+      where: { id: companyId },
+      select: { webhookToken: true, evolutionInstance: true },
+    })
+    if (!company) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const result = await setupEvolutionWebhookForCompany(company)
+    return res.json(createSuccessResponse(result))
+  } catch (error: any) {
+    console.error('[WhatsApp Webhook Setup] Erro:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao configurar webhook do WhatsApp', 500))
+  }
+})
+
+router.post('/my-company/whatsapp/disconnect', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const data = await disconnectCentralWhatsapp(companyId)
+    return res.json(createSuccessResponse({ success: true, data }))
+  } catch (error: any) {
+    console.error('[WhatsApp Disconnect] Erro:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao desconectar WhatsApp', 500))
+  }
+})
+
+router.post('/my-company/whatsapp/restart', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const data = await restartCentralWhatsapp(companyId)
+    return res.json(createSuccessResponse({ success: true, data }))
+  } catch (error: any) {
+    console.error('[WhatsApp Restart] Erro:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao reiniciar WhatsApp', 500))
   }
 })
 

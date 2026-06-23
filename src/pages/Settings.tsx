@@ -1415,6 +1415,8 @@ const WhatsAppStatusManager = () => {
     status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' | 'ERROR' | 'LOADING';
     qrcode?: string | null;
     pairingCode?: string | null;
+    instance?: string | null;
+    webhookUrl?: string | null;
     message?: string;
   }>({ status: 'LOADING' });
 
@@ -1426,13 +1428,39 @@ const WhatsAppStatusManager = () => {
         setStatusInfo({
           status: res.data.status,
           qrcode: res.data.qrcode,
-          pairingCode: res.data.pairingCode
+          pairingCode: res.data.pairingCode,
+          instance: res.data.instance,
+          webhookUrl: res.data.webhookUrl,
+          message: res.data.message
         });
       } else {
         setStatusInfo({ status: 'ERROR', message: res.error?.message || 'Falha ao buscar status' });
       }
     } catch (e: any) {
       setStatusInfo({ status: 'ERROR', message: e.message });
+    }
+  };
+
+  const handleStartConnection = async () => {
+    setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
+    try {
+      const res = await empresasApi.startWhatsappConnection();
+      if (res.success && res.data) {
+        setStatusInfo({
+          status: res.data.status,
+          qrcode: res.data.qrcode,
+          pairingCode: res.data.pairingCode,
+          instance: res.data.instance,
+          webhookUrl: res.data.webhookUrl,
+          message: res.data.message
+        });
+        toast({ title: 'WhatsApp pronto para conectar', description: 'Escaneie o QR Code para ativar a captura automatica de leads.' });
+      } else {
+        throw new Error(res.error?.message || 'Nao foi possivel iniciar a conexao');
+      }
+    } catch (e: any) {
+      setStatusInfo({ status: 'ERROR', message: e.message });
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     }
   };
 
@@ -1473,10 +1501,6 @@ const WhatsAppStatusManager = () => {
     fetchStatus();
   }, []);
 
-  if (statusInfo.status === 'NOT_CONFIGURED') {
-    return null;
-  }
-
   return (
     <Card className="border border-emerald-500/20 bg-emerald-50/5 dark:bg-slate-900/40 backdrop-blur-md shadow-lg rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
       <CardHeader className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -1495,6 +1519,24 @@ const WhatsAppStatusManager = () => {
           <div className="flex flex-col items-center justify-center py-8 space-y-3">
             <span className="material-symbols-outlined animate-spin text-3xl text-emerald-500">progress_activity</span>
             <span className="text-xs text-muted-foreground">Comunicando com a sua VPS da Evolution API...</span>
+          </div>
+        )}
+
+        {statusInfo.status === 'NOT_CONFIGURED' && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+              <span className="material-symbols-outlined text-amber-500 mt-0.5">settings_alert</span>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Evolution central nao configurada</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                  {statusInfo.message || 'Configure EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY no servidor para liberar conexao por QR Code.'}
+                </p>
+              </div>
+            </div>
+            <Button type="button" onClick={handleStartConnection} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold">
+              <span className="material-symbols-outlined text-sm mr-2">qr_code_scanner</span>
+              Conectar WhatsApp
+            </Button>
           </div>
         )}
 
@@ -1573,6 +1615,10 @@ const WhatsAppStatusManager = () => {
                 <Button type="button" onClick={fetchStatus} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-md shadow-emerald-500/10">
                   <span className="material-symbols-outlined text-sm mr-2">sync</span>
                   Gerar / Atualizar QR Code
+                </Button>
+                <Button type="button" variant="outline" onClick={handleStartConnection} className="w-full font-semibold border-emerald-200 hover:bg-emerald-50 transition-all text-emerald-700 dark:text-emerald-300">
+                  <span className="material-symbols-outlined text-sm mr-2">qr_code_scanner</span>
+                  Conectar WhatsApp
                 </Button>
                 <Button type="button" variant="outline" onClick={handleRestart} className="w-full font-semibold border-slate-200 hover:bg-slate-50 transition-all text-slate-600 dark:text-slate-300">
                   <span className="material-symbols-outlined text-sm mr-2">restart_alt</span>
@@ -1768,6 +1814,34 @@ const GoogleCalendarView = () => {
 };
 
 const WhatsAppView = () => {
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl text-sm border border-emerald-200/50 dark:border-emerald-800/50 flex items-start gap-3 shadow-sm">
+        <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
+        <div className="leading-relaxed">
+          <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SalesClin</strong>
+          Conecte o numero da clinica por QR Code. Quando uma pessoa nova mandar mensagem, o SalesClin verifica o telefone nesta clinica e cria o lead automaticamente no funil.
+        </div>
+      </div>
+
+      <WhatsAppStatusManager />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          { icon: 'person_add', title: 'Novo contato', desc: 'Telefone novo vira lead em Novos Leads.' },
+          { icon: 'rule', title: 'Sem duplicar', desc: 'A verificacao usa telefone + clinica.' },
+          { icon: 'forum', title: 'Historico salvo', desc: 'Mensagem e conversa ficam vinculadas ao lead.' },
+        ].map((item) => (
+          <div key={item.title} className="rounded-2xl border border-slate-200/70 dark:border-slate-800 p-4 bg-white/70 dark:bg-slate-900/40">
+            <span className="material-symbols-outlined text-[#F97316] text-xl mb-2 block">{item.icon}</span>
+            <p className="text-sm font-bold text-primary">{item.title}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed mt-1">{item.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const { toast } = useToast();
   const { professional } = useAuth();
   const [data, setData] = useState({

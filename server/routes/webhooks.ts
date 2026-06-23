@@ -15,6 +15,11 @@ import {
   type BillingCycle,
   type PlanCode,
 } from '../services/billing.js';
+import {
+  findCompanyByInstance as findWhatsappCompanyByInstance,
+  handleEvolutionPayload as handleWhatsappEvolutionPayload,
+  handleMetaMessages as handleWhatsappMetaMessages,
+} from '../services/whatsapp-integration.js';
 
 export const router = Router();
 
@@ -545,7 +550,7 @@ router.post('/evolution/:token', async (req, res) => {
 
     console.log(`[Webhook/Evolution] ✅ Recebido para clínica "${empresa.name}" (ID: ${empresa.id})`);
 
-    const result = await handleEvolutionPayload(req.body, empresa);
+    const result = await handleWhatsappEvolutionPayload(req.body, empresa);
     return res.json(result);
 
   } catch (error: any) {
@@ -571,7 +576,7 @@ router.post('/evolution', async (req, res) => {
     }
 
     // Identificar clínica pela instância (fallback — menos seguro)
-    const empresa = await findCompanyByInstance(instance);
+    const empresa = await findWhatsappCompanyByInstance(instance);
     if (!empresa) {
       console.warn(`[Webhook/Evolution] Instância "${instance}" não encontrada no DB.`);
       return res.json({ received: true, ignored: true, reason: 'unknown_instance' });
@@ -579,7 +584,7 @@ router.post('/evolution', async (req, res) => {
 
     console.log(`[Webhook/Evolution/Legacy] Recebido via rota legada para "${empresa.name}" (ID: ${empresa.id})`);
 
-    const result = await handleEvolutionPayload(body, empresa);
+    const result = await handleWhatsappEvolutionPayload(body, empresa);
     return res.json(result);
 
   } catch (error: any) {
@@ -691,7 +696,7 @@ router.post('/meta/:token', async (req, res) => {
     }
 
     console.log(`[Webhook/Meta] ✅ Recebido para clínica "${empresa.name}" (ID: ${empresa.id})`);
-    await handleMetaMessages(req.body, empresa);
+    await handleWhatsappMetaMessages(req.body, empresa);
     return res.sendStatus(200);
   } catch (error: any) {
     console.error('[Webhook/Meta] Erro:', error);
@@ -702,7 +707,7 @@ router.post('/meta/:token', async (req, res) => {
 // Receber mensagens (POST) — legada (busca por phone_number_id)
 router.post('/meta', async (req, res) => {
   try {
-    await handleMetaMessages(req.body);
+    await handleWhatsappMetaMessages(req.body);
     return res.sendStatus(200);
   } catch (error: any) {
     console.error('[Webhook/Meta] Erro:', error);
