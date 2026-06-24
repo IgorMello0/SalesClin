@@ -41,6 +41,7 @@ import PrecosPage from "./pages/PrecosPage";
 import ClientesPage from "./pages/ClientesPage";
 import SobrePage from "./pages/SobrePage";
 import Campaigns from "./pages/Campaigns";
+import LegalPage from "./pages/LegalPage";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,10 @@ const App = () => (
                 <Route path="/precos" element={<PrecosPage />} />
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/sobre" element={<SobrePage />} />
+                <Route path="/termos-de-uso" element={<LegalPage kind="terms" />} />
+                <Route path="/politica-de-privacidade" element={<LegalPage kind="privacy" />} />
+                <Route path="/politica-de-cookies" element={<LegalPage kind="cookies" />} />
+                <Route path="/seguranca" element={<LegalPage kind="security" />} />
                 <Route path="/" element={<AppLayout />}>
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="appointments" element={<ProtectedRoute moduleCode="agendamentos" moduleName="Agenda"><Appointments /></ProtectedRoute>} />

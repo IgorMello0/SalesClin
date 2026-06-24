@@ -385,9 +385,9 @@ const Login = () => {
             <div className="space-y-4 pt-2">
               <p className="text-[11px] text-slate-400 text-center leading-relaxed font-medium px-2">
                 Ao fazer login, você concorda com nossos{' '}
-                <a href="#" className="underline text-slate-500 hover:text-[#F97316] transition-colors">
+                <Link to="/termos-de-uso" className="underline text-slate-500 hover:text-[#F97316] transition-colors">
                   termos e condições
-                </a>
+                </Link>
                 .
               </p>
               

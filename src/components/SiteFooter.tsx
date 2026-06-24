@@ -49,8 +49,17 @@ export const SiteFooter = () => {
           <div className="space-y-4">
             <h4 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.3em]">Legal</h4>
             <ul className="space-y-2">
-              {["Termos de Uso", "Privacidade", "Cookies", "Segurança"].map((item, i) => (
-                <li key={i}><a href="#" className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">{item}</a></li>
+              {[
+                { label: "Termos de Uso", to: "/termos-de-uso" },
+                { label: "Privacidade", to: "/politica-de-privacidade" },
+                { label: "Cookies", to: "/politica-de-cookies" },
+                { label: "Segurança", to: "/seguranca" },
+              ].map((item) => (
+                <li key={item.to}>
+                  <Link to={item.to} className="text-sm text-slate-500 font-medium hover:text-[#F97316] transition-colors">
+                    {item.label}
+                  </Link>
+                </li>
               ))}
             </ul>
           </div>
