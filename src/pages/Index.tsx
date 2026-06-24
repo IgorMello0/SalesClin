@@ -60,9 +60,9 @@ const Index = () => {
       <SiteNavbar />
 
       {/* 2. HERO — ANCHORED BLUEPRINT */}
-      <section className="relative min-h-screen lg:h-screen flex items-center pt-8 overflow-hidden bg-white">
-        <div className="max-w-7xl mx-auto px-8 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <section className="relative min-h-screen flex items-center overflow-hidden bg-white pt-28 pb-16 lg:pt-24 lg:pb-20">
+        <div className="max-w-[1440px] mx-auto px-6 sm:px-8 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.86fr)_minmax(540px,1.14fr)] gap-12 lg:gap-14 items-center">
             <motion.div 
               initial="hidden"
               animate="visible"
@@ -73,14 +73,14 @@ const Index = () => {
                   transition: { staggerChildren: 0.2 }
                 }
               }}
-              className="z-10 py-0"
+              className="z-10 py-0 max-w-2xl"
             >
               <motion.h1 
                 variants={{
                   hidden: { opacity: 0, y: 30 },
                   visible: { opacity: 1, y: 0, transition: { duration: 1.4, ease: [0.16, 1, 0.3, 1] } }
                 }}
-                className="text-4xl md:text-5xl lg:text-[56px] font-headline font-black text-[#0F172A] leading-[1.1] tracking-tighter mb-4 max-w-xl"
+                className="text-4xl md:text-5xl xl:text-[58px] font-headline font-black text-[#0F172A] leading-[1.08] tracking-tighter mb-5 max-w-2xl"
               >
                 CRM feito para clínicas que querem vender mais com <span className="shimmer-text">inteligência comercial.</span>
               </motion.h1>
@@ -98,7 +98,7 @@ const Index = () => {
                   hidden: { opacity: 0, y: 20 },
                   visible: { opacity: 1, y: 0, transition: { duration: 1.4, ease: [0.16, 1, 0.3, 1] } }
                 }}
-                className="flex items-center gap-8 mb-10"
+                className="flex flex-wrap items-center gap-5 sm:gap-8 mb-10"
               >
                 <Link to="/signup" className="bg-[#F97316] text-white px-10 py-5 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-orange-200 hover:scale-105 transition-all flex items-center gap-3">
                   Começar agora <ArrowRight size={16}/>
@@ -112,7 +112,7 @@ const Index = () => {
                   hidden: { opacity: 0, y: 20 },
                   visible: { opacity: 1, y: 0, transition: { duration: 1.4, ease: [0.16, 1, 0.3, 1] } }
                 }}
-                className="flex items-center gap-12 border-l-2 border-slate-100 pl-8"
+                className="flex items-center gap-10 sm:gap-12 border-l-2 border-slate-100 pl-8"
               >
                 {[
                   { icon: <BarChart size={18}/>, t: "Escala", d: "Crescimento real." },
@@ -135,12 +135,12 @@ const Index = () => {
               initial={{ opacity: 0, x: 100, rotateY: -15 }}
               animate={{ opacity: 1, x: 0, rotateY: 0 }}
               transition={{ duration: 1.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="relative lg:absolute lg:right-[-30%] xl:right-[-20%] lg:w-[70%] h-full flex items-center"
+              className="relative z-0 min-w-0 w-full lg:translate-x-4 xl:translate-x-8"
             >
                <div className="relative w-full">
                   <div className="absolute -inset-10 bg-gradient-to-tr from-[#F97316]/10 to-blue-500/5 blur-[100px] opacity-40" />
-                  <div className="relative bg-white p-3 rounded-[3rem] border border-slate-100 shadow-[0_50px_100px_-20px_rgba(15,23,42,0.15)] transition-transform duration-700 hover:scale-[1.02]">
-                    <img src="/dashboard%20tela.png" alt="SalesClin Dashboard" className="w-full h-auto rounded-[2.5rem]" />
+                  <div className="relative bg-white p-2.5 sm:p-3 rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-[0_40px_90px_-30px_rgba(15,23,42,0.22)] transition-transform duration-700 hover:scale-[1.01] overflow-hidden">
+                    <img src="/dashboard%20tela.png" alt="SalesClin Dashboard" className="block w-full h-auto rounded-[1.5rem] lg:rounded-[2rem]" />
                   </div>
                </div>
             </motion.div>
