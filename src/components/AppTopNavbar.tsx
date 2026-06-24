@@ -103,7 +103,8 @@ export function AppTopNavbar() {
     // Módulos que NÃO estão no MVP (Gestão Financeira, Conversas, Catálogos, Contratos, Relatórios)
     // Devem aparecer APENAS para a conta do desenvolvedor (admin@admin.com)
     const nonMVPModules = ['pagamentos', 'conversas', 'catalogos', 'contratos', 'relatorios'];
-    const isDeveloper = professional?.email === 'admin@admin.com';
+    // Definido como false para ocultar funções antigas e simular a visão real do cliente/profissional
+    const isDeveloper = false;
     
     if (nonMVPModules.includes(item.moduleCode) && !isDeveloper) {
       return false;
@@ -262,15 +263,15 @@ export function AppTopNavbar() {
             <div className="relative z-[100]" ref={companyMenuRef}>
               <button 
                 onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
-                className="flex items-center gap-1.5 sm:gap-2 bg-white/5 hover:bg-white/10 px-2 sm:px-3 py-1.5 rounded-lg border border-white/10 transition-colors mr-2 sm:mr-4 max-w-[120px] sm:max-w-xs"
+                className="flex items-center gap-2 bg-[#03071233] hover:bg-[#03071266] px-3 py-1.5 rounded-xl border-none transition-all duration-300 mr-2 sm:mr-4 max-w-[140px] sm:max-w-xs cursor-pointer group"
               >
-                <div className="w-5 h-5 rounded bg-secondary/20 text-secondary flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[14px]">storefront</span>
+                <div className="w-5 h-5 rounded-lg bg-orange-500/10 text-secondary flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[13px]">storefront</span>
                 </div>
-                <span className="text-[10px] sm:text-xs font-semibold text-slate-200 truncate">
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-300 group-hover:text-slate-100 transition-colors truncate">
                   {professional.companies.find(c => c.id === professional.companyId)?.name || professional.companyName || 'Clínica'}
                 </span>
-                <span className="material-symbols-outlined text-[14px] sm:text-[16px] text-slate-400">
+                <span className="material-symbols-outlined text-[14px] sm:text-[16px] text-slate-500 group-hover:text-slate-300 transition-transform duration-300">
                   expand_more
                 </span>
               </button>

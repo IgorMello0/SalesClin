@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { 
+  ChevronDown,
+  ChevronUp,
   AlertCircle,
   Settings as SettingsIcon,
   Building,
@@ -32,7 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useLayout } from '@/contexts/LayoutContext';
-import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, billingApi, googleCalendarApi, whatsappMetaApi, type BillingStatus, type BillingUsage } from '@/lib/api';
+import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, modulesApi, billingApi, googleCalendarApi, whatsappMetaApi, type BillingStatus, type BillingUsage } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 
@@ -322,7 +324,9 @@ const EquipeView = () => {
     try {
       const res = await permissionsApi.getUserPermissions(userId);
       if (res.success && res.data) {
-        setUserPermissions(res.data);
+        const officialModuleCodes = ['dashboard', 'agendamentos', 'clientes', 'funnel', 'metas', 'tarefas', 'campanhas'];
+        const filtered = res.data.filter((p: any) => officialModuleCodes.includes(p.moduleCode));
+        setUserPermissions(filtered);
       }
     } catch (e) {
       toast({ title: 'Erro', description: 'Não foi possível carregar permissões', variant: 'destructive' });
@@ -899,9 +903,15 @@ const CargosView = () => {
   const loadModules = async () => {
     try {
       const res = await modulesApi.getAll();
-      if (res.success) setModules(res.data || []);
-    } catch (e) {
-      console.error('Erro ao carregar módulos:', e);
+      if (res.success) {
+        const officialModuleCodes = ['dashboard', 'agendamentos', 'clientes', 'funnel', 'metas', 'tarefas', 'campanhas'];
+        const filtered = (res.data || []).filter((m: any) => officialModuleCodes.includes(m.code));
+        setModules(filtered);
+      } else {
+        toast({ title: 'Erro', description: res.error?.message || 'Erro ao carregar módulos', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message || 'Erro ao carregar módulos', variant: 'destructive' });
     }
   };
 
@@ -940,6 +950,19 @@ const CargosView = () => {
         toast({ title: 'Cargo criado!', description: `"${trimmed}" agora está salvo no banco de dados.` });
         setNewRoleName('');
         setIsAdding(false);
+        
+        // Selecionar e expandir automaticamente as permissões do novo cargo
+        if (res.data) {
+          const newRole = res.data;
+          setSelectedRoleId(newRole.id);
+          const currentPermissions = modules.map(m => ({
+            moduleId: m.id,
+            moduleName: m.name,
+            hasAccess: true
+          }));
+          setRolePermissions(currentPermissions);
+        }
+        
         loadRoles();
       } else {
         throw new Error(res.error?.message || 'Erro ao criar');
@@ -1056,15 +1079,25 @@ const CargosView = () => {
                   {role.name}
                 </span>
                 <span className="text-xs text-muted-foreground font-mono">{role.value}</span>
+                <span className="text-[10px] text-muted-foreground/70 hidden sm:inline-block font-normal ml-2">
+                  (clique para ver/configurar permissões)
+                </span>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
-                className="text-red-500 hover:text-red-600 hover:bg-red-50 h-7 w-7 p-0"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 h-7 w-7 p-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+                {selectedRoleId === role.id ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
             </div>
 
             {selectedRoleId === role.id && (

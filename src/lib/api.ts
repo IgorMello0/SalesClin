@@ -75,10 +75,425 @@ export interface SignupCheckoutPayload {
   billingCycle: BillingCycle
 }
 
+const MOCK_MODE = false
+
+function getMockResponse(endpoint: string, options: RequestInit): ApiResponse<any> {
+  const cleanEndpoint = endpoint.split('?')[0]
+  let email = 'admin@admin.com'
+  try {
+    if (options.body) {
+      const body = JSON.parse(options.body as string)
+      if (body.email) email = body.email
+    }
+  } catch (e) {}
+
+  // 1. Auth/Login
+  if (cleanEndpoint.includes('/profissionais/login') || cleanEndpoint.includes('/usuarios/login')) {
+    return {
+      success: true,
+      data: {
+        token: 'mock-jwt-token-xyz',
+        professional: {
+          id: 1,
+          name: 'Profissional Admin',
+          email: email,
+          phone: '(11) 99999-9999',
+          specialization: 'Administração',
+          role: email === 'admin@admin.com' ? 'admin' : 'profissional',
+          onboardingCompleted: true,
+          company: { id: 1, name: 'Clínica SellClin Mock' },
+          companies: [{ id: 1, name: 'Clínica SellClin Mock', role: 'admin' }]
+        }
+      }
+    }
+  }
+
+  if (cleanEndpoint.includes('/auth/google')) {
+    return {
+      success: true,
+      data: {
+        token: 'mock-jwt-token-xyz',
+        professional: {
+          id: 1,
+          name: 'Profissional Admin (Google)',
+          email: 'admin@admin.com',
+          phone: '(11) 99999-9999',
+          specialization: 'Administração',
+          role: 'admin',
+          onboardingCompleted: true,
+          company: { id: 1, name: 'Clínica SellClin Mock' },
+          companies: [{ id: 1, name: 'Clínica SellClin Mock', role: 'admin' }]
+        }
+      }
+    }
+  }
+
+  // 2. Permissions
+  if (cleanEndpoint === '/permissions/my-permissions') {
+    return {
+      success: true,
+      data: [
+        { moduleCode: 'dashboard', moduleName: 'Dashboard', hasAccess: true },
+        { moduleCode: 'agendamentos', moduleName: 'Agendamentos', hasAccess: true },
+        { moduleCode: 'clientes', moduleName: 'Clientes', hasAccess: true },
+        { moduleCode: 'relatorios', moduleName: 'Relatórios', hasAccess: true },
+        { moduleCode: 'pagamentos', moduleName: 'Pagamentos', hasAccess: true },
+        { moduleCode: 'conversas', moduleName: 'Conversas', hasAccess: true },
+        { moduleCode: 'catalogos', moduleName: 'Catálogos', hasAccess: true },
+        { moduleCode: 'contratos', moduleName: 'Contratos', hasAccess: true },
+        { moduleCode: 'funnel', moduleName: 'Funil de Vendas', hasAccess: true },
+        { moduleCode: 'metas', moduleName: 'Metas', hasAccess: true },
+        { moduleCode: 'tarefas', moduleName: 'Tarefas', hasAccess: true },
+        { moduleCode: 'campanhas', moduleName: 'Campanhas', hasAccess: true }
+      ]
+    }
+  }
+
+  // 3. Me
+  if (cleanEndpoint === '/profissionais/me') {
+    return {
+      success: true,
+      data: {
+        id: 1,
+        name: 'Profissional Admin',
+        email: 'admin@admin.com',
+        phone: '(11) 99999-9999',
+        specialization: 'Administração',
+        role: 'admin',
+        onboardingCompleted: true,
+        company: { id: 1, name: 'Clínica SellClin Mock' },
+        companies: [{ id: 1, name: 'Clínica SellClin Mock', role: 'admin' }]
+      }
+    }
+  }
+
+  // 4. Companies
+  if (cleanEndpoint === '/empresas/my-company') {
+    return {
+      success: true,
+      data: {
+        id: 1,
+        name: 'Clínica SellClin Mock',
+        logoUrl: null,
+        domain: 'sellclin.com',
+        isActive: true,
+        openHour: '08:00',
+        closeHour: '20:00'
+      }
+    }
+  }
+
+  if (cleanEndpoint === '/empresas/my-companies') {
+    return {
+      success: true,
+      data: [
+        { id: 1, name: 'Clínica SellClin Mock', role: 'admin' }
+      ]
+    }
+  }
+
+  // 5. Dashboard Metrics
+  if (cleanEndpoint === '/dashboard/metrics') {
+    return {
+      success: true,
+      data: {
+        leads: 142,
+        agendamentos: 88,
+        comparada: 64,
+        oportunidades: 35,
+        contratos: 24,
+        faturamento: 45000,
+        receita: 36000,
+        ticketOrcado: 1285,
+        ticketFechado: 1500,
+        conversao: 16.9,
+        conversaoPropostas: 68.5,
+        conversaoFinanceira: 80.0,
+        parcelamentoMedioBoleto: 3.5,
+        metodos: {
+          boleto: { gerados: 15000, pagos: 10000 },
+          cartao: 12000,
+          pix: 11000,
+          dinheiro: 3000
+        },
+        funil: {
+          novos: 45,
+          contatados: 35,
+          agendamentos: 24,
+          fechados: 12
+        },
+        origem: [
+          { origin: 'Instagram Ad', count: 68 },
+          { origin: 'Google Search', count: 42 },
+          { origin: 'Facebook Ad', count: 32 }
+        ]
+      }
+    }
+  }
+
+  // 6. Clients
+  if (cleanEndpoint.startsWith('/clientes')) {
+    return {
+      success: true,
+      data: [
+        { id: 1, name: 'Ana Souza', email: 'ana@gmail.com', phone: '(11) 98888-8888', document: '123.456.789-00', tags: ['vip'], originLead: null },
+        { id: 2, name: 'Carlos Silva', email: 'carlos@gmail.com', phone: '(11) 97777-7777', document: '987.654.321-00', tags: ['leads'], originLead: null }
+      ]
+    }
+  }
+
+  // 7. Agendamentos
+  if (cleanEndpoint.startsWith('/agendamentos')) {
+    return {
+      success: true,
+      data: [
+        {
+          id: 1,
+          clientId: 1,
+          professionalId: 1,
+          startTime: new Date().toISOString(),
+          endTime: new Date(Date.now() + 3600000).toISOString(),
+          status: 'agendado',
+          client: { id: 1, name: 'Ana Souza' }
+        }
+      ]
+    }
+  }
+
+  // 8. Catalogo / Serviços
+  if (cleanEndpoint.startsWith('/catalogo')) {
+    return {
+      success: true,
+      data: [
+        { id: 1, name: 'Consulta Geral', price: 150.0, durationMinutes: 60, status: 'ativo' },
+        { id: 2, name: 'Tratamento Especial', price: 500.0, durationMinutes: 90, status: 'ativo' }
+      ]
+    }
+  }
+
+  // 9. Tasks
+  if (cleanEndpoint.startsWith('/tasks')) {
+    return {
+      success: true,
+      data: [
+        { id: 1, title: 'Retornar para Lead Ana', priority: 'high', status: 'pending', dueDate: new Date().toISOString() }
+      ]
+    }
+  }
+
+  // 10. Notifications
+  if (cleanEndpoint.startsWith('/notifications')) {
+    return {
+      success: true,
+      data: [
+        { id: 1, title: 'Novo agendamento', content: 'Ana Souza agendou para hoje às 14:00', read: false }
+      ]
+    }
+  }
+
+  // 11. Roles
+  if (cleanEndpoint.startsWith('/roles')) {
+    return {
+      success: true,
+      data: [
+        { id: 1, name: 'Administrador', value: 'admin' },
+        { id: 2, name: 'Comercial', value: 'comercial' }
+      ]
+    }
+  }
+
+  // 12. Metas
+  if (cleanEndpoint.startsWith('/metas')) {
+    return {
+      success: true,
+      data: []
+    }
+  }
+
+  // 12.1. Leads (All)
+  if (cleanEndpoint.startsWith('/leads')) {
+    if (cleanEndpoint.includes('/proposals')) {
+      return {
+        success: true,
+        data: []
+      }
+    }
+    return {
+      success: true,
+      data: [
+        {
+          id: 1,
+          name: 'Ana Souza',
+          value: 1500,
+          origin: 'instagram',
+          status: 'prospect_lead',
+          phone: '(11) 98888-8888',
+          email: 'ana@gmail.com',
+          isScheduled: false,
+          isPaid: false,
+          notes: 'Interessada no tratamento facial.',
+          responsible: 'Amanda Santos',
+          tags: ['Estética'],
+          activities: []
+        },
+        {
+          id: 2,
+          name: 'Carlos Silva',
+          value: 3200,
+          origin: 'meta ads',
+          status: 'prospect_qualified',
+          phone: '(11) 97777-7777',
+          email: 'carlos@gmail.com',
+          isScheduled: true,
+          isPaid: false,
+          notes: 'Qualificado. Procura implante dentário.',
+          responsible: 'Amanda Santos',
+          tags: ['Implantodontia'],
+          activities: []
+        },
+        {
+          id: 3,
+          name: 'Juliana Costa',
+          value: 2500,
+          origin: 'google',
+          status: 'prospect_scheduled',
+          phone: '(11) 96666-6666',
+          email: 'juliana@gmail.com',
+          isScheduled: true,
+          isPaid: false,
+          notes: 'Agendou consulta de avaliação.',
+          responsible: 'Amanda Santos',
+          tags: ['Clínico Geral'],
+          activities: []
+        },
+        {
+          id: 4,
+          name: 'Lucas Santos',
+          value: 5000,
+          origin: 'indicação',
+          status: 'comercial_proposal',
+          phone: '(11) 95555-5555',
+          email: 'lucas@gmail.com',
+          isScheduled: true,
+          isPaid: false,
+          notes: 'Aguardando aprovação da proposta.',
+          responsible: 'Amanda Santos',
+          tags: ['Ortodontia'],
+          activities: []
+        },
+        {
+          id: 5,
+          name: 'Maria Oliveira',
+          value: 1800,
+          origin: 'whatsapp',
+          status: 'comercial_consult',
+          phone: '(11) 94444-4444',
+          email: 'maria@gmail.com',
+          isScheduled: true,
+          isPaid: false,
+          notes: 'Realizou a consulta inicial.',
+          responsible: 'Amanda Santos',
+          tags: ['Estética'],
+          activities: []
+        }
+      ]
+    }
+  }
+
+  // 13. Funnel Config
+  if (cleanEndpoint.startsWith('/funnel-config')) {
+    return {
+      success: true,
+      data: [
+        {
+          id: 1,
+          code: 'prospecting',
+          label: 'Prospecção',
+          icon: 'person_search',
+          order: 0,
+          stages: [
+            { id: 1, code: 'prospect_lead', label: 'Novos Leads', color: 'bg-blue-500', order: 0 },
+            { id: 2, code: 'prospect_qualified', label: 'Qualificados', color: 'bg-indigo-500', order: 1 },
+            { id: 3, code: 'prospect_scheduled', label: 'Agendados', color: 'bg-violet-500', order: 2 },
+            { id: 4, code: 'prospect_attended', label: 'Compareceu', color: 'bg-emerald-500', isTransition: true, order: 3 }
+          ]
+        },
+        {
+          id: 2,
+          code: 'commercial',
+          label: 'Comercial',
+          icon: 'handshake',
+          order: 1,
+          stages: [
+            { id: 5, code: 'comercial_consult', label: 'Consulta Feita', color: 'bg-emerald-500', isLinked: true, order: 0 },
+            { id: 6, code: 'comercial_proposal', label: 'Proposta', color: 'bg-orange-500', order: 1 },
+            { id: 7, code: 'comercial_follow', label: 'Follow-up', color: 'bg-amber-500', order: 2 },
+            { id: 8, code: 'comercial_closed', label: 'Fechado', color: 'bg-green-600', order: 3 }
+          ]
+        },
+        {
+          id: 3,
+          code: 'sales',
+          label: 'Vendas',
+          icon: 'payments',
+          order: 2,
+          stages: [
+            { id: 9, code: 'sales_payment', label: 'Pagamento', color: 'bg-cyan-500', order: 0 },
+            { id: 10, code: 'sales_contract', label: 'Contrato', color: 'bg-blue-600', order: 1 },
+            { id: 11, code: 'sales_post', label: 'Pós-Venda', color: 'bg-purple-500', order: 2 }
+          ]
+        }
+      ]
+    }
+  }
+
+  // 14. Billing
+  if (cleanEndpoint.startsWith('/billing/status')) {
+    return {
+      success: true,
+      data: {
+        planCode: 'pro',
+        billingCycle: 'monthly',
+        status: 'active',
+        trialEndsAt: new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
+        daysRemaining: 30,
+        modules: []
+      }
+    }
+  }
+
+  if (cleanEndpoint.startsWith('/billing/usage')) {
+    return {
+      success: true,
+      data: {
+        planCode: 'pro',
+        billingCycle: 'monthly',
+        subscriptionStatus: 'active',
+        clinics: { used: 1, baseLimit: 5, extraQuantity: 0, limit: 5, canCreate: true },
+        users: { companyId: 1, used: 2, baseLimit: 10, extraQuantity: 0, limit: 10, canCreate: true }
+      }
+    }
+  }
+
+  return {
+    success: true,
+    data: null
+  }
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
+  if (MOCK_MODE) {
+    console.warn(`[API] [MOCK MODE] Intercepted request to ${endpoint}`)
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(getMockResponse(endpoint, options) as ApiResponse<T>)
+      }, 200)
+    })
+  }
+
   const url = `${API_BASE_URL}${endpoint}`
   const token = localStorage.getItem('token')
   const activeCompanyId = localStorage.getItem('activeCompanyId')

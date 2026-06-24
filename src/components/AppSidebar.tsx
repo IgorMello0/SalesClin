@@ -86,7 +86,8 @@ export function AppSidebar() {
     // Módulos que NÃO estão no MVP (Gestão Financeira, Conversas, Análises/Relatórios)
     // Devem aparecer APENAS para a conta do desenvolvedor (admin@admin.com)
     const nonMVPModules = ['pagamentos', 'conversas', 'relatorios'];
-    const isDeveloper = professional?.email === 'admin@admin.com';
+    // Definido como false para ocultar funções antigas e simular a visão real do cliente/profissional
+    const isDeveloper = false;
     
     if (nonMVPModules.includes(item.moduleCode) && !isDeveloper) {
       return false;
@@ -238,15 +239,15 @@ export function AppSidebar() {
               <div className="relative">
                 <button 
                   onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
-                  className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 transition-colors text-left"
+                  className="w-full flex items-center justify-between bg-[#03071233] hover:bg-[#03071266] px-3 py-2 rounded-xl border-none transition-all duration-300 text-left group"
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden flex-1">
                     <span className="material-symbols-outlined text-[18px] text-secondary shrink-0">storefront</span>
-                    <span className="text-xs font-semibold text-slate-200 truncate">
+                    <span className="text-xs font-semibold text-slate-300 group-hover:text-slate-100 transition-colors truncate">
                       {professional.companies.find(c => c.id === professional.companyId)?.name || professional.companyName || 'Clínica'}
                     </span>
                   </div>
-                  <span className="material-symbols-outlined text-[16px] text-slate-400 shrink-0 ml-1">
+                  <span className="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-slate-300 transition-colors shrink-0 ml-1">
                     expand_more
                   </span>
                 </button>

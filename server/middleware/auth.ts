@@ -165,7 +165,26 @@ export function requireModule(moduleCode: string) {
 
         return next()
       } else if (req.user.type === 'usuario') {
-        // Buscar o usuário com seu cargo e as permissões do cargo para este módulo
+        // Buscar o acesso do usuário à clínica ativa com o respectivo cargo e permissões
+        const companyAccess = await prisma.userCompanyAccess.findUnique({
+          where: {
+            userId_companyId: {
+              userId: req.user.id,
+              companyId: req.user.companyId || 0,
+            },
+          },
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  where: { moduleId: module.id },
+                },
+              },
+            },
+          },
+        })
+
+        // Buscar o usuário global para fallback do cargo
         const userWithRole = await prisma.usuario.findUnique({
           where: { id: req.user.id },
           include: {
@@ -183,16 +202,10 @@ export function requireModule(moduleCode: string) {
           return res.status(403).json(createErrorResponse('Usuário não encontrado', 403))
         }
 
-        // Se o usuário tem um cargo definido
-        if (userWithRole.role) {
-          const rolePermission = userWithRole.role.permissions[0]
-          // Se houver uma restrição explícita no cargo, bloqueia
-          if (rolePermission && !rolePermission.hasAccess) {
-            return res.status(403).json(createErrorResponse('Acesso negado a este módulo pelo seu cargo', 403))
-          }
-        }
+        const activeRole = companyAccess?.role || userWithRole.role
+        const rolePermission = activeRole?.permissions[0]
 
-        // Além do cargo, mantemos a verificação de permissão individual como override (opcional)
+        // Buscar permissão individual (override)
         const individualPermission = await prisma.userPermission.findUnique({
           where: {
             userId_moduleId: {
@@ -202,8 +215,14 @@ export function requireModule(moduleCode: string) {
           },
         })
 
-        if (individualPermission && !individualPermission.hasAccess) {
-          return res.status(403).json(createErrorResponse('Acesso negado a este módulo (bloqueio individual)', 403))
+        // Segue a mesma hierarquia de prioridade do frontend/permissions API:
+        // 1. Permissão Individual (se existir)
+        // 2. Permissão do Cargo (se existir)
+        // 3. Padrão: Permitido (true)
+        const hasAccess = individualPermission?.hasAccess ?? rolePermission?.hasAccess ?? true
+
+        if (!hasAccess) {
+          return res.status(403).json(createErrorResponse('Acesso negado a este módulo', 403))
         }
 
         return next()

@@ -119,8 +119,16 @@ export async function ensureDefaultModules(prisma: PrismaExecutor) {
   }
 }
 
+let defaultsEnsured = false
+
 export async function ensureDefaultPlans(prisma: PrismaExecutor) {
+  if (defaultsEnsured) {
+    console.log('    [plans] Defaults already ensured. Skipping.')
+    return
+  }
+  console.log('    [plans] Ensuring default modules...')
   await ensureDefaultModules(prisma)
+  console.log('    [plans] Default modules ensured. Upserting plans...')
 
   for (const plan of DEFAULT_PLANS) {
     await prisma.plan.upsert({
@@ -160,6 +168,7 @@ export async function ensureDefaultPlans(prisma: PrismaExecutor) {
       })
     }
   }
+  defaultsEnsured = true
 }
 
 export async function ensureCompanyDefaults(
@@ -167,7 +176,9 @@ export async function ensureCompanyDefaults(
   companyId: number,
   professionalId?: number | null
 ) {
+  console.log(`  [company ${companyId}] Ensuring default plans...`);
   await ensureDefaultPlans(prisma)
+  console.log(`  [company ${companyId}] Ensuring company subscription...`);
   await ensureCompanySubscription(prisma, companyId)
 
   const ownerId = professionalId ?? await resolveCompanyOwnerId(prisma, companyId)
@@ -217,14 +228,19 @@ export async function ensureCompanyDefaults(
 }
 
 export async function bootstrapSystemDefaults(prisma: PrismaClient) {
+  console.log('[bootstrap] Ensuring default plans...');
   await ensureDefaultPlans(prisma)
+  console.log('[bootstrap] Default plans ensured. Querying companies...');
 
   const companies = await prisma.empresa.findMany({
     select: { id: true, ownerId: true },
   })
+  console.log(`[bootstrap] Found ${companies.length} companies. Starting company defaults bootstrap...`);
 
   for (const company of companies) {
+    console.log(`[bootstrap] Ensuring defaults for company ID: ${company.id}...`);
     await ensureCompanyDefaults(prisma, company.id, company.ownerId)
+    console.log(`[bootstrap] Company ID ${company.id} defaults ensured.`);
   }
 }
 
