@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SiteFooter } from '@/components/SiteFooter';
-import { billingApi } from '@/lib/api';
+import { billingApi, type BillingCycle } from '@/lib/api';
 import { 
   Check, ArrowRight, ShieldCheck, Zap, Sparkles, 
   Lock, CreditCard, Award, HeartHandshake, CheckCircle2, ChevronRight,
@@ -11,7 +11,11 @@ import {
 } from 'lucide-react';
 
 const SelectPlan = () => {
+  const [searchParams] = useSearchParams();
   const [selectedPlan, setSelectedPlan] = useState<'pro' | 'start' | 'enterprise'>('pro');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(
+    searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'
+  );
   const [isActivating, setIsActivating] = useState(false);
   const [activationStep, setActivationStep] = useState(0);
   
@@ -75,11 +79,11 @@ const SelectPlan = () => {
   const handleActivate = async () => {
     if (selectedPlan !== 'enterprise') {
       if (!localStorage.getItem('token')) {
-        navigate(`/signup?plan=${selectedPlan}`);
+        navigate(`/signup?plan=${selectedPlan}&cycle=${billingCycle}`);
         return;
       }
 
-      const response = await billingApi.createCheckout(selectedPlan, 'monthly');
+      const response = await billingApi.createCheckout(selectedPlan, billingCycle);
       if (!response.success) {
         toast({
           title: 'Não foi possível selecionar o plano',
@@ -110,7 +114,8 @@ const SelectPlan = () => {
       id: 'start',
       name: "Plano Start",
       badge: "Início de Escala",
-      price: "197",
+      monthly: 197,
+      yearly: 1970,
       desc: "Ideal para consultórios individuais e clínicas em início de escala comercial.",
       features: [
         "Até 5 usuários ativos",
@@ -128,7 +133,8 @@ const SelectPlan = () => {
       id: 'pro',
       name: "Plano Pro",
       badge: "Mais Popular & Recomendado",
-      price: "297",
+      monthly: 297,
+      yearly: 2970,
       desc: "O plano definitivo para clínicas que buscam crescimento agressivo.",
       features: [
         "Até 10 usuários por clínica",
@@ -147,7 +153,8 @@ const SelectPlan = () => {
       id: 'enterprise',
       name: "Plano Enterprise",
       badge: "Redes e Multiclínicas",
-      price: "Custom",
+      monthly: null,
+      yearly: null,
       desc: "Soluções personalizadas para redes de clínicas e operações de alta escala.",
       features: [
         "Módulos Multiclínicas integrados",
@@ -162,6 +169,15 @@ const SelectPlan = () => {
       cta: "Falar com Time de Vendas"
     }
   ];
+
+  const selectedPlanData = plans.find((plan) => plan.id === selectedPlan);
+  const selectedPrice = selectedPlanData && selectedPlan !== 'enterprise'
+    ? billingCycle === 'yearly'
+      ? selectedPlanData.yearly
+      : selectedPlanData.monthly
+    : null;
+  const cycleLabel = billingCycle === 'yearly' ? 'Anual' : 'Mensal';
+  const cycleSuffix = billingCycle === 'yearly' ? '/ano' : '/mês';
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#0F172A] font-body selection:bg-[#F97316]/20 relative overflow-x-hidden flex flex-col justify-between">
@@ -220,6 +236,37 @@ const SelectPlan = () => {
           <p className="text-slate-500 text-sm sm:text-base font-medium max-w-xl mx-auto leading-relaxed">
             Selecione a capacidade de faturamento ideal para o momento da sua clínica. Você pode fazer o upgrade de licença a qualquer momento.
           </p>
+
+          <div className="mx-auto grid w-full max-w-sm grid-cols-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setBillingCycle('monthly')}
+              className={`rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all ${
+                billingCycle === 'monthly'
+                  ? 'bg-[#0F172A] text-white shadow-md'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Mensal
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingCycle('yearly')}
+              className={`rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all ${
+                billingCycle === 'yearly'
+                  ? 'bg-[#0F172A] text-white shadow-md'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Anual
+            </button>
+          </div>
+
+          {billingCycle === 'yearly' && (
+            <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-600">
+              Plano anual com 2 meses de economia
+            </p>
+          )}
         </div>
 
         {/* Breathtaking 3-Column Grid */}
@@ -265,11 +312,13 @@ const SelectPlan = () => {
 
                   {/* Big price display */}
                   <div className="flex items-baseline gap-1 pt-2">
-                    {p.price !== 'Custom' ? (
+                    {p.monthly !== null ? (
                       <>
                         <span className="text-sm font-bold text-slate-400">R$</span>
-                        <span className="text-5xl font-black text-[#0F172A] tracking-tighter tabular-nums">{p.price}</span>
-                        <span className="text-xs font-bold text-slate-400">/mês</span>
+                        <span className="text-5xl font-black text-[#0F172A] tracking-tighter tabular-nums">
+                          {(billingCycle === 'yearly' ? p.yearly : p.monthly)?.toLocaleString('pt-BR')}
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">{cycleSuffix}</span>
                       </>
                     ) : (
                       <span className="text-3xl font-black text-[#0F172A] tracking-tight py-1">Sob Consulta</span>
@@ -297,7 +346,7 @@ const SelectPlan = () => {
                     <Award size={14} className={isSelected ? 'text-[#F97316]' : 'text-slate-400'} />
                     <span>Licença Ativa</span>
                   </div>
-                  {p.price !== 'Custom' && <span className="text-emerald-600">Instalação Grátis</span>}
+                  {p.monthly !== null && <span className="text-emerald-600">Instalação Grátis</span>}
                 </div>
 
               </div>
@@ -322,7 +371,10 @@ const SelectPlan = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
               <div className="space-y-1">
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Licença Selecionada</span>
-                <span className="text-[#0F172A] font-black">{plans.find(p => p.id === selectedPlan)?.name}</span>
+                <span className="text-[#0F172A] font-black">
+                  {plans.find(p => p.id === selectedPlan)?.name}
+                  {selectedPlan !== 'enterprise' ? ` ${cycleLabel}` : ''}
+                </span>
               </div>
               <div className="space-y-1">
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Setup Clínico</span>
@@ -331,7 +383,7 @@ const SelectPlan = () => {
               <div className="space-y-1">
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Valor da Licença</span>
                 <span className="text-[#0F172A] font-black">
-                  {selectedPlan === 'enterprise' ? 'Sob Consulta' : `R$ ${selectedPlan === 'pro' ? '297' : '197'},00/mês`}
+                  {selectedPrice === null ? 'Sob Consulta' : `R$ ${selectedPrice.toLocaleString('pt-BR')},00${cycleSuffix}`}
                 </span>
               </div>
             </div>

@@ -45,6 +45,7 @@ const PLAN_OPTIONS: Array<{
 const Signup = () => {
   const [searchParams] = useSearchParams();
   const initialPlan = searchParams.get('plan') === 'start' ? 'start' : 'pro';
+  const initialBillingCycle = searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly';
 
   const [formData, setFormData] = useState({
     name: '',
@@ -55,7 +56,7 @@ const Signup = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PublicPlanCode>(initialPlan);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(initialBillingCycle);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { toast } = useToast();
