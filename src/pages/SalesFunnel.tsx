@@ -1569,7 +1569,7 @@ const SalesFunnel = () => {
                               </SelectTrigger>
                               <SelectContent className="z-[300]">
                                 {funnelList.map((f: any) => (
-                                  <SelectItem key={f.code || f.id} value={f.code || f.id} className="text-xs rounded-lg pl-3">
+                                  <SelectItem key={f.code || f.id} value={f.code || f.id} className="text-xs rounded-lg pl-8">
                                     {f.label}
                                   </SelectItem>
                                 ))}
@@ -1598,7 +1598,7 @@ const SalesFunnel = () => {
                               </SelectTrigger>
                               <SelectContent className="z-[300]">
                                 {editStages.map((s: any) => (
-                                  <SelectItem key={s.id || s.code} value={s.id || s.code} className="text-xs rounded-lg pl-3">
+                                  <SelectItem key={s.id || s.code} value={s.id || s.code} className="text-xs rounded-lg pl-8">
                                     {s.label}
                                   </SelectItem>
                                 ))}
