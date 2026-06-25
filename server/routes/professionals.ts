@@ -92,15 +92,26 @@ router.get('/me', auth(), async (req, res) => {
 
     const allowedCompanies = availableCompanies.map(c => c.id)
 
+    const activeCompanyId = req.user?.companyId || professional.companyId
+    let activeCompany = professional.company
+    if (activeCompanyId && activeCompanyId !== professional.companyId) {
+      const found = professional.ownedCompanies.find(c => c.id === activeCompanyId)
+      if (found) {
+        activeCompany = found as any
+      }
+    }
+
     const token = jwt.sign({ 
       id: professional.id, 
-      companyId: professional.companyId, 
+      companyId: activeCompanyId, 
       type: 'profissional',
       allowedCompanies 
     }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
 
     res.json(createSuccessResponse({
       ...professional,
+      companyId: activeCompanyId,
+      company: activeCompany,
       passwordHash: undefined,
       companies: availableCompanies,
       token

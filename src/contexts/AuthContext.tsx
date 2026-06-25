@@ -78,14 +78,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           setProfessional(prev => {
             if (!prev) return prev;
+            const activeCompanyId = Number(localStorage.getItem('activeCompanyId')) || d.company?.id || d.companyId || prev.companyId;
+            const activeCompany = (d.companies || prev.companies)?.find((c: any) => c.id === activeCompanyId);
             const updated = {
               ...prev,
               name: d.name,
               phone: d.phone || '',
               specialization: d.specialization || '',
               photoUrl: d.photoUrl || undefined,
-              companyId: d.company?.id || d.companyId || prev.companyId,
-              companyName: d.company?.name || prev.companyName,
+              companyId: activeCompanyId,
+              companyName: activeCompany?.name || d.company?.name || prev.companyName,
               companies: d.companies || prev.companies,
             };
             // Evitar QuotaExceededError limpando base64 do localStorage
