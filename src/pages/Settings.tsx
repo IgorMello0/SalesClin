@@ -28,7 +28,8 @@ import {
   Trash2,
   Users,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -1150,6 +1151,7 @@ const ClinicasView = () => {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newClinica, setNewClinica] = useState({ name: '', domain: '', whatsapp: '' });
+  const [isSavingClinica, setIsSavingClinica] = useState(false);
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [buyingClinicExtra, setBuyingClinicExtra] = useState(false);
@@ -1240,6 +1242,7 @@ const ClinicasView = () => {
       toast({ title: 'Atenção', description: 'Nome da clínica é obrigatório', variant: 'destructive' });
       return;
     }
+    setIsSavingClinica(true);
     try {
       const res = await empresasApi.create({
         name: newClinica.name,
@@ -1261,6 +1264,8 @@ const ClinicasView = () => {
       }
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message || 'Erro ao criar', variant: 'destructive' });
+    } finally {
+      setIsSavingClinica(false);
     }
   };
 
@@ -1401,7 +1406,16 @@ const ClinicasView = () => {
                 <Input value={newClinica.whatsapp} onChange={e => setNewClinica({...newClinica, whatsapp: e.target.value})} placeholder="Ex: 11999999999" />
               </div>
             </div>
-            <Button onClick={handleCreate} className="w-full sm:w-auto">Criar Filial</Button>
+            <Button onClick={handleCreate} className="w-full sm:w-auto" disabled={isSavingClinica}>
+              {isSavingClinica ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                "Criar Filial"
+              )}
+            </Button>
           </CardContent>
         </Card>
       )}
