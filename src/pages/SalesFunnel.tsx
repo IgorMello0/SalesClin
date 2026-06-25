@@ -1370,7 +1370,9 @@ const SalesFunnel = () => {
                 <Label htmlFor="origin" className="text-xs font-bold uppercase tracking-widest text-slate-400">Origem</Label>
                 <Select value={newLeadData.origin} onValueChange={(val) => setNewLeadData({...newLeadData, origin: val})}>
                   <SelectTrigger id="origin" className="rounded-xl border-slate-200 h-12 bg-white">
-                    <SelectValue placeholder="Selecione..." />
+                    <SelectValue placeholder="Selecione...">
+                      {ORIGIN_OPTIONS.find(opt => opt.value === newLeadData.origin)?.label}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
                     {ORIGIN_OPTIONS.map(opt => (
@@ -1422,7 +1424,9 @@ const SalesFunnel = () => {
                 }}
               >
                 <SelectTrigger className="w-full border-slate-200 focus:ring-secondary/20 rounded-xl h-11">
-                  <SelectValue placeholder="Selecione o Funil" />
+                  <SelectValue placeholder="Selecione o Funil">
+                    {funnelList.find(f => (f.code || f.id) === bulkSelectedFunnel)?.label}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="z-[350]">
                   {funnelList.map((f: any) => (
@@ -1442,7 +1446,9 @@ const SalesFunnel = () => {
                 disabled={!bulkSelectedFunnel}
               >
                 <SelectTrigger className="w-full border-slate-200 focus:ring-secondary/20 rounded-xl h-11">
-                  <SelectValue placeholder="Selecione o Estágio" />
+                  <SelectValue placeholder="Selecione o Estágio">
+                    {bulkStages.find(s => (s.code || s.id) === bulkSelectedStage)?.label}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="z-[350]">
                   {bulkStages.map((s: any) => (
@@ -1557,7 +1563,9 @@ const SalesFunnel = () => {
                               }}
                             >
                               <SelectTrigger className="h-7 py-0 px-2 text-xs font-semibold border-slate-200 focus:ring-secondary/20 bg-white w-[130px] rounded-lg">
-                                <SelectValue placeholder="Selecione o Funil" />
+                                <SelectValue placeholder="Selecione o Funil">
+                                  {funnelList.find(f => (f.code || f.id) === selectedFunnelForEdit)?.label}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent className="z-[300]">
                                 {funnelList.map((f: any) => (
@@ -1584,7 +1592,9 @@ const SalesFunnel = () => {
                               }}
                             >
                               <SelectTrigger className="h-7 py-0 px-2 text-xs font-bold border-secondary focus:ring-secondary/20 bg-white min-w-[130px] max-w-[200px] rounded-lg">
-                                <SelectValue placeholder="Selecione a Etapa" />
+                                <SelectValue placeholder="Selecione a Etapa">
+                                  {editStages.find(s => (s.id || s.code) === stageValue)?.label || "Selecione a Etapa"}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent className="z-[300]">
                                 {editStages.map((s: any) => (
@@ -1597,7 +1607,7 @@ const SalesFunnel = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mr-8 sm:mr-6">
                         <Button 
                           onClick={() => openWhatsApp(selectedLead.phone)}
                           variant="outline" 
