@@ -49,7 +49,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ExportModal } from "@/components/ExportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, History, FileDown, Edit2, Check, X, Eye, Plus } from "lucide-react";
+import { FileText, History, FileDown, Edit2, Check, X, Eye, Plus, Trash2 } from "lucide-react";
 import { FunnelBoard } from '@/components/funnel/FunnelBoard';
 import { ProposalDialog } from '@/components/funnel/ProposalDialog';
 import { FunnelSettingsDialog } from '@/components/funnel/FunnelSettingsDialog';
@@ -216,6 +216,13 @@ const SalesFunnel = () => {
   const [tempOrigin, setTempOrigin] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState("");
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [tempPhone, setTempPhone] = useState("");
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [tempEmail, setTempEmail] = useState("");
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [tempActivityContent, setTempActivityContent] = useState("");
+  const [noteText, setNoteText] = useState("");
 
   const getOriginLabel = (origin: string) => {
     return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
@@ -278,6 +285,11 @@ const SalesFunnel = () => {
       setIsEditingOrigin(false);
       setTempName(selectedLead.name || "");
       setIsEditingName(false);
+      setTempPhone(selectedLead.phone || "");
+      setIsEditingPhone(false);
+      setTempEmail(selectedLead.email || "");
+      setIsEditingEmail(false);
+      setEditingActivityId(null);
     }
   }, [selectedLead?.id]);
 
@@ -542,9 +554,6 @@ const SalesFunnel = () => {
     }
   };
 
-  // Note state
-  const [noteText, setNoteText] = useState('');
-
   const handleSaveNote = async () => {
     if (!noteText.trim() || !selectedLead) return;
 
@@ -557,13 +566,106 @@ const SalesFunnel = () => {
 
       if (res.success) {
         toast({ title: 'Nota salva com sucesso!' });
-        loadLeads(); // Recarrega para atualizar a linha do tempo e selectedLead
+        
+        // Formatar e adicionar localmente a nova nota para atualizar na hora
+        const newAct = res.data;
+        const mappedAct = {
+          id: newAct.id.toString(),
+          type: 'task',
+          user: newAct.createdBy || professional?.name || 'Consultor',
+          action: 'fez uma anotação',
+          content: newAct.content,
+          date: safeFormatDate(newAct.createdAt, "dd/MM/yy 'às' HH:mm"),
+          icon: 'edit_note',
+          color: 'bg-[#FF7A00]'
+        };
+        
+        setSelectedLead(prev => prev ? {
+          ...prev,
+          activities: [mappedAct, ...(prev.activities || [])]
+        } : null);
+
         setNoteText('');
+        loadLeads(); // Sincroniza em background
       } else {
         toast({ title: 'Erro ao salvar nota', description: res.error?.message, variant: 'destructive' });
       }
     } catch (e) {
       toast({ title: 'Erro de conexão', variant: 'destructive' });
+    }
+  };
+
+  const handleUpdatePhone = async () => {
+    if (!selectedLead || !tempPhone.trim()) return;
+    try {
+      const res = await leadsApi.update(Number(selectedLead.id), { phone: tempPhone });
+      if (res.success) {
+        toast({ title: "Telefone atualizado!" });
+        setSelectedLead({ ...selectedLead, phone: tempPhone });
+        setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, phone: tempPhone } : l));
+        setIsEditingPhone(false);
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar telefone", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!selectedLead) return;
+    try {
+      const res = await leadsApi.update(Number(selectedLead.id), { email: tempEmail });
+      if (res.success) {
+        toast({ title: "E-mail atualizado!" });
+        setSelectedLead({ ...selectedLead, email: tempEmail });
+        setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, email: tempEmail } : l));
+        setIsEditingEmail(false);
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar e-mail", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateActivity = async (activityId: string) => {
+    if (!selectedLead || !tempActivityContent.trim()) return;
+    try {
+      const res = await leadsApi.updateActivity(Number(selectedLead.id), Number(activityId), {
+        content: tempActivityContent
+      });
+      if (res.success) {
+        toast({ title: "Anotação atualizada!" });
+        setSelectedLead(prev => prev ? {
+          ...prev,
+          activities: (prev.activities || []).map(act => 
+            act.id === activityId ? { ...act, content: tempActivityContent } : act
+          )
+        } : null);
+        setEditingActivityId(null);
+        loadLeads();
+      } else {
+        toast({ title: "Erro ao atualizar", description: res.error?.message, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Erro de conexão", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    if (!selectedLead) return;
+    if (!confirm("Tem certeza que deseja excluir esta anotação?")) return;
+    try {
+      const res = await leadsApi.deleteActivity(Number(selectedLead.id), Number(activityId));
+      if (res.success) {
+        toast({ title: "Anotação excluída!" });
+        setSelectedLead(prev => prev ? {
+          ...prev,
+          activities: (prev.activities || []).filter(act => act.id !== activityId)
+        } : null);
+        loadLeads();
+      } else {
+        toast({ title: "Erro ao excluir", description: res.error?.message, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Erro de conexão", variant: "destructive" });
     }
   };
 
@@ -1259,11 +1361,80 @@ const SalesFunnel = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 pt-3 sm:pt-4">
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</p>
-                        <p className="text-sm font-bold text-primary">{selectedLead.phone}</p>
+                        {isEditingPhone ? (
+                          <div className="flex items-center gap-1.5 animate-in fade-in duration-200 h-8">
+                            <Input 
+                              value={tempPhone}
+                              onChange={(e) => setTempPhone(e.target.value)}
+                              className="h-8 py-0 px-2 text-xs font-bold border-secondary focus-visible:ring-secondary/20 w-32 bg-white"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleUpdatePhone();
+                                if (e.key === 'Escape') setIsEditingPhone(false);
+                              }}
+                            />
+                            <button onClick={handleUpdatePhone} className="text-emerald-500 hover:text-emerald-600 transition-colors">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setIsEditingPhone(false)} className="text-slate-400 hover:text-slate-500 transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 group/phone h-8">
+                            <p 
+                              className="text-sm font-bold text-primary cursor-pointer hover:text-secondary transition-colors"
+                              onClick={() => setIsEditingPhone(true)}
+                            >
+                              {selectedLead.phone || "Sem telefone"}
+                            </p>
+                            <button 
+                              onClick={() => setIsEditingPhone(true)}
+                              className="opacity-0 group-hover/phone:opacity-100 text-slate-300 hover:text-secondary transition-all animate-in fade-in"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</p>
-                        <p className="text-sm font-bold text-primary truncate max-w-[150px]">{selectedLead.email}</p>
+                        {isEditingEmail ? (
+                          <div className="flex items-center gap-1.5 animate-in fade-in duration-200 h-8">
+                            <Input 
+                              value={tempEmail}
+                              onChange={(e) => setTempEmail(e.target.value)}
+                              className="h-8 py-0 px-2 text-xs font-bold border-secondary focus-visible:ring-secondary/20 w-44 bg-white"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleUpdateEmail();
+                                if (e.key === 'Escape') setIsEditingEmail(false);
+                              }}
+                            />
+                            <button onClick={handleUpdateEmail} className="text-emerald-500 hover:text-emerald-600 transition-colors">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setIsEditingEmail(false)} className="text-slate-400 hover:text-slate-500 transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 group/email h-8">
+                            <p 
+                              className="text-sm font-bold text-primary truncate max-w-[150px] cursor-pointer hover:text-secondary transition-colors"
+                              onClick={() => setIsEditingEmail(true)}
+                              title={selectedLead.email}
+                            >
+                              {selectedLead.email || "Sem e-mail"}
+                            </p>
+                            <button 
+                              onClick={() => setIsEditingEmail(true)}
+                              className="opacity-0 group-hover/email:opacity-100 text-slate-300 hover:text-secondary transition-all animate-in fade-in"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor do Lead</p>
@@ -1443,9 +1614,62 @@ const SalesFunnel = () => {
                                   {act.content && (
                                     <div className="space-y-1">
                                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detalhamento</p>
-                                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm border-l-4 border-secondary/20">
-                                        <p className="text-xs text-slate-600 leading-relaxed font-medium">{act.content}</p>
-                                      </div>
+                                      {editingActivityId === act.id ? (
+                                        <div className="space-y-2 animate-in fade-in duration-200">
+                                          <Textarea
+                                            value={tempActivityContent}
+                                            onChange={(e) => setTempActivityContent(e.target.value)}
+                                            className="text-xs text-slate-600 leading-relaxed font-medium border-secondary focus:ring-secondary/20 min-h-[60px] bg-white rounded-xl"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Escape') setEditingActivityId(null);
+                                            }}
+                                          />
+                                          <div className="flex justify-end gap-2">
+                                            <Button 
+                                              onClick={() => handleUpdateActivity(act.id)} 
+                                              variant="secondary" 
+                                              size="sm" 
+                                              className="h-8 px-3 text-[10px] font-bold gap-1 rounded-lg"
+                                            >
+                                              <Check className="w-3.5 h-3.5" /> Salvar
+                                            </Button>
+                                            <Button 
+                                              onClick={() => setEditingActivityId(null)} 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              className="h-8 px-3 text-[10px] font-bold gap-1 text-slate-400 rounded-lg"
+                                            >
+                                              <X className="w-3.5 h-3.5" /> Cancelar
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm border-l-4 border-secondary/20 group/note relative">
+                                          <p className="text-xs text-slate-600 leading-relaxed font-medium pr-14">{act.content}</p>
+                                          {act.type === 'task' && (
+                                            <div className="absolute right-3 top-3 flex items-center gap-1 opacity-0 group-hover/note:opacity-100 transition-all duration-200 animate-in fade-in">
+                                              <button 
+                                                onClick={() => {
+                                                  setEditingActivityId(act.id);
+                                                  setTempActivityContent(act.content || "");
+                                                }} 
+                                                className="text-slate-400 hover:text-secondary transition-colors p-1 rounded hover:bg-slate-50"
+                                                title="Editar Anotação"
+                                              >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button 
+                                                onClick={() => handleDeleteActivity(act.id)} 
+                                                className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                                                title="Excluir Anotação"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
 

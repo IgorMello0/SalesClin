@@ -168,6 +168,38 @@ router.post('/:id/activities', auth(), async (req, res) => {
   }
 })
 
+// Atualizar Atividade do Lead
+router.put('/:id/activities/:activityId', auth(), async (req, res) => {
+  try {
+    const activityId = Number(req.params.activityId)
+    const { content } = req.body
+    
+    const updated = await prisma.leadActivity.update({
+      where: { id: activityId },
+      data: { content }
+    })
+    
+    res.json(createSuccessResponse(updated))
+  } catch (error: any) {
+    console.error('[Leads] Erro ao atualizar atividade:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar atividade', 500))
+  }
+})
+
+// Deletar Atividade do Lead
+router.delete('/:id/activities/:activityId', auth(), async (req, res) => {
+  try {
+    const activityId = Number(req.params.activityId)
+    await prisma.leadActivity.delete({
+      where: { id: activityId }
+    })
+    res.json(createSuccessResponse({ id: activityId }))
+  } catch (error: any) {
+    console.error('[Leads] Erro ao deletar atividade:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao deletar atividade', 500))
+  }
+})
+
 // Listar Propostas do Lead
 router.get('/:id/proposals', auth(false), async (req, res) => {
   try {
