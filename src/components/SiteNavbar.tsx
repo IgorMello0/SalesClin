@@ -76,7 +76,7 @@ export const SiteNavbar = () => {
           <Link to="/" className="flex-shrink-0 opacity-90 hover:opacity-100 transition-opacity">
             <img
               src="/logo-site.png"
-              alt="SalesClin"
+              alt="SellClin"
               className={`h-9 w-auto object-contain transition-all duration-300 ${logoFilter}`}
             />
           </Link>
@@ -172,7 +172,7 @@ export const SiteNavbar = () => {
           {/* Panel */}
           <div className="absolute top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-              <img src="/logo-site.png" alt="SalesClin" className="h-8 w-auto" />
+              <img src="/logo-site.png" alt="SellClin" className="h-8 w-auto" />
               <button onClick={() => setIsMenuOpen(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
                 <X size={20} />
               </button>

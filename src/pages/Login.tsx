@@ -234,7 +234,7 @@ const Login = () => {
             <Link to="/" aria-label="Voltar para a página inicial" className="inline-flex opacity-95 hover:opacity-100 transition-opacity">
               <img
                 src="/logo-site.png"
-                alt="SalesClin Logo"
+                alt="SellClin Logo"
                 className="h-9 w-auto"
               />
             </Link>
@@ -243,7 +243,7 @@ const Login = () => {
           {/* Header */}
           <div className="text-center space-y-2">
             <h1 className="text-2xl font-headline font-black text-slate-800 tracking-tight">
-              Boas vindas ao <span className="text-[#F97316]">SalesClin.</span>
+              Boas vindas ao <span className="text-[#F97316]">SellClin.</span>
             </h1>
             <p className="text-slate-400 text-xs font-semibold leading-relaxed px-4">
               Preparamos seu espaço para que o dia de hoje seja produtivo, leve e cheio de resultados.

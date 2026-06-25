@@ -30,7 +30,7 @@ function addHours(date: Date, hours: number) {
 
 async function sendResendEmail(to: string, subject: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.EMAIL_FROM || 'SalesClin <noreply@sellclin.com>'
+  const from = process.env.EMAIL_FROM || 'SellClin <noreply@sellclin.com>'
 
   if (!apiKey) {
     console.warn('[Email] RESEND_API_KEY ausente. E-mail nao enviado:', { to, subject })
@@ -108,11 +108,11 @@ export async function sendVerificationEmail(params: {
 
   await sendResendEmail(
     params.email,
-    'Confirme seu e-mail no SalesClin',
+    'Confirme seu e-mail no SellClin',
     `
       <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.5;">
         <h2>Confirme seu e-mail</h2>
-        <p>Ola, ${params.name}. Clique no botao abaixo para ativar sua conta no SalesClin.</p>
+        <p>Ola, ${params.name}. Clique no botao abaixo para ativar sua conta no SellClin.</p>
         <p><a href="${link}" style="display:inline-block;background:#f97316;color:white;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;">Verificar e-mail</a></p>
         <p style="color:#64748b;font-size:13px;">Este link expira em ${EMAIL_TOKEN_HOURS} horas.</p>
       </div>
@@ -137,11 +137,11 @@ export async function sendTeamInviteEmail(params: {
 
   await sendResendEmail(
     params.email,
-    `Convite para acessar ${params.companyName || 'SalesClin'}`,
+    `Convite para acessar ${params.companyName || 'SellClin'}`,
     `
       <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.5;">
         <h2>Voce recebeu um convite</h2>
-        <p>Ola, ${params.name}. Voce foi convidado para acessar ${params.companyName || 'uma clinica'} no SalesClin.</p>
+        <p>Ola, ${params.name}. Voce foi convidado para acessar ${params.companyName || 'uma clinica'} no SellClin.</p>
         <p><a href="${link}" style="display:inline-block;background:#f97316;color:white;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;">Aceitar convite</a></p>
         <p style="color:#64748b;font-size:13px;">Este link expira em ${EMAIL_TOKEN_HOURS} horas.</p>
       </div>

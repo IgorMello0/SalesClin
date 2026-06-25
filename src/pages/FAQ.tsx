@@ -100,13 +100,13 @@ const FAQ = () => {
   const faqs = [
     {
       category: "Geral",
-      question: "O que torna o SalesClin diferente?",
-      answer: "O SalesClin CRM não é apenas uma agenda. É uma plataforma de inteligência comercial desenhada para clínicas. Unimos a organização da recepção (agenda inteligente) com a agressividade do time comercial (funil Kanban e engenharia de metas), criando uma máquina previsível de captação e retenção de pacientes."
+      question: "O que torna o SellClin diferente?",
+      answer: "O SellClin CRM não é apenas uma agenda. É uma plataforma de inteligência comercial desenhada para clínicas. Unimos a organização da recepção (agenda inteligente) com a agressividade do time comercial (funil Kanban e engenharia de metas), criando uma máquina previsível de captação e retenção de pacientes."
     },
     {
       category: "Geral",
       question: "Para qual tipo de operação o CRM foi feito?",
-      answer: "Desenhado para clínicas odontológicas, médicas, estéticas e consultórios de alto padrão. Se a sua clínica sofre com 'pacientes que agendam e não comparecem' ou 'leads do Instagram que somem', o SalesClin é a infraestrutura que resolve esse problema de ponta a ponta."
+      answer: "Desenhado para clínicas odontológicas, médicas, estéticas e consultórios de alto padrão. Se a sua clínica sofre com 'pacientes que agendam e não comparecem' ou 'leads do Instagram que somem', o SellClin é a infraestrutura que resolve esse problema de ponta a ponta."
     },
     {
       category: "Agenda",
@@ -131,7 +131,7 @@ const FAQ = () => {
     {
       category: "Vendas",
       question: "O que é a famosa 'Engenharia de Metas'?",
-      answer: "É o nosso recurso premium de previsibilidade. Esqueça o 'achismo'. Você insere quanto quer faturar e qual o seu ticket médio. O algoritmo reverso do SalesClin calcula, baseado nas suas taxas de conversão históricas, exatamente quantos contatos o seu marketing precisa gerar e quantas avaliações você precisa realizar."
+      answer: "É o nosso recurso premium de previsibilidade. Esqueça o 'achismo'. Você insere quanto quer faturar e qual o seu ticket médio. O algoritmo reverso do SellClin calcula, baseado nas suas taxas de conversão históricas, exatamente quantos contatos o seu marketing precisa gerar e quantas avaliações você precisa realizar."
     },
     {
       category: "Vendas",
@@ -146,7 +146,7 @@ const FAQ = () => {
     {
       category: "Pacientes",
       question: "O sistema aprisiona meus dados?",
-      answer: "De forma alguma. O SalesClin garante a soberania dos seus dados. Você possui acesso a ferramentas de exportação robustas em formato CSV/Excel a qualquer momento, seja para clientes, leads ou faturamento."
+      answer: "De forma alguma. O SellClin garante a soberania dos seus dados. Você possui acesso a ferramentas de exportação robustas em formato CSV/Excel a qualquer momento, seja para clientes, leads ou faturamento."
     },
     {
       category: "Suporte",
@@ -405,7 +405,7 @@ const FAQ = () => {
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(249,115,22,0.1),transparent_70%)] z-10 pointer-events-none" />
             <img 
               src="/atendente.jpg" 
-              alt="Atendente SalesClin" 
+              alt="Atendente SellClin" 
               className="absolute inset-0 w-full h-full object-cover" 
             />
           </div>

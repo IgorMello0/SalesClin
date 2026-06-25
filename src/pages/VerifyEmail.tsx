@@ -19,7 +19,7 @@ const VerifyEmail = () => {
     authApi.verifyEmail(token).then((response) => {
       if (response.success) {
         setStatus('success');
-        setMessage('Seu e-mail foi verificado. Você já pode acessar o SalesClin.');
+        setMessage('Seu e-mail foi verificado. Você já pode acessar o SellClin.');
       } else {
         setStatus('error');
         setMessage(response.error?.message || 'Não foi possível verificar seu e-mail.');

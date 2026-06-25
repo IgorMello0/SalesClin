@@ -140,7 +140,7 @@ const Index = () => {
                <div className="relative w-full">
                   <div className="absolute -inset-10 bg-gradient-to-tr from-[#F97316]/10 to-blue-500/5 blur-[100px] opacity-40" />
                   <div className="relative bg-white p-2.5 sm:p-3 rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-[0_40px_90px_-30px_rgba(15,23,42,0.22)] transition-transform duration-700 hover:scale-[1.01] overflow-hidden">
-                    <img src="/dashboard%20tela.png" alt="SalesClin Dashboard" className="block w-full h-auto rounded-[1.5rem] lg:rounded-[2rem]" />
+                    <img src="/dashboard%20tela.png" alt="SellClin Dashboard" className="block w-full h-auto rounded-[1.5rem] lg:rounded-[2rem]" />
                   </div>
                </div>
             </motion.div>
@@ -176,7 +176,7 @@ const Index = () => {
             {[...Array(2)].map((_, idx) => (
               <React.Fragment key={idx}>
                 {[
-                  { name: "Dr. Ricardo Santos", clinic: "Clínica OrthoDesign", text: "O SalesClin mudou o jogo aqui. Aumentamos nossa conversão de implantes em 45% no primeiro trimestre.", img: "https://i.pravatar.cc/150?u=dr1" },
+                  { name: "Dr. Ricardo Santos", clinic: "Clínica OrthoDesign", text: "O SellClin mudou o jogo aqui. Aumentamos nossa conversão de implantes em 45% no primeiro trimestre.", img: "https://i.pravatar.cc/150?u=dr1" },
                   { name: "Mariana Costa", clinic: "Aesthetic Center", text: "Finalmente tenho controle total dos meus leads de WhatsApp. Não perdemos mais nenhuma oportunidade.", img: "https://i.pravatar.cc/150?u=dr2" },
                   { name: "Dr. Paulo Vieira", clinic: "Vision Institute", text: "A agenda inteligente é fantástica. Reduzimos o no-show em 30% usando as automações do CRM.", img: "https://i.pravatar.cc/150?u=dr3" },
                   { name: "Dra. Eliana Melo", clinic: "DermaGlow", text: "O melhor investimento que fiz este ano. O suporte é incrível e a plataforma é muito intuitiva.", img: "https://i.pravatar.cc/150?u=dr4" },
@@ -207,7 +207,7 @@ const Index = () => {
               <React.Fragment key={idx}>
                 {[
                   { name: "Dr. Felipe Neves", clinic: "Neves Odontologia", text: "O sistema de funis é o que faltava para organizar meu comercial. Hoje sei exatamente onde focar.", img: "https://i.pravatar.cc/150?u=dr5" },
-                  { name: "Dra. Sarah Lima", clinic: "Lima Cardiovascular", text: "Interface limpa e resultados expressivos. A SalesClin entende o dia a dia de uma clínica.", img: "https://i.pravatar.cc/150?u=dr6" },
+                  { name: "Dra. Sarah Lima", clinic: "Lima Cardiovascular", text: "Interface limpa e resultados expressivos. A SellClin entende o dia a dia de uma clínica.", img: "https://i.pravatar.cc/150?u=dr6" },
                   { name: "Bruno Rocha", clinic: "Rocha & Associados", text: "Gerenciar leads nunca foi tão simples. O dashboard me dá clareza total para tomar decisões.", img: "https://i.pravatar.cc/150?u=dr7" },
                   { name: "Dra. Beatriz Ferraz", clinic: "Ferraz Pediatria", text: "Minha equipe amou a plataforma. Facilitou demais a comunicação com os pais via WhatsApp.", img: "https://i.pravatar.cc/150?u=dr8" },
                 ].map((t, i) => (
@@ -460,7 +460,7 @@ const Index = () => {
                 "Não criamos um software de laboratório. Criamos a solução que eu mesmo precisava para gerenciar minhas 3 clínicas de 7 dígitos."
               </p>
               <p className="text-slate-500 text-lg leading-relaxed">
-                A SalesClin nasceu da necessidade real de um dono de clínica. Combinamos a experiência prática do Luiz Bucco com tecnologia de ponta para entregar a primeira infraestrutura comercial especializada em alto ticket do Brasil.
+                A SellClin nasceu da necessidade real de um dono de clínica. Combinamos a experiência prática do Luiz Bucco com tecnologia de ponta para entregar a primeira infraestrutura comercial especializada em alto ticket do Brasil.
               </p>
               <div className="pt-8">
                 <Link to="/sobre" className="group flex items-center gap-4 text-sm font-black uppercase tracking-[0.3em] text-[#0F172A] hover:text-[#F97316] transition-colors">

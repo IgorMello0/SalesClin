@@ -30,7 +30,7 @@ const MetasPage = () => {
   ];
 
   const faqs = [
-    { q: "As taxas de conversão são automáticas?", a: "Sim. O SalesClin calcula suas taxas de conversão reais baseado nos históricos de movimento dos leads no seu funil. Quanto mais você usa, mais precisa fica a previsão." },
+    { q: "As taxas de conversão são automáticas?", a: "Sim. O SellClin calcula suas taxas de conversão reais baseado nos históricos de movimento dos leads no seu funil. Quanto mais você usa, mais precisa fica a previsão." },
     { q: "Posso ter metas diferentes por profissional?", a: "A engenharia de metas funciona a nível de clínica. Metas individuais por profissional estão no roadmap de próximas atualizações." },
     { q: "Como isso é diferente de uma simples calculadora?", a: "Uma calculadora usa dados que você imagina. A Engenharia de Metas usa os seus dados reais de histórico de leads, conversão por etapa e ticket médio dos seus próprios serviços — tornando a previsão muito mais confiável." },
   ];
@@ -219,7 +219,7 @@ const MetasPage = () => {
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
               <div className="flex items-center gap-3 mb-8">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#F97316] bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full shadow-sm">Com o SalesClin</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#F97316] bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full shadow-sm">Com o SellClin</span>
               </div>
               <div className="space-y-4">
                 <div className="flex gap-4 p-4 rounded-2xl bg-slate-950/80 border border-orange-500/20 shadow-[0_4px_20px_rgba(249,115,22,0.08)] transition-all hover:border-orange-500/40 hover:-translate-y-0.5 duration-300">
@@ -391,7 +391,7 @@ const MetasPage = () => {
                 Sua meta do próximo mês começa hoje.
               </h2>
               <p className="text-sm sm:text-base text-slate-400 font-medium leading-relaxed">
-                Deixe o SalesClin fazer o cálculo por você e foque no que realmente importa: atender bem.
+                Deixe o SellClin fazer o cálculo por você e foque no que realmente importa: atender bem.
               </p>
             </div>
 

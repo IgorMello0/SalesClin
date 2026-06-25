@@ -64,7 +64,7 @@ const FunilPage = () => {
               <span className="text-[#F97316]">finalmente aparece.</span>
             </h1>
             <p className="text-lg text-slate-400 font-medium leading-relaxed mb-12 max-w-lg">
-              Visualize cada lead, em cada etapa, in real time. Com o Funil Kanban do SalesClin, você para de perder oportunidades que já estavam na sua mão.
+              Visualize cada lead, em cada etapa, in real time. Com o Funil Kanban do SellClin, você para de perder oportunidades que já estavam na sua mão.
             </p>
             <div className="flex items-center gap-4 flex-wrap">
               <Link to="/login" className="bg-[#F97316] text-white px-10 py-5 rounded-full font-black text-xs uppercase tracking-[0.2em] hover:scale-105 transition-all shadow-2xl shadow-orange-900/40 flex items-center gap-3">
@@ -239,7 +239,7 @@ const FunilPage = () => {
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
               <div className="flex items-center gap-3 mb-8">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#F97316] bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full shadow-sm">Com o SalesClin</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#F97316] bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full shadow-sm">Com o SellClin</span>
               </div>
               <div className="space-y-4">
                 <div className="flex gap-4 p-4 rounded-2xl bg-slate-950/80 border border-orange-500/20 shadow-[0_4px_20px_rgba(249,115,22,0.08)] transition-all hover:border-orange-500/40 hover:-translate-y-0.5 duration-300">

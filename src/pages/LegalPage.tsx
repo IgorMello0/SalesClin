@@ -23,20 +23,20 @@ const pages: Record<LegalPageKind, {
   terms: {
     eyebrow: 'Legal',
     title: 'Termos de Uso',
-    description: 'Regras gerais para acesso e uso da plataforma SalesClin.',
+    description: 'Regras gerais para acesso e uso da plataforma SellClin.',
     icon: <FileText className="h-5 w-5" />,
     sections: [
       {
         title: '1. Aceite dos termos',
         body: [
-          'Ao criar uma conta, acessar ou utilizar o SalesClin, o usuário declara que leu, compreendeu e concorda com estes Termos de Uso.',
+          'Ao criar uma conta, acessar ou utilizar o SellClin, o usuário declara que leu, compreendeu e concorda com estes Termos de Uso.',
           'Se estiver usando a plataforma em nome de uma clínica, empresa ou equipe, você declara ter autorização para aceitar estes termos em nome dessa organização.',
         ],
       },
       {
         title: '2. Uso da plataforma',
         body: [
-          'O SalesClin oferece recursos de CRM, funil comercial, agenda, campanhas, tarefas, integrações e gestão operacional para clínicas.',
+          'O SellClin oferece recursos de CRM, funil comercial, agenda, campanhas, tarefas, integrações e gestão operacional para clínicas.',
           'O usuário se compromete a utilizar a plataforma de forma lícita, responsável e compatível com as regras aplicáveis a dados pessoais, comunicação com clientes e relacionamento comercial.',
         ],
       },
@@ -51,7 +51,7 @@ const pages: Record<LegalPageKind, {
         title: '4. Integrações externas',
         body: [
           'A plataforma pode se integrar a serviços externos, como Google Calendar, WhatsApp, provedores de pagamento e ferramentas de automação.',
-          'O funcionamento dessas integrações depende de autorizações, disponibilidade e regras dos respectivos provedores. O SalesClin não controla alterações feitas por terceiros.',
+          'O funcionamento dessas integrações depende de autorizações, disponibilidade e regras dos respectivos provedores. O SellClin não controla alterações feitas por terceiros.',
         ],
       },
       {
@@ -71,7 +71,7 @@ const pages: Record<LegalPageKind, {
       {
         title: '7. Alterações e disponibilidade',
         body: [
-          'O SalesClin pode evoluir recursos, ajustar interfaces, corrigir falhas, alterar planos e atualizar estes termos conforme necessário.',
+          'O SellClin pode evoluir recursos, ajustar interfaces, corrigir falhas, alterar planos e atualizar estes termos conforme necessário.',
           'Nosso objetivo é manter a plataforma disponível e segura, mas podem ocorrer interrupções temporárias por manutenção, instabilidade técnica ou serviços de terceiros.',
         ],
       },
@@ -80,7 +80,7 @@ const pages: Record<LegalPageKind, {
   privacy: {
     eyebrow: 'Privacidade',
     title: 'Política de Privacidade',
-    description: 'Como tratamos dados pessoais na operação do SalesClin.',
+    description: 'Como tratamos dados pessoais na operação do SellClin.',
     icon: <ShieldCheck className="h-5 w-5" />,
     sections: [
       {
@@ -122,7 +122,7 @@ const pages: Record<LegalPageKind, {
         title: '6. Direitos dos titulares',
         body: [
           'Titulares podem solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio, eliminação, portabilidade e informações sobre compartilhamento, conforme a LGPD.',
-          'Quando o SalesClin atuar como operador de dados da clínica, algumas solicitações poderão ser direcionadas à própria clínica controladora.',
+          'Quando o SellClin atuar como operador de dados da clínica, algumas solicitações poderão ser direcionadas à própria clínica controladora.',
         ],
       },
       {
@@ -149,7 +149,7 @@ const pages: Record<LegalPageKind, {
         title: '2. Cookies necessários',
         body: [
           'Usamos cookies e armazenamento local essenciais para autenticação, segurança, sessão, preferências de interface e funcionamento básico da plataforma.',
-          'Sem esses recursos, algumas partes do SalesClin podem não funcionar corretamente.',
+          'Sem esses recursos, algumas partes do SellClin podem não funcionar corretamente.',
         ],
       },
       {
@@ -181,7 +181,7 @@ const pages: Record<LegalPageKind, {
       {
         title: '1. Proteção de acesso',
         body: [
-          'O SalesClin utiliza autenticação, controle de permissões por equipe e restrição de módulos conforme plano e papel do usuário.',
+          'O SellClin utiliza autenticação, controle de permissões por equipe e restrição de módulos conforme plano e papel do usuário.',
           'Administradores devem conceder apenas os acessos necessários para cada membro da equipe.',
         ],
       },
@@ -195,7 +195,7 @@ const pages: Record<LegalPageKind, {
       {
         title: '3. Integrações autorizadas',
         body: [
-          'Integrações como Google Calendar e WhatsApp exigem autorização da conta responsável. O SalesClin usa essas autorizações para operar os recursos conectados.',
+          'Integrações como Google Calendar e WhatsApp exigem autorização da conta responsável. O SellClin usa essas autorizações para operar os recursos conectados.',
           'Credenciais sensíveis devem ser mantidas apenas no backend e em ambientes seguros.',
         ],
       },
@@ -273,7 +273,7 @@ export default function LegalPage({ kind }: { kind: LegalPageKind }) {
               </div>
 
               <div className="mt-12 rounded-2xl bg-slate-50 border border-slate-100 p-5 text-sm text-slate-500 font-medium leading-relaxed">
-                Este documento é uma base informativa da operação do SalesClin e pode ser atualizado. Recomenda-se revisão jurídica para adequações específicas da empresa e contratos comerciais.
+                Este documento é uma base informativa da operação do SellClin e pode ser atualizado. Recomenda-se revisão jurídica para adequações específicas da empresa e contratos comerciais.
               </div>
             </div>
           </div>

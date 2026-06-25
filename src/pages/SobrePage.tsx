@@ -62,7 +62,7 @@ const SobrePage = () => {
               <div className="relative z-20 p-8 md:p-12">
                 <Quote className="w-10 h-10 text-[#F97316] mb-6" />
                 <p className="text-white text-2xl md:text-3xl font-headline font-black leading-[1.2] tracking-tight mb-8">
-                  "O SalesClin é o braço direito que toda clínica de sucesso deve ter para recuperar o controle do seu tempo e caixa."
+                  "O SellClin é o braço direito que toda clínica de sucesso deve ter para recuperar o controle do seu tempo e caixa."
                 </p>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-1 bg-[#F97316] rounded-full" />

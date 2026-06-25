@@ -26,7 +26,7 @@ const AgendaPage = () => {
   ];
 
   const faqs = [
-    { q: "A agenda se integra com Google Calendar?", a: "A integração com Google Calendar está no nosso roadmap. Atualmente, a agenda do SalesClin é autocontida e gerenciada dentro da plataforma para garantir máxima segurança e controle dos dados da clínica." },
+    { q: "A agenda se integra com Google Calendar?", a: "A integração com Google Calendar está no nosso roadmap. Atualmente, a agenda do SellClin é autocontida e gerenciada dentro da plataforma para garantir máxima segurança e controle dos dados da clínica." },
     { q: "Posso filtrar a agenda por profissional?", a: "Sim! A agenda tem um filtro rápido por profissional, perfeito para clínicas com múltiplos doutores ou especialidades." },
     { q: "O sistema avisa quando um paciente não confirmou?", a: "Isso é gerenciado pelo status do Card. A recepção pode visualizar todos os pacientes com status 'Agendado' que ainda não foram atualizados para 'Confirmado', facilitando o acompanhamento." },
   ];
@@ -63,7 +63,7 @@ const AgendaPage = () => {
               Sua recepção no controle. <span className="text-[#F97316]">Sempre.</span>
             </h1>
             <p className="text-lg text-slate-500 font-medium leading-relaxed mb-12 max-w-lg">
-              Chega de agendas no papel, planilhas soltas e WhatsApp bagunçado. O SalesClin centraliza tudo em uma agenda visual, intuitiva e conectada ao seu comercial.
+              Chega de agendas no papel, planilhas soltas e WhatsApp bagunçado. O SellClin centraliza tudo em uma agenda visual, intuitiva e conectada ao seu comercial.
             </p>
             <div className="flex items-center gap-4 flex-wrap">
               <Link to="/login" className="bg-[#F97316] text-white px-10 py-5 rounded-full font-black text-xs uppercase tracking-[0.2em] hover:scale-105 transition-all shadow-2xl shadow-orange-200 flex items-center gap-3">
@@ -336,7 +336,7 @@ const AgendaPage = () => {
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
               <div className="flex items-center gap-3 mb-8">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#F97316] bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full shadow-sm">Com o SalesClin</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#F97316] bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full shadow-sm">Com o SellClin</span>
               </div>
               <div className="space-y-4">
                 <div className="flex gap-4 p-4 rounded-2xl bg-slate-950/80 border border-orange-500/20 shadow-[0_4px_20px_rgba(249,115,22,0.08)] transition-all hover:border-orange-500/40 hover:-translate-y-0.5 duration-300">

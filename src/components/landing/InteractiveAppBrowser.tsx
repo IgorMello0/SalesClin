@@ -240,7 +240,7 @@ export const InteractiveAppBrowser = () => {
             <div className="mt-auto p-6 hidden md:block">
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div className="text-xs font-bold text-slate-700 mb-1">Como no CRM real</div>
-                <div className="text-[10px] text-slate-500 mb-3">Esta interface simula exatamente as telas operacionais do SalesClin.</div>
+                <div className="text-[10px] text-slate-500 mb-3">Esta interface simula exatamente as telas operacionais do SellClin.</div>
                 
                 {/* Navigation links for marketing pages */}
                 <div className="space-y-1.5 pt-2 border-t border-slate-200/60 mb-3">
@@ -343,7 +343,7 @@ export const InteractiveAppBrowser = () => {
                     {/* Funnel of Leads */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
                       <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                        <Layers size={12} className="text-blue-500" /> Funil de Leads SalesClin
+                        <Layers size={12} className="text-blue-500" /> Funil de Leads SellClin
                       </h4>
                       <div className="space-y-2.5">
                         {[
@@ -634,7 +634,7 @@ export const InteractiveAppBrowser = () => {
                               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
                                   <Send size={12} className="text-emerald-500 animate-bounce" />
-                                  SalesClin disparando template...
+                                  SellClin disparando template...
                                 </div>
                                 <div className="bg-emerald-50 p-3 rounded-lg text-[11px] text-slate-700 border border-emerald-100 leading-relaxed max-w-[85%]">
                                   "Olá {selectedApt.clientName}, tudo bem? Confirmamos seu horário com {selectedApt.professional} amanhã às {selectedApt.time}?"

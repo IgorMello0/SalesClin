@@ -15,7 +15,7 @@ const ClientesPage = () => {
       name: "Dra. Juliana Silva",
       clinic: "OdontoPremium",
       img: "https://i.pravatar.cc/150?u=dra_juliana",
-      quote: "O SalesClin mudou nossa percepção de leads. Antes achávamos que o marketing era ruim, agora vemos que o problema era nossa gestão comercial.",
+      quote: "O SellClin mudou nossa percepção de leads. Antes achávamos que o marketing era ruim, agora vemos que o problema era nossa gestão comercial.",
       stats: { metric: "+120%", label: "faturamento" },
       featured: true
     },
@@ -61,7 +61,7 @@ const ClientesPage = () => {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-400 to-[#F97316]">escritas com dados.</span>
             </h1>
             <p className="text-lg md:text-xl text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto">
-              Conheça as clínicas de alto padrão que transformaram sua gestão comercial e dominaram a previsibilidade de caixa com a infraestrutura SalesClin.
+              Conheça as clínicas de alto padrão que transformaram sua gestão comercial e dominaram a previsibilidade de caixa com a infraestrutura SellClin.
             </p>
           </motion.div>
         </div>

@@ -31,7 +31,7 @@ const AcceptInvite = () => {
     setIsLoading(false);
 
     if (response.success) {
-      toast({ title: 'Convite aceito', description: 'Agora você já pode entrar no SalesClin.' });
+      toast({ title: 'Convite aceito', description: 'Agora você já pode entrar no SellClin.' });
       navigate('/login');
       return;
     }
