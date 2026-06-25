@@ -405,6 +405,7 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
           email: lead.email,
           phone: lead.phone,
           notes: lead.notes,
+          avatar: lead.avatar || null,
         }
       })
       clientId = newClient.id

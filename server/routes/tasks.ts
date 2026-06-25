@@ -135,12 +135,22 @@ router.get('/', auth(), async (req, res) => {
     }
 
     // Busca textual no título ou descrição
+    // Usa AND para combinar a restrição de propriedade (OR) com a busca textual (OR),
+    // evitando que a busca exponha tarefas de outros usuários.
     if (search) {
-      where.OR = [
-        ...(where.OR || []),
+      const searchConditions = [
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } }
       ]
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          { OR: searchConditions }
+        ]
+        delete where.OR
+      } else {
+        where.OR = searchConditions
+      }
     }
 
     const tasks = await prisma.task.findMany({

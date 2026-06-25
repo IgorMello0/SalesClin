@@ -39,6 +39,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     } else if (filter === 'custom' && req.query.startDate && req.query.endDate) {
       startDate = new Date(req.query.startDate as string);
       endDate = new Date(req.query.endDate as string);
+      endDate.setHours(23, 59, 59, 999);
     } else {
       // Custom / Mês Atual (fallback)
       startDate.setDate(1);

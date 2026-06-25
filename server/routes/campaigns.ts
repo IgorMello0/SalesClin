@@ -1000,24 +1000,37 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
       const randomIndex = Math.floor(Math.random() * config.variations.length)
       const selectedVariation = config.variations[randomIndex]
       
-      const upcomingAppt = await prisma.appointment.findFirst({
-        where: {
-          clientId: recipient.sourceType === 'client' ? recipient.sourceId : undefined,
-          leadId: recipient.sourceType === 'lead' ? recipient.sourceId : undefined,
-          startTime: { gte: new Date() },
-          status: { in: ['agendado', 'confirmado'] }
-        },
-        orderBy: { startTime: 'asc' }
-      })
+      // Busca agendamentos apenas quando temos um sourceId válido e explícito,
+      // evitando que filtros undefined façam o Prisma retornar agendamentos de outros clientes/leads.
+      let upcomingAppt = null
+      let pastAppt = null
 
-      const pastAppt = await prisma.appointment.findFirst({
-        where: {
-          clientId: recipient.sourceType === 'client' ? recipient.sourceId : undefined,
-          leadId: recipient.sourceType === 'lead' ? recipient.sourceId : undefined,
-          status: 'concluido'
-        },
-        orderBy: { startTime: 'desc' }
-      })
+      if (recipient.sourceId) {
+        const apptFilter: any = {
+          ...(recipient.sourceType === 'client' && { clientId: recipient.sourceId }),
+          ...(recipient.sourceType === 'lead' && { leadId: recipient.sourceId }),
+        }
+
+        // Só busca se pelo menos um filtro de identidade foi definido
+        if (Object.keys(apptFilter).length > 0) {
+          upcomingAppt = await prisma.appointment.findFirst({
+            where: {
+              ...apptFilter,
+              startTime: { gte: new Date() },
+              status: { in: ['agendado', 'confirmado'] }
+            },
+            orderBy: { startTime: 'asc' }
+          })
+
+          pastAppt = await prisma.appointment.findFirst({
+            where: {
+              ...apptFilter,
+              status: 'concluido'
+            },
+            orderBy: { startTime: 'desc' }
+          })
+        }
+      }
 
       messageToSend = renderMessage(selectedVariation, recipient, upcomingAppt, pastAppt)
     }
