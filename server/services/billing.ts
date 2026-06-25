@@ -338,7 +338,9 @@ export async function getBillingUsage(ownerProfessionalId: number, activeCompany
     countActiveUsersForCompany(targetCompanyId),
   ])
 
-  const clinicLimit = baseLimits.clinicLimit === null ? null : baseLimits.clinicLimit + clinicExtraQuantity
+  const clinicLimit = billingStatus.status === 'trialing'
+    ? null
+    : (baseLimits.clinicLimit === null ? null : baseLimits.clinicLimit + clinicExtraQuantity)
   const usersPerClinicLimit = baseLimits.usersPerClinicLimit === null ? null : baseLimits.usersPerClinicLimit + userExtraQuantity
 
   return {
