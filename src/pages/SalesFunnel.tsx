@@ -229,6 +229,23 @@ const SalesFunnel = () => {
     return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
   };
 
+  const getStageLabel = (status: string) => {
+    if (dynamicFunnels.length > 0) {
+      for (const f of dynamicFunnels) {
+        const stage = (f.stages || []).find((s: any) => s.code === status);
+        if (stage) return `${f.label}: ${stage.label}`;
+      }
+    }
+    for (const [funnelKey, stagesList] of Object.entries(STAGES)) {
+      const stage = stagesList.find(s => s.id === status);
+      if (stage) {
+        const funnelLabel = FUNNELS.find(f => f.id === funnelKey)?.label || funnelKey;
+        return `${funnelLabel}: ${stage.label}`;
+      }
+    }
+    return status;
+  };
+
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     const finalPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
@@ -1339,10 +1356,56 @@ const SalesFunnel = () => {
                             </button>
                           </div>
                         )}
-                        <p className="text-on-surface-variant font-medium text-sm flex items-center gap-2 mt-1">
-                          <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                          Estágio: {STAGES[activeFunnel as keyof typeof STAGES].find(s => s.id === selectedLead.status)?.label || selectedLead.status}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1 group/stage h-7">
+                          <span className="w-2 h-2 rounded-full bg-secondary animate-pulse-subtle"></span>
+                          <span className="text-on-surface-variant font-medium text-xs sm:text-sm">Estágio:</span>
+                          
+                          <Select
+                            value={selectedLead.status}
+                            onValueChange={async (newStatus) => {
+                              try {
+                                const res = await leadsApi.update(Number(selectedLead.id), { status: newStatus });
+                                if (res.success) {
+                                  toast({ title: "Estágio do lead atualizado!" });
+                                  setSelectedLead({ ...selectedLead, status: newStatus });
+                                  loadLeads();
+                                }
+                              } catch (e) {
+                                toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-7 py-0 px-2 text-xs font-bold border-secondary focus:ring-secondary/20 bg-white min-w-[150px] max-w-[250px] rounded-lg">
+                              <SelectValue placeholder="Selecione o Estágio">
+                                {getStageLabel(selectedLead.status)}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="z-[300] max-h-[300px]">
+                              {dynamicFunnels.length > 0 ? (
+                                dynamicFunnels.map((funnel: any) => (
+                                  <div key={funnel.id} className="p-1">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 py-1 bg-slate-50 rounded-md mb-1">{funnel.label}</p>
+                                    {(funnel.stages || []).map((s: any) => (
+                                      <SelectItem key={s.code} value={s.code} className="text-xs rounded-lg pl-3">{s.label}</SelectItem>
+                                    ))}
+                                  </div>
+                                ))
+                              ) : (
+                                Object.entries(STAGES).map(([funnelKey, stagesList]) => {
+                                  const funnelLabel = FUNNELS.find(f => f.id === funnelKey)?.label || funnelKey;
+                                  return (
+                                    <div key={funnelKey} className="p-1">
+                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 py-1 bg-slate-50 rounded-md mb-1">{funnelLabel}</p>
+                                      {stagesList.map(s => (
+                                        <SelectItem key={s.id} value={s.id} className="text-xs rounded-lg pl-3">{s.label}</SelectItem>
+                                      ))}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button 

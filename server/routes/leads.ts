@@ -281,6 +281,49 @@ router.put('/:id', auth(), async (req, res) => {
       return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
     }
 
+    // Regra de Negócio: Cancelamento/Rollback automático ao voltar estágio
+    if (prismaData.status && prismaData.status !== currentLead.status) {
+      const newStatus = prismaData.status;
+
+      // 1. Se voltou para antes de Agendados (Novos Leads ou Qualificados)
+      if (newStatus === 'prospect_lead' || newStatus === 'prospect_qualified') {
+        // Cancelar todos os agendamentos ativos/confirmados deste lead
+        await prisma.appointment.updateMany({
+          where: { 
+            leadId: id,
+            status: { in: ['agendado', 'confirmado'] }
+          },
+          data: { status: 'cancelado' }
+        });
+        prismaData.isScheduled = false;
+      }
+
+      // 2. Se voltou para antes de Proposta (Novos Leads, Qualificados, Agendados, Consulta Feita)
+      const beforeProposalStatuses = ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'comercial_consult'];
+      if (beforeProposalStatuses.includes(newStatus)) {
+        // Cancelar todas as propostas pendentes/ativas do lead
+        await prisma.proposal.updateMany({
+          where: {
+            leadId: id,
+            status: 'pending'
+          },
+          data: { status: 'rejected' }
+        });
+      }
+
+      // 3. Se voltou para antes de Fechado (Comercial ou Prospecção)
+      const beforeClosedStatuses = [
+        'prospect_lead', 'prospect_qualified', 'prospect_scheduled',
+        'comercial_consult', 'comercial_proposal', 'comercial_follow'
+      ];
+      if (beforeClosedStatuses.includes(newStatus)) {
+        // Resetar o estado de conversão do lead para que possa ser convertido novamente
+        prismaData.convertedToClientId = null;
+        prismaData.convertedAt = null;
+        prismaData.isPaid = false; // resetar flag de pago
+      }
+    }
+
     // Conversão automática: quando status muda para 'comercial_closed' OU quando há propostas de remarketing (fechamento parcial)
     const isClosing = prismaData.status === 'comercial_closed' && currentLead.status !== 'comercial_closed'
     const isPartialClosing = prismaData.remarketingProposals !== undefined
