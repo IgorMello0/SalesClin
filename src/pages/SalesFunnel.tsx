@@ -131,6 +131,13 @@ const SalesFunnel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
+  // Two-Level Edit & Bulk Edit States
+  const [selectedFunnelForEdit, setSelectedFunnelForEdit] = useState<string>("");
+  const [isBulkStageDialogOpen, setIsBulkStageDialogOpen] = useState(false);
+  const [bulkSelectedFunnel, setBulkSelectedFunnel] = useState("");
+  const [bulkSelectedStage, setBulkSelectedStage] = useState("");
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -246,6 +253,20 @@ const SalesFunnel = () => {
     return status;
   };
 
+  const getFunnelOfStage = (status: string) => {
+    if (dynamicFunnels.length > 0) {
+      for (const f of dynamicFunnels) {
+        const stage = (f.stages || []).find((s: any) => s.code === status);
+        if (stage) return f.code || f.id;
+      }
+    }
+    for (const [funnelKey, stagesList] of Object.entries(STAGES)) {
+      const stage = stagesList.find(s => s.id === status);
+      if (stage) return funnelKey;
+    }
+    return "";
+  };
+
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     const finalPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
@@ -268,6 +289,42 @@ const SalesFunnel = () => {
     }
     return STAGES[activeFunnel as keyof typeof STAGES] || [];
   }, [activeFunnel, dynamicFunnels]);
+
+  const editStages = useMemo(() => {
+    if (!selectedFunnelForEdit) return [];
+    if (dynamicFunnels.length > 0) {
+      const funnel = dynamicFunnels.find(f => f.code === selectedFunnelForEdit || f.id === selectedFunnelForEdit);
+      return (funnel?.stages || []).map((s: any) => ({
+        ...s,
+        id: s.code,
+      }));
+    }
+    return STAGES[selectedFunnelForEdit as keyof typeof STAGES] || [];
+  }, [selectedFunnelForEdit, dynamicFunnels]);
+
+  const isCurrentStageInSelectedFunnel = useMemo(() => {
+    if (!selectedLead?.status || !selectedFunnelForEdit) return false;
+    if (dynamicFunnels.length > 0) {
+      const funnel = dynamicFunnels.find(f => f.code === selectedFunnelForEdit || f.id === selectedFunnelForEdit);
+      return !!(funnel?.stages || []).find((s: any) => s.code === selectedLead.status);
+    }
+    const stagesList = STAGES[selectedFunnelForEdit] || [];
+    return !!stagesList.find(s => s.id === selectedLead.status);
+  }, [selectedFunnelForEdit, selectedLead?.status, dynamicFunnels]);
+
+  const stageValue = isCurrentStageInSelectedFunnel && selectedLead ? selectedLead.status : "";
+
+  const bulkStages = useMemo(() => {
+    if (!bulkSelectedFunnel) return [];
+    if (dynamicFunnels.length > 0) {
+      const funnel = dynamicFunnels.find(f => f.code === bulkSelectedFunnel || f.id === bulkSelectedFunnel);
+      return (funnel?.stages || []).map((s: any) => ({
+        ...s,
+        id: s.code,
+      }));
+    }
+    return STAGES[bulkSelectedFunnel as keyof typeof STAGES] || [];
+  }, [bulkSelectedFunnel, dynamicFunnels]);
 
   const filteredAndSortedLeads = useMemo(() => {
     let result = [...leads];
@@ -309,6 +366,9 @@ const SalesFunnel = () => {
       setIsEditingEmail(false);
       setEditingActivityId(null);
       setActivityToDeleteId(null);
+
+      const leadFunnel = getFunnelOfStage(selectedLead.status);
+      setSelectedFunnelForEdit(leadFunnel);
     }
   }, [selectedLead?.id]);
 
@@ -768,6 +828,28 @@ const SalesFunnel = () => {
     }
   };
 
+  const handleBulkStageChange = async () => {
+    if (!bulkSelectedStage || selectedLeadIds.length === 0) return;
+    setIsBulkUpdating(true);
+    try {
+      let successCount = 0;
+      for (const leadId of selectedLeadIds) {
+        const res = await leadsApi.update(Number(leadId), { status: bulkSelectedStage });
+        if (res.success) successCount++;
+      }
+      toast({ title: `${successCount} lead${successCount > 1 ? 's' : ''} atualizado${successCount > 1 ? 's' : ''} com sucesso!` });
+      setSelectedLeadIds([]);
+      setIsMultiSelectMode(false);
+      setIsBulkStageDialogOpen(false);
+      loadLeads();
+    } catch (error) {
+      console.error('Error bulk updating leads:', error);
+      toast({ title: 'Erro ao atualizar estágio dos leads', variant: 'destructive' });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
   // Tour de primeira visita
   const { tourActive, tourStep, tourSteps, tourHandleNext, tourHandlePrev, tourHandleClose } =
     useSectionTour('comercial', [
@@ -1161,23 +1243,45 @@ const SalesFunnel = () => {
 
             {/* Lixeira vermelha — aparece quando seleção múltipla está ativa */}
             {isMultiSelectMode && (
-              <Button
-                onClick={handleDeleteSelectedLeads}
-                disabled={selectedLeadIds.length === 0}
-                variant="ghost"
-                className={cn(
-                  "h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-bold gap-1.5 text-sm flex-shrink-0 transition-all duration-200",
-                  selectedLeadIds.length > 0
-                    ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "bg-red-50 text-red-300 cursor-not-allowed"
-                )}
-                title={selectedLeadIds.length > 0 ? `Excluir ${selectedLeadIds.length} lead(s)` : "Selecione leads para excluir"}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete</span>
-                {selectedLeadIds.length > 0 && (
-                  <span className="hidden sm:inline">{selectedLeadIds.length}</span>
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setBulkSelectedFunnel(activeFunnel);
+                    setBulkSelectedStage("");
+                    setIsBulkStageDialogOpen(true);
+                  }}
+                  disabled={selectedLeadIds.length === 0}
+                  variant="ghost"
+                  className={cn(
+                    "h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-bold gap-1.5 text-sm flex-shrink-0 transition-all duration-200",
+                    selectedLeadIds.length > 0
+                      ? "bg-secondary hover:bg-secondary/90 text-white shadow-lg shadow-secondary/20"
+                      : "bg-orange-50 text-orange-300 cursor-not-allowed"
+                  )}
+                  title={selectedLeadIds.length > 0 ? `Alterar estágio de ${selectedLeadIds.length} lead(s)` : "Selecione leads para alterar estágio"}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>swap_horiz</span>
+                  <span className="hidden sm:inline">Mudar Estágio</span>
+                </Button>
+
+                <Button
+                  onClick={handleDeleteSelectedLeads}
+                  disabled={selectedLeadIds.length === 0}
+                  variant="ghost"
+                  className={cn(
+                    "h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-bold gap-1.5 text-sm flex-shrink-0 transition-all duration-200",
+                    selectedLeadIds.length > 0
+                      ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20"
+                      : "bg-red-50 text-red-300 cursor-not-allowed"
+                  )}
+                  title={selectedLeadIds.length > 0 ? `Excluir ${selectedLeadIds.length} lead(s)` : "Selecione leads para excluir"}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete</span>
+                  {selectedLeadIds.length > 0 && (
+                    <span className="hidden sm:inline">{selectedLeadIds.length}</span>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -1295,6 +1399,89 @@ const SalesFunnel = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Bulk Stage Change Dialog */}
+      <Dialog open={isBulkStageDialogOpen} onOpenChange={setIsBulkStageDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-white border border-slate-100 p-6 rounded-2xl">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-2 text-primary">
+              <span className="material-symbols-outlined text-3xl text-secondary">swap_horiz</span>
+              <DialogTitle className="text-xl font-extrabold font-headline tracking-tight">Alterar Estágio em Lote</DialogTitle>
+            </div>
+            <p className="text-slate-500 text-sm font-medium">
+              Selecione o novo funil e estágio para mover os {selectedLeadIds.length} leads selecionados de uma vez só.
+            </p>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Funil de Vendas</Label>
+              <Select
+                value={bulkSelectedFunnel}
+                onValueChange={(val) => {
+                  setBulkSelectedFunnel(val);
+                  setBulkSelectedStage(""); // Reset stage selection when funnel changes
+                }}
+              >
+                <SelectTrigger className="w-full border-slate-200 focus:ring-secondary/20 rounded-xl h-11">
+                  <SelectValue placeholder="Selecione o Funil" />
+                </SelectTrigger>
+                <SelectContent className="z-[350]">
+                  {funnelList.map((f: any) => (
+                    <SelectItem key={f.code || f.id} value={f.code || f.id}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Novo Estágio</Label>
+              <Select
+                value={bulkSelectedStage}
+                onValueChange={setBulkSelectedStage}
+                disabled={!bulkSelectedFunnel}
+              >
+                <SelectTrigger className="w-full border-slate-200 focus:ring-secondary/20 rounded-xl h-11">
+                  <SelectValue placeholder="Selecione o Estágio" />
+                </SelectTrigger>
+                <SelectContent className="z-[350]">
+                  {bulkStages.map((s: any) => (
+                    <SelectItem key={s.code || s.id} value={s.code || s.id}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsBulkStageDialogOpen(false)} 
+              className="rounded-xl"
+              disabled={isBulkUpdating}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleBulkStageChange} 
+              variant="secondary" 
+              className="rounded-xl px-6 font-bold"
+              disabled={!bulkSelectedStage || isBulkUpdating}
+            >
+              {isBulkUpdating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Atualizando...
+                </>
+              ) : (
+                "Atualizar Leads"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Lead Details Modal */}
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
         <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 flex flex-col w-full h-full sm:h-auto">
@@ -1356,55 +1543,58 @@ const SalesFunnel = () => {
                             </button>
                           </div>
                         )}
-                        <div className="flex items-center gap-2 mt-1 group/stage h-7">
-                          <span className="w-2 h-2 rounded-full bg-secondary animate-pulse-subtle"></span>
-                          <span className="text-on-surface-variant font-medium text-xs sm:text-sm">Estágio:</span>
+                        <div className="flex flex-col sm:flex-row gap-2 mt-1 w-full items-start sm:items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse-subtle"></span>
+                            <span className="text-on-surface-variant font-medium text-xs sm:text-sm">Estágio:</span>
+                          </div>
                           
-                          <Select
-                            value={selectedLead.status}
-                            onValueChange={async (newStatus) => {
-                              try {
-                                const res = await leadsApi.update(Number(selectedLead.id), { status: newStatus });
-                                if (res.success) {
-                                  toast({ title: "Estágio do lead atualizado!" });
-                                  setSelectedLead({ ...selectedLead, status: newStatus });
-                                  loadLeads();
+                          <div className="flex gap-2 items-center flex-wrap">
+                            <Select
+                              value={selectedFunnelForEdit}
+                              onValueChange={(newFunnel) => {
+                                setSelectedFunnelForEdit(newFunnel);
+                              }}
+                            >
+                              <SelectTrigger className="h-7 py-0 px-2 text-xs font-semibold border-slate-200 focus:ring-secondary/20 bg-white w-[130px] rounded-lg">
+                                <SelectValue placeholder="Selecione o Funil" />
+                              </SelectTrigger>
+                              <SelectContent className="z-[300]">
+                                {funnelList.map((f: any) => (
+                                  <SelectItem key={f.code || f.id} value={f.code || f.id} className="text-xs rounded-lg pl-3">
+                                    {f.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={stageValue}
+                              onValueChange={async (newStatus) => {
+                                try {
+                                  const res = await leadsApi.update(Number(selectedLead.id), { status: newStatus });
+                                  if (res.success) {
+                                    toast({ title: "Estágio do lead atualizado!" });
+                                    setSelectedLead({ ...selectedLead, status: newStatus });
+                                    loadLeads();
+                                  }
+                                } catch (e) {
+                                  toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
                                 }
-                              } catch (e) {
-                                toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="h-7 py-0 px-2 text-xs font-bold border-secondary focus:ring-secondary/20 bg-white min-w-[150px] max-w-[250px] rounded-lg">
-                              <SelectValue placeholder="Selecione o Estágio">
-                                {getStageLabel(selectedLead.status)}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent className="z-[300] max-h-[300px]">
-                              {dynamicFunnels.length > 0 ? (
-                                dynamicFunnels.map((funnel: any) => (
-                                  <div key={funnel.id} className="p-1">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 py-1 bg-slate-50 rounded-md mb-1">{funnel.label}</p>
-                                    {(funnel.stages || []).map((s: any) => (
-                                      <SelectItem key={s.code} value={s.code} className="text-xs rounded-lg pl-3">{s.label}</SelectItem>
-                                    ))}
-                                  </div>
-                                ))
-                              ) : (
-                                Object.entries(STAGES).map(([funnelKey, stagesList]) => {
-                                  const funnelLabel = FUNNELS.find(f => f.id === funnelKey)?.label || funnelKey;
-                                  return (
-                                    <div key={funnelKey} className="p-1">
-                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 py-1 bg-slate-50 rounded-md mb-1">{funnelLabel}</p>
-                                      {stagesList.map(s => (
-                                        <SelectItem key={s.id} value={s.id} className="text-xs rounded-lg pl-3">{s.label}</SelectItem>
-                                      ))}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </SelectContent>
-                          </Select>
+                              }}
+                            >
+                              <SelectTrigger className="h-7 py-0 px-2 text-xs font-bold border-secondary focus:ring-secondary/20 bg-white min-w-[130px] max-w-[200px] rounded-lg">
+                                <SelectValue placeholder="Selecione a Etapa" />
+                              </SelectTrigger>
+                              <SelectContent className="z-[300]">
+                                {editStages.map((s: any) => (
+                                  <SelectItem key={s.id || s.code} value={s.id || s.code} className="text-xs rounded-lg pl-3">
+                                    {s.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
