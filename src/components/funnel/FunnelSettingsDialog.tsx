@@ -510,26 +510,15 @@ export function FunnelSettingsDialog({ open, onOpenChange, onSaved }: FunnelSett
                       {/* Add Stage Form */}
                       {addingStageToFunnel === funnel.id ? (
                         <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-3 animate-in fade-in slide-in-from-top-1">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Nome da Etapa</Label>
-                              <Input 
-                                value={newStageData.label}
-                                onChange={(e) => setNewStageData({ ...newStageData, label: e.target.value })}
-                                placeholder="Ex: Em Negociação"
-                                className="h-9 text-xs rounded-lg"
-                                autoFocus
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Código (opcional)</Label>
-                              <Input 
-                                value={newStageData.code}
-                                onChange={(e) => setNewStageData({ ...newStageData, code: e.target.value })}
-                                placeholder="Auto-gerado"
-                                className="h-9 text-xs rounded-lg font-mono"
-                              />
-                            </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Nome da Etapa</Label>
+                            <Input 
+                              value={newStageData.label}
+                              onChange={(e) => setNewStageData({ ...newStageData, label: e.target.value })}
+                              placeholder="Ex: Em Negociação"
+                              className="h-9 text-xs rounded-lg"
+                              autoFocus
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cor</Label>
