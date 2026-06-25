@@ -39,9 +39,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
     }
     
-    const availableCompanies = professional.ownedCompanies.length > 0 
-      ? professional.ownedCompanies.map(c => ({ id: c.id, name: c.name }))
-      : (professional.company ? [{ id: professional.company.id, name: professional.company.name }] : [])
+    const companiesMap = new Map<number, string>()
+    if (professional.company) {
+      companiesMap.set(professional.company.id, professional.company.name)
+    }
+    for (const c of professional.ownedCompanies) {
+      companiesMap.set(c.id, c.name)
+    }
+    const availableCompanies = Array.from(companiesMap.entries()).map(([id, name]) => ({ id, name }))
 
     const allowedCompanies = availableCompanies.map(c => c.id)
 
@@ -86,9 +91,14 @@ router.get('/me', auth(), async (req, res) => {
       return res.status(404).json(createErrorResponse('Profissional não encontrado', 404))
     }
 
-    const availableCompanies = professional.ownedCompanies.length > 0 
-      ? professional.ownedCompanies.map(c => ({ id: c.id, name: c.name }))
-      : (professional.company ? [{ id: professional.company.id, name: professional.company.name }] : [])
+    const companiesMap = new Map<number, string>()
+    if (professional.company) {
+      companiesMap.set(professional.company.id, professional.company.name)
+    }
+    for (const c of professional.ownedCompanies) {
+      companiesMap.set(c.id, c.name)
+    }
+    const availableCompanies = Array.from(companiesMap.entries()).map(([id, name]) => ({ id, name }))
 
     const allowedCompanies = availableCompanies.map(c => c.id)
 
