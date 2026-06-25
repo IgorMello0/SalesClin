@@ -223,6 +223,7 @@ const SalesFunnel = () => {
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [tempActivityContent, setTempActivityContent] = useState("");
   const [noteText, setNoteText] = useState("");
+  const [activityToDeleteId, setActivityToDeleteId] = useState<string | null>(null);
 
   const getOriginLabel = (origin: string) => {
     return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
@@ -290,6 +291,7 @@ const SalesFunnel = () => {
       setTempEmail(selectedLead.email || "");
       setIsEditingEmail(false);
       setEditingActivityId(null);
+      setActivityToDeleteId(null);
     }
   }, [selectedLead?.id]);
 
@@ -651,7 +653,6 @@ const SalesFunnel = () => {
 
   const handleDeleteActivity = async (activityId: string) => {
     if (!selectedLead) return;
-    if (!confirm("Tem certeza que deseja excluir esta anotação?")) return;
     try {
       const res = await leadsApi.deleteActivity(Number(selectedLead.id), Number(activityId));
       if (res.success) {
@@ -666,6 +667,13 @@ const SalesFunnel = () => {
       }
     } catch (e) {
       toast({ title: "Erro de conexão", variant: "destructive" });
+    }
+  };
+
+  const confirmDeleteActivity = () => {
+    if (activityToDeleteId) {
+      handleDeleteActivity(activityToDeleteId);
+      setActivityToDeleteId(null);
     }
   };
 
@@ -1660,7 +1668,7 @@ const SalesFunnel = () => {
                                                 <Edit2 className="w-3.5 h-3.5" />
                                               </button>
                                               <button 
-                                                onClick={() => handleDeleteActivity(act.id)} 
+                                                onClick={() => setActivityToDeleteId(act.id)} 
                                                 className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
                                                 title="Excluir Anotação"
                                               >
@@ -1835,6 +1843,36 @@ const SalesFunnel = () => {
           phone: "(11) 99999-9999"
         }}
       />
+
+      {/* Exclusão de Anotação Confirm Dialog */}
+      <Dialog open={!!activityToDeleteId} onOpenChange={(open) => { if (!open) setActivityToDeleteId(null); }}>
+        <DialogContent className="w-[90vw] max-w-[400px] border-0 shadow-2xl rounded-3xl bg-card p-6 text-foreground z-[310]">
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center">
+              <span className="material-symbols-outlined text-2xl">warning</span>
+            </div>
+            <div className="space-y-1.5">
+              <DialogTitle className="text-base font-bold font-headline text-primary">Confirmar Exclusão</DialogTitle>
+              <p className="text-xs text-muted-foreground">Tem certeza que deseja excluir esta anotação? Esta ação não pode ser desfeita.</p>
+            </div>
+            <div className="flex w-full gap-3 mt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setActivityToDeleteId(null)}
+                className="flex-1 rounded-xl h-10 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={confirmDeleteActivity}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-10 text-xs font-bold shadow-none cursor-pointer"
+              >
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <FunnelSettingsDialog 
         open={isConfiguringFunnels}
