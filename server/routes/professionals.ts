@@ -76,17 +76,35 @@ router.post('/login', async (req, res) => {
     res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
   }
 })
-// Obter perfil do profissional logado
 router.get('/me', auth(), async (req, res) => {
   try {
     const professional = await prisma.professional.findUnique({
       where: { id: req.user!.id },
-      include: { company: true }
+      include: { company: true, ownedCompanies: true }
     })
     if (!professional) {
       return res.status(404).json(createErrorResponse('Profissional não encontrado', 404))
     }
-    res.json(createSuccessResponse(professional))
+
+    const availableCompanies = professional.ownedCompanies.length > 0 
+      ? professional.ownedCompanies.map(c => ({ id: c.id, name: c.name }))
+      : (professional.company ? [{ id: professional.company.id, name: professional.company.name }] : [])
+
+    const allowedCompanies = availableCompanies.map(c => c.id)
+
+    const token = jwt.sign({ 
+      id: professional.id, 
+      companyId: professional.companyId, 
+      type: 'profissional',
+      allowedCompanies 
+    }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+
+    res.json(createSuccessResponse({
+      ...professional,
+      passwordHash: undefined,
+      companies: availableCompanies,
+      token
+    }))
   } catch (error) {
     console.error('[Profile] Erro:', error)
     res.status(500).json(createErrorResponse('Erro interno do servidor', 500))

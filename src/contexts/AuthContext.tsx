@@ -71,6 +71,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const response = await professionalsApi.getMe();
         if (response.success && response.data) {
           const d = response.data;
+          
+          if (d.token) {
+            localStorage.setItem('token', d.token);
+          }
+          
           setProfessional(prev => {
             if (!prev) return prev;
             const updated = {
@@ -79,6 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               phone: d.phone || '',
               specialization: d.specialization || '',
               photoUrl: d.photoUrl || undefined,
+              companyId: d.company?.id || d.companyId || prev.companyId,
+              companyName: d.company?.name || prev.companyName,
+              companies: d.companies || prev.companies,
             };
             // Evitar QuotaExceededError limpando base64 do localStorage
             const storageUpdated = { ...updated };
