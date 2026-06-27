@@ -235,8 +235,9 @@ router.post('/abacate-pay', async (req, res) => {
     }
 
     const data = body.data || {};
-    const subscription = data.subscription || data;
-    const checkout = data.checkout || {};
+    const directCheckout = !data.subscription && !data.checkout && (data.id || data.url || data.externalId || data.metadata || data.items);
+    const checkout = data.checkout || (directCheckout ? data : {});
+    const subscription = data.subscription || (directCheckout ? {} : data);
     const payment = data.payment || {};
     const itemProductId = checkout.items?.[0]?.id || subscription.items?.[0]?.id;
     const metadata = checkout.metadata || subscription.metadata || body.metadata || {};

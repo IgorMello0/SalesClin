@@ -203,6 +203,43 @@ function getPublicAppUrl() {
   ).replace(/\/$/, '')
 }
 
+function getAbacateApiBaseUrl() {
+  return (process.env.ABACATEPAY_API_BASE_URL || 'https://api.abacatepay.com/v2').replace(/\/$/, '')
+}
+
+function getAbacateCheckoutPath() {
+  const mode = (process.env.ABACATEPAY_CHECKOUT_MODE || 'checkout').toLowerCase()
+  return mode === 'subscription' ? '/subscriptions/create' : '/checkouts/create'
+}
+
+async function createAbacateCheckout(payload: Record<string, unknown>, apiKey: string) {
+  const response = await fetch(`${getAbacateApiBaseUrl()}${getAbacateCheckoutPath()}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const body = await response.json().catch(() => ({}))
+
+  if (!response.ok || body?.success === false) {
+    const message = body?.error?.message || body?.error || 'Nao foi possivel criar checkout na Abacate Pay.'
+    throw new Error(message)
+  }
+
+  const data = body?.data || body
+  const checkoutId = data?.id || data?.checkoutId || null
+  const checkoutUrl = data?.url || data?.checkoutUrl || data?.paymentUrl || null
+
+  if (!checkoutUrl) {
+    throw new Error('A Abacate Pay nao retornou a URL do checkout.')
+  }
+
+  return { checkoutId, checkoutUrl }
+}
+
 export function getPeriodEndForCycle(cycle: BillingCycle, baseDate = new Date()) {
   return addDays(baseDate, cycle === 'yearly' ? 365 : 30)
 }
@@ -451,7 +488,6 @@ export async function createAddonCheckout(input: {
 
   const appUrl = getPublicAppUrl()
   const externalId = `sellclin-addon-${addon.id}-${Date.now()}`
-  const baseUrl = process.env.ABACATEPAY_API_BASE_URL || 'https://api.abacatepay.com/v2'
 
   const payload = {
     items: [{ id: productId, quantity }],
@@ -469,29 +505,7 @@ export async function createAddonCheckout(input: {
     },
   }
 
-  const response = await fetch(`${baseUrl}/subscriptions/create`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  const body = await response.json().catch(() => ({}))
-
-  if (!response.ok || body?.success === false) {
-    const message = body?.error?.message || body?.error || 'Nao foi possivel criar checkout de extra na Abacate Pay.'
-    throw new Error(message)
-  }
-
-  const data = body?.data || body
-  const checkoutId = data?.id || data?.checkoutId || null
-  const checkoutUrl = data?.url || data?.checkoutUrl || data?.paymentUrl || null
-
-  if (!checkoutUrl) {
-    throw new Error('A Abacate Pay nao retornou a URL do checkout de extra.')
-  }
+  const { checkoutId, checkoutUrl } = await createAbacateCheckout(payload, apiKey)
 
   await prisma.billingAddon.update({
     where: { id: addon.id },
@@ -578,7 +592,6 @@ export async function createAbacateSubscriptionCheckout(
   const subscription = company.subscription || await ensureCompanySubscription(prisma, companyId, planCode)
   const appUrl = getPublicAppUrl()
   const externalId = `sellclin-${companyId}-${Date.now()}`
-  const baseUrl = process.env.ABACATEPAY_API_BASE_URL || 'https://api.abacatepay.com/v2'
 
   const payload = {
     items: [{ id: productId, quantity: 1 }],
@@ -594,29 +607,7 @@ export async function createAbacateSubscriptionCheckout(
     },
   }
 
-  const response = await fetch(`${baseUrl}/subscriptions/create`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  const body = await response.json().catch(() => ({}))
-
-  if (!response.ok || body?.success === false) {
-    const message = body?.error?.message || body?.error || 'Nao foi possivel criar checkout na Abacate Pay.'
-    throw new Error(message)
-  }
-
-  const data = body?.data || body
-  const checkoutId = data?.id || data?.checkoutId || null
-  const checkoutUrl = data?.url || data?.checkoutUrl || data?.paymentUrl || null
-
-  if (!checkoutUrl) {
-    throw new Error('A Abacate Pay nao retornou a URL do checkout.')
-  }
+  const { checkoutId, checkoutUrl } = await createAbacateCheckout(payload, apiKey)
 
   await prisma.companySubscription.update({
     where: { companyId },
@@ -698,7 +689,6 @@ export async function createPendingSignupCheckout(input: {
 
   const appUrl = getPublicAppUrl()
   const externalId = `sellclin-signup-${pending.id}-${Date.now()}`
-  const baseUrl = process.env.ABACATEPAY_API_BASE_URL || 'https://api.abacatepay.com/v2'
 
   const payload = {
     items: [{ id: productId, quantity: 1 }],
@@ -714,29 +704,7 @@ export async function createPendingSignupCheckout(input: {
     },
   }
 
-  const response = await fetch(`${baseUrl}/subscriptions/create`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  const body = await response.json().catch(() => ({}))
-
-  if (!response.ok || body?.success === false) {
-    const message = body?.error?.message || body?.error || 'Nao foi possivel criar checkout na Abacate Pay.'
-    throw new Error(message)
-  }
-
-  const data = body?.data || body
-  const checkoutId = data?.id || data?.checkoutId || null
-  const checkoutUrl = data?.url || data?.checkoutUrl || data?.paymentUrl || null
-
-  if (!checkoutUrl) {
-    throw new Error('A Abacate Pay nao retornou a URL do checkout.')
-  }
+  const { checkoutId, checkoutUrl } = await createAbacateCheckout(payload, apiKey)
 
   await prisma.pendingSignup.update({
     where: { id: pending.id },
