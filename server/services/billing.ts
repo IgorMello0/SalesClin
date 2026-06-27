@@ -147,6 +147,9 @@ export async function getCompanyBillingStatus(companyId: number) {
     abacateSubscriptionId: subscription.abacateSubscriptionId,
     abacateCheckoutId: subscription.abacateCheckoutId,
     checkoutUrl: subscription.checkoutUrl,
+    pendingPlanCode: subscription.pendingPlanCode,
+    pendingBillingCycle: subscription.pendingBillingCycle,
+    planChangeStatus: subscription.planChangeStatus,
   }
 }
 
@@ -207,13 +210,8 @@ function getAbacateApiBaseUrl() {
   return (process.env.ABACATEPAY_API_BASE_URL || 'https://api.abacatepay.com/v2').replace(/\/$/, '')
 }
 
-function getAbacateCheckoutPath() {
-  const mode = (process.env.ABACATEPAY_CHECKOUT_MODE || 'checkout').toLowerCase()
-  return mode === 'subscription' ? '/subscriptions/create' : '/checkouts/create'
-}
-
-async function createAbacateCheckout(payload: Record<string, unknown>, apiKey: string) {
-  const response = await fetch(`${getAbacateApiBaseUrl()}${getAbacateCheckoutPath()}`, {
+async function postAbacate(path: string, payload: Record<string, unknown>, apiKey: string) {
+  const response = await fetch(`${getAbacateApiBaseUrl()}${path}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -225,11 +223,21 @@ async function createAbacateCheckout(payload: Record<string, unknown>, apiKey: s
   const body = await response.json().catch(() => ({}))
 
   if (!response.ok || body?.success === false) {
-    const message = body?.error?.message || body?.error || 'Nao foi possivel criar checkout na Abacate Pay.'
-    throw new Error(message)
+    const rawMessage = body?.error?.message || body?.error || 'Nao foi possivel concluir a operacao na Abacate Pay.'
+    const message = typeof rawMessage === 'string' ? rawMessage : JSON.stringify(rawMessage)
+    const friendlyMessage = response.status === 401
+      ? 'Chave da Abacate Pay invalida, inativa ou sem permissao para esta operacao.'
+      : message
+    const error = new Error(friendlyMessage) as Error & { status?: number }
+    error.status = response.status
+    throw error
   }
 
-  const data = body?.data || body
+  return body?.data || body
+}
+
+async function createAbacateBilling(path: string, payload: Record<string, unknown>, apiKey: string) {
+  const data = await postAbacate(path, payload, apiKey)
   const checkoutId = data?.id || data?.checkoutId || null
   const checkoutUrl = data?.url || data?.checkoutUrl || data?.paymentUrl || null
 
@@ -238,6 +246,26 @@ async function createAbacateCheckout(payload: Record<string, unknown>, apiKey: s
   }
 
   return { checkoutId, checkoutUrl }
+}
+
+async function createAbacateCheckout(payload: Record<string, unknown>, apiKey: string) {
+  return createAbacateBilling('/checkouts/create', payload, apiKey)
+}
+
+async function createAbacateSubscriptionBilling(payload: Record<string, unknown>, apiKey: string) {
+  return createAbacateBilling('/subscriptions/create', payload, apiKey)
+}
+
+async function cancelAbacateSubscription(subscriptionId: string, apiKey: string) {
+  return postAbacate('/subscriptions/cancel', { id: subscriptionId }, apiKey)
+}
+
+async function changeAbacateSubscriptionPlan(subscriptionId: string, productId: string, apiKey: string) {
+  return postAbacate('/subscriptions/change-plan', {
+    id: subscriptionId,
+    productId,
+    quantity: 1,
+  }, apiKey)
 }
 
 export function getPeriodEndForCycle(cycle: BillingCycle, baseDate = new Date()) {
@@ -505,7 +533,7 @@ export async function createAddonCheckout(input: {
     },
   }
 
-  const { checkoutId, checkoutUrl } = await createAbacateCheckout(payload, apiKey)
+  const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, apiKey)
 
   await prisma.billingAddon.update({
     where: { id: addon.id },
@@ -591,7 +619,7 @@ export async function createAbacateSubscriptionCheckout(
 
   const subscription = company.subscription || await ensureCompanySubscription(prisma, companyId, planCode)
   const appUrl = getPublicAppUrl()
-  const externalId = `sellclin-${companyId}-${Date.now()}`
+  const externalId = `sellclin-${companyId}-${subscription.id}`
 
   const payload = {
     items: [{ id: productId, quantity: 1 }],
@@ -607,7 +635,7 @@ export async function createAbacateSubscriptionCheckout(
     },
   }
 
-  const { checkoutId, checkoutUrl } = await createAbacateCheckout(payload, apiKey)
+  const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, apiKey)
 
   await prisma.companySubscription.update({
     where: { companyId },
@@ -617,6 +645,10 @@ export async function createAbacateSubscriptionCheckout(
       status: getEffectiveSubscriptionStatus(subscription) === 'expired' ? 'payment_pending' : subscription.status,
       abacateCheckoutId: checkoutId,
       checkoutUrl,
+      pendingPlanCode: null,
+      pendingBillingCycle: null,
+      abacatePlanChangeId: null,
+      planChangeStatus: null,
     },
   })
 
@@ -628,6 +660,96 @@ export async function createAbacateSubscriptionCheckout(
   return {
     checkoutId,
     checkoutUrl,
+  }
+}
+
+export async function cancelCompanyAbacateSubscription(companyId: number) {
+  const apiKey = process.env.ABACATEPAY_API_KEY
+  if (!apiKey) {
+    throw new Error('Configuracao da Abacate Pay incompleta para cancelar assinatura.')
+  }
+
+  const subscription = await prisma.companySubscription.findUnique({
+    where: { companyId },
+  })
+
+  if (!subscription) {
+    throw new Error('Assinatura nao encontrada.')
+  }
+
+  if (!subscription.abacateSubscriptionId) {
+    throw new Error('Esta assinatura ainda nao possui ID recorrente na Abacate Pay.')
+  }
+
+  await cancelAbacateSubscription(subscription.abacateSubscriptionId, apiKey)
+
+  const updated = await prisma.companySubscription.update({
+    where: { companyId },
+    data: {
+      status: 'canceled',
+      canceledAt: new Date(),
+      pendingPlanCode: null,
+      pendingBillingCycle: null,
+      abacatePlanChangeId: null,
+      planChangeStatus: null,
+    },
+  })
+
+  return {
+    planCode: updated.planCode,
+    billingCycle: updated.billingCycle,
+    status: updated.status,
+    canceledAt: updated.canceledAt,
+  }
+}
+
+export async function changeCompanyAbacateSubscriptionPlan(
+  companyId: number,
+  planCode: PlanCode,
+  billingCycle: BillingCycle
+) {
+  if (planCode === 'enterprise') {
+    throw new Error('O plano Enterprise e gerenciado manualmente.')
+  }
+
+  const apiKey = process.env.ABACATEPAY_API_KEY
+  const productId = getProductIdForPlan(planCode, billingCycle)
+  if (!apiKey || !productId) {
+    throw new Error('Configuracao da Abacate Pay incompleta para alterar plano.')
+  }
+
+  const subscription = await prisma.companySubscription.findUnique({
+    where: { companyId },
+  })
+
+  if (!subscription) {
+    throw new Error('Assinatura nao encontrada.')
+  }
+
+  if (subscription.status !== 'active' || !subscription.abacateSubscriptionId) {
+    throw new Error('Somente assinaturas ativas da Abacate Pay podem trocar de plano.')
+  }
+
+  const change = await changeAbacateSubscriptionPlan(subscription.abacateSubscriptionId, productId, apiKey)
+  const planChangeId = change?.id || null
+  const planChangeStatus = change?.status || 'PENDING'
+
+  const updated = await prisma.companySubscription.update({
+    where: { companyId },
+    data: {
+      pendingPlanCode: planCode,
+      pendingBillingCycle: billingCycle,
+      abacatePlanChangeId: planChangeId,
+      planChangeStatus,
+    },
+  })
+
+  return {
+    planCode: updated.planCode,
+    billingCycle: updated.billingCycle,
+    pendingPlanCode: updated.pendingPlanCode,
+    pendingBillingCycle: updated.pendingBillingCycle,
+    planChangeStatus: updated.planChangeStatus,
   }
 }
 
@@ -704,7 +826,7 @@ export async function createPendingSignupCheckout(input: {
     },
   }
 
-  const { checkoutId, checkoutUrl } = await createAbacateCheckout(payload, apiKey)
+  const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, apiKey)
 
   await prisma.pendingSignup.update({
     where: { id: pending.id },

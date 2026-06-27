@@ -37,6 +37,9 @@ export interface BillingStatus {
   abacateSubscriptionId?: string | null
   abacateCheckoutId?: string | null
   checkoutUrl?: string | null
+  pendingPlanCode?: string | null
+  pendingBillingCycle?: 'monthly' | 'yearly' | null
+  planChangeStatus?: string | null
 }
 
 export type BillingCycle = 'monthly' | 'yearly'
@@ -770,6 +773,21 @@ export const billingApi = {
     apiRequest<{ checkoutId?: string | null; checkoutUrl: string }>('/billing/checkout', {
       method: 'POST',
       body: JSON.stringify({ planCode, billingCycle }),
+    }),
+  changePlan: async (planCode: string, billingCycle: BillingCycle) =>
+    apiRequest<{
+      planCode: string
+      billingCycle: string
+      pendingPlanCode?: string | null
+      pendingBillingCycle?: string | null
+      planChangeStatus?: string | null
+    }>('/billing/change-plan', {
+      method: 'POST',
+      body: JSON.stringify({ planCode, billingCycle }),
+    }),
+  cancelSubscription: async () =>
+    apiRequest<{ planCode: string; billingCycle: string; status: string; canceledAt?: string | null }>('/billing/cancel-subscription', {
+      method: 'POST',
     }),
   createSignupCheckout: async (payload: SignupCheckoutPayload) =>
     apiRequest<{ pendingSignupId: number; checkoutId?: string | null; checkoutUrl: string }>('/billing/signup-checkout', {

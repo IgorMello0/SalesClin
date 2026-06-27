@@ -239,7 +239,7 @@ router.post('/abacate-pay', async (req, res) => {
     const checkout = data.checkout || (directCheckout ? data : {});
     const subscription = data.subscription || (directCheckout ? {} : data);
     const payment = data.payment || {};
-    const itemProductId = checkout.items?.[0]?.id || subscription.items?.[0]?.id;
+    const itemProductId = checkout.items?.[0]?.id || subscription.items?.[0]?.id || data.productId || data.update?.productId;
     const metadata = checkout.metadata || subscription.metadata || body.metadata || {};
     const parsedPendingSignupId = Number(metadata.pendingSignupId);
     const pendingSignupId = Number.isFinite(parsedPendingSignupId) && parsedPendingSignupId > 0
@@ -262,6 +262,42 @@ router.post('/abacate-pay', async (req, res) => {
     const resolvedBillingCycle = isBillingCycle(billingCycle) ? billingCycle : undefined;
     const subscriptionId = subscription.id || data.subscriptionId || body.subscriptionId || null;
     const checkoutId = checkout.id || data.checkoutId || body.checkoutId || null;
+
+    if (eventName.toLowerCase().includes('plan_changed')) {
+      const planChangeStatus = data.status || data.update?.status || 'PENDING';
+      const where = companyId
+        ? { companyId }
+        : subscriptionId
+          ? { abacateSubscriptionId: subscriptionId }
+          : null;
+
+      if (!where) {
+        return res.status(400).json(createErrorResponse('Evento de troca sem assinatura vinculada', 400));
+      }
+
+      const isApplied = String(planChangeStatus).toUpperCase() === 'APPLIED';
+      const updatedSubscription = await prisma.companySubscription.update({
+        where,
+        data: {
+          ...(isApplied && resolvedPlanCode ? { planCode: resolvedPlanCode } : {}),
+          ...(isApplied && resolvedBillingCycle ? { billingCycle: resolvedBillingCycle } : {}),
+          pendingPlanCode: isApplied ? null : resolvedPlanCode,
+          pendingBillingCycle: isApplied ? null : resolvedBillingCycle,
+          abacatePlanChangeId: data.id || data.update?.id || null,
+          planChangeStatus,
+        },
+      });
+
+      if (isApplied && resolvedPlanCode) {
+        await prisma.empresa.update({
+          where: { id: updatedSubscription.companyId },
+          data: { plan: resolvedPlanCode },
+        });
+      }
+
+      await markWebhookEventProcessed(eventId, eventName, body);
+      return res.json(createSuccessResponse({ received: true, planChange: true }));
+    }
 
     if (pendingSignupId) {
       const activation = await activatePendingSignup({

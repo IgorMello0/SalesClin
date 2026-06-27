@@ -3,6 +3,8 @@ import { auth, requireCompany } from '../middleware/auth.js'
 import { prisma } from '../prisma.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import {
+  cancelCompanyAbacateSubscription,
+  changeCompanyAbacateSubscriptionPlan,
   createAddonCheckout,
   createAbacateSubscriptionCheckout,
   createPendingSignupCheckout,
@@ -105,7 +107,43 @@ router.post('/checkout', auth(), requireCompany, async (req, res) => {
     return res.json(createSuccessResponse(checkout))
   } catch (error: any) {
     console.error('[Billing] Erro ao criar checkout:', error)
-    return res.status(500).json(createErrorResponse(error.message || 'Erro ao criar checkout', 500))
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
+    return res.status(status).json(createErrorResponse(error.message || 'Erro ao criar checkout', status))
+  }
+})
+
+router.post('/change-plan', auth(), requireCompany, async (req, res) => {
+  try {
+    const companyId = req.user!.companyId!
+    const requestedPlanCode = req.body?.planCode
+    const requestedBillingCycle = req.body?.billingCycle
+
+    if (!isPlanCode(requestedPlanCode) || requestedPlanCode === 'enterprise') {
+      return res.status(400).json(createErrorResponse('Plano invalido para alteracao automatica', 400))
+    }
+
+    if (!isBillingCycle(requestedBillingCycle)) {
+      return res.status(400).json(createErrorResponse('Ciclo de cobranca invalido', 400))
+    }
+
+    const change = await changeCompanyAbacateSubscriptionPlan(companyId, requestedPlanCode, requestedBillingCycle)
+    return res.json(createSuccessResponse(change))
+  } catch (error: any) {
+    console.error('[Billing] Erro ao alterar plano:', error)
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
+    return res.status(status).json(createErrorResponse(error.message || 'Erro ao alterar plano', status))
+  }
+})
+
+router.post('/cancel-subscription', auth(), requireCompany, async (req, res) => {
+  try {
+    const companyId = req.user!.companyId!
+    const result = await cancelCompanyAbacateSubscription(companyId)
+    return res.json(createSuccessResponse(result))
+  } catch (error: any) {
+    console.error('[Billing] Erro ao cancelar assinatura:', error)
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
+    return res.status(status).json(createErrorResponse(error.message || 'Erro ao cancelar assinatura', status))
   }
 })
 

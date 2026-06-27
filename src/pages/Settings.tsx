@@ -1156,6 +1156,8 @@ const ClinicasView = () => {
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [buyingClinicExtra, setBuyingClinicExtra] = useState(false);
   const [openingPlanCheckout, setOpeningPlanCheckout] = useState(false);
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [cancelingSubscription, setCancelingSubscription] = useState(false);
   
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState({ name: '', domain: '', whatsapp: '', openHour: '08:00', closeHour: '20:00' });
@@ -1234,6 +1236,44 @@ const ClinicasView = () => {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     } finally {
       setOpeningPlanCheckout(false);
+    }
+  };
+
+  const handleChangePlan = async (planCode: 'start' | 'pro', billingCycle: 'monthly' | 'yearly') => {
+    setChangingPlan(true);
+    try {
+      const res = await billingApi.changePlan(planCode, billingCycle);
+      if (!res.success) {
+        throw new Error(res.error?.message || 'Nao foi possivel alterar o plano.');
+      }
+      toast({
+        title: 'Alteracao agendada',
+        description: 'A AbacatePay vai aplicar a troca no proximo ciclo de cobranca.',
+      });
+      loadBillingStatus();
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setChangingPlan(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    setCancelingSubscription(true);
+    try {
+      const res = await billingApi.cancelSubscription();
+      if (!res.success) {
+        throw new Error(res.error?.message || 'Nao foi possivel cancelar a assinatura.');
+      }
+      toast({
+        title: 'Assinatura cancelada',
+        description: 'O cancelamento foi aplicado agora e novas cobrancas nao serao geradas.',
+      });
+      loadBillingStatus();
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setCancelingSubscription(false);
     }
   };
 
@@ -1319,6 +1359,16 @@ const ClinicasView = () => {
   const trialEndsAtLabel = billingStatus?.trialEndsAt
     ? new Date(billingStatus.trialEndsAt).toLocaleDateString('pt-BR')
     : null;
+  const targetPlanCode = billingStatus?.planCode === 'pro' ? 'start' : 'pro';
+  const targetPlanLabel = targetPlanCode === 'pro' ? 'Pro' : 'Start';
+  const targetBillingCycle = billingStatus?.billingCycle === 'yearly' ? 'monthly' : 'yearly';
+  const targetBillingCycleLabel = targetBillingCycle === 'yearly' ? 'anual' : 'mensal';
+  const pendingPlanLabel = billingStatus?.pendingPlanCode === 'pro'
+    ? 'Pro'
+    : billingStatus?.pendingPlanCode === 'start'
+      ? 'Start'
+      : null;
+  const pendingCycleLabel = billingStatus?.pendingBillingCycle === 'yearly' ? 'anual' : 'mensal';
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -1366,6 +1416,10 @@ const ClinicasView = () => {
                     <p className="text-sm font-medium text-orange-800">
                       Faltam {Math.max(0, billingStatus.daysRemaining)} dia{billingStatus.daysRemaining === 1 ? '' : 's'}. Depois do teste, o login continua, mas os módulos operacionais ficam bloqueados até ativar o plano.
                     </p>
+                  ) : billingStatus.planChangeStatus === 'PENDING' && pendingPlanLabel ? (
+                    <p className="text-sm font-medium text-blue-700">
+                      Alteracao agendada para Plano {pendingPlanLabel} {pendingCycleLabel}. A troca entra no proximo ciclo de cobranca.
+                    </p>
                   ) : isSubscriptionBlocked ? (
                     <p className="text-sm font-medium text-orange-900">
                       Esta clínica está sem assinatura ativa. Ative o plano para liberar os módulos operacionais novamente.
@@ -1378,11 +1432,39 @@ const ClinicasView = () => {
                 </div>
               </div>
 
-              {billingStatus.status !== 'active' && (
+              {billingStatus.status !== 'active' ? (
                 <Button onClick={handleOpenPlanCheckout} disabled={openingPlanCheckout} className="w-full lg:w-auto">
                   <CreditCard className="h-4 w-4 mr-2" />
                   {openingPlanCheckout ? 'Abrindo...' : 'Ativar plano'}
                 </Button>
+              ) : (
+                <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                  {billingStatus.planCode !== 'enterprise' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleChangePlan(targetPlanCode, billingStatus.billingCycle)}
+                        disabled={changingPlan || cancelingSubscription}
+                      >
+                        {changingPlan ? 'Agendando...' : `Trocar para ${targetPlanLabel}`}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleChangePlan(billingStatus.planCode as 'start' | 'pro', targetBillingCycle)}
+                        disabled={changingPlan || cancelingSubscription}
+                      >
+                        {changingPlan ? 'Agendando...' : `Trocar para ${targetBillingCycleLabel}`}
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="destructive"
+                    onClick={handleCancelSubscription}
+                    disabled={changingPlan || cancelingSubscription || !billingStatus.abacateSubscriptionId}
+                  >
+                    {cancelingSubscription ? 'Cancelando...' : 'Cancelar assinatura'}
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>
