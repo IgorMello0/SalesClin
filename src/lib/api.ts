@@ -958,7 +958,18 @@ export const campaignsApi = {
     return apiRequest<Array<any>>(`/campaigns?${query.toString()}`)
   },
   getById: async (id: number) => apiRequest<any>(`/campaigns/${id}`),
-  create: async (data: { name: string; message: string; audienceType: string; audienceFilter?: any }) =>
+  create: async (data: {
+    name: string
+    message: string
+    audienceType: string
+    audienceFilter?: any
+    mediaUrl?: string | null
+    mediaType?: string | null
+    minDelay?: number
+    maxDelay?: number
+    randomize?: boolean
+    variations?: string[] | null
+  }) =>
     apiRequest<any>('/campaigns', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) =>
     apiRequest<any>(`/campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

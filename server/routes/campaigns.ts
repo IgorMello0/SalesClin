@@ -5,6 +5,8 @@ import { createErrorResponse, createSuccessResponse, parsePagination } from '../
 
 export const router = Router()
 
+const SPREADSHEET_CONTACT_LIMIT = 5000
+
 // ─── Helper: Resolve companyId & professionalId from JWT ───
 function resolveIds(req: any) {
   let professionalId: number | undefined
@@ -153,10 +155,19 @@ router.post('/', auth(false), async (req, res) => {
     }
 
     // Buscar destinatários com base no tipo de audiência
-    const recipients = await resolveAudience(audienceType, audienceFilter, profId, companyId)
+    const audienceResolution = await resolveAudience(audienceType, audienceFilter, profId, companyId)
+    const recipients = audienceResolution.recipients
 
-    const leadIds = recipients.filter(r => r.sourceType === 'lead').map(r => r.sourceId)
-    const clientIds = recipients.filter(r => r.sourceType === 'client').map(r => r.sourceId)
+    if (recipients.length === 0) {
+      return res.status(400).json(createErrorResponse('Nenhum destinatario valido encontrado para esta campanha'))
+    }
+
+    const leadIds = recipients
+      .filter(r => r.sourceType === 'lead' && r.sourceId)
+      .map(r => Number(r.sourceId))
+    const clientIds = recipients
+      .filter(r => r.sourceType === 'client' && r.sourceId)
+      .map(r => Number(r.sourceId))
 
     // Buscar próximos agendamentos (futuros) em lote
     const upcomingAppointments = await prisma.appointment.findMany({
@@ -207,7 +218,7 @@ router.post('/', auth(false), async (req, res) => {
         name,
         message,
         audienceType,
-        audienceFilter: audienceFilter || undefined,
+        audienceFilter: audienceResolution.audienceFilter || undefined,
         status: 'draft',
         totalRecipients: recipients.length,
         mediaUrl: mediaUrl || null,
@@ -229,7 +240,7 @@ router.post('/', auth(false), async (req, res) => {
               name: r.name,
               phone: r.phone,
               sourceType: r.sourceType,
-              sourceId: r.sourceId,
+              sourceId: r.sourceId ?? null,
               status: 'pending',
               renderedMessage: renderMessage(message, r, upcomingAppt, pastAppt)
             }
@@ -460,7 +471,62 @@ interface RecipientData {
   name: string
   phone: string
   sourceType: 'lead' | 'client' | 'spreadsheet'
-  sourceId: number
+  sourceId?: number | null
+}
+
+interface AudienceResolution {
+  recipients: RecipientData[]
+  audienceFilter?: any
+}
+
+function normalizeSpreadsheetContacts(audienceFilter: any): {
+  recipients: RecipientData[]
+  metadata: Record<string, any>
+} {
+  const rawContacts = Array.isArray(audienceFilter?.contacts) ? audienceFilter.contacts : []
+  const contacts = rawContacts.slice(0, SPREADSHEET_CONTACT_LIMIT)
+  const phones = new Set<string>()
+  const recipients: RecipientData[] = []
+  let duplicateRows = 0
+  let invalidRows = 0
+
+  for (const contact of contacts) {
+    const phone = String(contact?.phone || contact?.telefone || contact?.whatsapp || contact?.celular || '').replace(/\D/g, '')
+    const name = String(contact?.name || contact?.nome || contact?.cliente || contact?.contato || '').trim() || 'Contato'
+
+    if (!phone) {
+      invalidRows++
+      continue
+    }
+
+    if (phones.has(phone)) {
+      duplicateRows++
+      continue
+    }
+
+    phones.add(phone)
+    recipients.push({ name, phone, sourceType: 'spreadsheet', sourceId: null })
+  }
+
+  const clientStats = audienceFilter?.stats || {}
+  const totalImported = Number(clientStats.totalImported || rawContacts.length || contacts.length)
+  const clientInvalidRows = Number(clientStats.invalidRows)
+  const clientDuplicateRows = Number(clientStats.duplicateRows)
+
+  return {
+    recipients,
+    metadata: {
+      source: audienceFilter?.source || audienceFilter?.fileName || null,
+      totalImported: Number.isFinite(totalImported) ? totalImported : rawContacts.length,
+      totalReceived: rawContacts.length,
+      totalProcessed: contacts.length,
+      totalValid: recipients.length,
+      duplicateRows: Number.isFinite(clientDuplicateRows) ? Math.max(clientDuplicateRows, duplicateRows) : duplicateRows,
+      invalidRows: Number.isFinite(clientInvalidRows) ? Math.max(clientInvalidRows, invalidRows) : invalidRows,
+      limit: SPREADSHEET_CONTACT_LIMIT,
+      truncated: rawContacts.length > SPREADSHEET_CONTACT_LIMIT || Boolean(clientStats.truncated),
+    },
+  }
 }
 
 // Resolve audiência: busca leads/clientes com base nos filtros
@@ -469,19 +535,15 @@ async function resolveAudience(
   audienceFilter: any,
   professionalId: number,
   companyId: number
-): Promise<RecipientData[]> {
+): Promise<AudienceResolution> {
   const recipients: RecipientData[] = []
   const phones = new Set<string>() // Evita duplicatas
 
   if (audienceType === 'spreadsheet' && Array.isArray(audienceFilter?.contacts)) {
-    const contacts = audienceFilter.contacts.slice(0, 5000)
-    for (const contact of contacts) {
-      const phone = String(contact.phone || contact.telefone || '').replace(/\D/g, '')
-      const name = String(contact.name || contact.nome || '').trim() || 'Contato'
-      if (phone && !phones.has(phone)) {
-        phones.add(phone)
-        recipients.push({ name, phone, sourceType: 'spreadsheet', sourceId: 0 })
-      }
+    const spreadsheetAudience = normalizeSpreadsheetContacts(audienceFilter)
+    return {
+      recipients: spreadsheetAudience.recipients,
+      audienceFilter: spreadsheetAudience.metadata,
     }
   }
 
@@ -616,7 +678,10 @@ async function resolveAudience(
     }
   }
 
-  return recipients
+  return {
+    recipients,
+    audienceFilter: audienceFilter || undefined,
+  }
 }
 
 // Renderiza mensagem substituindo variáveis

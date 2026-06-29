@@ -964,8 +964,8 @@ model CampaignRecipient {
   campaignId   Int             @map("campaign_id")
   name         String          // Nome do destinatário
   phone        String          // Telefone do destinatário
-  sourceType   String          @map("source_type") // 'lead' ou 'client'
-  sourceId     Int             @map("source_id")   // ID do lead ou client
+  sourceType   String          @map("source_type") // 'lead', 'client' ou 'spreadsheet'
+  sourceId     Int?            @map("source_id")   // ID do lead/client; nulo para planilha
   status       RecipientStatus @default(pending)
   sentAt       DateTime?       @map("sent_at")
   errorMessage String?         @map("error_message")

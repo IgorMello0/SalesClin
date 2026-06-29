@@ -41,6 +41,17 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: string }>
   canceled: { label: 'Cancelada', color: 'bg-slate-100 text-slate-500', icon: 'cancel' },
 };
 
+const SPREADSHEET_CONTACT_LIMIT = 5000;
+
+type SpreadsheetStats = {
+  totalImported: number;
+  validRows: number;
+  duplicateRows: number;
+  invalidRows: number;
+  truncated: boolean;
+  missingPhoneColumn?: boolean;
+};
+
 function splitSpreadsheetLine(line: string, delimiter: string) {
   const result: string[] = [];
   let current = '';
@@ -68,7 +79,14 @@ function splitSpreadsheetLine(line: string, delimiter: string) {
 
 function parseSpreadsheetContacts(text: string) {
   const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  if (lines.length < 2) return [];
+  const emptyStats: SpreadsheetStats = {
+    totalImported: Math.max(0, lines.length - 1),
+    validRows: 0,
+    duplicateRows: 0,
+    invalidRows: 0,
+    truncated: false,
+  };
+  if (lines.length < 2) return { contacts: [], stats: emptyStats };
 
   const firstLine = lines[0];
   const delimiter = firstLine.includes(';') ? ';' : firstLine.includes('\t') ? '\t' : ',';
@@ -77,22 +95,43 @@ function parseSpreadsheetContacts(text: string) {
   const nameIndex = headers.findIndex(h => ['nome', 'name', 'cliente', 'contato'].includes(h));
   const phoneIndex = headers.findIndex(h => ['telefone', 'phone', 'whatsapp', 'celular', 'numero'].includes(h));
 
-  if (phoneIndex === -1) return [];
+  if (phoneIndex === -1) {
+    return { contacts: [], stats: { ...emptyStats, missingPhoneColumn: true } };
+  }
 
   const seen = new Set<string>();
   const contacts: Array<{ name: string; phone: string }> = [];
+  const dataLines = lines.slice(1);
+  const rowsToProcess = dataLines.slice(0, SPREADSHEET_CONTACT_LIMIT);
+  let duplicateRows = 0;
+  let invalidRows = 0;
 
-  for (const line of lines.slice(1)) {
+  for (const line of rowsToProcess) {
     const columns = splitSpreadsheetLine(line, delimiter);
     const phone = String(columns[phoneIndex] || '').replace(/\D/g, '');
     const name = nameIndex >= 0 ? String(columns[nameIndex] || '').trim() : '';
-    if (phone && !seen.has(phone)) {
-      seen.add(phone);
-      contacts.push({ name: name || 'Contato', phone });
+    if (!phone) {
+      invalidRows++;
+      continue;
     }
+    if (seen.has(phone)) {
+      duplicateRows++;
+      continue;
+    }
+    seen.add(phone);
+    contacts.push({ name: name || 'Contato', phone });
   }
 
-  return contacts;
+  return {
+    contacts,
+    stats: {
+      totalImported: dataLines.length,
+      validRows: contacts.length,
+      duplicateRows,
+      invalidRows,
+      truncated: dataLines.length > SPREADSHEET_CONTACT_LIMIT,
+    },
+  };
 }
 
 export default function Campaigns() {
@@ -135,6 +174,7 @@ export default function Campaigns() {
   const [tagTarget, setTagTarget] = useState<'both' | 'leads' | 'clients'>('both');
   const [spreadsheetContacts, setSpreadsheetContacts] = useState<Array<{ name: string; phone: string }>>([]);
   const [spreadsheetFileName, setSpreadsheetFileName] = useState('');
+  const [spreadsheetStats, setSpreadsheetStats] = useState<SpreadsheetStats | null>(null);
 
   const loadCampaigns = useCallback(async () => {
     setIsLoading(true);
@@ -224,7 +264,7 @@ export default function Campaigns() {
   const resetForm = () => {
     setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both');
     setMediaUrl(''); setMediaType(''); setMinDelay(180); setMaxDelay(200); setRandomize(false); setVariations([]); setNewVariation('');
-    setAttachments([]); setSpreadsheetContacts([]); setSpreadsheetFileName('');
+    setAttachments([]); setSpreadsheetContacts([]); setSpreadsheetFileName(''); setSpreadsheetStats(null);
     setIsCreating(false);
   };
 
@@ -237,7 +277,11 @@ export default function Campaigns() {
     }
 
     const text = await file.text();
-    const contacts = parseSpreadsheetContacts(text);
+    const { contacts, stats } = parseSpreadsheetContacts(text);
+    if (stats.missingPhoneColumn) {
+      toast({ title: 'Coluna de telefone ausente', description: 'Use uma coluna chamada telefone, whatsapp, celular, phone ou numero.', variant: 'destructive' });
+      return;
+    }
     if (contacts.length === 0) {
       toast({ title: 'Nenhum contato encontrado', description: 'A planilha precisa ter uma coluna telefone, whatsapp ou celular.', variant: 'destructive' });
       return;
@@ -245,8 +289,9 @@ export default function Campaigns() {
 
     setSpreadsheetContacts(contacts);
     setSpreadsheetFileName(file.name);
+    setSpreadsheetStats(stats);
     setPreviewRecipients(contacts.length);
-    toast({ title: 'Planilha importada', description: `${contacts.length} contatos com telefone valido.` });
+    toast({ title: 'Planilha importada', description: `${contacts.length} contatos validos. ${stats.duplicateRows} duplicados e ${stats.invalidRows} invalidos ignorados.` });
   };
 
   const handleCreate = async () => {
@@ -264,7 +309,7 @@ export default function Campaigns() {
       const audienceFilter = audienceType === 'by_tags'
         ? { tags: selectedTags, target: tagTarget }
         : audienceType === 'spreadsheet'
-          ? { source: spreadsheetFileName, contacts: spreadsheetContacts }
+          ? { source: spreadsheetFileName, contacts: spreadsheetContacts, stats: spreadsheetStats }
           : undefined;
       
       let finalMediaUrl = null;
@@ -577,6 +622,9 @@ export default function Campaigns() {
                           <p className="mt-2 text-[11px] text-muted-foreground">
                             Exporte do Excel/Google Sheets como CSV. Use colunas <strong>nome</strong> e <strong>telefone</strong>.
                           </p>
+                          <p className="mt-1 text-[10px] text-muted-foreground font-mono">
+                            Exemplo: nome,telefone
+                          </p>
                         </div>
                       </div>
 
@@ -586,6 +634,27 @@ export default function Campaigns() {
                             <span className="material-symbols-outlined text-sm">check_circle</span>
                             {spreadsheetContacts.length} contatos importados de {spreadsheetFileName}
                           </div>
+                          {spreadsheetStats && (
+                            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+                              <span className="rounded-lg bg-white/70 px-2 py-1 text-slate-700">
+                                {spreadsheetStats.totalImported} linhas
+                              </span>
+                              <span className="rounded-lg bg-white/70 px-2 py-1 text-emerald-700">
+                                {spreadsheetStats.validRows} validos
+                              </span>
+                              <span className="rounded-lg bg-white/70 px-2 py-1 text-amber-700">
+                                {spreadsheetStats.duplicateRows} duplicados
+                              </span>
+                              <span className="rounded-lg bg-white/70 px-2 py-1 text-red-700">
+                                {spreadsheetStats.invalidRows} invalidos
+                              </span>
+                            </div>
+                          )}
+                          {spreadsheetStats?.truncated && (
+                            <p className="mt-2 rounded-lg bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                              A planilha passou de {SPREADSHEET_CONTACT_LIMIT} contatos. Apenas os primeiros {SPREADSHEET_CONTACT_LIMIT} foram considerados.
+                            </p>
+                          )}
                           <div className="mt-2 max-h-24 overflow-y-auto rounded-lg bg-white/70 p-2 text-[11px] text-slate-600">
                             {spreadsheetContacts.slice(0, 5).map((contact, index) => (
                               <div key={`${contact.phone}-${index}`} className="flex justify-between gap-3">
@@ -950,6 +1019,12 @@ export default function Campaigns() {
                       <span className="font-bold text-primary">{selectedTags.join(', ')} ({tagTarget === 'both' ? 'Todos' : tagTarget === 'leads' ? 'Apenas Leads' : 'Apenas Clientes'})</span>
                     </div>
                   )}
+                  {audienceType === 'spreadsheet' && (
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span className="text-muted-foreground">Planilha</span>
+                      <span className="font-bold text-primary text-right">{spreadsheetFileName}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Destinatários</span><span className="font-bold text-primary">{previewRecipients} contatos</span></div>
                   
                   {/* Media confirmation */}
@@ -1150,7 +1225,11 @@ export default function Campaigns() {
                           <tr key={r.id} className="hover:bg-slate-50/50">
                             <td className="px-3 py-2 font-medium">{r.name}</td>
                             <td className="px-3 py-2 text-muted-foreground font-mono text-xs">{r.phone}</td>
-                            <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">{r.sourceType === 'lead' ? 'Lead' : 'Cliente'}</Badge></td>
+                            <td className="px-3 py-2">
+                              <Badge variant="outline" className="text-[10px]">
+                                {r.sourceType === 'lead' ? 'Lead' : r.sourceType === 'spreadsheet' ? 'Planilha' : 'Cliente'}
+                              </Badge>
+                            </td>
                             <td className="px-3 py-2">
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                 r.status === 'sent' ? 'bg-emerald-100 text-emerald-700' :
