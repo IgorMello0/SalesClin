@@ -1685,22 +1685,34 @@ const WhatsAppStatusManager = () => {
     pairingCode?: string | null;
     instance?: string | null;
     webhookUrl?: string | null;
+    webhookStatus?: 'configured' | 'error' | 'pending' | 'not_configured';
+    webhookEndpoint?: string | null;
+    webhookError?: string | null;
     message?: string;
   }>({ status: 'LOADING' });
+  const [diagnostics, setDiagnostics] = useState<any>(null);
+  const [testingEvolution, setTestingEvolution] = useState(false);
+
+  const applyStatusData = (data: any) => {
+    setStatusInfo({
+      status: data.status,
+      qrcode: data.qrcode,
+      pairingCode: data.pairingCode,
+      instance: data.instance,
+      webhookUrl: data.webhookUrl,
+      webhookStatus: data.webhookStatus,
+      webhookEndpoint: data.webhookEndpoint,
+      webhookError: data.webhookError,
+      message: data.message
+    });
+  };
 
   const fetchStatus = async () => {
     setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
     try {
       const res = await empresasApi.getWhatsappStatus();
       if (res.success && res.data) {
-        setStatusInfo({
-          status: res.data.status,
-          qrcode: res.data.qrcode,
-          pairingCode: res.data.pairingCode,
-          instance: res.data.instance,
-          webhookUrl: res.data.webhookUrl,
-          message: res.data.message
-        });
+        applyStatusData(res.data);
       } else {
         setStatusInfo({ status: 'ERROR', message: res.error?.message || 'Falha ao buscar status' });
       }
@@ -1714,14 +1726,7 @@ const WhatsAppStatusManager = () => {
     try {
       const res = await empresasApi.startWhatsappConnection();
       if (res.success && res.data) {
-        setStatusInfo({
-          status: res.data.status,
-          qrcode: res.data.qrcode,
-          pairingCode: res.data.pairingCode,
-          instance: res.data.instance,
-          webhookUrl: res.data.webhookUrl,
-          message: res.data.message
-        });
+        applyStatusData(res.data);
         toast({ title: 'WhatsApp pronto para conectar', description: 'Escaneie o QR Code para ativar a captura automatica de leads.' });
       } else {
         throw new Error(res.error?.message || 'Nao foi possivel iniciar a conexao');
@@ -1765,9 +1770,34 @@ const WhatsAppStatusManager = () => {
     }
   };
 
+  const handleTestEvolution = async () => {
+    setTestingEvolution(true);
+    try {
+      const res = await empresasApi.getWhatsappDiagnostics();
+      if (res.success && res.data) {
+        setDiagnostics(res.data);
+        toast({
+          title: res.data.webhookStatus === 'configured' ? 'Evolution validada' : 'Diagnostico concluido',
+          description: res.data.message || 'Teste finalizado.',
+          variant: res.data.webhookStatus === 'configured' ? 'default' : 'destructive'
+        });
+      } else {
+        throw new Error(res.error?.message || 'Nao foi possivel testar a Evolution');
+      }
+    } catch (e: any) {
+      setDiagnostics({ webhookStatus: 'error', message: e.message, attempts: [] });
+      toast({ title: 'Erro no teste', description: e.message, variant: 'destructive' });
+    } finally {
+      setTestingEvolution(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
   }, []);
+
+  const webhookProblem = statusInfo.webhookStatus === 'error';
+  const webhookOk = statusInfo.webhookStatus === 'configured';
 
   return (
     <Card className="border border-emerald-500/20 bg-emerald-50/5 dark:bg-slate-900/40 backdrop-blur-md shadow-lg rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
@@ -1787,6 +1817,77 @@ const WhatsAppStatusManager = () => {
           <div className="flex flex-col items-center justify-center py-8 space-y-3">
             <span className="material-symbols-outlined animate-spin text-3xl text-emerald-500">progress_activity</span>
             <span className="text-xs text-muted-foreground">Comunicando com a sua VPS da Evolution API...</span>
+          </div>
+        )}
+
+        {statusInfo.status !== 'LOADING' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={`p-3 rounded-2xl border text-xs ${
+              webhookOk
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : webhookProblem
+                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                  : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}>
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-base mt-0.5">
+                  {webhookOk ? 'verified' : webhookProblem ? 'warning' : 'webhook'}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-bold">
+                    {webhookOk ? 'Webhook configurado' : webhookProblem ? 'Webhook nao configurado' : 'Webhook pendente'}
+                  </p>
+                  <p className="mt-1 leading-relaxed break-words">
+                    {webhookOk
+                      ? statusInfo.webhookEndpoint || statusInfo.webhookUrl || 'A captura automatica de mensagens esta ativa.'
+                      : webhookProblem
+                        ? statusInfo.webhookError || 'A conexao/QR pode funcionar, mas a captura automatica precisa do webhook.'
+                        : statusInfo.webhookUrl || 'Aguardando teste da Evolution.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl border bg-white dark:bg-slate-950 text-xs">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-800 dark:text-slate-100">Diagnostico Evolution</p>
+                  <p className="mt-1 text-muted-foreground break-words">
+                    {diagnostics
+                      ? `${diagnostics.apiKeyAccepted ? 'API key OK' : 'API key/base URL pendente'} · ${diagnostics.instance || statusInfo.instance || 'sem instancia'}`
+                      : 'Teste a VPS para ver URL, instancia e endpoint aceito.'}
+                  </p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={handleTestEvolution} disabled={testingEvolution} className="shrink-0 h-8 text-xs">
+                  <span className="material-symbols-outlined text-sm mr-1">{testingEvolution ? 'progress_activity' : 'science'}</span>
+                  {testingEvolution ? 'Testando' : 'Testar'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {diagnostics && (
+          <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 dark:bg-slate-900/40 text-xs space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div><strong>Base URL:</strong> <span className="break-all">{diagnostics.baseUrl || 'Nao configurada'}</span></div>
+              <div><strong>Instancia:</strong> <span className="break-all">{diagnostics.instance || statusInfo.instance || 'Nao definida'}</span></div>
+              <div><strong>API responde:</strong> {diagnostics.apiReachable ? 'Sim' : 'Nao'}</div>
+              <div><strong>API key:</strong> {diagnostics.apiKeyAccepted ? 'Aceita' : 'Nao confirmada'}</div>
+              <div className="sm:col-span-2"><strong>Webhook:</strong> <span className="break-all">{diagnostics.webhookEndpoint || diagnostics.message || 'Nao configurado'}</span></div>
+            </div>
+            {Array.isArray(diagnostics.attempts) && diagnostics.attempts.length > 0 && (
+              <details className="pt-2">
+                <summary className="cursor-pointer font-bold text-slate-600">Ver tentativas tecnicas</summary>
+                <div className="mt-2 max-h-48 overflow-auto space-y-1 font-mono text-[10px] text-slate-600">
+                  {diagnostics.attempts.slice(-8).map((attempt: any, index: number) => (
+                    <div key={`${attempt.url}-${index}`} className="break-all">
+                      {attempt.method} {attempt.url} - {attempt.status || 'sem status'} {attempt.ok ? 'OK' : 'falhou'}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </div>
         )}
 
@@ -1902,9 +2003,11 @@ const WhatsAppStatusManager = () => {
             <div className="flex items-start gap-3 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
               <span className="material-symbols-outlined text-rose-500 mt-0.5">error_outline</span>
               <div className="flex-1">
-                <p className="text-sm font-bold text-rose-800 dark:text-rose-400">Servidor Inacessível</p>
+                <p className="text-sm font-bold text-rose-800 dark:text-rose-400">
+                  {webhookProblem ? 'Webhook nao configurado' : 'Evolution API indisponivel'}
+                </p>
                 <p className="text-xs text-rose-600 dark:text-rose-500 leading-relaxed">
-                  {statusInfo.message || 'Falha ao se comunicar com a Evolution API. Certifique-se de que a instância e a URL estão corretas.'}
+                  {statusInfo.webhookError || statusInfo.message || 'Falha ao se comunicar com a Evolution API. Certifique-se de que a instancia e a URL estao corretas.'}
                 </p>
               </div>
             </div>

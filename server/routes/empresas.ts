@@ -5,6 +5,7 @@ import { createErrorResponse, createSuccessResponse, parsePagination } from '../
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 import { getBillingUsage } from '../services/billing.js'
 import {
+  diagnoseCentralEvolution,
   disconnectCentralWhatsapp,
   getCentralWhatsappStatus,
   restartCentralWhatsapp,
@@ -110,6 +111,19 @@ router.post('/my-company/whatsapp/webhook/setup', auth(), async (req, res) => {
   }
 })
 
+router.get('/my-company/whatsapp/diagnostics', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const diagnostics = await diagnoseCentralEvolution(companyId)
+    return res.json(createSuccessResponse(diagnostics))
+  } catch (error: any) {
+    console.error('[WhatsApp Diagnostics] Erro:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao diagnosticar Evolution API', 500))
+  }
+})
+
 router.post('/my-company/whatsapp/disconnect', auth(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
@@ -135,191 +149,6 @@ router.post('/my-company/whatsapp/restart', auth(), async (req, res) => {
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao reiniciar WhatsApp', 500))
   }
 })
-
-// Obter status do WhatsApp e QR Code da Evolution API
-router.get('/my-company/whatsapp/status', auth(), async (req, res) => {
-  try {
-    let companyId: number | undefined
-
-    if (req.user?.type === 'profissional') {
-      const prof = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-        select: { companyId: true }
-      })
-      companyId = prof?.companyId || undefined
-    } else if (req.user?.type === 'usuario') {
-      companyId = req.user.companyId || undefined
-    }
-
-    if (!companyId) {
-      return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
-    }
-
-    const empresa = await prisma.empresa.findUnique({
-      where: { id: companyId },
-      select: { evolutionApiUrl: true, apiKey: true, evolutionInstance: true, whatsappProvider: true }
-    })
-
-    if (!empresa) {
-      return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
-    }
-
-    if (empresa.whatsappProvider !== 'evolution' || !empresa.evolutionApiUrl || !empresa.apiKey || !empresa.evolutionInstance) {
-      return res.json(createSuccessResponse({ status: 'NOT_CONFIGURED' }))
-    }
-
-    const baseUrl = empresa.evolutionApiUrl.replace(/\/+$/, '')
-    const instance = empresa.evolutionInstance
-    const apiKey = empresa.apiKey
-
-    // 1. Checar o estado da conexão da instância
-    let connectionState: any
-    try {
-      const stateRes = await fetch(`${baseUrl}/instance/connectionState/${instance}`, {
-        method: 'GET',
-        headers: { 'apikey': apiKey }
-      })
-      if (stateRes.status === 200) {
-        connectionState = await stateRes.json()
-      }
-    } catch (e: any) {
-      console.error('[WhatsApp Status] Erro ao consultar connectionState:', e.message)
-    }
-
-    // Se estiver conectado
-    if (connectionState?.instance?.state === 'open') {
-      return res.json(createSuccessResponse({ status: 'CONNECTED' }))
-    }
-
-    // 2. Se não estiver conectado, solicitar QR Code / Conexão
-    try {
-      const connectRes = await fetch(`${baseUrl}/instance/connect/${instance}`, {
-        method: 'GET',
-        headers: { 'apikey': apiKey }
-      })
-
-      if (connectRes.status === 200) {
-        const connectData: any = await connectRes.json()
-        
-        // Se no meio do caminho abriu a conexão
-        if (connectData?.instance?.state === 'open') {
-          return res.json(createSuccessResponse({ status: 'CONNECTED' }))
-        }
-
-        // Extrair o QR Code base64
-        const qrcode = connectData?.base64 || connectData?.qrcode?.base64 || connectData?.code || null
-        const pairingCode = connectData?.pairingCode || null
-
-        return res.json(createSuccessResponse({
-          status: 'DISCONNECTED',
-          qrcode,
-          pairingCode
-        }))
-      }
-    } catch (e: any) {
-      console.error('[WhatsApp Status] Erro ao gerar QR Code:', e.message)
-    }
-
-    return res.json(createSuccessResponse({ status: 'DISCONNECTED', qrcode: null }))
-
-  } catch (error: any) {
-    console.error('[WhatsApp Status] Erro geral:', error)
-    res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar status do WhatsApp', 500))
-  }
-})
-
-// Desconectar/Logout do WhatsApp na Evolution API
-router.post('/my-company/whatsapp/disconnect', auth(), async (req, res) => {
-  try {
-    let companyId: number | undefined
-
-    if (req.user?.type === 'profissional') {
-      const prof = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-        select: { companyId: true }
-      })
-      companyId = prof?.companyId || undefined
-    } else if (req.user?.type === 'usuario') {
-      companyId = req.user.companyId || undefined
-    }
-
-    if (!companyId) {
-      return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
-    }
-
-    const empresa = await prisma.empresa.findUnique({
-      where: { id: companyId },
-      select: { evolutionApiUrl: true, apiKey: true, evolutionInstance: true }
-    })
-
-    if (!empresa || !empresa.evolutionApiUrl || !empresa.apiKey || !empresa.evolutionInstance) {
-      return res.status(400).json(createErrorResponse('Integração não configurada', 400))
-    }
-
-    const baseUrl = empresa.evolutionApiUrl.replace(/\/+$/, '')
-    const instance = empresa.evolutionInstance
-    const apiKey = empresa.apiKey
-
-    const logoutRes = await fetch(`${baseUrl}/instance/logout/${instance}`, {
-      method: 'DELETE',
-      headers: { 'apikey': apiKey }
-    })
-
-    const data = await logoutRes.json().catch(() => ({}))
-
-    res.json(createSuccessResponse({ success: true, data }))
-  } catch (error: any) {
-    console.error('[WhatsApp Disconnect] Erro:', error)
-    res.status(500).json(createErrorResponse(error.message || 'Erro ao desconectar WhatsApp', 500))
-  }
-})
-
-// Reiniciar Instância do WhatsApp na Evolution API
-router.post('/my-company/whatsapp/restart', auth(), async (req, res) => {
-  try {
-    let companyId: number | undefined
-
-    if (req.user?.type === 'profissional') {
-      const prof = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-        select: { companyId: true }
-      })
-      companyId = prof?.companyId || undefined
-    } else if (req.user?.type === 'usuario') {
-      companyId = req.user.companyId || undefined
-    }
-
-    if (!companyId) {
-      return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
-    }
-
-    const empresa = await prisma.empresa.findUnique({
-      where: { id: companyId },
-      select: { evolutionApiUrl: true, apiKey: true, evolutionInstance: true }
-    })
-
-    if (!empresa || !empresa.evolutionApiUrl || !empresa.apiKey || !empresa.evolutionInstance) {
-      return res.status(400).json(createErrorResponse('Integração não configurada', 400))
-    }
-
-    const baseUrl = empresa.evolutionApiUrl.replace(/\/+$/, '')
-    const instance = empresa.evolutionInstance
-    const apiKey = empresa.apiKey
-
-    const restartRes = await fetch(`${baseUrl}/instance/restart/${instance}`, {
-      method: 'POST',
-      headers: { 'apikey': apiKey }
-    })
-
-    const data = await restartRes.json().catch(() => ({}))
-
-    res.json(createSuccessResponse({ success: true, data }))
-  } catch (error: any) {
-    console.error('[WhatsApp Restart] Erro:', error)
-    res.status(500).json(createErrorResponse(error.message || 'Erro ao reiniciar WhatsApp', 500))
-  }
-})
-
 
 router.get('/', auth(), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)

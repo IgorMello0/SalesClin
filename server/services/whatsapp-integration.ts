@@ -15,7 +15,35 @@ type WhatsAppStatus = {
   pairingCode?: string | null
   instance?: string | null
   webhookUrl?: string | null
+  webhookStatus?: 'configured' | 'error' | 'pending' | 'not_configured'
+  webhookEndpoint?: string | null
+  webhookError?: string | null
+  diagnostics?: EvolutionDiagnostic | null
   message?: string
+}
+
+type EvolutionAttemptResult = {
+  label: string
+  method: string
+  url: string
+  status?: number
+  ok: boolean
+  response?: string
+  error?: string
+}
+
+type EvolutionDiagnostic = {
+  configured: boolean
+  baseUrl?: string
+  testedBaseUrls?: string[]
+  instance?: string | null
+  apiReachable: boolean
+  apiKeyAccepted: boolean
+  webhookUrl?: string | null
+  webhookStatus: 'configured' | 'error' | 'pending' | 'not_configured'
+  webhookEndpoint?: string | null
+  message?: string
+  attempts: EvolutionAttemptResult[]
 }
 
 function trimTrailingSlash(value: string) {
@@ -45,6 +73,14 @@ function getCentralEvolutionConfig() {
   }
 }
 
+function getCandidateBaseUrls(baseUrl: string) {
+  const normalized = trimTrailingSlash(baseUrl)
+  const candidates = [normalized]
+  const withoutManager = normalized.replace(/\/manager$/i, '')
+  if (withoutManager && withoutManager !== normalized) candidates.push(withoutManager)
+  return Array.from(new Set(candidates))
+}
+
 function evolutionHeaders(apiKey: string) {
   return {
     'Content-Type': 'application/json',
@@ -54,6 +90,11 @@ function evolutionHeaders(apiKey: string) {
 
 async function parseJson(response: Response) {
   return response.json().catch(() => ({}))
+}
+
+async function responseSnippet(response: Response) {
+  const text = await response.text().catch(() => '')
+  return text.slice(0, 220)
 }
 
 function getWebhookUrl(token?: string | null) {
@@ -123,16 +164,16 @@ async function createEvolutionInstanceIfNeeded(instance: string) {
     throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.')
   }
 
-  const attempts = [
+  const attempts = getCandidateBaseUrls(config.baseUrl).flatMap((baseUrl) => [
     {
-      url: `${config.baseUrl}/instance/create`,
+      url: `${baseUrl}/instance/create`,
       body: { instanceName: instance, qrcode: true, integration: 'WHATSAPP-BAILEYS' },
     },
     {
-      url: `${config.baseUrl}/instance/create`,
+      url: `${baseUrl}/instance/create`,
       body: { instanceName: instance, qrcode: true },
     },
-  ]
+  ])
 
   for (const attempt of attempts) {
     const response = await fetch(attempt.url, {
@@ -163,43 +204,163 @@ export async function setupEvolutionWebhookForCompany(company: Pick<CompanyRef, 
     throw new Error('Instancia ou webhook token ausente para configurar webhook.')
   }
 
-  const attempts = [
-    {
-      url: `${config.baseUrl}/webhook/set/${instance}`,
-      body: { url: webhookUrl, enabled: true, webhookByEvents: true, events: ['MESSAGES_UPSERT'] },
+  const result = await tryConfigureEvolutionWebhook(config, instance, webhookUrl)
+  if (result.ok) {
+    return { webhookUrl, endpoint: result.endpoint }
+  }
+
+  throw new Error(formatWebhookFailure(result.attempts))
+}
+
+function buildWebhookAttempts(baseUrl: string, instance: string, webhookUrl: string) {
+  const events = ['MESSAGES_UPSERT']
+  const webhookObject = {
+    webhook: {
+      enabled: true,
+      url: webhookUrl,
+      webhook_by_events: true,
+      webhookByEvents: true,
+      events,
     },
-    {
-      url: `${config.baseUrl}/webhook/manage/${instance}`,
-      body: { url: webhookUrl, enabled: true, webhookByEvents: true, events: ['MESSAGES_UPSERT'] },
-    },
-    {
-      url: `${config.baseUrl}/webhook/instance/${instance}`,
-      body: { url: webhookUrl, enabled: true, webhook_by_events: true, events: ['MESSAGES_UPSERT'] },
-    },
+  }
+  const flatSnake = { url: webhookUrl, enabled: true, webhook_by_events: true, events }
+  const flatCamel = { url: webhookUrl, enabled: true, webhookByEvents: true, events }
+
+  return [
+    { label: 'v2 webhook/set object', url: `${baseUrl}/webhook/set/${instance}`, body: webhookObject },
+    { label: 'v2 webhook/set snake', url: `${baseUrl}/webhook/set/${instance}`, body: flatSnake },
+    { label: 'v2 webhook/set camel', url: `${baseUrl}/webhook/set/${instance}`, body: flatCamel },
+    { label: 'legacy webhook/manage', url: `${baseUrl}/webhook/manage/${instance}`, body: flatCamel },
+    { label: 'legacy webhook/instance', url: `${baseUrl}/webhook/instance/${instance}`, body: flatSnake },
   ]
+}
 
-  let lastError = ''
+async function tryConfigureEvolutionWebhook(
+  config: { baseUrl: string; apiKey: string },
+  instance: string,
+  webhookUrl: string
+): Promise<{ ok: true; endpoint: string; attempts: EvolutionAttemptResult[] } | { ok: false; attempts: EvolutionAttemptResult[] }> {
+  const attempts: EvolutionAttemptResult[] = []
+  const candidates = getCandidateBaseUrls(config.baseUrl).flatMap((baseUrl) =>
+    buildWebhookAttempts(baseUrl, instance, webhookUrl)
+  )
 
-  for (const attempt of attempts) {
+  for (const attempt of candidates) {
     try {
       const response = await fetch(attempt.url, {
         method: 'POST',
         headers: evolutionHeaders(config.apiKey),
         body: JSON.stringify(attempt.body),
       })
-      const body = await response.text().catch(() => '')
+      const body = await responseSnippet(response)
+      const result: EvolutionAttemptResult = {
+        label: attempt.label,
+        method: 'POST',
+        url: attempt.url,
+        status: response.status,
+        ok: response.ok,
+        response: body,
+      }
+      attempts.push(result)
 
       if (response.ok) {
-        return { webhookUrl, endpoint: attempt.url }
+        return { ok: true, endpoint: attempt.url, attempts }
       }
-
-      lastError = `${attempt.url} HTTP ${response.status}: ${body.slice(0, 180)}`
     } catch (error: any) {
-      lastError = `${attempt.url}: ${error.message}`
+      attempts.push({
+        label: attempt.label,
+        method: 'POST',
+        url: attempt.url,
+        ok: false,
+        error: error.message,
+      })
     }
   }
 
-  throw new Error(`Nao foi possivel configurar webhook na Evolution. ${lastError}`)
+  return { ok: false, attempts }
+}
+
+function formatWebhookFailure(attempts: EvolutionAttemptResult[]) {
+  const last = attempts[attempts.length - 1]
+  const notFoundCount = attempts.filter((attempt) => attempt.status === 404).length
+  const hint = notFoundCount === attempts.length
+    ? 'A Evolution respondeu 404 para todos os endpoints de webhook. Verifique se EVOLUTION_CENTRAL_API_URL aponta para a raiz da API, sem /manager, ou se a versao da Evolution usa outro endpoint.'
+    : 'Verifique URL, API key e permissao de webhook da Evolution.'
+  const detail = last
+    ? `${last.url} HTTP ${last.status || 'sem resposta'}: ${last.response || last.error || 'sem detalhes'}`
+    : 'nenhum endpoint testado'
+  return `Webhook nao configurado. ${hint} Ultima tentativa: ${detail}`
+}
+
+async function probeEvolutionApi(config: { baseUrl: string; apiKey: string }, instance?: string | null) {
+  const attempts: EvolutionAttemptResult[] = []
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const urls = [
+      `${baseUrl}/instance/fetchInstances`,
+      instance ? `${baseUrl}/instance/connectionState/${instance}` : null,
+    ].filter(Boolean) as string[]
+
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, { method: 'GET', headers: { apikey: config.apiKey } })
+        const body = await responseSnippet(response)
+        const result = {
+          label: 'api probe',
+          method: 'GET',
+          url,
+          status: response.status,
+          ok: response.ok,
+          response: body,
+        }
+        attempts.push(result)
+        if (response.ok) return { ok: true, baseUrl, attempts }
+      } catch (error: any) {
+        attempts.push({ label: 'api probe', method: 'GET', url, ok: false, error: error.message })
+      }
+    }
+  }
+  return { ok: false, baseUrl: getCandidateBaseUrls(config.baseUrl)[0], attempts }
+}
+
+export async function diagnoseCentralEvolution(companyId: number): Promise<EvolutionDiagnostic> {
+  const config = getCentralEvolutionConfig()
+  if (!config) {
+    return {
+      configured: false,
+      apiReachable: false,
+      apiKeyAccepted: false,
+      webhookStatus: 'not_configured',
+      message: 'Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.',
+      attempts: [],
+    }
+  }
+
+  const company = await ensureCompanyWhatsappToken(companyId)
+  const instance = company.evolutionInstance!
+  const webhookUrl = getWebhookUrl(company.webhookToken)
+  const probe = await probeEvolutionApi(config, instance)
+  let webhookResult: Awaited<ReturnType<typeof tryConfigureEvolutionWebhook>> | null = null
+
+  if (webhookUrl) {
+    webhookResult = await tryConfigureEvolutionWebhook(config, instance, webhookUrl)
+  }
+
+  const attempts = [...probe.attempts, ...(webhookResult?.attempts || [])]
+  return {
+    configured: true,
+    baseUrl: config.baseUrl,
+    testedBaseUrls: getCandidateBaseUrls(config.baseUrl),
+    instance,
+    apiReachable: probe.attempts.some((attempt) => attempt.status !== undefined),
+    apiKeyAccepted: probe.ok,
+    webhookUrl,
+    webhookStatus: webhookResult?.ok ? 'configured' : 'error',
+    webhookEndpoint: webhookResult?.ok ? webhookResult.endpoint : null,
+    message: webhookResult?.ok
+      ? 'Evolution respondeu e webhook foi configurado.'
+      : formatWebhookFailure(webhookResult?.attempts || []),
+    attempts,
+  }
 }
 
 export async function getCentralWhatsappStatus(companyId: number): Promise<WhatsAppStatus> {
@@ -207,6 +368,7 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
   if (!config) {
     return {
       status: 'NOT_CONFIGURED',
+      webhookStatus: 'not_configured',
       message: 'Evolution central nao configurada no servidor.',
     }
   }
@@ -214,12 +376,19 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
   const company = await ensureCompanyWhatsappToken(companyId)
   const instance = company.evolutionInstance!
   const webhookUrl = getWebhookUrl(company.webhookToken)
+  let webhookStatus: WhatsAppStatus['webhookStatus'] = webhookUrl ? 'pending' : 'not_configured'
+  let webhookEndpoint: string | null = null
+  let webhookError: string | null = null
 
   try {
     await createEvolutionInstanceIfNeeded(instance)
-    await setupEvolutionWebhookForCompany(company)
+    const webhook = await setupEvolutionWebhookForCompany(company)
+    webhookStatus = 'configured'
+    webhookEndpoint = webhook.endpoint
   } catch (error) {
     console.warn('[WhatsApp] Falha ao preparar instancia/webhook:', error)
+    webhookStatus = 'error'
+    webhookError = error instanceof Error ? error.message : 'Webhook nao configurado.'
   }
 
   try {
@@ -231,7 +400,7 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
     if (stateRes.ok) {
       const connectionState: any = await parseJson(stateRes)
       if (connectionState?.instance?.state === 'open' || connectionState?.state === 'open') {
-        return { status: 'CONNECTED', instance, webhookUrl }
+        return { status: 'CONNECTED', instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError }
       }
     }
   } catch (error: any) {
@@ -247,7 +416,7 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
     if (connectRes.ok) {
       const connectData: any = await parseJson(connectRes)
       if (connectData?.instance?.state === 'open') {
-        return { status: 'CONNECTED', instance, webhookUrl }
+        return { status: 'CONNECTED', instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError }
       }
 
       const qrcode = connectData?.base64 || connectData?.qrcode?.base64 || connectData?.code || null
@@ -259,14 +428,17 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
         pairingCode,
         instance,
         webhookUrl,
+        webhookStatus,
+        webhookEndpoint,
+        webhookError,
       }
     }
   } catch (error: any) {
     console.error('[WhatsApp Status] Erro ao gerar QR Code:', error.message)
-    return { status: 'ERROR', instance, webhookUrl, message: error.message }
+    return { status: 'ERROR', instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError, message: error.message }
   }
 
-  return { status: 'DISCONNECTED', qrcode: null, instance, webhookUrl }
+  return { status: 'DISCONNECTED', qrcode: null, instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError }
 }
 
 export async function startCentralWhatsappConnection(companyId: number) {
@@ -277,7 +449,11 @@ export async function startCentralWhatsappConnection(companyId: number) {
   }
 
   await createEvolutionInstanceIfNeeded(company.evolutionInstance!)
-  await setupEvolutionWebhookForCompany(company)
+  try {
+    await setupEvolutionWebhookForCompany(company)
+  } catch (error) {
+    console.warn('[WhatsApp Connect] Webhook nao configurado, seguindo para QR/status:', error)
+  }
   return getCentralWhatsappStatus(companyId)
 }
 
