@@ -13,6 +13,9 @@ type WhatsAppStatus = {
   status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' | 'ERROR'
   qrcode?: string | null
   pairingCode?: string | null
+  qrcodeStatus?: 'ready' | 'empty' | 'error'
+  qrcodeEndpoint?: string | null
+  qrcodeError?: string | null
   instance?: string | null
   webhookUrl?: string | null
   webhookStatus?: 'configured' | 'error' | 'pending' | 'not_configured'
@@ -95,6 +98,56 @@ async function parseJson(response: Response) {
 async function responseSnippet(response: Response) {
   const text = await response.text().catch(() => '')
   return text.slice(0, 220)
+}
+
+async function fetchEvolutionJson(url: string, apiKey: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', body?: any) {
+  const response = await fetch(url, {
+    method,
+    headers: evolutionHeaders(apiKey),
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const text = await response.text().catch(() => '')
+  let data: any = {}
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { raw: text }
+  }
+
+  return { response, data, text }
+}
+
+function isConnectedPayload(payload: any) {
+  const state = payload?.instance?.state || payload?.state || payload?.connectionState || payload?.status
+  return String(state || '').toLowerCase() === 'open' || String(state || '').toLowerCase() === 'connected'
+}
+
+function normalizeQrCode(value: any): string | null {
+  if (!value || typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('data:image/')) return trimmed
+  if (trimmed.startsWith('iVBOR') || trimmed.startsWith('/9j/') || trimmed.startsWith('PHN2Zy')) return trimmed
+  if (trimmed.length > 500 && /^[A-Za-z0-9+/=]+$/.test(trimmed)) return trimmed
+  return null
+}
+
+function extractQrCode(payload: any): string | null {
+  return normalizeQrCode(
+    payload?.base64 ||
+    payload?.qrcode?.base64 ||
+    payload?.qrcode?.code ||
+    payload?.qrcode ||
+    payload?.qrCode?.base64 ||
+    payload?.qrCode?.code ||
+    payload?.qrCode ||
+    payload?.qr ||
+    payload?.code
+  )
+}
+
+function extractPairingCode(payload: any): string | null {
+  return payload?.pairingCode || payload?.pairing_code || payload?.codePairing || null
 }
 
 function getWebhookUrl(token?: string | null) {
@@ -322,6 +375,86 @@ async function probeEvolutionApi(config: { baseUrl: string; apiKey: string }, in
   return { ok: false, baseUrl: getCandidateBaseUrls(config.baseUrl)[0], attempts }
 }
 
+async function getEvolutionConnectionState(config: { baseUrl: string; apiKey: string }, instance: string) {
+  const attempts: EvolutionAttemptResult[] = []
+
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const url = `${baseUrl}/instance/connectionState/${instance}`
+    try {
+      const { response, data, text } = await fetchEvolutionJson(url, config.apiKey)
+      attempts.push({
+        label: 'connection state',
+        method: 'GET',
+        url,
+        status: response.status,
+        ok: response.ok,
+        response: text.slice(0, 220),
+      })
+
+      if (response.ok && isConnectedPayload(data)) {
+        return { connected: true, endpoint: url, attempts }
+      }
+    } catch (error: any) {
+      attempts.push({ label: 'connection state', method: 'GET', url, ok: false, error: error.message })
+    }
+  }
+
+  return { connected: false, endpoint: null, attempts }
+}
+
+async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string }, instance: string) {
+  const attempts: EvolutionAttemptResult[] = []
+
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const candidates = [
+      { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}` },
+      { method: 'POST' as const, url: `${baseUrl}/instance/connect/${instance}` },
+    ]
+
+    for (const candidate of candidates) {
+      try {
+        const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, candidate.method)
+        const qrcode = extractQrCode(data)
+        const pairingCode = extractPairingCode(data)
+        attempts.push({
+          label: 'qrcode connect',
+          method: candidate.method,
+          url: candidate.url,
+          status: response.status,
+          ok: response.ok,
+          response: text.slice(0, 220),
+        })
+
+        if (response.ok && isConnectedPayload(data)) {
+          return { connected: true, qrcode: null, pairingCode: null, endpoint: candidate.url, attempts }
+        }
+
+        if (response.ok && (qrcode || pairingCode)) {
+          return { connected: false, qrcode, pairingCode, endpoint: candidate.url, attempts }
+        }
+      } catch (error: any) {
+        attempts.push({ label: 'qrcode connect', method: candidate.method, url: candidate.url, ok: false, error: error.message })
+      }
+    }
+  }
+
+  return { connected: false, qrcode: null, pairingCode: null, endpoint: null, attempts }
+}
+
+function formatQrFailure(attempts: EvolutionAttemptResult[]) {
+  const last = attempts[attempts.length - 1]
+  const okWithoutQr = attempts.some((attempt) => attempt.ok)
+  if (okWithoutQr) {
+    return 'A Evolution respondeu, mas nao retornou QR Code. Tente reiniciar a instancia e gerar novamente.'
+  }
+
+  if (!last) {
+    return 'Nenhum endpoint de QR Code foi testado.'
+  }
+
+  return `Nao foi possivel gerar QR Code. Ultima tentativa: ${last.url} HTTP ${last.status || 'sem resposta'}: ${last.response || last.error || 'sem detalhes'}`
+}
+
 export async function diagnoseCentralEvolution(companyId: number): Promise<EvolutionDiagnostic> {
   const config = getCentralEvolutionConfig()
   if (!config) {
@@ -379,6 +512,9 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
   let webhookStatus: WhatsAppStatus['webhookStatus'] = webhookUrl ? 'pending' : 'not_configured'
   let webhookEndpoint: string | null = null
   let webhookError: string | null = null
+  let qrcodeStatus: WhatsAppStatus['qrcodeStatus'] = 'empty'
+  let qrcodeEndpoint: string | null = null
+  let qrcodeError: string | null = null
 
   try {
     await createEvolutionInstanceIfNeeded(instance)
@@ -391,54 +527,75 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
     webhookError = error instanceof Error ? error.message : 'Webhook nao configurado.'
   }
 
-  try {
-    const stateRes = await fetch(`${config.baseUrl}/instance/connectionState/${instance}`, {
-      method: 'GET',
-      headers: { apikey: config.apiKey },
-    })
-
-    if (stateRes.ok) {
-      const connectionState: any = await parseJson(stateRes)
-      if (connectionState?.instance?.state === 'open' || connectionState?.state === 'open') {
-        return { status: 'CONNECTED', instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError }
-      }
+  const state = await getEvolutionConnectionState(config, instance)
+  if (state.connected) {
+    return {
+      status: 'CONNECTED',
+      instance,
+      webhookUrl,
+      webhookStatus,
+      webhookEndpoint,
+      webhookError,
+      qrcodeStatus,
+      qrcodeEndpoint: state.endpoint,
     }
-  } catch (error: any) {
-    console.error('[WhatsApp Status] Erro ao consultar connectionState:', error.message)
   }
 
   try {
-    const connectRes = await fetch(`${config.baseUrl}/instance/connect/${instance}`, {
-      method: 'GET',
-      headers: { apikey: config.apiKey },
-    })
+    const qr = await requestEvolutionQrCode(config, instance)
+    qrcodeEndpoint = qr.endpoint
 
-    if (connectRes.ok) {
-      const connectData: any = await parseJson(connectRes)
-      if (connectData?.instance?.state === 'open') {
-        return { status: 'CONNECTED', instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError }
-      }
-
-      const qrcode = connectData?.base64 || connectData?.qrcode?.base64 || connectData?.code || null
-      const pairingCode = connectData?.pairingCode || null
-
+    if (qr.connected) {
       return {
-        status: 'DISCONNECTED',
-        qrcode,
-        pairingCode,
+        status: 'CONNECTED',
         instance,
         webhookUrl,
         webhookStatus,
         webhookEndpoint,
         webhookError,
+        qrcodeStatus,
+        qrcodeEndpoint,
       }
     }
+
+    if (qr.qrcode || qr.pairingCode) {
+      qrcodeStatus = 'ready'
+
+      return {
+        status: 'DISCONNECTED',
+        qrcode: qr.qrcode,
+        pairingCode: qr.pairingCode,
+        instance,
+        webhookUrl,
+        webhookStatus,
+        webhookEndpoint,
+        webhookError,
+        qrcodeStatus,
+        qrcodeEndpoint,
+      }
+    }
+
+    qrcodeStatus = 'empty'
+    qrcodeError = formatQrFailure(qr.attempts)
   } catch (error: any) {
     console.error('[WhatsApp Status] Erro ao gerar QR Code:', error.message)
-    return { status: 'ERROR', instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError, message: error.message }
+    qrcodeStatus = 'error'
+    qrcodeError = error.message
   }
 
-  return { status: 'DISCONNECTED', qrcode: null, instance, webhookUrl, webhookStatus, webhookEndpoint, webhookError }
+  return {
+    status: 'DISCONNECTED',
+    qrcode: null,
+    instance,
+    webhookUrl,
+    webhookStatus,
+    webhookEndpoint,
+    webhookError,
+    qrcodeStatus,
+    qrcodeEndpoint,
+    qrcodeError,
+    message: qrcodeError || undefined,
+  }
 }
 
 export async function startCentralWhatsappConnection(companyId: number) {
@@ -457,6 +614,23 @@ export async function startCentralWhatsappConnection(companyId: number) {
   return getCentralWhatsappStatus(companyId)
 }
 
+export async function getCentralEvolutionRuntime(companyId: number) {
+  const company = await ensureCompanyWhatsappToken(companyId)
+  const config = getCentralEvolutionConfig()
+  if (!config) {
+    throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.')
+  }
+
+  await createEvolutionInstanceIfNeeded(company.evolutionInstance!)
+  const probe = await probeEvolutionApi(config, company.evolutionInstance)
+
+  return {
+    baseUrl: probe.ok ? probe.baseUrl : getCandidateBaseUrls(config.baseUrl)[0],
+    apiKey: config.apiKey,
+    instance: company.evolutionInstance!,
+  }
+}
+
 export async function restartCentralWhatsapp(companyId: number) {
   const company = await ensureCompanyWhatsappToken(companyId)
   const config = getCentralEvolutionConfig()
@@ -464,17 +638,14 @@ export async function restartCentralWhatsapp(companyId: number) {
     throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.')
   }
 
-  const response = await fetch(`${config.baseUrl}/instance/restart/${company.evolutionInstance}`, {
-    method: 'POST',
-    headers: { apikey: config.apiKey },
-  })
-
-  const data = await parseJson(response)
-  if (!response.ok) {
-    throw new Error(data?.message || data?.error || 'Erro ao reiniciar instancia Evolution.')
+  let lastError = 'Erro ao reiniciar instancia Evolution.'
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const { response, data, text } = await fetchEvolutionJson(`${baseUrl}/instance/restart/${company.evolutionInstance}`, config.apiKey, 'POST')
+    if (response.ok) return data
+    lastError = data?.message || data?.error || `HTTP ${response.status}: ${text.slice(0, 180)}`
   }
 
-  return data
+  throw new Error(lastError)
 }
 
 export async function disconnectCentralWhatsapp(companyId: number) {
@@ -484,17 +655,14 @@ export async function disconnectCentralWhatsapp(companyId: number) {
     throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.')
   }
 
-  const response = await fetch(`${config.baseUrl}/instance/logout/${company.evolutionInstance}`, {
-    method: 'DELETE',
-    headers: { apikey: config.apiKey },
-  })
-
-  const data = await parseJson(response)
-  if (!response.ok) {
-    throw new Error(data?.message || data?.error || 'Erro ao desconectar WhatsApp.')
+  let lastError = 'Erro ao desconectar WhatsApp.'
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const { response, data, text } = await fetchEvolutionJson(`${baseUrl}/instance/logout/${company.evolutionInstance}`, config.apiKey, 'DELETE')
+    if (response.ok) return data
+    lastError = data?.message || data?.error || `HTTP ${response.status}: ${text.slice(0, 180)}`
   }
 
-  return data
+  throw new Error(lastError)
 }
 
 export async function processIncomingMessage(opts: {

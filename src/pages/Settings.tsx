@@ -1683,6 +1683,9 @@ const WhatsAppStatusManager = () => {
     status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' | 'ERROR' | 'LOADING';
     qrcode?: string | null;
     pairingCode?: string | null;
+    qrcodeStatus?: 'ready' | 'empty' | 'error';
+    qrcodeEndpoint?: string | null;
+    qrcodeError?: string | null;
     instance?: string | null;
     webhookUrl?: string | null;
     webhookStatus?: 'configured' | 'error' | 'pending' | 'not_configured';
@@ -1698,6 +1701,9 @@ const WhatsAppStatusManager = () => {
       status: data.status,
       qrcode: data.qrcode,
       pairingCode: data.pairingCode,
+      qrcodeStatus: data.qrcodeStatus,
+      qrcodeEndpoint: data.qrcodeEndpoint,
+      qrcodeError: data.qrcodeError,
       instance: data.instance,
       webhookUrl: data.webhookUrl,
       webhookStatus: data.webhookStatus,
@@ -1798,6 +1804,7 @@ const WhatsAppStatusManager = () => {
 
   const webhookProblem = statusInfo.webhookStatus === 'error';
   const webhookOk = statusInfo.webhookStatus === 'configured';
+  const qrProblem = statusInfo.status === 'DISCONNECTED' && statusInfo.qrcodeStatus !== 'ready';
 
   return (
     <Card className="border border-emerald-500/20 bg-emerald-50/5 dark:bg-slate-900/40 backdrop-blur-md shadow-lg rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
@@ -1875,6 +1882,9 @@ const WhatsAppStatusManager = () => {
               <div><strong>API responde:</strong> {diagnostics.apiReachable ? 'Sim' : 'Nao'}</div>
               <div><strong>API key:</strong> {diagnostics.apiKeyAccepted ? 'Aceita' : 'Nao confirmada'}</div>
               <div className="sm:col-span-2"><strong>Webhook:</strong> <span className="break-all">{diagnostics.webhookEndpoint || diagnostics.message || 'Nao configurado'}</span></div>
+              {statusInfo.qrcodeEndpoint && (
+                <div className="sm:col-span-2"><strong>QR Code:</strong> <span className="break-all">{statusInfo.qrcodeEndpoint}</span></div>
+              )}
             </div>
             {Array.isArray(diagnostics.attempts) && diagnostics.attempts.length > 0 && (
               <details className="pt-2">
@@ -1957,12 +1967,29 @@ const WhatsAppStatusManager = () => {
               ) : (
                 <div className="flex flex-col items-center justify-center text-center p-4 space-y-2">
                   <span className="material-symbols-outlined text-3xl text-amber-500 font-light">qr_code_2</span>
-                  <p className="text-xs text-muted-foreground max-w-[180px]">QR Code expirado ou não gerado. Clique no botão de atualizar abaixo.</p>
+                  <p className="text-xs text-muted-foreground max-w-[220px]">
+                    {statusInfo.qrcodeError || 'QR Code expirado ou nao gerado. Clique no botao de atualizar abaixo.'}
+                  </p>
                 </div>
               )}
             </div>
 
             <div className="space-y-4">
+              {qrProblem && (
+                <div className="p-4 bg-rose-500/10 dark:bg-rose-950/20 border border-rose-500/20 rounded-2xl space-y-1.5">
+                  <p className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">qr_code_2_add</span>
+                    QR Code nao retornado
+                  </p>
+                  <p className="text-[11px] text-rose-700 dark:text-rose-400 leading-relaxed">
+                    {statusInfo.qrcodeError || 'A Evolution respondeu, mas nao enviou a imagem do QR Code. Reinicie a instancia e gere novamente.'}
+                  </p>
+                  {statusInfo.qrcodeEndpoint && (
+                    <p className="text-[10px] text-rose-600 dark:text-rose-500 break-all">Endpoint: {statusInfo.qrcodeEndpoint}</p>
+                  )}
+                </div>
+              )}
+
               <div className="p-4 bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 rounded-2xl space-y-1.5">
                 <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-sm">info</span>

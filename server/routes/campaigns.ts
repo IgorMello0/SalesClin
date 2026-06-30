@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma.js'
 import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
+import { getCentralEvolutionRuntime } from '../services/whatsapp-integration.js'
 
 export const router = Router()
 
@@ -285,7 +286,18 @@ router.post('/:id/send', auth(false), async (req, res) => {
     })
 
     const provider = empresa?.whatsappProvider || 'evolution'
-    const isEvolutionConfigured = provider === 'evolution' && empresa?.evolutionApiUrl && empresa?.apiKey && empresa?.evolutionInstance
+    let centralEvolution: Awaited<ReturnType<typeof getCentralEvolutionRuntime>> | null = null
+    if (provider === 'evolution') {
+      try {
+        centralEvolution = await getCentralEvolutionRuntime(companyId!)
+      } catch (error) {
+        console.warn('[campaigns] Evolution central indisponivel, tentando configuracao legada da empresa:', error)
+      }
+    }
+
+    const isEvolutionConfigured = provider === 'evolution' && Boolean(
+      centralEvolution || (empresa?.evolutionApiUrl && empresa?.apiKey && empresa?.evolutionInstance)
+    )
     const isMetaConfigured = provider === 'meta' && empresa?.metaToken && empresa?.metaPhoneNumberId
 
     if (!isEvolutionConfigured && !isMetaConfigured) {
@@ -349,9 +361,9 @@ router.post('/:id/send', auth(false), async (req, res) => {
     // Processar envios em background
     processCampaignSend(id, campaign.recipients, {
       provider,
-      evolutionUrl: empresa!.evolutionApiUrl!,
-      evolutionKey: empresa!.apiKey!,
-      evolutionInstance: empresa!.evolutionInstance!,
+      evolutionUrl: centralEvolution?.baseUrl || empresa!.evolutionApiUrl!,
+      evolutionKey: centralEvolution?.apiKey || empresa!.apiKey!,
+      evolutionInstance: centralEvolution?.instance || empresa!.evolutionInstance!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
       mediaUrl: absoluteMediaUrl,
