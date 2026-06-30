@@ -211,6 +211,21 @@ const EquipeView = () => {
   const [buyingUserExtra, setBuyingUserExtra] = useState(false);
   const [resendingInviteId, setResendingInviteId] = useState<number | null>(null);
 
+  const validRoles = roles.filter((role) => role?.id !== undefined && role?.id !== null);
+  const getUserDisplayName = (user: any) => String(user?.name || user?.email || 'Usuario');
+  const getUserEmail = (user: any) => String(user?.email || 'E-mail nao informado');
+  const getUserInitials = (user: any) => {
+    const displayName = getUserDisplayName(user);
+    return displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'U';
+  };
+  const getRoleIdValue = (roleId: unknown) => (roleId === undefined || roleId === null ? '' : String(roleId));
+
   const loadRoles = async () => {
     try {
       const res = await rolesApi.getAll();
@@ -377,7 +392,7 @@ const EquipeView = () => {
 
     setEditingMember({ 
       ...user, 
-      roleId: user.roleId?.toString() || '',
+      roleId: getRoleIdValue(user.roleId),
       companyIds: userCompanyIds
     });
     loadUserPermissions(user.id);
@@ -515,12 +530,12 @@ const EquipeView = () => {
               <Select value={newMember.roleId} onValueChange={v => setNewMember({...newMember, roleId: v})}>
                 <SelectTrigger className="h-9 text-sm bg-background">
                   <SelectValue placeholder="Selecione um cargo...">
-                    {roles.find(r => r.id.toString() === newMember.roleId)?.name || 'Selecione um cargo...'}
+                    {validRoles.find(r => String(r.id) === newMember.roleId)?.name || 'Selecione um cargo...'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent position="item-aligned" className="z-[200]">
-                  {roles.map(r => (
-                    <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                  {validRoles.map(r => (
+                    <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -572,11 +587,11 @@ const EquipeView = () => {
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs uppercase">
-                  {u.name.substring(0,2)}
+                  {getUserInitials(u)}
                 </div>
                 <div>
-                  <div className="font-medium text-sm">{u.name}</div>
-                  <div className="text-xs text-muted-foreground">{u.email}</div>
+                  <div className="font-medium text-sm">{getUserDisplayName(u)}</div>
+                  <div className="text-xs text-muted-foreground">{getUserEmail(u)}</div>
                   {(!u.isActive || !u.emailVerified) && (
                     <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-600">
                       Convite pendente
@@ -608,7 +623,7 @@ const EquipeView = () => {
               </div>
             </div>
 
-            {selectedUserId === u.id && (
+            {selectedUserId === u.id && editingMember && (
               <div className="mt-2 p-5 border rounded-lg bg-background space-y-6 animate-in slide-in-from-top-2 duration-200 shadow-inner">
                 {/* Editar Perfil */}
                 <div className="space-y-4">
@@ -653,12 +668,12 @@ const EquipeView = () => {
                       >
                         <SelectTrigger className="h-9 text-sm">
                           <SelectValue placeholder="Selecione um cargo...">
-                            {roles.find(r => r.id.toString() === editingMember?.roleId)?.name || 'Selecione um cargo...'}
+                            {validRoles.find(r => String(r.id) === editingMember?.roleId)?.name || 'Selecione um cargo...'}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="z-[250]">
-                          {roles.map(r => (
-                            <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                          {validRoles.map(r => (
+                            <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

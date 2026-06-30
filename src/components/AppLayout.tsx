@@ -6,6 +6,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { BillingBanner } from '@/components/BillingBanner';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { ProductTour } from '@/components/onboarding/ProductTour';
+import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 
 const AppLayout = () => {
   const { professional, isLoading } = useAuth();
@@ -38,12 +39,16 @@ const AppLayout = () => {
           {/* Main content area */}
           {isFullScreen ? (
             <div className="flex-1 overflow-hidden">
-              <Outlet />
+              <RouteErrorBoundary key={location.pathname}>
+                <Outlet />
+              </RouteErrorBoundary>
             </div>
           ) : (
             <main className="w-full flex-1 px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-10 overflow-y-auto">
               <div className="max-w-[1400px] mx-auto animate-fade-in-up">
-                <Outlet />
+                <RouteErrorBoundary key={location.pathname}>
+                  <Outlet />
+                </RouteErrorBoundary>
               </div>
             </main>
           )}
@@ -63,12 +68,16 @@ const AppLayout = () => {
       {/* Main content area */}
       {isFullScreen ? (
         <div className="flex-1 overflow-hidden">
-          <Outlet />
+          <RouteErrorBoundary key={location.pathname}>
+            <Outlet />
+          </RouteErrorBoundary>
         </div>
       ) : (
         <main className="w-full flex-1 px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-10">
           <div className="max-w-[1400px] mx-auto animate-fade-in-up">
-            <Outlet />
+            <RouteErrorBoundary key={location.pathname}>
+              <Outlet />
+            </RouteErrorBoundary>
           </div>
         </main>
       )}
