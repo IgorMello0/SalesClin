@@ -13,7 +13,7 @@ const MOCK_CONVERSATIONS: any[] = [
     lastMessageTime: new Date(Date.now() - 1000 * 60 * 3), unread: 2, isAI: true,
     messages: [
       { id: 'm1', from: 'client', text: 'Olá! Gostaria de saber mais sobre o tratamento de depilação a laser.', time: new Date(Date.now() - 1000 * 60 * 12) },
-      { id: 'm2', from: 'ai', text: 'Olá, Ana! Tudo bem? Aqui é a assistente virtual da SalesClin. Ficamos felizes com o seu interesse! A depilação a laser é um dos nossos tratamentos mais populares. Qual região do corpo você tem interesse?', time: new Date(Date.now() - 1000 * 60 * 11) },
+      { id: 'm2', from: 'ai', text: 'Olá, Ana! Tudo bem? Aqui é a assistente virtual da SellClin. Ficamos felizes com o seu interesse! A depilação a laser é um dos nossos tratamentos mais populares. Qual região do corpo você tem interesse?', time: new Date(Date.now() - 1000 * 60 * 11) },
       { id: 'm3', from: 'client', text: 'Axilas e virilha.', time: new Date(Date.now() - 1000 * 60 * 8) },
       { id: 'm4', from: 'ai', text: 'Ótima escolha! Para axilas e virilha, recomendamos um pacote de 6 sessões para resultados definitivos. Posso agendar uma avaliação gratuita para você?', time: new Date(Date.now() - 1000 * 60 * 7) },
       { id: 'm5', from: 'client', text: 'Sim! Quando vocês têm disponibilidade?', time: new Date(Date.now() - 1000 * 60 * 3) },

@@ -183,7 +183,7 @@ function buildCalendarEvent(appointment: any) {
 
   return {
     summary: `${clientName} - ${serviceName}`,
-    description: `Agendamento criado pelo SalesClin.\nProfissional: ${professionalName}${notes}`,
+    description: `Agendamento criado pelo SellClin.\nProfissional: ${professionalName}${notes}`,
     start: {
       dateTime: new Date(appointment.startTime).toISOString(),
       timeZone: DEFAULT_TIME_ZONE,

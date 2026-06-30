@@ -421,7 +421,7 @@ const Profile = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plano Contratado</p>
                   <p className="text-sm font-semibold text-primary mt-0.5">
-                    {professional?.role === 'admin' ? 'Plano Developer' : 'SalesClin Pro'}
+                    {professional?.role === 'admin' ? 'Plano Developer' : 'SellClin Pro'}
                   </p>
                 </div>
               </div>

@@ -31,7 +31,7 @@ async function fnAlertUrgentTask(task: any, assignee: any, creatorName: string, 
   console.log(`[Alerts] Iniciando alertas urgentes para ${assignee.name} (${assignee.email} / ${assignee.phone})`)
 
   // Alerta por E-mail (Simulação no console / SMTP Integrável)
-  console.log(`[Alerts - E-mail] Enviando para: ${assignee.email}\nAssunto: TAREFA URGENTE - SalesClin CRM\nCorpo: ${msg}`)
+  console.log(`[Alerts - E-mail] Enviando para: ${assignee.email}\nAssunto: TAREFA URGENTE - SellClin CRM\nCorpo: ${msg}`)
 
   // Alerta por WhatsApp (Evolution API / Meta API)
   if (assignee.phone) {

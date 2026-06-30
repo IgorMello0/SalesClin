@@ -211,7 +211,7 @@ const Dashboard = () => {
           <p className="text-on-surface-variant text-xs sm:text-sm mt-1">
             {hasMultipleClinics && activeCompany
               ? `Dados da clínica: ${activeCompany.name}`
-              : 'Bem-vindo ao centro de comando SalesClin.'}
+              : 'Bem-vindo ao centro de comando SellClin.'}
           </p>
         </div>
         
@@ -502,7 +502,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 relative z-10">
         <Card className="p-4 sm:p-8 space-y-4 sm:space-y-8">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-bold text-primary font-headline">Funil de Leads SalesClin</h3>
+            <h3 className="text-lg font-bold text-primary font-headline">Funil de Leads SellClin</h3>
             <button className="text-on-surface-variant hover:text-primary transition-colors btn-hover">
               <span className="material-symbols-outlined">more_vert</span>
             </button>
@@ -603,4 +603,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Dashboard;

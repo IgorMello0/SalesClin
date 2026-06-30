@@ -37,7 +37,7 @@ const ClientesPage = () => {
     }
   ];
 
-  const logos = ["OdontoPrime", "LifeClin", "VisionGroup", "Auraia", "OrthoStyle", "HealthHub"];
+  const logos = ["OdontoPrime", "LifeClin", "VisionGroup", "SellClin", "OrthoStyle", "HealthHub"];
 
   return (
     <div className="min-h-screen bg-white text-[#0F172A] font-body selection:bg-[#F97316]/20 flex flex-col relative overflow-x-hidden">

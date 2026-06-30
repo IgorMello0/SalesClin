@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════╗
-# ║  SalesClin — Docker Swarm Stack (Traefik + HTTPS)           ║
+# ║  SellClin — Docker Swarm Stack (Traefik + HTTPS)            ║
 # ║                                                              ║
 # ║  Deploy:                                                     ║
 # ║    docker stack deploy -c docker-stack.yml sellclin           ║

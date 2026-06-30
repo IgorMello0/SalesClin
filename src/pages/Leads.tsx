@@ -770,7 +770,7 @@ const Leads = () => {
         proposal={selectedProposal}
         lead={selectedLeadForProposals}
         companyInfo={{
-          name: "SalesClin CRM",
+          name: "SellClin CRM",
           address: "Av. Paulista, 1000 - São Paulo, SP",
           phone: "(11) 99999-9999"
         }}

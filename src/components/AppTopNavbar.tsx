@@ -252,7 +252,7 @@ export function AppTopNavbar() {
           {/* Logo */}
           <Link to="/dashboard" className="flex items-center gap-2 mr-4 lg:mr-6 shrink-0">
             <img
-              alt="SalesClin Logo"
+              alt="SellClin Logo"
               className="h-8 sm:h-10 w-auto object-contain"
               src="/logo-oficial-v3.png"
             />

@@ -128,7 +128,7 @@ export const OnboardingWizard = () => {
         >
           <div>
             <h2 className="text-2xl font-bold text-foreground font-headline mb-1">
-              Bem-vindo(a) ao SalesClin!
+              Bem-vindo(a) ao SellClin!
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Vamos começar pelo essencial — qual é o nome da sua clínica ou empresa?
@@ -378,7 +378,7 @@ export const OnboardingWizard = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground font-headline mb-1">Tudo pronto! 🎉</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Seu ambiente está configurado com sucesso. Vamos iniciar um tour rápido para você conhecer as funcionalidades do SalesClin.
+                Seu ambiente está configurado com sucesso. Vamos iniciar um tour rápido para você conhecer as funcionalidades do SellClin.
               </p>
             </div>
           </div>
@@ -433,7 +433,7 @@ export const OnboardingWizard = () => {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-2">
-          <img src="/logo-oficial-v3.png" alt="SalesClin" className="h-8 object-contain brightness-0 invert" />
+          <img src="/logo-oficial-v3.png" alt="SellClin" className="h-8 object-contain brightness-0 invert" />
         </div>
 
         {/* Icon + title + desc (animated) */}
@@ -478,7 +478,7 @@ export const OnboardingWizard = () => {
               <span className="text-xs font-semibold text-primary-foreground/80">+240 clínicas ativas</span>
             </div>
             <p className="text-xs text-primary-foreground/60 leading-relaxed italic">
-              "O SalesClin transformou nossa gestão de pacientes e duplicou nossas conversões."
+              "O SellClin transformou nossa gestão de pacientes e duplicou nossas conversões."
             </p>
             <p className="text-xs text-secondary font-semibold">— Clínica Dr. Alves, SP</p>
           </div>
@@ -486,7 +486,7 @@ export const OnboardingWizard = () => {
 
         {/* Footer */}
         <p className="relative z-10 text-xs text-primary-foreground/40">
-          © 2026 SalesClin. Todos os direitos reservados.
+          © 2026 SellClin. Todos os direitos reservados.
         </p>
       </motion.aside>
 
@@ -511,7 +511,7 @@ export const OnboardingWizard = () => {
           <div className="flex items-center justify-between px-8 pt-4 pb-1">
             {/* Mobile logo */}
             <div className="flex lg:hidden items-center gap-2">
-              <img src="/logo-oficial-v3.png" alt="SalesClin" className="h-7 object-contain" />
+              <img src="/logo-oficial-v3.png" alt="SellClin" className="h-7 object-contain" />
             </div>
             <div className="hidden lg:block" />
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/8 text-primary text-xs font-bold ring-1 ring-primary/15">

@@ -649,7 +649,7 @@ function handleMetaVerification(req: any, res: any) {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN || 'salesclin-verify';
+  const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN || 'sellclin-verify';
 
   if (mode === 'subscribe' && token === expectedToken && challenge) {
     console.log('[Webhook/Meta] Challenge verificado com sucesso.');

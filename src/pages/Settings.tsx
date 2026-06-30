@@ -1519,7 +1519,7 @@ const ClinicasView = () => {
               </div>
               <div className="space-y-2">
                 <Label>Domínio / Subdomínio</Label>
-                <Input value={newClinica.domain} onChange={e => setNewClinica({...newClinica, domain: e.target.value})} placeholder="Ex: centro.salesclin.com" />
+                <Input value={newClinica.domain} onChange={e => setNewClinica({...newClinica, domain: e.target.value})} placeholder="Ex: centro.sellclin.com" />
               </div>
               <div className="space-y-2">
                 <Label>WhatsApp (Opcional)</Label>
@@ -1972,7 +1972,7 @@ const GoogleCalendarView = () => {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Desconectar o Google Calendar desta clinica? Os agendamentos continuam no SalesClin.')) return;
+    if (!confirm('Desconectar o Google Calendar desta clinica? Os agendamentos continuam no SellClin.')) return;
     setIsWorking(true);
     try {
       const res = await googleCalendarApi.disconnect();
@@ -2028,7 +2028,7 @@ const GoogleCalendarView = () => {
           </strong>
           {connected
             ? `Agenda conectada: ${status.googleEmail || status.calendarId || 'Google Calendar'}`
-            : 'Conecte uma agenda Google da clinica para espelhar os agendamentos criados no SalesClin.'}
+            : 'Conecte uma agenda Google da clinica para espelhar os agendamentos criados no SellClin.'}
         </div>
       </div>
 
@@ -2082,8 +2082,8 @@ const LegacyWhatsAppView = () => {
       <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl text-sm border border-emerald-200/50 dark:border-emerald-800/50 flex items-start gap-3 shadow-sm">
         <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
         <div className="leading-relaxed">
-          <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SalesClin</strong>
-          Conecte o numero da clinica por QR Code. Quando uma pessoa nova mandar mensagem, o SalesClin verifica o telefone nesta clinica e cria o lead automaticamente no funil.
+          <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SellClin</strong>
+          Conecte o numero da clinica por QR Code. Quando uma pessoa nova mandar mensagem, o SellClin verifica o telefone nesta clinica e cria o lead automaticamente no funil.
         </div>
       </div>
 
@@ -2371,7 +2371,7 @@ const LegacyWhatsAppView = () => {
                         <li>Acesse o <strong>Meta Developer Console</strong> ({`developers.facebook.com`})</li>
                         <li>Vá em <strong>WhatsApp → Configuration → Webhook</strong></li>
                         <li>Cole a URL acima no campo <strong>Callback URL</strong></li>
-                        <li>Use qualquer <strong>Verify Token</strong> (ex: <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px] font-mono">salesclin-verify</code>)</li>
+                        <li>Use qualquer <strong>Verify Token</strong> (ex: <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px] font-mono">sellclin-verify</code>)</li>
                         <li>Assine o evento <strong>messages</strong></li>
                         <li>Salve. Pronto! Novos leads serão criados automaticamente.</li>
                       </ol>
@@ -2423,7 +2423,7 @@ const LegacyWhatsAppView = () => {
                             
                             if (response.ok) {
                               success = true;
-                              toast({ title: '✅ Webhook configurado!', description: `Endpoint: ${attempt.url}. A Evolution API já está enviando mensagens para o SalesClin.` });
+                              toast({ title: '✅ Webhook configurado!', description: `Endpoint: ${attempt.url}. A Evolution API já está enviando mensagens para o SellClin.` });
                               break;
                             } else {
                               const errBody = await response.text().catch(() => '');
@@ -2677,7 +2677,7 @@ const WhatsAppView = () => {
       <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl text-sm border border-emerald-200/50 dark:border-emerald-800/50 flex items-start gap-3 shadow-sm">
         <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
         <div className="leading-relaxed">
-          <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SalesClin</strong>
+          <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SellClin</strong>
           Use a API Oficial Meta para conectar a conta da clinica pelo fluxo oficial, ou mantenha Evolution API como alternativa.
         </div>
       </div>
@@ -2873,7 +2873,7 @@ const Settings = () => {
 
               {/* Footer */}
               <div className="p-4 bg-muted border-t mt-auto text-xs text-center text-muted-foreground shrink-0">
-                Módulo Auraia CRM v1.0.5 - Configurações protegidas.
+                Módulo SellClin CRM v1.0.5 - Configurações protegidas.
               </div>
             </>
           )}

@@ -24,7 +24,7 @@ async function createAdmin() {
       console.log('   2. Adicione: DATABASE_URL="postgresql://usuario:senha@localhost:5432/nome_do_banco"')
       console.log('   3. Ou copie o arquivo .env.example e configure')
       console.log('\n💡 Exemplo:')
-      console.log('   DATABASE_URL="postgresql://postgres:senha@localhost:5432/auraia_hub"')
+      console.log('   DATABASE_URL="postgresql://postgres:senha@localhost:5432/sellclin"')
       process.exit(1)
     }
     
@@ -89,4 +89,3 @@ async function createAdmin() {
 }
 
 createAdmin()
-

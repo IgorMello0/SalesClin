@@ -11,7 +11,7 @@ export const ProductTour = () => {
   const steps: TourStep[] = [
     {
       id: null,
-      title: '👋 Bem-vindo ao SalesClin!',
+      title: '👋 Bem-vindo ao SellClin!',
       description: 'Preparamos um tour rápido pelas principais áreas do seu CRM. Leva menos de 1 minuto!',
       position: 'center',
     },

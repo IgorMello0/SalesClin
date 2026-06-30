@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════╗
-# ║  SalesClin — Production Dockerfile (Multi-Stage)            ║
+# ║  SellClin — Production Dockerfile (Multi-Stage)             ║
 # ║  Frontend: React/Vite (Nginx) + Backend: Express/Node      ║
 # ╚══════════════════════════════════════════════════════════════╝
 

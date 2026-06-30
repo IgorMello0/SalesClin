@@ -146,7 +146,7 @@ export function ProposalViewer({ open, onOpenChange, proposal, lead, companyInfo
               </div>
               <div className="text-right space-y-1">
                 <p className="text-xs font-bold text-[#94a3b8] uppercase tracking-widest">Emitido por</p>
-                <p className="text-sm font-black text-primary uppercase">{companyInfo?.name || "SalesClin CRM"}</p>
+                <p className="text-sm font-black text-primary uppercase">{companyInfo?.name || "SellClin CRM"}</p>
                 <p className="text-[10px] text-[#64748b]">{companyInfo?.address || "Av. Paulista, 1000 - São Paulo, SP"}</p>
                 <p className="text-[10px] text-[#64748b]">{companyInfo?.phone || "(11) 99999-9999"}</p>
               </div>
@@ -177,7 +177,7 @@ export function ProposalViewer({ open, onOpenChange, proposal, lead, companyInfo
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#64748b]">Consultor:</span>
-                    <span className="font-bold">{proposal.salespersonName || "Consultor SalesClin"}</span>
+                    <span className="font-bold">{proposal.salespersonName || "Consultor SellClin"}</span>
                   </div>
                 </div>
               </div>
@@ -246,7 +246,7 @@ export function ProposalViewer({ open, onOpenChange, proposal, lead, companyInfo
               </p>
               <div className="flex justify-center items-center gap-6 pt-4">
                 <div className="h-[1px] w-20 bg-[#f1f5f9]"></div>
-                <img src="/logo-oficial-v3.png" alt="SalesClin" className="h-6 opacity-30 grayscale" />
+                <img src="/logo-oficial-v3.png" alt="SellClin" className="h-6 opacity-30 grayscale" />
                 <div className="h-[1px] w-20 bg-[#f1f5f9]"></div>
               </div>
             </div>

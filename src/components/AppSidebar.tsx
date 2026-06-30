@@ -129,7 +129,7 @@ export function AppSidebar() {
         </button>
         <Link to="/dashboard" className="flex items-center">
           <img
-            alt="SalesClin Logo"
+            alt="SellClin Logo"
             className="h-8 w-auto object-contain"
             src="/logo-oficial-v3.png"
           />
@@ -166,7 +166,7 @@ export function AppSidebar() {
           ) : (
             <Link to="/dashboard" className="flex-1">
               <img 
-                alt="SalesClin Logo" 
+                alt="SellClin Logo"
                 className="h-8 w-auto object-contain max-w-[140px]" 
                 src="/logo-oficial-v3.png" 
               />
