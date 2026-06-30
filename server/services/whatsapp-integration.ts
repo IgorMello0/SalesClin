@@ -217,32 +217,51 @@ async function createEvolutionInstanceIfNeeded(instance: string) {
     throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.')
   }
 
-  const attempts = getCandidateBaseUrls(config.baseUrl).flatMap((baseUrl) => [
+  const result = await createEvolutionInstance(config, instance)
+  return result.data
+}
+
+async function createEvolutionInstance(config: { baseUrl: string; apiKey: string }, instance: string, attempts: EvolutionAttemptResult[] = []) {
+  const candidates = getCandidateBaseUrls(config.baseUrl).flatMap((baseUrl) => [
     {
+      label: 'instance create baileys',
       url: `${baseUrl}/instance/create`,
       body: { instanceName: instance, qrcode: true, integration: 'WHATSAPP-BAILEYS' },
     },
     {
+      label: 'instance create default',
       url: `${baseUrl}/instance/create`,
       body: { instanceName: instance, qrcode: true },
     },
   ])
 
-  for (const attempt of attempts) {
-    const response = await fetch(attempt.url, {
-      method: 'POST',
-      headers: evolutionHeaders(config.apiKey),
-      body: JSON.stringify(attempt.body),
-    })
-    const body = await parseJson(response)
-    const errorText = JSON.stringify(body).toLowerCase()
+  for (const candidate of candidates) {
+    try {
+      const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, 'POST', candidate.body)
+      const errorText = JSON.stringify(data).toLowerCase()
+      attempts.push({
+        label: candidate.label,
+        method: 'POST',
+        url: candidate.url,
+        status: response.status,
+        ok: response.ok,
+        response: text.slice(0, 220),
+      })
 
-    if (response.ok || response.status === 409 || errorText.includes('already') || errorText.includes('existe')) {
-      return body
+      if (response.ok || response.status === 409 || errorText.includes('already') || errorText.includes('existe')) {
+        return {
+          ok: response.ok,
+          alreadyExists: response.status === 409 || errorText.includes('already') || errorText.includes('existe'),
+          data,
+          endpoint: candidate.url,
+        }
+      }
+    } catch (error: any) {
+      attempts.push({ label: candidate.label, method: 'POST', url: candidate.url, ok: false, error: error.message })
     }
   }
 
-  return null
+  return { ok: false, alreadyExists: false, data: null, endpoint: null }
 }
 
 export async function setupEvolutionWebhookForCompany(company: Pick<CompanyRef, 'webhookToken' | 'evolutionInstance'>) {
@@ -402,8 +421,9 @@ async function getEvolutionConnectionState(config: { baseUrl: string; apiKey: st
   return { connected: false, endpoint: null, attempts }
 }
 
-async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string }, instance: string) {
+async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string }, instance: string, allowRecreate = false) {
   const attempts: EvolutionAttemptResult[] = []
+  let lastOkEndpoint: string | null = null
 
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
     const candidates = [
@@ -424,6 +444,7 @@ async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string 
           ok: response.ok,
           response: text.slice(0, 220),
         })
+        if (response.ok) lastOkEndpoint = candidate.url
 
         if (response.ok && isConnectedPayload(data)) {
           return { connected: true, qrcode: null, pairingCode: null, endpoint: candidate.url, attempts }
@@ -438,7 +459,82 @@ async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string 
     }
   }
 
-  return { connected: false, qrcode: null, pairingCode: null, endpoint: null, attempts }
+  if (allowRecreate) {
+    const recreated = await recreateEvolutionInstanceForQr(config, instance, attempts)
+    if (recreated.qrcode || recreated.pairingCode || recreated.connected) {
+      return recreated
+    }
+
+    return { connected: false, qrcode: null, pairingCode: null, endpoint: recreated.endpoint || lastOkEndpoint, attempts }
+  }
+
+  return { connected: false, qrcode: null, pairingCode: null, endpoint: lastOkEndpoint, attempts }
+}
+
+async function recreateEvolutionInstanceForQr(config: { baseUrl: string; apiKey: string }, instance: string, attempts: EvolutionAttemptResult[]) {
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const cleanup = [
+      { method: 'DELETE' as const, label: 'instance logout', url: `${baseUrl}/instance/logout/${instance}` },
+      { method: 'DELETE' as const, label: 'instance delete', url: `${baseUrl}/instance/delete/${instance}` },
+    ]
+
+    for (const candidate of cleanup) {
+      try {
+        const { response, text } = await fetchEvolutionJson(candidate.url, config.apiKey, candidate.method)
+        attempts.push({
+          label: candidate.label,
+          method: candidate.method,
+          url: candidate.url,
+          status: response.status,
+          ok: response.ok,
+          response: text.slice(0, 220),
+        })
+      } catch (error: any) {
+        attempts.push({ label: candidate.label, method: candidate.method, url: candidate.url, ok: false, error: error.message })
+      }
+    }
+  }
+
+  const created = await createEvolutionInstance(config, instance, attempts)
+  const qrcode = extractQrCode(created.data)
+  const pairingCode = extractPairingCode(created.data)
+
+  if (created.data && isConnectedPayload(created.data)) {
+    return { connected: true, qrcode: null, pairingCode: null, endpoint: created.endpoint, attempts }
+  }
+
+  if (qrcode || pairingCode) {
+    return { connected: false, qrcode, pairingCode, endpoint: created.endpoint, attempts }
+  }
+
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const url = `${baseUrl}/instance/connect/${instance}`
+    try {
+      const { response, data, text } = await fetchEvolutionJson(url, config.apiKey)
+      const connectQr = extractQrCode(data)
+      const connectPairingCode = extractPairingCode(data)
+      attempts.push({
+        label: 'qrcode after recreate',
+        method: 'GET',
+        url,
+        status: response.status,
+        ok: response.ok,
+        response: text.slice(0, 220),
+      })
+
+      if (response.ok && isConnectedPayload(data)) {
+        return { connected: true, qrcode: null, pairingCode: null, endpoint: url, attempts }
+      }
+
+      if (response.ok && (connectQr || connectPairingCode)) {
+        return { connected: false, qrcode: connectQr, pairingCode: connectPairingCode, endpoint: url, attempts }
+      }
+    } catch (error: any) {
+      attempts.push({ label: 'qrcode after recreate', method: 'GET', url, ok: false, error: error.message })
+    }
+  }
+
+  return { connected: false, qrcode: null, pairingCode: null, endpoint: created.endpoint, attempts }
 }
 
 function formatQrFailure(attempts: EvolutionAttemptResult[]) {
@@ -496,7 +592,7 @@ export async function diagnoseCentralEvolution(companyId: number): Promise<Evolu
   }
 }
 
-export async function getCentralWhatsappStatus(companyId: number): Promise<WhatsAppStatus> {
+export async function getCentralWhatsappStatus(companyId: number, forceQrRecreate = false): Promise<WhatsAppStatus> {
   const config = getCentralEvolutionConfig()
   if (!config) {
     return {
@@ -542,7 +638,7 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
   }
 
   try {
-    const qr = await requestEvolutionQrCode(config, instance)
+    const qr = await requestEvolutionQrCode(config, instance, forceQrRecreate)
     qrcodeEndpoint = qr.endpoint
 
     if (qr.connected) {
@@ -611,7 +707,7 @@ export async function startCentralWhatsappConnection(companyId: number) {
   } catch (error) {
     console.warn('[WhatsApp Connect] Webhook nao configurado, seguindo para QR/status:', error)
   }
-  return getCentralWhatsappStatus(companyId)
+  return getCentralWhatsappStatus(companyId, true)
 }
 
 export async function getCentralEvolutionRuntime(companyId: number) {

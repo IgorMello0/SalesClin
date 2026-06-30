@@ -2008,7 +2008,7 @@ const WhatsAppStatusManager = () => {
               )}
 
               <div className="flex flex-col gap-2 pt-1">
-                <Button type="button" onClick={fetchStatus} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-md shadow-emerald-500/10">
+                <Button type="button" onClick={handleStartConnection} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-md shadow-emerald-500/10">
                   <span className="material-symbols-outlined text-sm mr-2">sync</span>
                   Gerar / Atualizar QR Code
                 </Button>
