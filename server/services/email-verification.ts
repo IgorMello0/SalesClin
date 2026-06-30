@@ -33,8 +33,7 @@ async function sendResendEmail(to: string, subject: string, html: string) {
   const from = process.env.EMAIL_FROM || 'SellClin <noreply@sellclin.com>'
 
   if (!apiKey) {
-    console.warn('[Email] RESEND_API_KEY ausente. E-mail nao enviado:', { to, subject })
-    return
+    throw new Error('RESEND_API_KEY nao configurada. O e-mail nao foi enviado.')
   }
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -54,7 +53,7 @@ async function sendResendEmail(to: string, subject: string, html: string) {
   const body = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    const message = body?.message || body?.error || 'Erro ao enviar e-mail pela Resend'
+    const message = body?.message || body?.error || body?.name || 'Erro ao enviar e-mail pela Resend'
     throw new Error(message)
   }
 }

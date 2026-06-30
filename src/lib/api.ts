@@ -662,6 +662,7 @@ export const usuariosApi = {
     apiRequest<{ token: string }>('/usuarios/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   completeOnboarding: async (data: any) => apiRequest<any>('/usuarios/onboarding/complete', { method: 'POST', body: JSON.stringify(data) }),
   create: async (data: any) => apiRequest<any>('/usuarios', { method: 'POST', body: JSON.stringify(data) }),
+  resendInvite: async (id: number) => apiRequest<{ sent: boolean }>(`/usuarios/${id}/resend-invite`, { method: 'POST' }),
   update: async (id: number, data: any) => apiRequest<any>(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/usuarios/${id}`, { method: 'DELETE' }),
 }

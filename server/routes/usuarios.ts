@@ -10,6 +10,24 @@ import { sendTeamInviteEmail } from '../services/email-verification.js'
 
 export const router = Router()
 
+async function getOwnedCompanyIds(professionalId: number) {
+  const professional = await prisma.professional.findUnique({
+    where: { id: professionalId },
+    include: { ownedCompanies: true },
+  })
+
+  if (!professional || !professional.companyId) {
+    return null
+  }
+
+  const ownedCompanyIds = professional.ownedCompanies.map((company) => company.id)
+  if (professional.companyId && !ownedCompanyIds.includes(professional.companyId)) {
+    ownedCompanyIds.push(professional.companyId)
+  }
+
+  return { professional, ownedCompanyIds }
+}
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body as { email: string; password: string }
   const user = await prisma.usuario.findUnique({ 
@@ -123,7 +141,7 @@ router.get('/', auth(), async (req, res) => {
         skip, 
         take, 
         orderBy: { id: 'desc' }, 
-        include: { company: true, role: true, companyAccess: { include: { company: true } } } 
+        include: { company: true, role: true, companyAccess: { include: { company: true, role: true } } }
       }),
       prisma.usuario.count({ where })
     ])
@@ -249,19 +267,83 @@ router.post('/', auth(), async (req, res) => {
       });
     }
     
-    await sendTeamInviteEmail({
-      email: created.email,
-      name: created.name,
-      companyName: created.company?.name,
-      userId: created.id,
-    })
+    try {
+      await sendTeamInviteEmail({
+        email: created.email,
+        name: created.name,
+        companyName: created.company?.name,
+        userId: created.id,
+      })
+    } catch (emailError) {
+      await prisma.usuario.delete({ where: { id: created.id } }).catch((cleanupError) => {
+        console.error('[Usuarios] Falha ao limpar usuario apos erro de convite:', cleanupError)
+      })
+      throw emailError
+    }
 
     console.log('[Usuarios] Usuário criado com sucesso:', created.id)
-    res.status(201).json(createSuccessResponse(created))
+    const createdWithAccess = await prisma.usuario.findUnique({
+      where: { id: created.id },
+      include: { company: true, role: true, companyAccess: { include: { company: true, role: true } } },
+    })
+    res.status(201).json(createSuccessResponse(createdWithAccess || created))
   } catch (error: any) {
     console.error('[Usuarios] Erro ao criar usuário:', error)
     console.error('[Usuarios] Stack:', error.stack)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar usuário', 500))
+  }
+})
+
+router.post('/:id/resend-invite', auth(), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+
+    if (req.user?.type !== 'profissional') {
+      return res.status(403).json(createErrorResponse('Somente o profissional pode reenviar convites da equipe', 403))
+    }
+
+    const ownership = await getOwnedCompanyIds(req.user.id)
+    if (!ownership) {
+      return res.status(400).json(createErrorResponse('Profissional nao possui empresa associada', 400))
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id },
+      include: {
+        company: true,
+        companyAccess: { include: { company: true } },
+      },
+    })
+
+    if (!usuario) {
+      return res.status(404).json(createErrorResponse('Usuario nao encontrado', 404))
+    }
+
+    const userCompanyIds = Array.from(new Set([
+      ...(usuario.companyId ? [usuario.companyId] : []),
+      ...usuario.companyAccess.map((access) => access.companyId),
+    ]))
+    const hasSharedCompany = userCompanyIds.some((companyId) => ownership.ownedCompanyIds.includes(companyId))
+    if (!hasSharedCompany) {
+      return res.status(403).json(createErrorResponse('Voce nao tem permissao para reenviar convite deste usuario', 403))
+    }
+
+    if (usuario.isActive && usuario.emailVerified) {
+      return res.status(400).json(createErrorResponse('Este usuario ja aceitou o convite', 400))
+    }
+
+    const inviteCompanyName = usuario.company?.name || usuario.companyAccess[0]?.company?.name
+    await sendTeamInviteEmail({
+      email: usuario.email,
+      name: usuario.name,
+      companyName: inviteCompanyName,
+      userId: usuario.id,
+    })
+
+    res.json(createSuccessResponse({ sent: true }))
+  } catch (error: any) {
+    console.error('[Usuarios] Erro ao reenviar convite:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao reenviar convite', 500))
   }
 })
 

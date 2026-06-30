@@ -27,6 +27,7 @@ import {
   Tag,
   Trash2,
   Users,
+  Mail,
   Eye,
   EyeOff,
   Loader2
@@ -208,6 +209,7 @@ const EquipeView = () => {
   const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [buyingUserExtra, setBuyingUserExtra] = useState(false);
+  const [resendingInviteId, setResendingInviteId] = useState<number | null>(null);
 
   const loadRoles = async () => {
     try {
@@ -306,6 +308,22 @@ const EquipeView = () => {
     }
   };
 
+  const handleResendInvite = async (user: any) => {
+    setResendingInviteId(user.id);
+    try {
+      const res = await usuariosApi.resendInvite(user.id);
+      if (res.success) {
+        toast({ title: 'Convite reenviado', description: `${user.name} recebera um novo link para definir a senha.` });
+      } else {
+        throw new Error(res.error?.message || 'Nao foi possivel reenviar o convite');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setResendingInviteId(null);
+    }
+  };
+
   const handleDeleteMember = async (id: number) => {
     try {
       const res = await usuariosApi.delete(id);
@@ -350,9 +368,12 @@ const EquipeView = () => {
     setSelectedUserId(user.id);
     
     // Configura o membro em edição com as clínicas que ele já possui acesso
-    const userCompanyIds = user.companyAccess && user.companyAccess.length > 0 
-      ? user.companyAccess.map((ca: any) => ca.companyId) 
-      : [user.companyId];
+    const userCompanyIds = Array.from(new Set([
+      ...(Array.isArray(user.companyAccess)
+        ? user.companyAccess.map((ca: any) => Number(ca?.companyId)).filter(Boolean)
+        : []),
+      ...(user.companyId ? [Number(user.companyId)] : []),
+    ]));
 
     setEditingMember({ 
       ...user, 
@@ -556,10 +577,27 @@ const EquipeView = () => {
                 <div>
                   <div className="font-medium text-sm">{u.name}</div>
                   <div className="text-xs text-muted-foreground">{u.email}</div>
+                  {(!u.isActive || !u.emailVerified) && (
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                      Convite pendente
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {getRoleBadge(u.role?.name)}
+                {(!u.isActive || !u.emailVerified) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); handleResendInvite(u); }}
+                    disabled={resendingInviteId === u.id}
+                    className="h-7 px-2 text-xs"
+                  >
+                    <Mail className="w-3.5 h-3.5 mr-1" />
+                    {resendingInviteId === u.id ? 'Enviando...' : 'Reenviar'}
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" size="sm" 
                   onClick={(e) => { e.stopPropagation(); handleDeleteMember(u.id); }} 
