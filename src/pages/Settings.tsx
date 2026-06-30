@@ -206,7 +206,7 @@ const EquipeView = () => {
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
-  const [showNewMemberPassword, setShowNewMemberPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [buyingUserExtra, setBuyingUserExtra] = useState(false);
   const [resendingInviteId, setResendingInviteId] = useState<number | null>(null);

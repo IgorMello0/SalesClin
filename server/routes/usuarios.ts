@@ -174,18 +174,52 @@ router.post('/', auth(), async (req, res) => {
     const companyId = professional.companyId;
 
     const { name, email, role, isActive, companyIds } = req.body
+    const emailAddress = String(email || '').toLowerCase().trim()
     
     console.log('[Usuarios] Dados recebidos:', { name, email, role, isActive, companyIds })
     
     // Validações
-    if (!name || !email) {
+    if (!name || !emailAddress) {
       return res.status(400).json(createErrorResponse('Nome e email sao obrigatorios', 400))
     }
 
+    const ownership = await getOwnedCompanyIds(req.user.id)
+    if (!ownership) {
+      return res.status(400).json(createErrorResponse('Profissional nao possui empresa associada', 400))
+    }
+
     // Verificar se email já existe
-    const existingUser = await prisma.usuario.findUnique({ where: { email } })
+    const existingUser = await prisma.usuario.findUnique({
+      where: { email: emailAddress },
+      include: {
+        company: true,
+        role: true,
+        companyAccess: { include: { company: true, role: true } },
+      },
+    })
     if (existingUser) {
-      return res.status(400).json(createErrorResponse('Email já cadastrado', 400))
+      const existingCompanyIds = Array.from(new Set([
+        ...(existingUser.companyId ? [existingUser.companyId] : []),
+        ...existingUser.companyAccess.map((access) => access.companyId),
+      ]))
+      const hasSharedCompany = existingCompanyIds.some((existingCompanyId) => ownership.ownedCompanyIds.includes(existingCompanyId))
+
+      if (hasSharedCompany && (!existingUser.isActive || !existingUser.emailVerified)) {
+        const inviteCompanyName = existingUser.company?.name || existingUser.companyAccess[0]?.company?.name
+        await sendTeamInviteEmail({
+          email: existingUser.email,
+          name: existingUser.name,
+          companyName: inviteCompanyName,
+          userId: existingUser.id,
+        })
+        return res.json(createSuccessResponse({ ...existingUser, inviteResent: true }))
+      }
+
+      if (hasSharedCompany) {
+        return res.status(400).json(createErrorResponse('Este e-mail ja pertence a um funcionario ativo da equipe', 400))
+      }
+
+      return res.status(400).json(createErrorResponse('Email ja cadastrado', 400))
     }
 
     console.log('[Usuarios] Tentando criar usuário para empresa ID:', companyId)
@@ -233,7 +267,7 @@ router.post('/', auth(), async (req, res) => {
       data: { 
         companyId: primaryCompanyId,
         name, 
-        email, 
+        email: emailAddress,
         passwordHash: '',
         roleId, 
         isActive: false,

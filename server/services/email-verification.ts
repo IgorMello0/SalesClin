@@ -54,6 +54,9 @@ async function sendResendEmail(to: string, subject: string, html: string) {
 
   if (!response.ok) {
     const message = body?.message || body?.error || body?.name || 'Erro ao enviar e-mail pela Resend'
+    if (/domain is not verified/i.test(message)) {
+      throw new Error('Dominio do remetente nao verificado na Resend. Verifique o dominio sellclin.com e use EMAIL_FROM="SellClin <noreply@sellclin.com>".')
+    }
     throw new Error(message)
   }
 }
