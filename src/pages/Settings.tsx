@@ -19,8 +19,10 @@ import {
   Building,
   Clock,
   CreditCard,
+  CalendarDays,
   LayoutTemplate,
   Lock,
+  MessageCircle,
   Monitor,
   PanelLeft,
   Plus,
@@ -28,7 +30,9 @@ import {
   Trash2,
   Users,
   Mail,
-  Loader2
+  Loader2,
+  Zap,
+  ArrowRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -3066,6 +3070,180 @@ const WhatsAppView = () => {
   );
 };
 
+type IntegrationKey = 'googleCalendar' | 'metaWhatsapp' | 'evolutionWhatsapp';
+
+const integrationCards: Array<{
+  key: IntegrationKey;
+  name: string;
+  eyebrow: string;
+  description: string;
+  status: string;
+  accent: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    key: 'googleCalendar',
+    name: 'Google Calendar',
+    eyebrow: 'Agenda',
+    description: 'Sincronize os agendamentos da clinica com uma agenda Google conectada.',
+    status: 'Disponivel',
+    accent: 'from-blue-500/12 via-red-500/10 to-amber-400/12 border-blue-100 hover:border-blue-300',
+    icon: (
+      <div className="relative grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <CalendarDays className="h-6 w-6 text-blue-600" />
+        <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
+      </div>
+    ),
+  },
+  {
+    key: 'metaWhatsapp',
+    name: 'WhatsApp Oficial Meta',
+    eyebrow: 'Cloud API',
+    description: 'Conecte pela API oficial da Meta, preparada para coexistencia quando liberada.',
+    status: 'Recomendado',
+    accent: 'from-emerald-500/12 via-sky-500/10 to-blue-500/12 border-emerald-100 hover:border-emerald-300',
+    icon: (
+      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#0B5CFF] text-white shadow-sm">
+        <MessageCircle className="h-6 w-6" />
+      </div>
+    ),
+  },
+  {
+    key: 'evolutionWhatsapp',
+    name: 'Evolution API',
+    eyebrow: 'Alternativa operacional',
+    description: 'Use a Evolution propria da clinica com URL, API key, instancia e webhook.',
+    status: 'Ativo para disparos',
+    accent: 'from-emerald-500/12 via-lime-400/10 to-cyan-400/12 border-emerald-100 hover:border-emerald-300',
+    icon: (
+      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-emerald-300 shadow-sm">
+        <span className="text-sm font-black tracking-tight">EVO</span>
+      </div>
+    ),
+  },
+];
+
+const WhatsAppBenefits = () => (
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    {[
+      { icon: 'person_add', title: 'Novo contato', desc: 'Telefone novo vira lead em Novos Leads.' },
+      { icon: 'rule', title: 'Sem duplicar', desc: 'A verificacao usa telefone + clinica.' },
+      { icon: 'forum', title: 'Historico salvo', desc: 'Mensagem e conversa ficam vinculadas ao lead.' },
+    ].map((item) => (
+      <div key={item.title} className="rounded-2xl border border-slate-200/70 dark:border-slate-800 p-4 bg-white/70 dark:bg-slate-900/40">
+        <span className="material-symbols-outlined text-[#F97316] text-xl mb-2 block">{item.icon}</span>
+        <p className="text-sm font-bold text-primary">{item.title}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{item.desc}</p>
+      </div>
+    ))}
+  </div>
+);
+
+const IntegrationsView = () => {
+  const [activeIntegration, setActiveIntegration] = useState<IntegrationKey | null>(null);
+  const activeCard = integrationCards.find((card) => card.key === activeIntegration);
+
+  const renderIntegration = () => {
+    if (activeIntegration === 'googleCalendar') return <GoogleCalendarView />;
+    if (activeIntegration === 'metaWhatsapp') {
+      return (
+        <div className="space-y-6">
+          <MetaWhatsAppManager />
+          <WhatsAppBenefits />
+        </div>
+      );
+    }
+    if (activeIntegration === 'evolutionWhatsapp') {
+      return (
+        <div className="space-y-6">
+          <WhatsAppStatusManager />
+          <WhatsAppBenefits />
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      {!activeIntegration ? (
+        <>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-start gap-4">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F97316]">Central de integracoes</p>
+                <h3 className="mt-1 text-xl font-black text-slate-900 dark:text-white">Conecte os canais da sua clinica</h3>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  Escolha uma integracao para configurar agenda, WhatsApp oficial ou Evolution API sem misturar os fluxos.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {integrationCards.map((card) => (
+              <button
+                type="button"
+                key={card.key}
+                onClick={() => setActiveIntegration(card.key)}
+                className={`group overflow-hidden rounded-3xl border bg-gradient-to-br ${card.accent} p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    {card.icon}
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{card.eyebrow}</span>
+                        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100">
+                          {card.status}
+                        </span>
+                      </div>
+                      <h4 className="mt-2 text-lg font-black text-slate-900 dark:text-white">{card.name}</h4>
+                      <p className="mt-1 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-300">{card.description}</p>
+                    </div>
+                  </div>
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/85 text-slate-700 shadow-sm transition group-hover:bg-slate-950 group-hover:text-white">
+                    <ArrowRight className="h-4 w-4" />
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="space-y-5">
+          <button
+            type="button"
+            onClick={() => setActiveIntegration(null)}
+            className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-[#F97316]"
+          >
+            <ArrowRight className="h-4 w-4 rotate-180" />
+            Voltar para integracoes
+          </button>
+
+          {activeCard && (
+            <div className={`rounded-3xl border bg-gradient-to-br ${activeCard.accent} p-5`}>
+              <div className="flex items-start gap-4">
+                {activeCard.icon}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{activeCard.eyebrow}</p>
+                  <h3 className="mt-1 text-xl font-black text-slate-900 dark:text-white">{activeCard.name}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{activeCard.description}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {renderIntegration()}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Map of components per setting
 type SettingsItem = {
   key: string;
@@ -3080,6 +3258,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   clinics: ClinicasView,
   business: InfoNegocioView,
   appearance: AparenciaView,
+  integrations: IntegrationsView,
   googleCalendar: GoogleCalendarView,
   whatsapp: WhatsAppView,
 };
@@ -3117,8 +3296,7 @@ const Settings = () => {
       items: [
         ...(isOwner ? [
           { key: 'clinics', name: 'Minhas Clínicas', description: 'Crie e gerencie sua rede de clínicas' },
-          { key: 'googleCalendar', name: 'Google Calendar', description: 'Sincronize a agenda da clínica' },
-          { key: 'whatsapp', name: 'Integração WhatsApp', description: 'Configure API para disparos em massa' },
+          { key: 'integrations', name: 'Integracoes', description: 'Conecte Google Calendar, WhatsApp Oficial e Evolution API' },
         ] : []),
       ]
     },
@@ -3225,3 +3403,4 @@ const Settings = () => {
 };
 
 export default Settings;
+
