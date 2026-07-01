@@ -5,6 +5,7 @@ export const EMAIL_TOKEN_HOURS = 24
 export const EMAIL_TOKEN_TYPES = {
   verification: 'email_verification',
   teamInvite: 'team_invite',
+  passwordReset: 'password_reset',
 } as const
 
 type EmailTokenType = typeof EMAIL_TOKEN_TYPES[keyof typeof EMAIL_TOKEN_TYPES]
@@ -146,6 +147,36 @@ export async function sendTeamInviteEmail(params: {
         <p>Ola, ${params.name}. Voce foi convidado para acessar ${params.companyName || 'uma clinica'} no SellClin.</p>
         <p><a href="${link}" style="display:inline-block;background:#f97316;color:white;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;">Aceitar convite</a></p>
         <p style="color:#64748b;font-size:13px;">Este link expira em ${EMAIL_TOKEN_HOURS} horas.</p>
+      </div>
+    `
+  )
+
+  return { link }
+}
+
+export async function sendPasswordResetEmail(params: {
+  email: string
+  name: string
+  professionalId?: number | null
+  userId?: number | null
+}) {
+  const token = await createEmailToken({
+    email: params.email,
+    type: EMAIL_TOKEN_TYPES.passwordReset,
+    professionalId: params.professionalId,
+    userId: params.userId,
+  })
+  const link = `${getPublicAppUrl()}/reset-password?token=${encodeURIComponent(token)}`
+
+  await sendResendEmail(
+    params.email,
+    'Redefina sua senha no SellClin',
+    `
+      <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.5;">
+        <h2>Redefinir senha</h2>
+        <p>Ola, ${params.name}. Recebemos uma solicitacao para criar uma nova senha no SellClin.</p>
+        <p><a href="${link}" style="display:inline-block;background:#f97316;color:white;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;">Criar nova senha</a></p>
+        <p style="color:#64748b;font-size:13px;">Este link expira em ${EMAIL_TOKEN_HOURS} horas. Se voce nao solicitou, ignore este e-mail.</p>
       </div>
     `
   )

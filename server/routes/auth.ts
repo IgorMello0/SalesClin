@@ -10,6 +10,7 @@ import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
 import {
   consumeEmailToken,
   EMAIL_TOKEN_TYPES,
+  sendPasswordResetEmail,
   sendVerificationEmail,
 } from '../services/email-verification.js'
 
@@ -91,6 +92,78 @@ router.post('/resend-verification', async (req, res) => {
   } catch (error: any) {
     console.error('[Auth] Erro ao reenviar verificacao:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao reenviar e-mail', 500))
+  }
+})
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').toLowerCase().trim()
+    if (!email) return res.status(400).json(createErrorResponse('E-mail obrigatorio', 400))
+
+    const professional = await prisma.professional.findUnique({ where: { email } })
+    if (professional) {
+      await sendPasswordResetEmail({
+        email: professional.email,
+        name: professional.name,
+        professionalId: professional.id,
+      })
+      return res.json(createSuccessResponse({ sent: true }))
+    }
+
+    const user = await prisma.usuario.findUnique({ where: { email } })
+    if (user) {
+      await sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        userId: user.id,
+      })
+      return res.json(createSuccessResponse({ sent: true }))
+    }
+
+    return res.json(createSuccessResponse({ sent: true }))
+  } catch (error: any) {
+    console.error('[Auth] Erro ao solicitar recuperacao de senha:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao enviar recuperacao de senha', 500))
+  }
+})
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const token = String(req.body?.token || '')
+    const password = String(req.body?.password || '')
+
+    if (!token) return res.status(400).json(createErrorResponse('Token ausente', 400))
+    if (password.length < 6) return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
+
+    const record = await consumeEmailToken(token, EMAIL_TOKEN_TYPES.passwordReset)
+    const passwordHash = await bcrypt.hash(password, 10)
+
+    if (record.professionalId) {
+      await prisma.professional.update({
+        where: { id: record.professionalId },
+        data: {
+          passwordHash,
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+          authProvider: 'local',
+        },
+      })
+    } else if (record.userId) {
+      await prisma.usuario.update({
+        where: { id: record.userId },
+        data: {
+          passwordHash,
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      })
+    } else {
+      return res.status(400).json(createErrorResponse('Token sem conta vinculada', 400))
+    }
+
+    return res.json(createSuccessResponse({ reset: true }))
+  } catch (error: any) {
+    return res.status(400).json(createErrorResponse(error.message || 'Nao foi possivel redefinir a senha', 400))
   }
 })
 

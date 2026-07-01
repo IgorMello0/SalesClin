@@ -825,7 +825,8 @@ function getMimeType(url: string): string | undefined {
 }
 
 function getEvolutionBaseUrls(rawUrl: string) {
-  const normalized = rawUrl.replace(/\/+$/, '')
+  const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`
+  const normalized = withProtocol.replace(/\/+$/, '')
   const withoutManager = normalized.replace(/\/manager$/i, '')
   return Array.from(new Set([normalized, withoutManager].filter(Boolean)))
 }

@@ -333,7 +333,7 @@ const Login = () => {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center ml-1">
                   <label htmlFor="password" className="block text-[12px] font-bold text-slate-600">Senha de acesso</label>
-                  <a href="#" className="text-[11px] text-slate-400 hover:text-[#F97316] font-bold transition-colors duration-300">Esqueceu a senha?</a>
+                  <Link to="/forgot-password" className="text-[11px] text-slate-400 hover:text-[#F97316] font-bold transition-colors duration-300">Esqueceu a senha?</Link>
                 </div>
                 <div className="relative group">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F97316] transition-colors duration-300">

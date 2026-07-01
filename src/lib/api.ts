@@ -598,6 +598,10 @@ export const authApi = {
     apiRequest<{ verified: boolean }>(`/auth/verify-email?token=${encodeURIComponent(token)}`),
   acceptTeamInvite: async (token: string, password: string) =>
     apiRequest<{ accepted: boolean }>('/auth/team-invite/accept', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  forgotPassword: async (email: string) =>
+    apiRequest<{ sent: boolean }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: async (token: string, password: string) =>
+    apiRequest<{ reset: boolean }>('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 }
 
 // Profissionais

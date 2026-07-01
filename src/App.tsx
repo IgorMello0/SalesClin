@@ -14,6 +14,8 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import VerifyEmail from "./pages/VerifyEmail";
 import AcceptInvite from "./pages/AcceptInvite";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import SelectPlan from "./pages/SelectPlan";
 import Dashboard from "./pages/Dashboard";
 import Appointments from "./pages/Appointments";
@@ -61,6 +63,8 @@ const App = () => (
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/accept-invite" element={<AcceptInvite />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/select-plan" element={<SelectPlan />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/funcionalidades/funil" element={<FunilPage />} />
