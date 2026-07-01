@@ -73,20 +73,6 @@ function getPublicAppUrl() {
   ).replace(/\/$/, '')
 }
 
-function getCentralEvolutionConfig() {
-  const baseUrl = process.env.EVOLUTION_CENTRAL_API_URL
-  const apiKey = process.env.EVOLUTION_CENTRAL_API_KEY
-
-  if (!baseUrl || !apiKey) {
-    return null
-  }
-
-  return {
-    baseUrl: trimTrailingSlash(baseUrl),
-    apiKey,
-  }
-}
-
 function getCandidateBaseUrls(baseUrl: string) {
   const normalized = trimTrailingSlash(baseUrl)
   const candidates = [normalized]
@@ -95,12 +81,12 @@ function getCandidateBaseUrls(baseUrl: string) {
   return Array.from(new Set(candidates))
 }
 
-function getEvolutionMode(company: Pick<CompanyRef, 'evolutionMode' | 'evolutionApiUrl' | 'apiKey' | 'evolutionInstance'>): 'managed' | 'custom' {
-  if (company.evolutionMode === 'custom' || company.evolutionMode === 'managed') {
-    return company.evolutionMode
-  }
+function isCustomEvolutionConfigured(company: Pick<CompanyRef, 'evolutionApiUrl' | 'apiKey' | 'evolutionInstance'>) {
+  return Boolean(company.evolutionApiUrl && company.apiKey && company.evolutionInstance)
+}
 
-  return company.evolutionApiUrl && company.apiKey && company.evolutionInstance ? 'custom' : 'managed'
+function getEvolutionMode(_company: Pick<CompanyRef, 'evolutionMode' | 'evolutionApiUrl' | 'apiKey' | 'evolutionInstance'>): 'custom' {
+  return 'custom'
 }
 
 function evolutionHeaders(apiKey: string) {
@@ -178,11 +164,6 @@ export function normalizePhone(raw: string): string {
   return String(raw || '').replace(/@.*$/, '').replace(/\D/g, '')
 }
 
-export function getManagedEvolutionInstanceName(company: Pick<CompanyRef, 'id' | 'webhookToken'>) {
-  const suffix = (company.webhookToken || '').replace(/-/g, '').slice(0, 8) || 'default'
-  return `sellclin-company-${company.id}-${suffix}`
-}
-
 export async function findCompanyByInstance(instance: string) {
   const trimmed = instance.trim()
   return prisma.empresa.findFirst({
@@ -224,18 +205,12 @@ async function ensureCompanyWhatsappToken(companyId: number) {
     throw new Error('Empresa nao encontrada.')
   }
 
-  const mode = getEvolutionMode(company)
-  if (mode === 'custom') return company
-
-  const instance = getManagedEvolutionInstanceName(company)
-
-  if (company.evolutionInstance !== instance || company.evolutionMode !== 'managed') {
+  if (company.evolutionMode !== 'custom') {
     return prisma.empresa.update({
       where: { id: companyId },
       data: {
         whatsappProvider: 'evolution',
-        evolutionMode: 'managed',
-        evolutionInstance: instance,
+        evolutionMode: 'custom',
       },
       select: {
         id: true,
@@ -256,34 +231,16 @@ async function ensureCompanyWhatsappToken(companyId: number) {
 
 function getEvolutionRuntime(company: CompanyRef): EvolutionRuntime {
   const mode = getEvolutionMode(company)
-  const instance = mode === 'managed' ? getManagedEvolutionInstanceName(company) : company.evolutionInstance
+  const instance = company.evolutionInstance
 
-  if (!instance) {
-    throw new Error('Nome da instancia Evolution ausente.')
-  }
-
-  if (mode === 'custom') {
-    if (!company.evolutionApiUrl || !company.apiKey) {
-      throw new Error('Evolution propria incompleta. Informe URL, API key e instancia.')
-    }
-
-    return {
-      mode,
-      baseUrl: trimTrailingSlash(company.evolutionApiUrl),
-      apiKey: company.apiKey,
-      instance,
-    }
-  }
-
-  const config = getCentralEvolutionConfig()
-  if (!config) {
-    throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.')
+  if (!isCustomEvolutionConfigured(company) || !instance || !company.evolutionApiUrl || !company.apiKey) {
+    throw new Error('Evolution propria nao configurada. Informe URL da Evolution, API key e nome da instancia.')
   }
 
   return {
     mode,
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    baseUrl: trimTrailingSlash(company.evolutionApiUrl),
+    apiKey: company.apiKey,
     instance,
   }
 }
@@ -424,7 +381,7 @@ function formatWebhookFailure(attempts: EvolutionAttemptResult[]) {
   const last = attempts[attempts.length - 1]
   const notFoundCount = attempts.filter((attempt) => attempt.status === 404).length
   const hint = notFoundCount === attempts.length
-    ? 'A Evolution respondeu 404 para todos os endpoints de webhook. Verifique se EVOLUTION_CENTRAL_API_URL aponta para a raiz da API, sem /manager, ou se a versao da Evolution usa outro endpoint.'
+    ? 'A Evolution respondeu 404 para todos os endpoints de webhook. Verifique se a URL da Evolution aponta para a raiz da API, sem /manager, ou se a versao da Evolution usa outro endpoint.'
     : 'Verifique URL, API key e permissao de webhook da Evolution.'
   const detail = last
     ? `${last.url} HTTP ${last.status || 'sem resposta'}: ${last.response || last.error || 'sem detalhes'}`
@@ -620,20 +577,25 @@ function formatQrFailure(attempts: EvolutionAttemptResult[]) {
 }
 
 export async function diagnoseCentralEvolution(companyId: number): Promise<EvolutionDiagnostic> {
-  const config = getCentralEvolutionConfig()
-  if (!config) {
+  const company = await ensureCompanyWhatsappToken(companyId)
+  let runtime: EvolutionRuntime
+
+  try {
+    runtime = getEvolutionRuntime(company)
+  } catch (error: any) {
     return {
       configured: false,
       apiReachable: false,
       apiKeyAccepted: false,
       webhookStatus: 'not_configured',
-      message: 'Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY.',
+      instance: company.evolutionInstance,
+      message: error.message || 'Evolution propria nao configurada.',
       attempts: [],
     }
   }
 
-  const company = await ensureCompanyWhatsappToken(companyId)
-  const instance = company.evolutionInstance!
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const instance = runtime.instance
   const webhookUrl = getWebhookUrl(company.webhookToken)
   const probe = await probeEvolutionApi(config, instance)
   let webhookResult: Awaited<ReturnType<typeof tryConfigureEvolutionWebhook>> | null = null
