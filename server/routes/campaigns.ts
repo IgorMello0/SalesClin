@@ -2,7 +2,6 @@ import { Router } from 'express'
 import { prisma } from '../prisma.js'
 import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
-import { getCentralEvolutionRuntime } from '../services/whatsapp-integration.js'
 
 export const router = Router()
 
@@ -296,17 +295,8 @@ router.post('/:id/send', auth(false), async (req, res) => {
     })
 
     const provider = empresa?.whatsappProvider || 'evolution'
-    let centralEvolution: Awaited<ReturnType<typeof getCentralEvolutionRuntime>> | null = null
-    if (provider === 'evolution') {
-      try {
-        centralEvolution = await getCentralEvolutionRuntime(companyId!)
-      } catch (error) {
-        console.warn('[campaigns] Evolution central indisponivel, tentando configuracao legada da empresa:', error)
-      }
-    }
-
     const isEvolutionConfigured = provider === 'evolution' && Boolean(
-      centralEvolution || (empresa?.evolutionApiUrl && empresa?.apiKey && empresa?.evolutionInstance)
+      empresa?.evolutionApiUrl && empresa?.apiKey && empresa?.evolutionInstance
     )
     const isMetaConfigured = provider === 'meta' && empresa?.metaToken && empresa?.metaPhoneNumberId
 
@@ -371,9 +361,9 @@ router.post('/:id/send', auth(false), async (req, res) => {
     // Processar envios em background
     processCampaignSend(id, campaign.recipients, {
       provider,
-      evolutionUrl: centralEvolution?.baseUrl || empresa!.evolutionApiUrl!,
-      evolutionKey: centralEvolution?.apiKey || empresa!.apiKey!,
-      evolutionInstance: centralEvolution?.instance || empresa!.evolutionInstance!,
+      evolutionUrl: empresa!.evolutionApiUrl!,
+      evolutionKey: empresa!.apiKey!,
+      evolutionInstance: empresa!.evolutionInstance!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
       mediaUrl: absoluteMediaUrl,
@@ -834,9 +824,57 @@ function getMimeType(url: string): string | undefined {
   return undefined
 }
 
-async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
-  const baseUrl = config.evolutionUrl.replace(/\/+$/, '')
+function getEvolutionBaseUrls(rawUrl: string) {
+  const normalized = rawUrl.replace(/\/+$/, '')
+  const withoutManager = normalized.replace(/\/manager$/i, '')
+  return Array.from(new Set([normalized, withoutManager].filter(Boolean)))
+}
 
+function getEvolutionAuthHeaders(apiKey: string) {
+  return [
+    { 'Content-Type': 'application/json', apikey: apiKey },
+    { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+  ]
+}
+
+async function postEvolution(
+  config: WhatsAppConfig,
+  path: string,
+  payload: any
+): Promise<{ ok: boolean; status: number; text: string; url: string }> {
+  const attempts: string[] = []
+
+  for (const baseUrl of getEvolutionBaseUrls(config.evolutionUrl)) {
+    const url = `${baseUrl}${path}`
+    for (const headers of getEvolutionAuthHeaders(config.evolutionKey)) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      })
+      const text = await response.text().catch(() => '')
+      if (response.ok) return { ok: true, status: response.status, text, url }
+
+      const authFailed = response.status === 401 || response.status === 403
+      const notFound = response.status === 404
+      attempts.push(`${url} HTTP ${response.status}: ${text.slice(0, 180)}`)
+
+      if (!authFailed && !notFound) {
+        return { ok: false, status: response.status, text, url }
+      }
+    }
+  }
+
+  return {
+    ok: false,
+    status: 401,
+    text: attempts[attempts.length - 1] || 'Evolution API nao autorizou a requisicao.',
+    url: getEvolutionBaseUrls(config.evolutionUrl)[0] || config.evolutionUrl,
+  }
+}
+
+async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
   interface MediaAttachment {
     url: string
     type: 'image' | 'video' | 'audio'
@@ -862,21 +900,13 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
   // CASO 1: Múltiplas mídias
   if (attachments.length > 1) {
     if (message.trim()) {
-      const textUrl = `${baseUrl}/message/sendText/${config.evolutionInstance}`
-      const textResponse = await fetch(textUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.evolutionKey,
-        },
-        body: JSON.stringify({
-          number: formattedPhone,
-          text: message
-        })
+      const textResponse = await postEvolution(config, `/message/sendText/${config.evolutionInstance}`, {
+        number: formattedPhone,
+        text: message
       })
 
       if (!textResponse.ok) {
-        const errorData = await textResponse.text()
+        const errorData = textResponse.text
         console.error(`[whatsapp-evolution] send text failed in multi-media for ${formattedPhone}:`, errorData)
         return { success: false, error: `HTTP ${textResponse.status}: ${errorData}` }
       }
@@ -887,8 +917,8 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
       const att = attachments[i]
       const isAudio = att.type === 'audio'
       const mediaUrlEndpoint = isAudio
-        ? `${baseUrl}/message/sendWhatsAppAudio/${config.evolutionInstance}`
-        : `${baseUrl}/message/sendMedia/${config.evolutionInstance}`
+        ? `/message/sendWhatsAppAudio/${config.evolutionInstance}`
+        : `/message/sendMedia/${config.evolutionInstance}`
       
       const payload: any = isAudio
         ? {
@@ -908,17 +938,10 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
         }
       }
 
-      const mediaResponse = await fetch(mediaUrlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.evolutionKey,
-        },
-        body: JSON.stringify(payload)
-      })
+      const mediaResponse = await postEvolution(config, mediaUrlEndpoint, payload)
 
       if (!mediaResponse.ok) {
-        const errorData = await mediaResponse.text()
+        const errorData = mediaResponse.text
         console.error(`[whatsapp-evolution] send media index ${i} failed for ${formattedPhone}:`, errorData)
         return { success: false, error: `Falha no anexo ${i + 1} (${att.type}): HTTP ${mediaResponse.status}: ${errorData}` }
       }
@@ -932,7 +955,7 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
     const single = attachments[0]
 
     if (single.type === 'image' || single.type === 'video') {
-      const mediaUrlEndpoint = `${baseUrl}/message/sendMedia/${config.evolutionInstance}`
+      const mediaUrlEndpoint = `/message/sendMedia/${config.evolutionInstance}`
       const payload: any = {
         number: formattedPhone,
         mediatype: single.type,
@@ -945,59 +968,37 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
         payload.mimetype = mime
       }
 
-      const response = await fetch(mediaUrlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.evolutionKey,
-        },
-        body: JSON.stringify(payload)
-      })
+      const response = await postEvolution(config, mediaUrlEndpoint, payload)
       if (!response.ok) {
-        const responseError = await response.text()
+        const responseError = response.text
         console.error(`[whatsapp-evolution] send media failed for ${formattedPhone}:`, responseError)
         return { success: false, error: `HTTP ${response.status}: ${responseError}` }
       }
       return { success: true }
     } else if (single.type === 'audio') {
-      const mediaUrlEndpoint = `${baseUrl}/message/sendWhatsAppAudio/${config.evolutionInstance}`
+      const mediaUrlEndpoint = `/message/sendWhatsAppAudio/${config.evolutionInstance}`
       const payload = {
         number: formattedPhone,
         audio: single.url
       }
 
-      const audioResponse = await fetch(mediaUrlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.evolutionKey,
-        },
-        body: JSON.stringify(payload)
-      })
+      const audioResponse = await postEvolution(config, mediaUrlEndpoint, payload)
       
       if (!audioResponse.ok) {
-        const errorData = await audioResponse.text()
+        const errorData = audioResponse.text
         console.error(`[whatsapp-evolution] send audio failed for ${formattedPhone}:`, errorData)
         return { success: false, error: `HTTP ${audioResponse.status}: ${errorData}` }
       }
       
       if (message.trim()) {
         await new Promise(resolve => setTimeout(resolve, 1200))
-        const textUrl = `${baseUrl}/message/sendText/${config.evolutionInstance}`
-        const textResponse = await fetch(textUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': config.evolutionKey,
-          },
-          body: JSON.stringify({
-            number: formattedPhone,
-            text: message
-          })
+        const textResponse = await postEvolution(config, `/message/sendText/${config.evolutionInstance}`, {
+          number: formattedPhone,
+          text: message
         })
         
         if (!textResponse.ok) {
-          const errorData = await textResponse.text()
+          const errorData = textResponse.text
           console.error(`[whatsapp-evolution] send text after audio failed for ${formattedPhone}:`, errorData)
           return { success: false, error: `HTTP ${textResponse.status}: ${errorData}` }
         }
@@ -1007,21 +1008,13 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
   }
 
   // CASO 3: Sem mídia (apenas texto)
-  const url = `${baseUrl}/message/sendText/${config.evolutionInstance}`
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': config.evolutionKey,
-    },
-    body: JSON.stringify({
-      number: formattedPhone,
-      text: message
-    })
+  const response = await postEvolution(config, `/message/sendText/${config.evolutionInstance}`, {
+    number: formattedPhone,
+    text: message
   })
 
   if (!response.ok) {
-    const errorData = await response.text()
+    const errorData = response.text
     console.error(`[whatsapp-evolution] send failed for ${formattedPhone}:`, errorData)
     return { success: false, error: `HTTP ${response.status}: ${errorData}` }
   }
