@@ -1805,24 +1805,22 @@ const WhatsAppStatusManager = () => {
     }
   };
 
-  const handleStartConnection = async () => {
+  const handleSetupWebhook = async () => {
     setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
     try {
-      const res = await empresasApi.startWhatsappConnection();
-      if (res.success && res.data) {
-        applyStatusData(res.data);
-        toast({ title: 'WhatsApp pronto para conectar', description: 'Escaneie o QR Code para ativar a captura automatica de leads.' });
-      } else {
-        throw new Error(res.error?.message || 'Nao foi possivel iniciar a conexao');
-      }
+      const res = await empresasApi.setupWhatsappWebhook();
+      if (!res.success) throw new Error(res.error?.message || 'Nao foi possivel configurar o webhook');
+      toast({ title: 'Webhook configurado', description: 'Agora as mensagens recebidas pela Evolution podem virar leads no SellClin.' });
+      await fetchStatus();
     } catch (e: any) {
       setStatusInfo({ status: 'ERROR', message: e.message });
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
     }
   };
+  const handleStartConnection = handleSetupWebhook;
 
   const handleDisconnect = async () => {
-    if (!confirm('Tem certeza que deseja desconectar o WhatsApp da clínica? Seu celular precisará escanear o QR Code novamente para reativar.')) return;
+    if (!confirm('Tem certeza que deseja desconectar o WhatsApp da clinica na Evolution?')) return;
     try {
       setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
       const res = await empresasApi.disconnectWhatsapp();
@@ -1882,7 +1880,7 @@ const WhatsAppStatusManager = () => {
 
   const webhookProblem = statusInfo.webhookStatus === 'error';
   const webhookOk = statusInfo.webhookStatus === 'configured';
-  const qrProblem = statusInfo.status === 'DISCONNECTED' && statusInfo.qrcodeStatus !== 'ready';
+  const qrProblem = false;
   const evolutionConfigured = Boolean(evolutionConfig.evolutionApiUrl && evolutionConfig.apiKey && evolutionConfig.evolutionInstance);
 
   return (
@@ -1890,7 +1888,7 @@ const WhatsAppStatusManager = () => {
     <Card className="border border-slate-200/70 rounded-2xl shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">Evolution API da Clinica</CardTitle>
-        <CardDescription>Informe os dados da Evolution propria do cliente. O SellClin usa esses dados para gerar QR Code, configurar webhook e capturar leads automaticamente.</CardDescription>
+        <CardDescription>Informe os dados da Evolution propria do cliente. O SellClin usa esses dados para configurar webhook, consultar status e capturar leads automaticamente.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-2xl border bg-slate-50 p-4 space-y-3">
@@ -1915,7 +1913,7 @@ const WhatsAppStatusManager = () => {
           {!evolutionConfigured && (
             <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <span className="material-symbols-outlined text-sm mt-0.5">info</span>
-              <p>Preencha e salve os dados da Evolution para liberar QR Code, status da conexao e captura automatica de leads.</p>
+              <p>Preencha e salve os dados da Evolution para liberar status da conexao, webhook e captura automatica de leads.</p>
             </div>
           )}
         </div>
@@ -1944,11 +1942,11 @@ const WhatsAppStatusManager = () => {
       <CardHeader className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-b border-slate-100 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl text-white shadow-md shadow-emerald-500/20">
-            <span className="material-symbols-outlined block text-xl">qr_code_scanner</span>
+            <span className="material-symbols-outlined block text-xl">settings_input_antenna</span>
           </div>
           <div>
             <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100">Status da Conexão WhatsApp</CardTitle>
-            <CardDescription className="text-xs">Monitore a conexão e escaneie o QR Code diretamente do CRM</CardDescription>
+            <CardDescription className="text-xs">Monitore a conexao e configure o webhook para capturar leads</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -2041,13 +2039,13 @@ const WhatsAppStatusManager = () => {
               <div className="flex-1">
                 <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Evolution API nao configurada</p>
                 <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                  {statusInfo.message || 'Informe URL da Evolution, API key e nome da instancia acima para liberar conexao por QR Code.'}
+                  {statusInfo.message || 'Informe URL da Evolution, API key e nome da instancia acima para liberar status e webhook.'}
                 </p>
               </div>
             </div>
-            <Button type="button" onClick={handleStartConnection} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold">
-              <span className="material-symbols-outlined text-sm mr-2">qr_code_scanner</span>
-              Gerar QR Code
+            <Button type="button" onClick={handleSetupWebhook} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold">
+              <span className="material-symbols-outlined text-sm mr-2">webhook</span>
+              Configurar Webhook
             </Button>
           </div>
         )}
@@ -2083,6 +2081,35 @@ const WhatsAppStatusManager = () => {
         )}
 
         {statusInfo.status === 'DISCONNECTED' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 rounded-2xl space-y-1.5">
+              <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">info</span>
+                WhatsApp nao conectado na Evolution
+              </p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                Conecte o numero diretamente no painel da Evolution do cliente. Depois volte aqui para atualizar o status e configurar o webhook do SellClin.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <Button type="button" onClick={handleSetupWebhook} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-md shadow-emerald-500/10">
+                <span className="material-symbols-outlined text-sm mr-2">webhook</span>
+                Configurar Webhook
+              </Button>
+              <Button type="button" variant="outline" onClick={fetchStatus} className="flex-1 font-semibold border-emerald-200 hover:bg-emerald-50 transition-all text-emerald-700 dark:text-emerald-300">
+                <span className="material-symbols-outlined text-sm mr-2">refresh</span>
+                Atualizar Status
+              </Button>
+              <Button type="button" variant="outline" onClick={handleRestart} className="flex-1 font-semibold border-slate-200 hover:bg-slate-50 transition-all text-slate-600 dark:text-slate-300">
+                <span className="material-symbols-outlined text-sm mr-2">restart_alt</span>
+                Reiniciar Evolution
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {false && statusInfo.status === 'DISCONNECTED' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-850 rounded-2xl shadow-inner min-h-[220px]">
               {statusInfo.qrcode ? (
@@ -2353,7 +2380,7 @@ const LegacyWhatsAppView = () => {
         <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
         <div className="leading-relaxed">
           <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SellClin</strong>
-          Conecte o numero da clinica por QR Code. Quando uma pessoa nova mandar mensagem, o SellClin verifica o telefone nesta clinica e cria o lead automaticamente no funil.
+          Conecte o numero da clinica na Evolution propria. Quando uma pessoa nova mandar mensagem, o SellClin verifica o telefone nesta clinica e cria o lead automaticamente no funil.
         </div>
       </div>
 
@@ -2940,7 +2967,7 @@ const MetaWhatsAppManager = () => {
 };
 
 const WhatsAppView = () => {
-  const [provider, setProvider] = useState<'meta' | 'evolution'>('meta');
+  const [provider, setProvider] = useState<'meta' | 'evolution'>('evolution');
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -2948,7 +2975,7 @@ const WhatsAppView = () => {
         <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
         <div className="leading-relaxed">
           <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SellClin</strong>
-          Use a API Oficial Meta para conectar a conta da clinica pelo fluxo oficial, ou mantenha Evolution API como alternativa.
+          Configure a Evolution API da clinica para capturar mensagens e criar leads automaticamente.
         </div>
       </div>
 
@@ -2973,7 +3000,7 @@ const WhatsAppView = () => {
           className={`text-left p-4 border rounded-2xl transition-all ${provider === 'evolution' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500 shadow-sm' : 'bg-background hover:border-emerald-300'}`}
         >
           <p className="text-sm font-bold text-emerald-700">Evolution API</p>
-          <p className="text-xs text-muted-foreground mt-1">Alternativa por QR Code usando a instancia central da VPS.</p>
+          <p className="text-xs text-muted-foreground mt-1">Use URL, API key e instancia da Evolution propria do cliente.</p>
         </button>
       </div>
 

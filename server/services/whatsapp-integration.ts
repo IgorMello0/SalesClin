@@ -622,7 +622,7 @@ export async function diagnoseCentralEvolution(companyId: number): Promise<Evolu
   }
 }
 
-export async function getCentralWhatsappStatus(companyId: number, forceQrRecreate = false): Promise<WhatsAppStatus> {
+export async function getCentralWhatsappStatus(companyId: number): Promise<WhatsAppStatus> {
   const company = await ensureCompanyWhatsappToken(companyId)
   let runtime: EvolutionRuntime
   try {
@@ -643,9 +643,6 @@ export async function getCentralWhatsappStatus(companyId: number, forceQrRecreat
   let webhookStatus: WhatsAppStatus['webhookStatus'] = webhookUrl ? 'pending' : 'not_configured'
   let webhookEndpoint: string | null = null
   let webhookError: string | null = null
-  let qrcodeStatus: WhatsAppStatus['qrcodeStatus'] = 'empty'
-  let qrcodeEndpoint: string | null = null
-  let qrcodeError: string | null = null
 
   try {
     await createEvolutionInstanceIfNeeded(runtime)
@@ -668,68 +665,19 @@ export async function getCentralWhatsappStatus(companyId: number, forceQrRecreat
       webhookStatus,
       webhookEndpoint,
       webhookError,
-      qrcodeStatus,
-      qrcodeEndpoint: state.endpoint,
+      message: 'WhatsApp conectado na instancia Evolution.',
     }
-  }
-
-  try {
-    const qr = await requestEvolutionQrCode(config, instance, forceQrRecreate)
-    qrcodeEndpoint = qr.endpoint
-
-    if (qr.connected) {
-      return {
-        status: 'CONNECTED',
-        instance,
-        evolutionMode: runtime.mode,
-        webhookUrl,
-        webhookStatus,
-        webhookEndpoint,
-        webhookError,
-        qrcodeStatus,
-        qrcodeEndpoint,
-      }
-    }
-
-    if (qr.qrcode || qr.pairingCode) {
-      qrcodeStatus = 'ready'
-
-      return {
-        status: 'DISCONNECTED',
-        qrcode: qr.qrcode,
-        pairingCode: qr.pairingCode,
-        instance,
-        evolutionMode: runtime.mode,
-        webhookUrl,
-        webhookStatus,
-        webhookEndpoint,
-        webhookError,
-        qrcodeStatus,
-        qrcodeEndpoint,
-      }
-    }
-
-    qrcodeStatus = 'empty'
-    qrcodeError = formatQrFailure(qr.attempts)
-  } catch (error: any) {
-    console.error('[WhatsApp Status] Erro ao gerar QR Code:', error.message)
-    qrcodeStatus = 'error'
-    qrcodeError = error.message
   }
 
   return {
     status: 'DISCONNECTED',
-    qrcode: null,
     instance,
     evolutionMode: runtime.mode,
     webhookUrl,
     webhookStatus,
     webhookEndpoint,
     webhookError,
-    qrcodeStatus,
-    qrcodeEndpoint,
-    qrcodeError,
-    message: qrcodeError || undefined,
+    message: 'WhatsApp ainda nao conectado na Evolution. Conecte o numero pelo painel da sua Evolution e atualize o status no SellClin.',
   }
 }
 
@@ -740,9 +688,9 @@ export async function startCentralWhatsappConnection(companyId: number) {
   try {
     await setupEvolutionWebhookForCompany(company)
   } catch (error) {
-    console.warn('[WhatsApp Connect] Webhook nao configurado, seguindo para QR/status:', error)
+    console.warn('[WhatsApp Connect] Webhook nao configurado:', error)
   }
-  return getCentralWhatsappStatus(companyId, true)
+  return getCentralWhatsappStatus(companyId)
 }
 
 export async function getCentralEvolutionRuntime(companyId: number) {
