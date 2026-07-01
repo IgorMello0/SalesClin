@@ -1704,6 +1704,7 @@ const WhatsAppStatusManager = () => {
     evolutionApiUrl: '',
     apiKey: '',
     evolutionInstance: '',
+    webhookToken: '',
   });
 
   const applyStatusData = (data: any) => {
@@ -1736,6 +1737,7 @@ const WhatsAppStatusManager = () => {
           evolutionApiUrl: res.data.evolutionApiUrl || '',
           apiKey: res.data.apiKey || '',
           evolutionInstance: res.data.evolutionInstance || '',
+          webhookToken: res.data.webhookToken || '',
         });
         if (hasSavedEvolutionConfig) {
           const statusRes = await empresasApi.getWhatsappStatus();
@@ -1882,6 +1884,14 @@ const WhatsAppStatusManager = () => {
   const webhookOk = statusInfo.webhookStatus === 'configured';
   const qrProblem = false;
   const evolutionConfigured = Boolean(evolutionConfig.evolutionApiUrl && evolutionConfig.apiKey && evolutionConfig.evolutionInstance);
+  const appOrigin = window.location.hostname.includes('localhost') || window.location.hostname === '127.0.0.1'
+    ? 'https://sellclin.com'
+    : window.location.origin;
+  const evolutionWebhookUrl = statusInfo.webhookUrl || (
+    evolutionConfig.webhookToken
+      ? `${appOrigin}/api/webhooks/evolution/${evolutionConfig.webhookToken}`
+      : `${appOrigin}/api/webhooks/evolution`
+  );
 
   return (
     <>
@@ -1910,6 +1920,29 @@ const WhatsAppStatusManager = () => {
             <span className="material-symbols-outlined text-sm mr-2">save</span>
             Salvar Evolution API
           </Button>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="material-symbols-outlined text-base text-blue-700 mt-0.5">webhook</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-900">URL para colar na Evolution</p>
+                <p className="text-xs text-blue-700">Use esta URL no webhook da instancia e habilite o evento MESSAGES_UPSERT.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Input readOnly value={evolutionWebhookUrl} className="bg-white font-mono text-xs" />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => {
+                  navigator.clipboard.writeText(evolutionWebhookUrl);
+                  toast({ title: 'URL copiada', description: 'Cole essa URL no webhook da instancia Evolution.' });
+                }}
+              >
+                <span className="material-symbols-outlined text-sm">content_copy</span>
+              </Button>
+            </div>
+          </div>
           {!evolutionConfigured && (
             <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <span className="material-symbols-outlined text-sm mt-0.5">info</span>
@@ -1931,6 +1964,16 @@ const WhatsAppStatusManager = () => {
           <div className="rounded-xl border p-3">
             <p className="font-bold uppercase text-muted-foreground">Webhook</p>
             <p className="mt-1">{webhookOk ? 'Configurado' : 'Pendente'}</p>
+            <button
+              type="button"
+              className="mt-1 text-[11px] font-semibold text-blue-700 hover:underline"
+              onClick={() => {
+                navigator.clipboard.writeText(evolutionWebhookUrl);
+                toast({ title: 'URL copiada', description: 'Cole essa URL no webhook da instancia Evolution.' });
+              }}
+            >
+              Copiar URL
+            </button>
           </div>
         </div>
         )}
