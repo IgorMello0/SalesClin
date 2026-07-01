@@ -42,6 +42,13 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: string }>
 };
 
 const SPREADSHEET_CONTACT_LIMIT = 5000;
+const SPREADSHEET_TEMPLATE_FILE = 'modelo-disparo-sellclin.csv';
+const SPREADSHEET_TEMPLATE_ROWS = [
+  ['nome', 'telefone'],
+  ['Joao Silva', '5511999999999'],
+  ['Maria Souza', '5511988887777'],
+  ['Clinica Exemplo', '11977776666'],
+];
 
 type SpreadsheetStats = {
   totalImported: number;
@@ -132,6 +139,21 @@ function parseSpreadsheetContacts(text: string) {
       truncated: dataLines.length > SPREADSHEET_CONTACT_LIMIT,
     },
   };
+}
+
+function downloadSpreadsheetTemplate() {
+  const csv = SPREADSHEET_TEMPLATE_ROWS
+    .map(row => row.map(value => `"${value.replace(/"/g, '""')}"`).join(';'))
+    .join('\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = SPREADSHEET_TEMPLATE_FILE;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export default function Campaigns() {
@@ -611,7 +633,19 @@ export default function Campaigns() {
                   {audienceType === 'spreadsheet' && (
                     <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100/60 space-y-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Arquivo da planilha</label>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Arquivo da planilha</label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={downloadSpreadsheetTemplate}
+                            className="h-8 rounded-lg text-[11px] font-bold"
+                          >
+                            <span className="material-symbols-outlined mr-1 text-sm">download</span>
+                            Baixar modelo
+                          </Button>
+                        </div>
                         <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-4">
                           <input
                             type="file"
@@ -620,10 +654,10 @@ export default function Campaigns() {
                             className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-primary/90"
                           />
                           <p className="mt-2 text-[11px] text-muted-foreground">
-                            Exporte do Excel/Google Sheets como CSV. Use colunas <strong>nome</strong> e <strong>telefone</strong>.
+                            Baixe o modelo, preencha os contatos e salve como CSV. Use colunas <strong>nome</strong> e <strong>telefone</strong>.
                           </p>
                           <p className="mt-1 text-[10px] text-muted-foreground font-mono">
-                            Exemplo: nome,telefone
+                            Exemplo: nome;telefone
                           </p>
                         </div>
                       </div>
