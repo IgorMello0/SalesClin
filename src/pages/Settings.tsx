@@ -1729,6 +1729,7 @@ const WhatsAppStatusManager = () => {
       setConfigLoading(true);
       const res = await empresasApi.getMyCompany();
       if (res.success && res.data) {
+        const hasSavedEvolutionConfig = Boolean(res.data.evolutionApiUrl && res.data.apiKey && res.data.evolutionInstance);
         setEvolutionConfig({
           companyId: res.data.id,
           evolutionMode: 'custom',
@@ -1736,6 +1737,14 @@ const WhatsAppStatusManager = () => {
           apiKey: res.data.apiKey || '',
           evolutionInstance: res.data.evolutionInstance || '',
         });
+        if (hasSavedEvolutionConfig) {
+          const statusRes = await empresasApi.getWhatsappStatus();
+          if (statusRes.success && statusRes.data) {
+            applyStatusData(statusRes.data);
+          }
+        } else {
+          setStatusInfo({ status: 'NOT_CONFIGURED', message: 'Informe URL da Evolution, API key e nome da instancia.' });
+        }
       }
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message || 'Nao foi possivel carregar configuracao Evolution', variant: 'destructive' });
@@ -1745,6 +1754,11 @@ const WhatsAppStatusManager = () => {
   };
 
   const fetchStatus = async () => {
+    if (!evolutionConfig.evolutionApiUrl || !evolutionConfig.apiKey || !evolutionConfig.evolutionInstance) {
+      setStatusInfo({ status: 'NOT_CONFIGURED', message: 'Informe URL da Evolution, API key e nome da instancia.' });
+      return;
+    }
+
     setStatusInfo(prev => ({ ...prev, status: 'LOADING' }));
     try {
       const res = await empresasApi.getWhatsappStatus();
@@ -1864,12 +1878,12 @@ const WhatsAppStatusManager = () => {
 
   useEffect(() => {
     loadEvolutionConfig();
-    fetchStatus();
   }, []);
 
   const webhookProblem = statusInfo.webhookStatus === 'error';
   const webhookOk = statusInfo.webhookStatus === 'configured';
   const qrProblem = statusInfo.status === 'DISCONNECTED' && statusInfo.qrcodeStatus !== 'ready';
+  const evolutionConfigured = Boolean(evolutionConfig.evolutionApiUrl && evolutionConfig.apiKey && evolutionConfig.evolutionInstance);
 
   return (
     <>
@@ -1898,8 +1912,15 @@ const WhatsAppStatusManager = () => {
             <span className="material-symbols-outlined text-sm mr-2">save</span>
             Salvar Evolution API
           </Button>
+          {!evolutionConfigured && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <span className="material-symbols-outlined text-sm mt-0.5">info</span>
+              <p>Preencha e salve os dados da Evolution para liberar QR Code, status da conexao e captura automatica de leads.</p>
+            </div>
+          )}
         </div>
 
+        {evolutionConfigured && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
           <div className="rounded-xl border p-3">
             <p className="font-bold uppercase text-muted-foreground">Modo</p>
@@ -1914,9 +1935,11 @@ const WhatsAppStatusManager = () => {
             <p className="mt-1">{webhookOk ? 'Configurado' : 'Pendente'}</p>
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
 
+    {evolutionConfigured && (
     <Card className="border border-emerald-500/20 bg-emerald-50/5 dark:bg-slate-900/40 backdrop-blur-md shadow-lg rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
       <CardHeader className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-b border-slate-100 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3">
@@ -2163,6 +2186,7 @@ const WhatsAppStatusManager = () => {
         )}
       </CardContent>
     </Card>
+    )}
     </>
   );
 };
