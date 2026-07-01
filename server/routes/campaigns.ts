@@ -282,7 +282,17 @@ router.post('/:id/send', auth(false), async (req, res) => {
     // Verificar se a API de WhatsApp está configurada
     const empresa = await prisma.empresa.findUnique({
       where: { id: companyId! },
-      select: { whatsappProvider: true, apiKey: true, evolutionApiUrl: true, evolutionInstance: true, metaToken: true, metaPhoneNumberId: true }
+      select: {
+        id: true,
+        webhookToken: true,
+        whatsappProvider: true,
+        evolutionMode: true,
+        apiKey: true,
+        evolutionApiUrl: true,
+        evolutionInstance: true,
+        metaToken: true,
+        metaPhoneNumberId: true,
+      }
     })
 
     const provider = empresa?.whatsappProvider || 'evolution'
@@ -1161,4 +1171,3 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
     }
   })
 }
-

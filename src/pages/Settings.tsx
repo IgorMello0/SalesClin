@@ -1687,6 +1687,7 @@ const WhatsAppStatusManager = () => {
     qrcodeEndpoint?: string | null;
     qrcodeError?: string | null;
     instance?: string | null;
+    evolutionMode?: 'managed' | 'custom';
     webhookUrl?: string | null;
     webhookStatus?: 'configured' | 'error' | 'pending' | 'not_configured';
     webhookEndpoint?: string | null;
@@ -1695,6 +1696,16 @@ const WhatsAppStatusManager = () => {
   }>({ status: 'LOADING' });
   const [diagnostics, setDiagnostics] = useState<any>(null);
   const [testingEvolution, setTestingEvolution] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [evolutionConfig, setEvolutionConfig] = useState({
+    companyId: 0,
+    evolutionMode: 'managed' as 'managed' | 'custom',
+    evolutionApiUrl: '',
+    apiKey: '',
+    evolutionInstance: '',
+  });
 
   const applyStatusData = (data: any) => {
     setStatusInfo({
@@ -1705,12 +1716,37 @@ const WhatsAppStatusManager = () => {
       qrcodeEndpoint: data.qrcodeEndpoint,
       qrcodeError: data.qrcodeError,
       instance: data.instance,
+      evolutionMode: data.evolutionMode,
       webhookUrl: data.webhookUrl,
       webhookStatus: data.webhookStatus,
       webhookEndpoint: data.webhookEndpoint,
       webhookError: data.webhookError,
       message: data.message
     });
+  };
+
+  const loadEvolutionConfig = async () => {
+    try {
+      setConfigLoading(true);
+      const res = await empresasApi.getMyCompany();
+      if (res.success && res.data) {
+        const inferredMode = res.data.evolutionMode || (
+          res.data.evolutionApiUrl && res.data.apiKey && res.data.evolutionInstance ? 'custom' : 'managed'
+        );
+        setEvolutionConfig({
+          companyId: res.data.id,
+          evolutionMode: inferredMode === 'custom' ? 'custom' : 'managed',
+          evolutionApiUrl: res.data.evolutionApiUrl || '',
+          apiKey: res.data.apiKey || '',
+          evolutionInstance: res.data.evolutionInstance || '',
+        });
+        setAdvancedOpen(inferredMode === 'custom');
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message || 'Nao foi possivel carregar configuracao Evolution', variant: 'destructive' });
+    } finally {
+      setConfigLoading(false);
+    }
   };
 
   const fetchStatus = async () => {
@@ -1724,6 +1760,44 @@ const WhatsAppStatusManager = () => {
       }
     } catch (e: any) {
       setStatusInfo({ status: 'ERROR', message: e.message });
+    }
+  };
+
+  const saveEvolutionMode = async (mode: 'managed' | 'custom') => {
+    if (!evolutionConfig.companyId) return;
+    if (mode === 'custom' && (!evolutionConfig.evolutionApiUrl || !evolutionConfig.apiKey || !evolutionConfig.evolutionInstance)) {
+      toast({ title: 'Campos obrigatorios', description: 'Informe URL, API key e nome da instancia para usar Evolution propria.', variant: 'destructive' });
+      setAdvancedOpen(true);
+      return;
+    }
+
+    setSavingConfig(true);
+    try {
+      const payload: any = {
+        whatsappProvider: 'evolution',
+        evolutionMode: mode,
+      };
+
+      if (mode === 'custom') {
+        payload.evolutionApiUrl = evolutionConfig.evolutionApiUrl;
+        payload.apiKey = evolutionConfig.apiKey;
+        payload.evolutionInstance = evolutionConfig.evolutionInstance;
+      }
+
+      const res = await empresasApi.update(evolutionConfig.companyId, payload);
+      if (!res.success) throw new Error(res.error?.message || 'Nao foi possivel salvar modo Evolution');
+
+      setEvolutionConfig(prev => ({ ...prev, evolutionMode: mode }));
+      setAdvancedOpen(mode === 'custom');
+      toast({
+        title: mode === 'managed' ? 'Evolution gerenciada ativada' : 'Evolution propria ativada',
+        description: mode === 'managed' ? 'O SellClin vai gerar uma instancia propria para esta clinica.' : 'O SellClin vai usar a URL e instancia informadas.',
+      });
+      await fetchStatus();
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingConfig(false);
     }
   };
 
@@ -1799,6 +1873,7 @@ const WhatsAppStatusManager = () => {
   };
 
   useEffect(() => {
+    loadEvolutionConfig();
     fetchStatus();
   }, []);
 
@@ -1807,6 +1882,81 @@ const WhatsAppStatusManager = () => {
   const qrProblem = statusInfo.status === 'DISCONNECTED' && statusInfo.qrcodeStatus !== 'ready';
 
   return (
+    <>
+    <Card className="border border-slate-200/70 rounded-2xl shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-base">Modo da Evolution API</CardTitle>
+        <CardDescription>Use a Evolution central do SellClin ou conecte a Evolution propria da clinica.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            disabled={configLoading || savingConfig}
+            onClick={() => saveEvolutionMode('managed')}
+            className={`text-left rounded-2xl border p-4 transition-all ${evolutionConfig.evolutionMode === 'managed' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' : 'bg-background hover:border-emerald-300'}`}
+          >
+            <p className="text-sm font-bold text-emerald-700">Gerenciado pelo SellClin</p>
+            <p className="text-xs text-muted-foreground mt-1">Padrao simples: o SellClin cria a instancia, configura webhook e mostra o QR Code.</p>
+          </button>
+          <button
+            type="button"
+            disabled={configLoading || savingConfig}
+            onClick={() => {
+              setAdvancedOpen(true);
+              if (evolutionConfig.evolutionApiUrl && evolutionConfig.apiKey && evolutionConfig.evolutionInstance) saveEvolutionMode('custom');
+            }}
+            className={`text-left rounded-2xl border p-4 transition-all ${evolutionConfig.evolutionMode === 'custom' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' : 'bg-background hover:border-emerald-300'}`}
+          >
+            <p className="text-sm font-bold text-emerald-700">Usar minha propria Evolution</p>
+            <p className="text-xs text-muted-foreground mt-1">Modo avancado: informe URL, API key e instancia da Evolution do cliente.</p>
+          </button>
+        </div>
+
+        {advancedOpen && (
+          <div className="rounded-2xl border bg-slate-50 p-4 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label>URL da Evolution</Label>
+                <Input value={evolutionConfig.evolutionApiUrl} onChange={e => setEvolutionConfig({ ...evolutionConfig, evolutionApiUrl: e.target.value })} placeholder="https://api.exemplo.com" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>API key</Label>
+                <Input type="password" value={evolutionConfig.apiKey} onChange={e => setEvolutionConfig({ ...evolutionConfig, apiKey: e.target.value })} placeholder="Global API key" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Instancia</Label>
+                <Input value={evolutionConfig.evolutionInstance} onChange={e => setEvolutionConfig({ ...evolutionConfig, evolutionInstance: e.target.value })} placeholder="clinica-whatsapp" />
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button size="sm" onClick={() => saveEvolutionMode('custom')} disabled={savingConfig}>
+                Salvar Evolution propria
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => saveEvolutionMode('managed')} disabled={savingConfig}>
+                Voltar para SellClin gerenciado
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          <div className="rounded-xl border p-3">
+            <p className="font-bold uppercase text-muted-foreground">Modo atual</p>
+            <p className="mt-1 font-mono">{statusInfo.evolutionMode || evolutionConfig.evolutionMode}</p>
+          </div>
+          <div className="rounded-xl border p-3">
+            <p className="font-bold uppercase text-muted-foreground">Instancia</p>
+            <p className="mt-1 font-mono break-all">{statusInfo.instance || evolutionConfig.evolutionInstance || '-'}</p>
+          </div>
+          <div className="rounded-xl border p-3">
+            <p className="font-bold uppercase text-muted-foreground">Webhook</p>
+            <p className="mt-1">{statusInfo.webhookConfigured ? 'Configurado' : 'Pendente'}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
     <Card className="border border-emerald-500/20 bg-emerald-50/5 dark:bg-slate-900/40 backdrop-blur-md shadow-lg rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
       <CardHeader className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-b border-slate-100 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3">
@@ -2053,6 +2203,7 @@ const WhatsAppStatusManager = () => {
         )}
       </CardContent>
     </Card>
+    </>
   );
 };
 
