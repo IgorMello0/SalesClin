@@ -1,7 +1,5 @@
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLayout } from '@/contexts/LayoutContext';
-import { AppTopNavbar } from '@/components/AppTopNavbar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { BillingBanner } from '@/components/BillingBanner';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
@@ -10,7 +8,6 @@ import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 
 const AppLayout = () => {
   const { professional, isLoading } = useAuth();
-  const { layout } = useLayout();
   const location = useLocation();
 
   if (isLoading) {
@@ -28,59 +25,29 @@ const AppLayout = () => {
   const isFullScreen = location.pathname === '/conversations';
   const showOnboarding = professional.onboardingCompleted !== true;
 
-  if (layout === 'side') {
-    return (
-      <div className="min-h-screen flex flex-col lg:flex-row w-full bg-background font-body overflow-hidden">
-        {showOnboarding && <OnboardingWizard />}
-        <ProductTour />
-        <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-          <BillingBanner />
-          {/* Main content area */}
-          {isFullScreen ? (
-            <div className="flex-1 overflow-hidden">
-              <RouteErrorBoundary key={location.pathname}>
-                <Outlet />
-              </RouteErrorBoundary>
-            </div>
-          ) : (
-            <main className="w-full flex-1 px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-10 overflow-y-auto">
-              <div className="max-w-[1400px] mx-auto animate-fade-in-up">
-                <RouteErrorBoundary key={location.pathname}>
-                  <Outlet />
-                </RouteErrorBoundary>
-              </div>
-            </main>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex flex-col w-full bg-background font-body">
+    <div className="min-h-screen flex flex-col lg:flex-row w-full bg-background font-body overflow-hidden">
       {showOnboarding && <OnboardingWizard />}
       <ProductTour />
-      {/* Top Navbar */}
-      <AppTopNavbar />
-      <BillingBanner />
-
-      {/* Main content area */}
-      {isFullScreen ? (
-        <div className="flex-1 overflow-hidden">
-          <RouteErrorBoundary key={location.pathname}>
-            <Outlet />
-          </RouteErrorBoundary>
-        </div>
-      ) : (
-        <main className="w-full flex-1 px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-10">
-          <div className="max-w-[1400px] mx-auto animate-fade-in-up">
+      <AppSidebar />
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        <BillingBanner />
+        {isFullScreen ? (
+          <div className="flex-1 overflow-hidden">
             <RouteErrorBoundary key={location.pathname}>
               <Outlet />
             </RouteErrorBoundary>
           </div>
-        </main>
-      )}
+        ) : (
+          <main className="w-full flex-1 px-4 sm:px-6 md:px-8 lg:px-10 py-4 sm:py-6 md:py-8 overflow-y-auto">
+            <div className="max-w-[1400px] mx-auto animate-fade-in-up">
+              <RouteErrorBoundary key={location.pathname}>
+                <Outlet />
+              </RouteErrorBoundary>
+            </div>
+          </main>
+        )}
+      </div>
     </div>
   );
 };

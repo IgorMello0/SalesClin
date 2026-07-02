@@ -25,7 +25,7 @@ import Payments from "./pages/Payments";
 import Conversations from "./pages/Conversations";
 import Settings from "./pages/Settings";
 const Admin = lazy(() => import("./pages/Admin"));
-import Profile from "./pages/Profile";
+import Integrations from "./pages/Integrations";
 import ContractSignature from "./pages/ContractSignature";
 import Catalogs from "./pages/Catalogs";
 import CatalogDetail from "./pages/CatalogDetail";
@@ -88,6 +88,7 @@ const App = () => (
                   <Route path="catalogs" element={<ProtectedRoute moduleCode="catalogos" moduleName="Catálogos"><Catalogs /></ProtectedRoute>} />
                   <Route path="catalogs/:id" element={<ProtectedRoute moduleCode="catalogos" moduleName="Catálogos"><CatalogDetail /></ProtectedRoute>} />
                   <Route path="settings" element={<Settings />} />
+                  <Route path="integrations" element={<Integrations />} />
                   <Route
                     path="admin"
                     element={
@@ -96,7 +97,7 @@ const App = () => (
                       </Suspense>
                     }
                   />
-                  <Route path="profile" element={<Profile />} />
+                  <Route path="profile" element={<Navigate to="/settings?tab=profile" replace />} />
                   <Route path="contracts" element={<ProtectedRoute moduleCode="contratos" moduleName="Contratos"><ContractSignature /></ProtectedRoute>} />
                   <Route path="sales-funnel" element={<ProtectedRoute moduleCode="funnel" moduleName="Comercial"><SalesFunnel /></ProtectedRoute>} />
                   <Route path="metas" element={<ProtectedRoute moduleCode="metas" moduleName="Metas"><Goals /></ProtectedRoute>} />

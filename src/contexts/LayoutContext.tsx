@@ -27,11 +27,7 @@ interface LayoutProviderProps {
 }
 
 export const LayoutProvider: React.FC<LayoutProviderProps> = ({ children }) => {
-  const [layout, setLayoutState] = useState<LayoutStyle>(() => {
-    const saved = localStorage.getItem('crm_layout_preference');
-    return (saved === 'top' || saved === 'side') ? saved : 'top'; // Default is top
-  });
-
+  const [layout, setLayoutState] = useState<LayoutStyle>('side');
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setSidebarCollapsedState] = useState(() => {
     const saved = localStorage.getItem('crm_sidebar_collapsed');
@@ -39,19 +35,22 @@ export const LayoutProvider: React.FC<LayoutProviderProps> = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_layout_preference', layout);
-  }, [layout]);
+    localStorage.setItem('crm_layout_preference', 'side');
+    setLayoutState('side');
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('crm_sidebar_collapsed', String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
   const setLayout = (newLayout: LayoutStyle) => {
-    setLayoutState(newLayout);
+    setLayoutState('side');
+    localStorage.setItem('crm_layout_preference', 'side');
   };
 
   const toggleLayout = () => {
-    setLayoutState(prev => prev === 'top' ? 'side' : 'top');
+    setLayoutState('side');
+    localStorage.setItem('crm_layout_preference', 'side');
   };
 
   const setSidebarCollapsed = (collapsed: boolean) => {

@@ -232,7 +232,7 @@ export function AppTopNavbar() {
     : 'U';
 
   const roleName = professional?.role === 'admin' ? 'ADMIN' : (professional?.role === 'profissional' ? 'PROFISSIONAL' : (professional?.role?.toUpperCase() || 'COLABORADOR'));
-  const isProfileActive = location.pathname === '/profile' || location.pathname === '/settings';
+  const isProfileActive = location.pathname === '/settings';
 
   return (
     <>
@@ -468,7 +468,7 @@ export function AppTopNavbar() {
                 {/* Menu items */}
                 <div className="py-1.5">
                   <Link
-                    to="/profile"
+                    to="/settings?tab=profile"
                     onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-3 px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                   >
@@ -546,7 +546,7 @@ export function AppTopNavbar() {
             {/* Mobile drawer footer */}
             <div className="border-t border-white/10 p-4 mt-2 space-y-1">
               <Link
-                to="/profile"
+                to="/settings?tab=profile"
                 className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all"
               >
                 <span className="material-symbols-outlined text-[22px] text-slate-500">person_outline</span>

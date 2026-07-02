@@ -6,8 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -19,10 +17,8 @@ import {
   Building,
   Clock,
   CreditCard,
-  LayoutTemplate,
   Lock,
   Monitor,
-  PanelLeft,
   Plus,
   Tag,
   Trash2,
@@ -36,10 +32,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useLayout } from '@/contexts/LayoutContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, modulesApi, billingApi, googleCalendarApi, whatsappMetaApi, type BillingStatus, type BillingUsage } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
+import Profile from './Profile';
 
 // -- CARGOS HELPERS REMOVIDOS (Agora vêm do banco) --
 
@@ -1626,54 +1622,29 @@ const ClinicasView = () => {
 };
 
 const AparenciaView = () => {
-  const { layout, setLayout } = useLayout();
-  const { toast } = useToast();
-
-  const handleLayoutChange = (value: 'top' | 'side') => {
-    setLayout(value);
-    toast({ title: 'Sucesso', description: 'Preferência de layout atualizada.' });
-  };
-
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="p-4 bg-orange-500/10 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 rounded-2xl text-sm border border-orange-200/50 dark:border-orange-800/50 flex items-start gap-3 shadow-sm">
         <Monitor className="w-5 h-5 flex-shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" />
         <div className="leading-relaxed">
-          <strong className="block mb-0.5 text-orange-900 dark:text-orange-100 font-bold">Layout e Navegação</strong>
-          Escolha como prefere navegar pelo sistema. Essa preferência é salva no seu navegador.
+          <strong className="block mb-0.5 text-orange-900 dark:text-orange-100 font-bold">Interface do CRM</strong>
+          O SellClin agora usa menu lateral como navegacao padrao para manter o sistema mais consistente.
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h3 className="font-medium text-sm">Posição do Menu</h3>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div 
-            onClick={() => handleLayoutChange('top')}
-            className={`p-4 border rounded-xl cursor-pointer transition-all ${layout === 'top' ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-md' : 'hover:border-primary/50 bg-background'}`}
-          >
-            <div className="flex justify-between items-start mb-2">
-              <LayoutTemplate className={`w-6 h-6 ${layout === 'top' ? 'text-primary' : 'text-muted-foreground'}`} />
-              {layout === 'top' && <div className="w-3 h-3 rounded-full bg-primary" />}
-            </div>
-            <div className="font-bold text-sm">Menu Superior</div>
-            <div className="text-xs text-muted-foreground mt-1">Navegação no topo da tela, ideal para foco no conteúdo.</div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-white">
+            <span className="material-symbols-outlined text-[20px]">dock_to_left</span>
           </div>
-
-          <div 
-            onClick={() => handleLayoutChange('side')}
-            className={`p-4 border rounded-xl cursor-pointer transition-all ${layout === 'side' ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-md' : 'hover:border-primary/50 bg-background'}`}
-          >
-            <div className="flex justify-between items-start mb-2">
-              <PanelLeft className={`w-6 h-6 ${layout === 'side' ? 'text-primary' : 'text-muted-foreground'}`} />
-              {layout === 'side' && <div className="w-3 h-3 rounded-full bg-primary" />}
-            </div>
-            <div className="font-bold text-sm">Menu Lateral</div>
-            <div className="text-xs text-muted-foreground mt-1">Navegação na lateral esquerda, estilo clássico de CRM.</div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Menu lateral ativo</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              A opcao de alternar para menu superior foi removida por enquanto. O menu lateral continua podendo ser recolhido para ganhar espaco.
+            </p>
           </div>
         </div>
       </div>
-
     </div>
   );
 };
@@ -3240,7 +3211,7 @@ const IntegrationLogo = ({ card }: { card: (typeof integrationCards)[number] }) 
   </div>
 );
 
-const IntegrationsView = () => {
+export const IntegrationsView = () => {
   const [activeIntegration, setActiveIntegration] = useState<IntegrationKey | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<IntegrationCategory>('all');
@@ -3406,155 +3377,162 @@ type SettingsItem = {
   key: string;
   name: string;
   description: string;
+  icon: string;
+  ownerOnly?: boolean;
 };
 
+type SettingsSection = {
+  title: string;
+  items: SettingsItem[];
+};
+
+const ProfileSettingsView = () => <Profile embedded />;
+
+const PlaceholderSettingsView = ({ title, description, icon }: { title: string; description: string; icon: string }) => (
+  <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+    <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-slate-500">
+      <span className="material-symbols-outlined text-[24px]">{icon}</span>
+    </div>
+    <h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3>
+    <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">{description}</p>
+  </div>
+);
+
 const ViewsMap: Record<string, React.FC<any>> = {
+  profile: ProfileSettingsView,
+  security: () => <PlaceholderSettingsView title="Seguranca" description="A troca de senha e controles de acesso ficam concentrados aqui em uma proxima etapa." icon="lock" />,
+  notifications: () => <PlaceholderSettingsView title="Notificacoes" description="Preferencias de alertas, lembretes e avisos serao organizadas nesta area." icon="notifications" />,
   services: ServicosView,
   team: EquipeView,
   roles: CargosView,
   clinics: ClinicasView,
   business: InfoNegocioView,
   appearance: AparenciaView,
-  integrations: IntegrationsView,
-  googleCalendar: GoogleCalendarView,
-  whatsapp: WhatsAppView,
 };
 
 const Settings = () => {
-  const { toast } = useToast();
-  const [selectedSetting, setSelectedSetting] = useState<SettingsItem | null>(null);
-
+  const [selectedKey, setSelectedKey] = useState('profile');
   const { professional: authUser } = useAuth();
   const isOwner = authUser?.role === 'profissional' || authUser?.role === 'admin';
 
-  // Tour de primeira visita
   const { tourActive, tourStep, tourSteps, tourHandleNext, tourHandlePrev, tourHandleClose } =
     useSectionTour('settings', [
-      { id: null, title: '⚙️ Configurações', description: 'Aqui você personaliza tudo do seu CRM: serviços, equipe, layout e informações da clínica.', position: 'center' },
-      { id: '#settings-grid', title: '📋 Opções', description: 'Clique em qualquer item para configurar. Cada seção abre um painel lateral com as opções detalhadas.', position: 'bottom' },
+      { id: null, title: 'Configuracoes', description: 'Gerencie sua conta, equipe e dados da clinica em uma tela unica.', position: 'center' },
+      { id: '#settings-navigation', title: 'Navegacao interna', description: 'Use o menu lateral para alternar entre perfil, organizacao e sistema.', position: 'right' },
     ]);
 
-  const settingsSections = [
+  const settingsSections: SettingsSection[] = [
     {
-      title: 'Configurações Gerais',
-      icon: SettingsIcon,
+      title: 'Conta',
       items: [
-        { key: 'appearance', name: 'Aparência', description: 'Ajuste o menu lateral ou superior' },
-        { key: 'services', name: 'Serviços', description: 'Gerencie os serviços oferecidos' },
-        ...(isOwner ? [
-          { key: 'team', name: 'Equipe', description: 'Gerencie membros da equipe e permissões' },
-          { key: 'roles', name: 'Cargos', description: 'Gerencie os cargos e funções da equipe' },
-        ] : []),
-      ]
+        { key: 'profile', name: 'Perfil', description: 'Dados pessoais e foto do usuario', icon: 'person' },
+        { key: 'security', name: 'Seguranca', description: 'Senha e acesso da conta', icon: 'lock' },
+        { key: 'notifications', name: 'Notificacoes', description: 'Alertas e preferencias', icon: 'notifications' },
+      ],
     },
     {
-      title: 'Minhas Filiais',
-      icon: Building,
+      title: 'Organizacao',
       items: [
-        ...(isOwner ? [
-          { key: 'clinics', name: 'Minhas Clínicas', description: 'Crie e gerencie sua rede de clínicas' },
-          { key: 'integrations', name: 'Integracoes', description: 'Conecte Google Calendar, WhatsApp Oficial e Evolution API' },
-        ] : []),
-      ]
+        { key: 'business', name: 'Clinica', description: 'Dados comerciais da empresa', icon: 'business', ownerOnly: true },
+        { key: 'services', name: 'Servicos', description: 'Servicos oferecidos', icon: 'medical_services', ownerOnly: true },
+        { key: 'team', name: 'Equipe', description: 'Usuarios e convites', icon: 'group', ownerOnly: true },
+        { key: 'roles', name: 'Cargos', description: 'Funcoes e permissoes', icon: 'badge', ownerOnly: true },
+        { key: 'clinics', name: 'Minhas clinicas', description: 'Filiais e multi-clinica', icon: 'apartment', ownerOnly: true },
+      ],
+    },
+    {
+      title: 'Sistema',
+      items: [
+        { key: 'appearance', name: 'Interface', description: 'Menu lateral e experiencia visual', icon: 'palette' },
+      ],
     },
   ];
 
+  const visibleSections = settingsSections
+    .map(section => ({ ...section, items: section.items.filter(item => !item.ownerOnly || isOwner) }))
+    .filter(section => section.items.length > 0);
+
+  const allItems = visibleSections.flatMap(section => section.items);
+  const selectedItem = allItems.find(item => item.key === selectedKey) || allItems[0];
+  const ActiveView = selectedItem ? ViewsMap[selectedItem.key] : null;
+
   useEffect(() => {
-    const view = new URLSearchParams(window.location.search).get('view');
-    if (!view || selectedSetting) return;
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get('tab') || params.get('view');
+    if (requestedTab && allItems.some(item => item.key === requestedTab)) {
+      setSelectedKey(requestedTab);
+    }
+  }, [isOwner]);
 
-    const item = settingsSections.flatMap(section => section.items).find(setting => setting.key === view);
-    if (item) setSelectedSetting(item);
-  }, [selectedSetting]);
-
-  // Define Active View safely
-  const ActiveView = selectedSetting ? (ViewsMap[selectedSetting.key] || null) : null;
+  const handleSelect = (item: SettingsItem) => {
+    setSelectedKey(item.key);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', item.key);
+    url.searchParams.delete('view');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+  };
 
   return (
-    <div className="w-full space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8 relative">
+    <div className="w-full space-y-6 p-4 sm:p-6 md:p-8 relative">
       <TourPopover active={tourActive} step={tourStep} steps={tourSteps} onNext={tourHandleNext} onPrev={tourHandlePrev} onClose={tourHandleClose} />
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Painel de Configurações</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Ajuste permissões, negócios, agendamentos e API.
-          </p>
-        </div>
-        <ThemeToggle />
+
+      <div className="space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Configuracoes</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Gerencie sua conta, equipe, clinicas e preferencias do sistema.
+        </p>
       </div>
 
-      <Separator className="my-6" />
-
-      {/* Settings Grid */}
-      <div id="settings-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {settingsSections.map((section) => (
-          <Card key={section.title} className="hover:shadow-sm transition-shadow">
-            <CardHeader className="pb-3 border-b bg-muted/50">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-md">
-                <section.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                {section.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {section.items.map((item) => (
-                  <div 
-                    key={item.key}
-                    onClick={() => setSelectedSetting(item)}
-                    className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-primary/5 cursor-pointer transition-all gap-3"
-                  >
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="font-semibold text-sm group-hover:text-primary transition-colors">{item.name}</div>
-                      <div className="text-xs text-muted-foreground">{item.description}</div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="hidden sm:inline-flex shrink-0 text-xs shadow-none hover:bg-primary hover:text-white transition-all w-24"
-                    >
-                      Configurar
-                    </Button>
-                  </div>
-                ))}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside id="settings-navigation" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm h-fit lg:sticky lg:top-6">
+          <div className="space-y-4">
+            {visibleSections.map(section => (
+              <div key={section.title}>
+                <p className="px-3 pb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{section.title}</p>
+                <div className="space-y-1">
+                  {section.items.map(item => {
+                    const active = selectedItem?.key === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handleSelect(item)}
+                        className={`w-full rounded-xl px-3 py-2.5 text-left transition ${active ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`material-symbols-outlined text-[18px] ${active ? 'text-orange-400' : 'text-slate-400'}`}>{item.icon}</span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold">{item.name}</p>
+                            <p className={`truncate text-[11px] ${active ? 'text-slate-300' : 'text-slate-400'}`}>{item.description}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            ))}
+          </div>
+        </aside>
 
-
-      {/* THE DRAWING SHEET CONFIG MENU (The Magic Drawer) */}
-      <Sheet open={!!selectedSetting} onOpenChange={(open) => !open && setSelectedSetting(null)}>
-        <SheetContent className="w-[90vw] sm:max-w-xl md:max-w-2xl p-0 flex flex-col border-l shadow-2xl max-h-screen">
-          {selectedSetting && (
-            <>
-              {/* Sheet Header Custom */}
-              <div className="px-6 py-6 border-b bg-muted/80 z-10 backdrop-blur pb-6 shrink-0">
-                <SheetHeader>
-                  <SheetTitle className="text-2xl font-bold flex items-center gap-2">
-                    {selectedSetting.name}
-                  </SheetTitle>
-                  <SheetDescription className="text-sm">
-                    {selectedSetting.description}
-                  </SheetDescription>
-                </SheetHeader>
+        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          {selectedItem && (
+            <div className="mb-5 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600">
+                  <span className="material-symbols-outlined text-[20px]">{selectedItem.icon}</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">{selectedItem.name}</h2>
+                  <p className="text-sm text-muted-foreground">{selectedItem.description}</p>
+                </div>
               </div>
-              
-              {/* Variable Content injected via Map */}
-              <div className="flex-1 p-6 overflow-y-auto min-h-0">
-                {ActiveView && <ActiveView name={selectedSetting.name} />}
-              </div>
-
-              {/* Footer */}
-              <div className="p-4 bg-muted border-t mt-auto text-xs text-center text-muted-foreground shrink-0">
-                Módulo SellClin CRM v1.0.5 - Configurações protegidas.
-              </div>
-            </>
+            </div>
           )}
-        </SheetContent>
-      </Sheet>
 
+          {ActiveView && <ActiveView name={selectedItem?.name} />}
+        </section>
+      </div>
     </div>
   );
 };

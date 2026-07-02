@@ -72,6 +72,14 @@ const menuItems = [
     icon: 'campaign',
     moduleCode: 'campanhas',
   },
+  {
+    title: 'Integrações',
+    url: '/integrations',
+    icon: 'hub',
+    moduleCode: 'integrations',
+    ownerOnly: true,
+    skipPermission: true,
+  },
 ];
 
 export function AppSidebar() {
@@ -83,6 +91,14 @@ export function AppSidebar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const filteredMenuItems = menuItems.filter((item) => {
+    if ((item as any).ownerOnly && !['admin', 'profissional'].includes(String(professional?.role))) {
+      return false;
+    }
+
+    if ((item as any).skipPermission) {
+      return true;
+    }
+
     // Módulos que NÃO estão no MVP (Gestão Financeira, Conversas, Análises/Relatórios)
     // Devem aparecer APENAS para a conta do desenvolvedor (admin@admin.com)
     const nonMVPModules = ['pagamentos', 'conversas', 'relatorios'];
@@ -287,7 +303,7 @@ export function AppSidebar() {
         )}
         
         <div id="tour-menu" className={cn(
-          "flex-1 overflow-y-auto scrollbar-hide py-2 space-y-1.5 transition-all",
+          "flex-1 overflow-y-auto scrollbar-hide py-2 space-y-1 transition-all",
           isSidebarCollapsed && !isMobileSidebarOpen ? "px-2" : "px-4"
         )}>
           {filteredMenuItems.map((item) => {
@@ -300,7 +316,7 @@ export function AppSidebar() {
                 to={item.url}
                 className={cn(
                   "flex items-center transition-all rounded-xl overflow-hidden group/item",
-                  showOnlyIcons ? "justify-center p-3" : "gap-3 px-4 py-3",
+                  showOnlyIcons ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
                   isActive 
                     ? 'bg-white/10 text-secondary shadow-lg shadow-black/10 scale-[1.02]' 
                     : 'text-slate-400 hover:bg-white/5 hover:text-white'
@@ -309,11 +325,11 @@ export function AppSidebar() {
               >
                 <span className={cn(
                   "material-symbols-outlined shrink-0 transition-transform duration-300",
-                  showOnlyIcons ? "text-2xl" : "text-xl",
+                  showOnlyIcons ? "text-[22px]" : "text-[18px]",
                   isActive ? "text-secondary" : "group-hover/item:scale-110"
                 )}>{item.icon}</span>
                 {!showOnlyIcons && (
-                  <span className="truncate text-sm font-semibold tracking-wide font-headline">{item.title}</span>
+                  <span className="truncate text-xs font-semibold tracking-wide font-headline">{item.title}</span>
                 )}
               </Link>
             );
@@ -349,7 +365,7 @@ export function AppSidebar() {
                   </div>
                   <div className="py-1">
                     <Link
-                      to="/profile"
+                      to="/settings?tab=profile"
                       onClick={() => setProfileMenuOpen(false)}
                       className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
                     >
@@ -417,7 +433,7 @@ export function AppSidebar() {
                 <div className="absolute bottom-14 left-0 right-0 bg-[#0B1525] rounded-xl shadow-2xl border border-white/10 py-1.5 text-white animate-fade-in-up z-[100]">
                   <div className="py-1">
                     <Link
-                      to="/profile"
+                      to="/settings?tab=profile"
                       onClick={() => setProfileMenuOpen(false)}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
                     >

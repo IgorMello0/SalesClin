@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { professionalsApi, uploadApi, getImageUrl } from '@/lib/api';
 
-const Profile = () => {
+const Profile = ({ embedded = false }: { embedded?: boolean }) => {
   const { professional, updateProfileData } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -295,7 +295,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="w-full space-y-4 sm:space-y-6 p-4 sm:p-6 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className={`w-full space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${embedded ? '' : 'p-4 sm:p-6 md:p-8'}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

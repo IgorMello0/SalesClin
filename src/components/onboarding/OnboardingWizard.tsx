@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLayout } from '@/contexts/LayoutContext';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import {
   Building2,
-  LayoutPanelLeft,
-  LayoutPanelTop,
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
@@ -18,7 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-/* ─── Step indicator ─────────────────────────────────────── */
+/* â”€â”€â”€ Step indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const StepDot = ({ active, done }: { active: boolean; done: boolean }) => (
   <div
     className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
@@ -27,10 +24,10 @@ const StepDot = ({ active, done }: { active: boolean; done: boolean }) => (
   />
 );
 
-/* ─── Shared label style ─────────────────────────────────── */
+/* â”€â”€â”€ Shared label style â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const labelCls = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5';
 
-/* ─── Field wrapper ──────────────────────────────────────── */
+/* â”€â”€â”€ Field wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div>
     <label className={labelCls}>{label}</label>
@@ -38,10 +35,9 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </div>
 );
 
-/* ═══════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 export const OnboardingWizard = () => {
   const { professional, completeOnboarding } = useAuth();
-  const { layout, setLayout } = useLayout();
 
   const [step, setStep] = useState(1);
   const [companyName, setCompanyName] = useState(professional?.company?.name || '');
@@ -53,7 +49,7 @@ export const OnboardingWizard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isOwner = professional?.role === 'profissional' || professional?.role === 'admin';
-  const totalSteps = isOwner ? 4 : 2;
+  const totalSteps = isOwner ? 3 : 1;
 
   const handleNext = () => {
     if (step < totalSteps) setStep(step + 1);
@@ -85,37 +81,32 @@ export const OnboardingWizard = () => {
     }
   };
 
-  /* ─── Left-panel meta per step ─────────────────────────── */
+  /* â”€â”€â”€ Left-panel meta per step â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const sideMeta: Record<number, { icon: React.ReactNode; title: string; desc: string }> = {
     1: {
       icon: <Building2 className="w-10 h-10" />,
-      title: 'Sua Clínica',
-      desc: 'Configure a identidade do seu negócio para personalizar toda a sua experiência.',
+      title: 'Sua ClÃ­nica',
+      desc: 'Configure a identidade do seu negÃ³cio para personalizar toda a sua experiÃªncia.',
     },
     2: {
       icon: <TrendingUp className="w-10 h-10" />,
-      title: 'Sobre o Negócio',
-      desc: 'Entender o seu contexto nos ajuda a sugerir as melhores configurações do CRM.',
+      title: 'Sobre o NegÃ³cio',
+      desc: 'Entender o seu contexto nos ajuda a sugerir as melhores configuraÃ§Ãµes do CRM.',
     },
     3: {
-      icon: <LayoutPanelTop className="w-10 h-10" />,
-      title: 'Layout Ideal',
-      desc: 'Escolha como prefere navegar. Você pode mudar isso a qualquer momento.',
-    },
-    4: {
       icon: <Sparkles className="w-10 h-10" />,
       title: 'Tudo Pronto!',
-      desc: 'Seu ambiente está configurado. Vamos dar um tour rápido pelas funcionalidades.',
+      desc: 'Seu ambiente estÃ¡ configurado. Vamos dar um tour rÃ¡pido pelas funcionalidades.',
     },
   };
 
-  const effectiveStep = isOwner ? step : step + 1;
-  const sideKey = isOwner ? step : step === 1 ? 3 : 4;
+  const effectiveStep = isOwner ? step : 3;
+  const sideKey = effectiveStep;
   const meta = sideMeta[sideKey] ?? sideMeta[1];
 
-  /* ─── Step content ─────────────────────────────────────── */
+  /* â”€â”€â”€ Step content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const renderStep = () => {
-    /* STEP 1 — Nome da Clínica (owners only) */
+    /* STEP 1 â€” Nome da ClÃ­nica (owners only) */
     if (effectiveStep === 1) {
       return (
         <motion.div
@@ -131,20 +122,20 @@ export const OnboardingWizard = () => {
               Bem-vindo(a) ao SellClin!
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Vamos começar pelo essencial — qual é o nome da sua clínica ou empresa?
+              Vamos comeÃ§ar pelo essencial â€” qual Ã© o nome da sua clÃ­nica ou empresa?
             </p>
           </div>
 
           <div>
             <label htmlFor="company-name" className={labelCls}>
-              Nome da Clínica / Empresa
+              Nome da ClÃ­nica / Empresa
             </label>
             <input
               id="company-name"
               type="text"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Ex: Clínica Sorriso"
+              placeholder="Ex: ClÃ­nica Sorriso"
               className={
                 'w-full h-12 rounded-xl border border-border bg-background px-4 text-sm text-foreground ' +
                 'placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/60 ' +
@@ -156,7 +147,7 @@ export const OnboardingWizard = () => {
       );
     }
 
-    /* STEP 2 — Dados do Negócio (owners only) */
+    /* STEP 2 â€” Dados do NegÃ³cio (owners only) */
     if (effectiveStep === 2 && isOwner) {
       return (
         <motion.div
@@ -169,21 +160,21 @@ export const OnboardingWizard = () => {
         >
           <div>
             <h2 className="text-2xl font-bold text-foreground font-headline mb-1">
-              Sobre o seu Negócio
+              Sobre o seu NegÃ³cio
             </h2>
             <p className="text-sm text-muted-foreground">
-              Essas informações nos ajudam a personalizar sua experiência no CRM.
+              Essas informaÃ§Ãµes nos ajudam a personalizar sua experiÃªncia no CRM.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Média de Faturamento">
+            <Field label="MÃ©dia de Faturamento">
               <CustomSelect
                 value={faturamento}
                 onChange={setFaturamento}
                 icon={<TrendingUp className="w-4 h-4" />}
                 options={[
-                  { value: 'Até 10k', label: 'Até R$ 10.000' },
+                  { value: 'AtÃ© 10k', label: 'AtÃ© R$ 10.000' },
                   { value: '10k a 50k', label: 'R$ 10k a R$ 50k' },
                   { value: '50k a 100k', label: 'R$ 50k a R$ 100k' },
                   { value: '100k a 500k', label: 'R$ 100k a R$ 500k' },
@@ -192,7 +183,7 @@ export const OnboardingWizard = () => {
               />
             </Field>
 
-            <Field label="Quantidade de Funcionários">
+            <Field label="Quantidade de FuncionÃ¡rios">
               <CustomSelect
                 value={funcionarios}
                 onChange={setFuncionarios}
@@ -206,7 +197,7 @@ export const OnboardingWizard = () => {
               />
             </Field>
 
-            <Field label="Clínicas / Unidades">
+            <Field label="ClÃ­nicas / Unidades">
               <CustomSelect
                 value={clinicas}
                 onChange={setClinicas}
@@ -227,7 +218,7 @@ export const OnboardingWizard = () => {
                 options={[
                   { value: 'Aumentar Vendas', label: 'Aumentar Vendas' },
                   { value: 'Organizar Processos', label: 'Organizar Processos' },
-                  { value: 'Analisar Métricas', label: 'Analisar Métricas' },
+                  { value: 'Analisar MÃ©tricas', label: 'Analisar MÃ©tricas' },
                   { value: 'Centralizar Atendimento', label: 'Centralizar Atendimento' },
                 ]}
               />
@@ -243,7 +234,7 @@ export const OnboardingWizard = () => {
                     { value: 'Instagram', label: 'Instagram' },
                     { value: 'Google', label: 'Google' },
                     { value: 'Youtube', label: 'YouTube' },
-                    { value: 'Indicação', label: 'Indicação de um amigo' },
+                    { value: 'IndicaÃ§Ã£o', label: 'IndicaÃ§Ã£o de um amigo' },
                     { value: 'Outro', label: 'Outro' },
                   ]}
                 />
@@ -254,114 +245,9 @@ export const OnboardingWizard = () => {
       );
     }
 
-    /* STEP 3 — Layout */
-    if (effectiveStep === (isOwner ? 3 : 2)) {
-      return (
-        <motion.div
-          key="s3"
-          initial={{ opacity: 0, x: 32 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -32 }}
-          transition={{ duration: 0.25 }}
-          className="w-full max-w-lg space-y-6"
-        >
-          <div>
-            <h2 className="text-2xl font-bold text-foreground font-headline mb-1">Escolha seu Layout</h2>
-            <p className="text-sm text-muted-foreground">
-              Como você prefere navegar pelo CRM? Você pode mudar isso depois.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Menu Superior */}
-            <button
-              type="button"
-              onClick={() => setLayout('top')}
-              className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-200 cursor-pointer group ${
-                layout === 'top'
-                  ? 'border-secondary bg-secondary/5 shadow-md shadow-secondary/10'
-                  : 'border-border bg-card hover:border-accent/50 hover:bg-muted/40'
-              }`}
-            >
-              {layout === 'top' && (
-                <span className="absolute top-3 right-3">
-                  <CheckCircle2 className="w-4 h-4 text-secondary" />
-                </span>
-              )}
-              {/* Preview top nav */}
-              <div className="w-full h-28 bg-muted rounded-lg mb-3 overflow-hidden border border-border">
-                <div className="w-full h-7 bg-primary flex items-center px-2 gap-2">
-                  <div className="w-8 h-1.5 bg-white/40 rounded-full" />
-                  <div className="ml-auto flex gap-1.5">
-                    <div className="w-6 h-1.5 bg-white/30 rounded-full" />
-                    <div className="w-6 h-1.5 bg-white/30 rounded-full" />
-                    <div className="w-6 h-1.5 bg-white/30 rounded-full" />
-                  </div>
-                </div>
-                <div className="p-2 space-y-1.5">
-                  <div className="h-3 w-3/4 bg-muted-foreground/20 rounded" />
-                  <div className="h-2 w-1/2 bg-muted-foreground/10 rounded" />
-                  <div className="grid grid-cols-3 gap-1 mt-2">
-                    <div className="h-6 bg-background rounded border border-border/50" />
-                    <div className="h-6 bg-background rounded border border-border/50" />
-                    <div className="h-6 bg-background rounded border border-border/50" />
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                <LayoutPanelTop className="w-4 h-4 text-accent" />
-                Menu Superior
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Mais espaço horizontal, visão ampla.</p>
-            </button>
-
-            {/* Menu Lateral */}
-            <button
-              type="button"
-              onClick={() => setLayout('side')}
-              className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-200 cursor-pointer group ${
-                layout === 'side'
-                  ? 'border-secondary bg-secondary/5 shadow-md shadow-secondary/10'
-                  : 'border-border bg-card hover:border-accent/50 hover:bg-muted/40'
-              }`}
-            >
-              {layout === 'side' && (
-                <span className="absolute top-3 right-3">
-                  <CheckCircle2 className="w-4 h-4 text-secondary" />
-                </span>
-              )}
-              {/* Preview side nav */}
-              <div className="w-full h-28 bg-muted rounded-lg mb-3 overflow-hidden border border-border flex">
-                <div className="w-10 h-full bg-primary flex flex-col items-center pt-3 gap-2">
-                  <div className="w-5 h-5 rounded-full bg-white/30" />
-                  <div className="w-4 h-1.5 bg-white/20 rounded-full" />
-                  <div className="w-4 h-1.5 bg-white/20 rounded-full" />
-                  <div className="w-4 h-1.5 bg-white/20 rounded-full" />
-                </div>
-                <div className="flex-1 p-2 space-y-1.5">
-                  <div className="h-4 w-full bg-background rounded border border-border/50 flex justify-end items-center pr-1">
-                    <div className="w-3 h-3 rounded-full bg-muted-foreground/30" />
-                  </div>
-                  <div className="h-3 w-2/3 bg-muted-foreground/20 rounded" />
-                  <div className="grid grid-cols-2 gap-1 mt-1">
-                    <div className="h-5 bg-background rounded border border-border/50" />
-                    <div className="h-5 bg-background rounded border border-border/50" />
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                <LayoutPanelLeft className="w-4 h-4 text-accent" />
-                Menu Lateral
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Estilo dashboard clássico.</p>
-            </button>
-          </div>
-        </motion.div>
-      );
-    }
-
-    /* STEP 4 — Conclusão */
-    if (effectiveStep === (isOwner ? 4 : 3)) {
+    /* STEP 3 - Conclusao */
+    /* STEP 4 â€” ConclusÃ£o */
+    if (effectiveStep === 3) {
       return (
         <motion.div
           key="s4"
@@ -376,9 +262,9 @@ export const OnboardingWizard = () => {
               <CheckCircle2 className="w-10 h-10 text-secondary" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-foreground font-headline mb-1">Tudo pronto! 🎉</h2>
+              <h2 className="text-2xl font-bold text-foreground font-headline mb-1">Tudo pronto! ðŸŽ‰</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Seu ambiente está configurado com sucesso. Vamos iniciar um tour rápido para você conhecer as funcionalidades do SellClin.
+                Seu ambiente estÃ¡ configurado com sucesso. Vamos iniciar um tour rÃ¡pido para vocÃª conhecer as funcionalidades do SellClin.
               </p>
             </div>
           </div>
@@ -386,10 +272,10 @@ export const OnboardingWizard = () => {
           <div className="rounded-xl border border-border bg-muted/40 p-4">
             <div className="flex flex-col gap-2 w-full">
               {[
-                'Dashboard de vendas e métricas',
+                'Dashboard de vendas e mÃ©tricas',
                 'Funil de leads e pipeline',
                 'Agenda e agendamentos',
-                'Relatórios e metas',
+                'RelatÃ³rios e metas',
               ].map((item) => (
                 <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />
@@ -403,12 +289,12 @@ export const OnboardingWizard = () => {
     }
   };
 
-  /* ─── Progress calc ──────────────────────────────────────── */
+  /* â”€â”€â”€ Progress calc â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const pct = Math.round((step / totalSteps) * 100);
 
   return (
     <div className="fixed inset-0 z-[100] flex">
-      {/* ── Left side panel (navy) ── */}
+      {/* â”€â”€ Left side panel (navy) â”€â”€ */}
       <motion.aside
         initial={{ x: -60, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
@@ -475,22 +361,22 @@ export const OnboardingWizard = () => {
                   <div key={i} className={`w-6 h-6 rounded-full ${c} ring-2 ring-primary`} />
                 ))}
               </div>
-              <span className="text-xs font-semibold text-primary-foreground/80">+240 clínicas ativas</span>
+              <span className="text-xs font-semibold text-primary-foreground/80">+240 clÃ­nicas ativas</span>
             </div>
             <p className="text-xs text-primary-foreground/60 leading-relaxed italic">
-              "O SellClin transformou nossa gestão de pacientes e duplicou nossas conversões."
+              "O SellClin transformou nossa gestÃ£o de pacientes e duplicou nossas conversÃµes."
             </p>
-            <p className="text-xs text-secondary font-semibold">— Clínica Dr. Alves, SP</p>
+            <p className="text-xs text-secondary font-semibold">â€” ClÃ­nica Dr. Alves, SP</p>
           </div>
         </div>
 
         {/* Footer */}
         <p className="relative z-10 text-xs text-primary-foreground/40">
-          © 2026 SellClin. Todos os direitos reservados.
+          Â© 2026 SellClin. Todos os direitos reservados.
         </p>
       </motion.aside>
 
-      {/* ── Right side (form) ── */}
+      {/* â”€â”€ Right side (form) â”€â”€ */}
       <div
         className="flex-1 flex flex-col bg-background overflow-y-auto relative"
         style={{
@@ -559,7 +445,7 @@ export const OnboardingWizard = () => {
               </>
             ) : (
               <>
-                {step === totalSteps ? 'Iniciar Tour 🚀' : 'Próximo'}
+                {step === totalSteps ? 'Iniciar Tour ðŸš€' : 'PrÃ³ximo'}
                 {step !== totalSteps && <ChevronRight className="w-4 h-4" />}
               </>
             )}
