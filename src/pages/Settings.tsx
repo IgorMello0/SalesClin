@@ -30,7 +30,8 @@ import {
   Mail,
   Loader2,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Search
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -3068,7 +3069,16 @@ const WhatsAppView = () => {
   );
 };
 
-type IntegrationKey = 'googleCalendar' | 'metaWhatsapp' | 'evolutionWhatsapp';
+type IntegrationKey =
+  | 'googleCalendar'
+  | 'metaWhatsapp'
+  | 'evolutionWhatsapp'
+  | 'instagram'
+  | 'email'
+  | 'messenger'
+  | 'liveChat';
+
+type IntegrationCategory = 'all' | 'agenda' | 'messaging' | 'future';
 
 const integrationCards: Array<{
   key: IntegrationKey;
@@ -3076,12 +3086,17 @@ const integrationCards: Array<{
   eyebrow: string;
   description: string;
   status: string;
-  accent: string;
-  logo: string;
-  logoAlt: string;
+  category: Exclude<IntegrationCategory, 'all'>;
+  available: boolean;
+  actionLabel: string;
+  bannerClassName: string;
+  badgeClassName: string;
+  logo?: string;
+  logoAlt?: string;
   secondaryLogo?: string;
   secondaryLogoAlt?: string;
   logoClassName?: string;
+  fallbackIcon?: string;
 }> = [
   {
     key: 'googleCalendar',
@@ -3089,17 +3104,25 @@ const integrationCards: Array<{
     eyebrow: 'Agenda',
     description: 'Sincronize os agendamentos da clinica com uma agenda Google conectada.',
     status: 'Disponivel',
-    accent: 'from-blue-500/12 via-red-500/10 to-amber-400/12 border-blue-100 hover:border-blue-300',
+    category: 'agenda',
+    available: true,
+    actionLabel: 'Configurar',
+    bannerClassName: 'from-blue-100 via-white to-amber-100 border-blue-200',
+    badgeClassName: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
     logo: '/integrations/google-calendar.webp',
     logoAlt: 'Google Calendar',
   },
   {
     key: 'metaWhatsapp',
     name: 'WhatsApp Oficial Meta',
-    eyebrow: 'Cloud API',
-    description: 'Conecte pela API oficial da Meta, preparada para coexistencia quando liberada.',
+    eyebrow: 'Business Messaging',
+    description: 'API oficial da Meta para Cloud API, webhooks e coexistencia quando liberada.',
     status: 'Recomendado',
-    accent: 'from-emerald-500/12 via-sky-500/10 to-blue-500/12 border-emerald-100 hover:border-emerald-300',
+    category: 'messaging',
+    available: true,
+    actionLabel: 'Conectar canal',
+    bannerClassName: 'from-blue-50 via-white to-sky-100 border-blue-200',
+    badgeClassName: 'bg-blue-50 text-blue-700 ring-blue-100',
     logo: '/integrations/whatsapp.webp',
     logoAlt: 'WhatsApp',
     secondaryLogo: '/integrations/meta-logo.png',
@@ -3108,14 +3131,77 @@ const integrationCards: Array<{
   {
     key: 'evolutionWhatsapp',
     name: 'Evolution API',
-    eyebrow: 'Alternativa operacional',
+    eyebrow: 'WhatsApp alternativo',
     description: 'Use a Evolution propria da clinica com URL, API key, instancia e webhook.',
     status: 'Ativo para disparos',
-    accent: 'from-emerald-500/12 via-lime-400/10 to-cyan-400/12 border-emerald-100 hover:border-emerald-300',
+    category: 'messaging',
+    available: true,
+    actionLabel: 'Configurar',
+    bannerClassName: 'from-emerald-100 via-white to-lime-100 border-emerald-200',
+    badgeClassName: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
     logo: '/integrations/evolution-logo.webp',
     logoAlt: 'Evolution API',
-    logoClassName: 'scale-[2.35]',
+    logoClassName: 'scale-[2.2]',
   },
+  {
+    key: 'instagram',
+    name: 'Instagram',
+    eyebrow: 'Social messaging',
+    description: 'Capte conversas e leads do Instagram Direct em uma proxima etapa.',
+    status: 'Em breve',
+    category: 'future',
+    available: false,
+    actionLabel: 'Em breve',
+    bannerClassName: 'from-pink-100 via-white to-orange-100 border-pink-200',
+    badgeClassName: 'bg-slate-100 text-slate-500 ring-slate-200',
+    fallbackIcon: 'photo_camera',
+  },
+  {
+    key: 'email',
+    name: 'E-mail SMTP/IMAP',
+    eyebrow: 'Inbox',
+    description: 'Centralize entradas por e-mail e respostas do time comercial futuramente.',
+    status: 'Em breve',
+    category: 'future',
+    available: false,
+    actionLabel: 'Em breve',
+    bannerClassName: 'from-slate-100 via-white to-blue-100 border-slate-200',
+    badgeClassName: 'bg-slate-100 text-slate-500 ring-slate-200',
+    fallbackIcon: 'mail',
+  },
+  {
+    key: 'messenger',
+    name: 'Facebook Messenger',
+    eyebrow: 'Meta',
+    description: 'Receba mensagens do Facebook Messenger quando o canal for liberado.',
+    status: 'Em breve',
+    category: 'future',
+    available: false,
+    actionLabel: 'Em breve',
+    bannerClassName: 'from-indigo-100 via-white to-sky-100 border-indigo-200',
+    badgeClassName: 'bg-slate-100 text-slate-500 ring-slate-200',
+    fallbackIcon: 'forum',
+  },
+  {
+    key: 'liveChat',
+    name: 'Chat do site',
+    eyebrow: 'Atendimento',
+    description: 'Widget de chat para o site da clinica, conectado ao funil comercial.',
+    status: 'Em breve',
+    category: 'future',
+    available: false,
+    actionLabel: 'Em breve',
+    bannerClassName: 'from-violet-100 via-white to-cyan-100 border-violet-200',
+    badgeClassName: 'bg-slate-100 text-slate-500 ring-slate-200',
+    fallbackIcon: 'chat_bubble',
+  },
+];
+
+const integrationFilters: Array<{ key: IntegrationCategory; label: string }> = [
+  { key: 'all', label: 'Todos' },
+  { key: 'messaging', label: 'Mensagens' },
+  { key: 'agenda', label: 'Agenda' },
+  { key: 'future', label: 'Em breve' },
 ];
 
 const WhatsAppBenefits = () => (
@@ -3136,12 +3222,16 @@ const WhatsAppBenefits = () => (
 
 const IntegrationLogo = ({ card }: { card: (typeof integrationCards)[number] }) => (
   <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-    <img
-      src={card.logo}
-      alt={card.logoAlt}
-      className={`h-9 w-9 object-contain ${card.logoClassName || ''}`}
-      loading="lazy"
-    />
+    {card.logo ? (
+      <img
+        src={card.logo}
+        alt={card.logoAlt || card.name}
+        className={`h-9 w-9 object-contain ${card.logoClassName || ''}`}
+        loading="lazy"
+      />
+    ) : (
+      <span className="material-symbols-outlined text-[24px] text-slate-500">{card.fallbackIcon || 'extension'}</span>
+    )}
     {card.secondaryLogo && (
       <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
         <img src={card.secondaryLogo} alt={card.secondaryLogoAlt || ''} className="h-3.5 w-3.5 object-contain" loading="lazy" />
@@ -3152,7 +3242,19 @@ const IntegrationLogo = ({ card }: { card: (typeof integrationCards)[number] }) 
 
 const IntegrationsView = () => {
   const [activeIntegration, setActiveIntegration] = useState<IntegrationKey | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilter, setActiveFilter] = useState<IntegrationCategory>('all');
   const activeCard = integrationCards.find((card) => card.key === activeIntegration);
+  const visibleCards = integrationCards.filter((card) => {
+    const search = searchTerm.trim().toLowerCase();
+    const matchesFilter = activeFilter === 'all' || card.category === activeFilter;
+    const matchesSearch = !search
+      || card.name.toLowerCase().includes(search)
+      || card.eyebrow.toLowerCase().includes(search)
+      || card.description.toLowerCase().includes(search);
+
+    return matchesFilter && matchesSearch;
+  });
 
   const renderIntegration = () => {
     if (activeIntegration === 'googleCalendar') return <GoogleCalendarView />;
@@ -3180,49 +3282,93 @@ const IntegrationsView = () => {
       {!activeIntegration ? (
         <>
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-start gap-4">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-                <Zap className="h-5 w-5" />
+            <div className="flex flex-col gap-5">
+              <div className="flex items-start gap-4">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F97316]">Central de integracoes</p>
+                  <h3 className="mt-1 text-xl font-black text-slate-900 dark:text-white">Conecte os canais da sua clinica</h3>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Escolha um canal para configurar agenda, mensagens, captura de leads e automacoes sem misturar os fluxos.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F97316]">Central de integracoes</p>
-                <h3 className="mt-1 text-xl font-black text-slate-900 dark:text-white">Conecte os canais da sua clinica</h3>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  Escolha uma integracao para configurar agenda, WhatsApp oficial ou Evolution API sem misturar os fluxos.
-                </p>
+
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative lg:max-w-xs lg:flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Buscar integracao..."
+                    className="h-11 rounded-2xl border-slate-200 bg-slate-50 pl-9 shadow-none"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {integrationFilters.map((filter) => (
+                    <button
+                      key={filter.key}
+                      type="button"
+                      onClick={() => setActiveFilter(filter.key)}
+                      className={`rounded-2xl px-3 py-2 text-xs font-black transition ${
+                        activeFilter === filter.key
+                          ? 'bg-slate-950 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300'
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {integrationCards.map((card) => (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {visibleCards.map((card) => (
               <button
                 type="button"
                 key={card.key}
-                onClick={() => setActiveIntegration(card.key)}
-                className={`group overflow-hidden rounded-3xl border bg-gradient-to-br ${card.accent} p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg`}
+                onClick={() => card.available && setActiveIntegration(card.key)}
+                disabled={!card.available}
+                className={`group overflow-hidden rounded-3xl border bg-white text-left shadow-sm transition-all ${
+                  card.available ? 'hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-not-allowed opacity-70'
+                }`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4">
+                <div className={`h-16 border-b bg-gradient-to-br ${card.bannerClassName}`} />
+                <div className="-mt-7 flex items-start justify-between gap-4 p-5 pt-0">
+                  <div className="flex min-w-0 items-start gap-4">
                     <IntegrationLogo card={card} />
-                    <div>
+                    <div className="min-w-0 pt-8">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{card.eyebrow}</span>
-                        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ring-1 ${card.badgeClassName}`}>
                           {card.status}
                         </span>
                       </div>
-                      <h4 className="mt-2 text-lg font-black text-slate-900 dark:text-white">{card.name}</h4>
-                      <p className="mt-1 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-300">{card.description}</p>
+                      <h4 className="mt-2 truncate text-base font-black text-slate-900 dark:text-white">{card.name}</h4>
+                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{card.description}</p>
+                      <div className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm">
+                        {card.actionLabel}
+                        {card.available && <ArrowRight className="h-3.5 w-3.5" />}
+                      </div>
                     </div>
                   </div>
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/85 text-slate-700 shadow-sm transition group-hover:bg-slate-950 group-hover:text-white">
+                  <div className="mt-8 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-50 text-slate-500 shadow-sm transition group-hover:bg-slate-950 group-hover:text-white">
                     <ArrowRight className="h-4 w-4" />
                   </div>
                 </div>
               </button>
             ))}
           </div>
+
+          {visibleCards.length === 0 && (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-muted-foreground">
+              Nenhuma integracao encontrada para esse filtro.
+            </div>
+          )}
         </>
       ) : (
         <div className="space-y-5">
@@ -3236,7 +3382,7 @@ const IntegrationsView = () => {
           </button>
 
           {activeCard && (
-            <div className={`rounded-3xl border bg-gradient-to-br ${activeCard.accent} p-5`}>
+            <div className={`rounded-3xl border bg-gradient-to-br ${activeCard.bannerClassName} p-5`}>
               <div className="flex items-start gap-4">
                 <IntegrationLogo card={activeCard} />
                 <div>
