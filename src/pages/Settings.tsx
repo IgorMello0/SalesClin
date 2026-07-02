@@ -19,10 +19,8 @@ import {
   Building,
   Clock,
   CreditCard,
-  CalendarDays,
   LayoutTemplate,
   Lock,
-  MessageCircle,
   Monitor,
   PanelLeft,
   Plus,
@@ -3079,7 +3077,11 @@ const integrationCards: Array<{
   description: string;
   status: string;
   accent: string;
-  icon: React.ReactNode;
+  logo: string;
+  logoAlt: string;
+  secondaryLogo?: string;
+  secondaryLogoAlt?: string;
+  logoClassName?: string;
 }> = [
   {
     key: 'googleCalendar',
@@ -3088,12 +3090,8 @@ const integrationCards: Array<{
     description: 'Sincronize os agendamentos da clinica com uma agenda Google conectada.',
     status: 'Disponivel',
     accent: 'from-blue-500/12 via-red-500/10 to-amber-400/12 border-blue-100 hover:border-blue-300',
-    icon: (
-      <div className="relative grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-        <CalendarDays className="h-6 w-6 text-blue-600" />
-        <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
-      </div>
-    ),
+    logo: '/integrations/google-calendar.webp',
+    logoAlt: 'Google Calendar',
   },
   {
     key: 'metaWhatsapp',
@@ -3102,11 +3100,10 @@ const integrationCards: Array<{
     description: 'Conecte pela API oficial da Meta, preparada para coexistencia quando liberada.',
     status: 'Recomendado',
     accent: 'from-emerald-500/12 via-sky-500/10 to-blue-500/12 border-emerald-100 hover:border-emerald-300',
-    icon: (
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#0B5CFF] text-white shadow-sm">
-        <MessageCircle className="h-6 w-6" />
-      </div>
-    ),
+    logo: '/integrations/whatsapp.webp',
+    logoAlt: 'WhatsApp',
+    secondaryLogo: '/integrations/meta-logo.png',
+    secondaryLogoAlt: 'Meta',
   },
   {
     key: 'evolutionWhatsapp',
@@ -3115,11 +3112,9 @@ const integrationCards: Array<{
     description: 'Use a Evolution propria da clinica com URL, API key, instancia e webhook.',
     status: 'Ativo para disparos',
     accent: 'from-emerald-500/12 via-lime-400/10 to-cyan-400/12 border-emerald-100 hover:border-emerald-300',
-    icon: (
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-emerald-300 shadow-sm">
-        <span className="text-sm font-black tracking-tight">EVO</span>
-      </div>
-    ),
+    logo: '/integrations/evolution-logo.webp',
+    logoAlt: 'Evolution API',
+    logoClassName: 'scale-[2.35]',
   },
 ];
 
@@ -3136,6 +3131,22 @@ const WhatsAppBenefits = () => (
         <p className="text-xs text-muted-foreground leading-relaxed mt-1">{item.desc}</p>
       </div>
     ))}
+  </div>
+);
+
+const IntegrationLogo = ({ card }: { card: (typeof integrationCards)[number] }) => (
+  <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+    <img
+      src={card.logo}
+      alt={card.logoAlt}
+      className={`h-9 w-9 object-contain ${card.logoClassName || ''}`}
+      loading="lazy"
+    />
+    {card.secondaryLogo && (
+      <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
+        <img src={card.secondaryLogo} alt={card.secondaryLogoAlt || ''} className="h-3.5 w-3.5 object-contain" loading="lazy" />
+      </span>
+    )}
   </div>
 );
 
@@ -3193,7 +3204,7 @@ const IntegrationsView = () => {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    {card.icon}
+                    <IntegrationLogo card={card} />
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{card.eyebrow}</span>
@@ -3227,7 +3238,7 @@ const IntegrationsView = () => {
           {activeCard && (
             <div className={`rounded-3xl border bg-gradient-to-br ${activeCard.accent} p-5`}>
               <div className="flex items-start gap-4">
-                {activeCard.icon}
+                <IntegrationLogo card={activeCard} />
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{activeCard.eyebrow}</p>
                   <h3 className="mt-1 text-xl font-black text-slate-900 dark:text-white">{activeCard.name}</h3>
@@ -3403,4 +3414,3 @@ const Settings = () => {
 };
 
 export default Settings;
-
