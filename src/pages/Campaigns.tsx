@@ -26,6 +26,9 @@ const VARIABLES = [
   { key: '{{nome}}', label: 'Nome completo' },
   { key: '{{primeiro_nome}}', label: 'Primeiro nome' },
   { key: '{{telefone}}', label: 'Telefone' },
+  { key: '{{data}}', label: 'Data da planilha' },
+  { key: '{{hora}}', label: 'Hora da planilha' },
+  { key: '{{especialista}}', label: 'Dr/especialista da planilha' },
   { key: '{{proxima_data}}', label: 'Data da próxima consulta' },
   { key: '{{proxima_hora}}', label: 'Hora da próxima consulta' },
   { key: '{{ultima_data}}', label: 'Data da última consulta' },
@@ -44,11 +47,19 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: string }>
 const SPREADSHEET_CONTACT_LIMIT = 5000;
 const SPREADSHEET_TEMPLATE_FILE = 'modelo-disparo-sellclin.csv';
 const SPREADSHEET_TEMPLATE_ROWS = [
-  ['nome', 'telefone'],
-  ['Joao Silva', '5511999999999'],
-  ['Maria Souza', '5511988887777'],
-  ['Clinica Exemplo', '11977776666'],
+  ['nome', 'telefone', 'data', 'hora', 'especialista'],
+  ['Joao Silva', '5511999999999', '15/07/2026', '14:30', 'Dra. Ana'],
+  ['Maria Souza', '5511988887777', '16/07/2026', '09:00', 'Dr. Pedro'],
+  ['Clinica Exemplo', '11977776666', '17/07/2026', '11:15', 'Equipe SellClin'],
 ];
+
+type SpreadsheetContact = {
+  name: string;
+  phone: string;
+  date?: string;
+  time?: string;
+  specialist?: string;
+};
 
 type SpreadsheetStats = {
   totalImported: number;
@@ -101,13 +112,16 @@ function parseSpreadsheetContacts(text: string) {
     .map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
   const nameIndex = headers.findIndex(h => ['nome', 'name', 'cliente', 'contato'].includes(h));
   const phoneIndex = headers.findIndex(h => ['telefone', 'phone', 'whatsapp', 'celular', 'numero'].includes(h));
+  const dateIndex = headers.findIndex(h => ['data', 'date', 'dia', 'data_agendamento', 'data_consulta', 'consulta_data'].includes(h));
+  const timeIndex = headers.findIndex(h => ['hora', 'horario', 'time', 'hora_agendamento', 'hora_consulta', 'consulta_hora'].includes(h));
+  const specialistIndex = headers.findIndex(h => ['especialista', 'profissional', 'dr', 'dra', 'doutor', 'doutora', 'medico', 'medica', 'doctor'].includes(h));
 
   if (phoneIndex === -1) {
     return { contacts: [], stats: { ...emptyStats, missingPhoneColumn: true } };
   }
 
   const seen = new Set<string>();
-  const contacts: Array<{ name: string; phone: string }> = [];
+  const contacts: SpreadsheetContact[] = [];
   const dataLines = lines.slice(1);
   const rowsToProcess = dataLines.slice(0, SPREADSHEET_CONTACT_LIMIT);
   let duplicateRows = 0;
@@ -117,6 +131,9 @@ function parseSpreadsheetContacts(text: string) {
     const columns = splitSpreadsheetLine(line, delimiter);
     const phone = String(columns[phoneIndex] || '').replace(/\D/g, '');
     const name = nameIndex >= 0 ? String(columns[nameIndex] || '').trim() : '';
+    const date = dateIndex >= 0 ? String(columns[dateIndex] || '').trim() : '';
+    const time = timeIndex >= 0 ? String(columns[timeIndex] || '').trim() : '';
+    const specialist = specialistIndex >= 0 ? String(columns[specialistIndex] || '').trim() : '';
     if (!phone) {
       invalidRows++;
       continue;
@@ -126,7 +143,7 @@ function parseSpreadsheetContacts(text: string) {
       continue;
     }
     seen.add(phone);
-    contacts.push({ name: name || 'Contato', phone });
+    contacts.push({ name: name || 'Contato', phone, date, time, specialist });
   }
 
   return {
@@ -194,7 +211,7 @@ export default function Campaigns() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagTarget, setTagTarget] = useState<'both' | 'leads' | 'clients'>('both');
-  const [spreadsheetContacts, setSpreadsheetContacts] = useState<Array<{ name: string; phone: string }>>([]);
+  const [spreadsheetContacts, setSpreadsheetContacts] = useState<SpreadsheetContact[]>([]);
   const [spreadsheetFileName, setSpreadsheetFileName] = useState('');
   const [spreadsheetStats, setSpreadsheetStats] = useState<SpreadsheetStats | null>(null);
 
@@ -294,7 +311,7 @@ export default function Campaigns() {
     if (!file) return;
     const lowerName = file.name.toLowerCase();
     if (!lowerName.endsWith('.csv') && !lowerName.endsWith('.tsv') && !lowerName.endsWith('.txt')) {
-      toast({ title: 'Use CSV ou TSV', description: 'Exporte a planilha com colunas nome e telefone.', variant: 'destructive' });
+      toast({ title: 'Use CSV ou TSV', description: 'Exporte a planilha com colunas nome, telefone, data, hora e especialista.', variant: 'destructive' });
       return;
     }
 
@@ -324,7 +341,7 @@ export default function Campaigns() {
       toast({ title: 'Selecione pelo menos uma tag', variant: 'destructive' }); return;
     }
     if (audienceType === 'spreadsheet' && spreadsheetContacts.length === 0) {
-      toast({ title: 'Importe uma planilha', description: 'Use CSV ou TSV com colunas nome e telefone.', variant: 'destructive' }); return;
+      toast({ title: 'Importe uma planilha', description: 'Use CSV ou TSV com colunas nome, telefone, data, hora e especialista.', variant: 'destructive' }); return;
     }
     setIsSending(true);
     try {
@@ -654,10 +671,10 @@ export default function Campaigns() {
                             className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-primary/90"
                           />
                           <p className="mt-2 text-[11px] text-muted-foreground">
-                            Baixe o modelo, preencha os contatos e salve como CSV. Use colunas <strong>nome</strong> e <strong>telefone</strong>.
+                            Baixe o modelo, preencha os contatos e salve como CSV. Use <strong>nome</strong>, <strong>telefone</strong>, <strong>data</strong>, <strong>hora</strong> e <strong>especialista</strong>.
                           </p>
                           <p className="mt-1 text-[10px] text-muted-foreground font-mono">
-                            Exemplo: nome;telefone
+                            Exemplo: nome;telefone;data;hora;especialista
                           </p>
                         </div>
                       </div>
@@ -691,9 +708,14 @@ export default function Campaigns() {
                           )}
                           <div className="mt-2 max-h-24 overflow-y-auto rounded-lg bg-white/70 p-2 text-[11px] text-slate-600">
                             {spreadsheetContacts.slice(0, 5).map((contact, index) => (
-                              <div key={`${contact.phone}-${index}`} className="flex justify-between gap-3">
-                                <span className="truncate">{contact.name}</span>
+                              <div key={`${contact.phone}-${index}`} className="grid grid-cols-[1fr_auto] gap-3 py-1">
+                                <span className="truncate font-semibold">{contact.name}</span>
                                 <span className="font-mono">{contact.phone}</span>
+                                {(contact.date || contact.time || contact.specialist) && (
+                                  <span className="col-span-2 truncate text-[10px] text-slate-500">
+                                    {[contact.date, contact.time, contact.specialist].filter(Boolean).join(' - ')}
+                                  </span>
+                                )}
                               </div>
                             ))}
                             {spreadsheetContacts.length > 5 && (
@@ -1025,7 +1047,14 @@ export default function Campaigns() {
                   <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
                     <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wide mb-1.5">Preview da Mensagem Principal</p>
                     <p className="text-sm text-emerald-800 whitespace-pre-wrap">
-                      {message.replace(/\{\{nome\}\}/gi, 'João da Silva').replace(/\{\{primeiro_nome\}\}/gi, 'João').replace(/\{\{telefone\}\}/gi, '(11) 99999-9999')}
+                      {message
+                        .replace(/\{\{nome\}\}/gi, 'João da Silva')
+                        .replace(/\{\{primeiro_nome\}\}/gi, 'João')
+                        .replace(/\{\{telefone\}\}/gi, '(11) 99999-9999')
+                        .replace(/\{\{data\}\}/gi, '15/07/2026')
+                        .replace(/\{\{hora\}\}/gi, '14:30')
+                        .replace(/\{\{especialista\}\}/gi, 'Dra. Ana')
+                        .replace(/\{\{dr\}\}/gi, 'Dra. Ana')}
                     </p>
                   </div>
                 )}
@@ -1291,3 +1320,4 @@ export default function Campaigns() {
     </div>
   );
 }
+

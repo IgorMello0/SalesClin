@@ -242,6 +242,7 @@ router.post('/', auth(false), async (req, res) => {
               sourceType: r.sourceType,
               sourceId: r.sourceId ?? null,
               status: 'pending',
+              variables: r.variables || undefined,
               renderedMessage: renderMessage(message, r, upcomingAppt, pastAppt)
             }
           })
@@ -484,6 +485,7 @@ interface RecipientData {
   phone: string
   sourceType: 'lead' | 'client' | 'spreadsheet'
   sourceId?: number | null
+  variables?: Record<string, string>
 }
 
 interface AudienceResolution {
@@ -505,6 +507,9 @@ function normalizeSpreadsheetContacts(audienceFilter: any): {
   for (const contact of contacts) {
     const phone = String(contact?.phone || contact?.telefone || contact?.whatsapp || contact?.celular || '').replace(/\D/g, '')
     const name = String(contact?.name || contact?.nome || contact?.cliente || contact?.contato || '').trim() || 'Contato'
+    const date = String(contact?.date || contact?.data || contact?.dia || contact?.dataAgendamento || contact?.data_consulta || '').trim()
+    const time = String(contact?.time || contact?.hora || contact?.horario || contact?.horaAgendamento || contact?.hora_consulta || '').trim()
+    const specialist = String(contact?.specialist || contact?.especialista || contact?.profissional || contact?.dr || contact?.dra || contact?.medico || '').trim()
 
     if (!phone) {
       invalidRows++
@@ -517,7 +522,18 @@ function normalizeSpreadsheetContacts(audienceFilter: any): {
     }
 
     phones.add(phone)
-    recipients.push({ name, phone, sourceType: 'spreadsheet', sourceId: null })
+    recipients.push({
+      name,
+      phone,
+      sourceType: 'spreadsheet',
+      sourceId: null,
+      variables: {
+        data: date,
+        hora: time,
+        especialista: specialist,
+        dr: specialist,
+      },
+    })
   }
 
   const clientStats = audienceFilter?.stats || {}
@@ -703,10 +719,19 @@ function renderMessage(
   upcomingAppt?: any, 
   pastAppt?: any
 ): string {
+  const variables = (recipient.variables && typeof recipient.variables === 'object') ? recipient.variables : {}
+  const spreadsheetDate = String(variables.data || variables.date || '')
+  const spreadsheetTime = String(variables.hora || variables.time || '')
+  const spreadsheetSpecialist = String(variables.especialista || variables.specialist || variables.dr || '')
+
   let msg = template
     .replace(/\{\{nome\}\}/gi, recipient.name)
     .replace(/\{\{telefone\}\}/gi, recipient.phone)
     .replace(/\{\{primeiro_nome\}\}/gi, recipient.name.split(' ')[0])
+    .replace(/\{\{data\}\}/gi, spreadsheetDate)
+    .replace(/\{\{hora\}\}/gi, spreadsheetTime)
+    .replace(/\{\{especialista\}\}/gi, spreadsheetSpecialist)
+    .replace(/\{\{dr\}\}/gi, spreadsheetSpecialist)
 
   // Substituição para o próximo agendamento (futuro)
   if (upcomingAppt) {

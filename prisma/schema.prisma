@@ -971,6 +971,7 @@ model CampaignRecipient {
   sentAt       DateTime?       @map("sent_at")
   errorMessage String?         @map("error_message")
   renderedMessage String?      @map("rendered_message") @db.Text // Mensagem final renderizada
+  variables    Json?           // Dados extras para variaveis de planilha, como data, hora e especialista
   createdAt    DateTime        @default(now()) @map("created_at")
 
   // Relacionamentos
