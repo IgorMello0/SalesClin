@@ -32,7 +32,16 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body as { email: string; password: string }
   const user = await prisma.usuario.findUnique({ 
     where: { email },
-    include: { company: true, role: true, companyAccess: { include: { company: true, role: true } } }
+    include: {
+      company: { select: { id: true, name: true } },
+      role: true,
+      companyAccess: {
+        include: {
+          company: { select: { id: true, name: true } },
+          role: true,
+        },
+      },
+    }
   })
   if (!user) return res.status(401).json(createErrorResponse('Credenciais inválidas', 401))
   if (!user.isActive || !user.emailVerified) {
@@ -104,7 +113,7 @@ router.get('/', auth(), async (req, res) => {
 
       ownedCompanyIds = [req.user.companyId]
     } else {
-      // Buscar profissional com TODAS as empresas que ele possui
+      // Buscar profissional com as empresas que ele controla ou que estao no token.
       const professional = await prisma.professional.findUnique({
         where: { id: req.user.id },
         include: { ownedCompanies: true }
@@ -114,11 +123,12 @@ router.get('/', auth(), async (req, res) => {
         return res.status(400).json(createErrorResponse('Profissional nao possui empresa associada', 400))
       }
 
-      // Coletar todos os IDs de empresa que o profissional controla
-      ownedCompanyIds = professional.ownedCompanies.map(c => c.id);
-      if (professional.companyId && !ownedCompanyIds.includes(professional.companyId)) {
-        ownedCompanyIds.push(professional.companyId);
-      }
+      ownedCompanyIds = Array.from(new Set([
+        ...(req.user.companyId ? [req.user.companyId] : []),
+        ...(req.user.allowedCompanies || []),
+        professional.companyId,
+        ...professional.ownedCompanies.map(c => c.id),
+      ].filter(Boolean) as number[]))
     }
 
     if (ownedCompanyIds.length === 0) {
@@ -141,7 +151,16 @@ router.get('/', auth(), async (req, res) => {
         skip, 
         take, 
         orderBy: { id: 'desc' }, 
-        include: { company: true, role: true, companyAccess: { include: { company: true, role: true } } }
+        include: {
+          company: { select: { id: true, name: true } },
+          role: true,
+          companyAccess: {
+            include: {
+              company: { select: { id: true, name: true } },
+              role: true,
+            },
+          },
+        }
       }),
       prisma.usuario.count({ where })
     ])

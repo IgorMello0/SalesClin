@@ -535,8 +535,9 @@ async function apiRequest<T>(
       if (response.status === 401) {
         localStorage.removeItem('token')
         localStorage.removeItem('professional')
-        // Redirecionar para login apenas se não estiver já na página de login
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+        const publicAuthPaths = ['/login', '/signup', '/accept-invite', '/verify-email', '/forgot-password', '/reset-password']
+        // Redirecionar para login apenas fora das telas publicas de autenticação.
+        if (!publicAuthPaths.includes(window.location.pathname)) {
           window.location.href = '/login'
         }
       }

@@ -234,9 +234,19 @@ const EquipeView = () => {
   const loadClinicas = async () => {
     try {
       const res = await empresasApi.myCompanies();
-      if (res.success) setClinicas(res.data || []);
+      if (res.success) {
+        const merged = new Map<number, any>();
+        for (const clinic of professional?.companies || []) {
+          if (clinic?.id) merged.set(Number(clinic.id), clinic);
+        }
+        for (const clinic of res.data || []) {
+          if (clinic?.id) merged.set(Number(clinic.id), clinic);
+        }
+        setClinicas(Array.from(merged.values()));
+      }
     } catch (e) {
       console.error('Erro ao carregar clínicas', e);
+      setClinicas(professional?.companies || []);
     }
   };
 
@@ -1209,11 +1219,19 @@ const ClinicasView = () => {
     try {
       setLoading(true);
       const res = await empresasApi.myCompanies();
-      if (res.success && res.data) {
-        setClinicas(res.data);
+      if (res.success) {
+        const merged = new Map<number, any>();
+        for (const clinic of professional?.companies || []) {
+          if (clinic?.id) merged.set(Number(clinic.id), clinic);
+        }
+        for (const clinic of res.data || []) {
+          if (clinic?.id) merged.set(Number(clinic.id), clinic);
+        }
+        setClinicas(Array.from(merged.values()));
       }
     } catch (e) {
       toast({ title: 'Erro', description: 'Erro ao carregar clínicas', variant: 'destructive' });
+      setClinicas(professional?.companies || []);
     } finally {
       setLoading(false);
     }
@@ -1546,6 +1564,10 @@ const ClinicasView = () => {
 
       {loading ? (
         <div className="text-center py-4 text-muted-foreground">Carregando clínicas...</div>
+      ) : clinicas.length === 0 ? (
+        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+          Nenhuma clínica encontrada para este acesso. Saia e entre novamente para renovar o token ou verifique se a clínica está vinculada ao proprietário.
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {clinicas.map((c) => (

@@ -8,6 +8,7 @@ export type AuthUser = {
   id: number
   role?: string | null
   companyId?: number | null
+  allowedCompanies?: number[]
   type: 'usuario' | 'profissional' | 'cliente'
 }
 

@@ -20,9 +20,12 @@ router.post('/login', async (req, res) => {
     
     console.log('[Login] Tentativa de login:', email)
     
-    const professional = await prisma.professional.findUnique({ 
+    const professional = await prisma.professional.findUnique({
       where: { email },
-      include: { company: true, ownedCompanies: true }
+      include: {
+        company: { select: { id: true, name: true } },
+        ownedCompanies: { select: { id: true, name: true } },
+      }
     })
     if (!professional) {
       console.log('[Login] Profissional não encontrado:', email)
@@ -85,7 +88,10 @@ router.get('/me', auth(), async (req, res) => {
   try {
     const professional = await prisma.professional.findUnique({
       where: { id: req.user!.id },
-      include: { company: true, ownedCompanies: true }
+      include: {
+        company: { select: { id: true, name: true } },
+        ownedCompanies: { select: { id: true, name: true } },
+      }
     })
     if (!professional) {
       return res.status(404).json(createErrorResponse('Profissional não encontrado', 404))

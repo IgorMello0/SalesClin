@@ -367,17 +367,41 @@ router.get('/my-companies', auth(), async (req, res) => {
 
     const professional = await prisma.professional.findUnique({
       where: { id: req.user.id },
-      select: { companyId: true }
+      select: {
+        companyId: true,
+        ownedCompanies: {
+          where: { isActive: true },
+          select: { id: true },
+        },
+      }
     })
 
+    const allowedCompanyIds = Array.from(new Set([
+      ...(req.user.allowedCompanies || []),
+      ...(professional?.companyId ? [professional.companyId] : []),
+      ...(professional?.ownedCompanies.map((company) => company.id) || []),
+    ].filter(Boolean)))
+
+    if (allowedCompanyIds.length === 0) {
+      return res.json(createSuccessResponse([]))
+    }
+
     const empresas = await prisma.empresa.findMany({
-      where: { 
-        OR: [
-          { ownerId: req.user.id },
-          { id: professional?.companyId || -1 }
-        ]
+      where: {
+        id: { in: allowedCompanyIds },
+        isActive: true,
       },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        whatsapp: true,
+        openHour: true,
+        closeHour: true,
+        isActive: true,
+        createdAt: true,
+      },
     })
 
     res.json(createSuccessResponse(empresas))

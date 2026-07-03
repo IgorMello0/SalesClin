@@ -228,7 +228,7 @@ router.post('/google', async (req, res) => {
 
     let professional = await prisma.professional.findFirst({
       where: { googleId },
-      include: { company: true, ownedCompanies: true },
+      include: { company: { select: { id: true, name: true } }, ownedCompanies: { select: { id: true, name: true } } },
     })
 
     if (professional) {
@@ -241,7 +241,7 @@ router.post('/google', async (req, res) => {
             photoUrl,
             ...(shouldVerifyEmail ? { emailVerified: true, emailVerifiedAt: new Date() } : {}),
           },
-          include: { company: true, ownedCompanies: true },
+          include: { company: { select: { id: true, name: true } }, ownedCompanies: { select: { id: true, name: true } } },
         })
       }
     }
@@ -249,7 +249,7 @@ router.post('/google', async (req, res) => {
     if (!professional) {
       professional = await prisma.professional.findUnique({
         where: { email },
-        include: { company: true, ownedCompanies: true },
+        include: { company: { select: { id: true, name: true } }, ownedCompanies: { select: { id: true, name: true } } },
       })
 
       if (professional) {
@@ -262,7 +262,7 @@ router.post('/google', async (req, res) => {
             emailVerified: true,
             emailVerifiedAt: professional.emailVerifiedAt || new Date(),
           },
-          include: { company: true, ownedCompanies: true },
+          include: { company: { select: { id: true, name: true } }, ownedCompanies: { select: { id: true, name: true } } },
         })
       }
     }
@@ -287,7 +287,7 @@ router.post('/google', async (req, res) => {
           companyId: company.id,
           companyName,
         },
-        include: { company: true, ownedCompanies: true },
+        include: { company: { select: { id: true, name: true } }, ownedCompanies: { select: { id: true, name: true } } },
       })
 
       await ensureCompanyDefaults(prisma, company.id, professional.id)
