@@ -24,6 +24,7 @@ export interface ModulePermission {
   planCode?: string
   subscriptionStatus?: string
   canEdit?: boolean
+  subPermissions?: Record<string, boolean> | null
 }
 
 export interface BillingStatus {
@@ -716,9 +717,9 @@ export const leadsApi = {
   delete: async (id: number) => apiRequest<{ id: number }>(`/leads/${id}`, { method: 'DELETE' }),
   addActivity: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/activities`, { method: 'POST', body: JSON.stringify(data) }),
   updateActivity: async (id: number, activityId: number, data: any) => apiRequest<any>(`/leads/${id}/activities/${activityId}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteActivity: async (id: number, activityId: number) => apiRequest<any>(`/leads/${id}/activities/${activityId}`, { method: 'DELETE' }),
   addProposal: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/proposals`, { method: 'POST', body: JSON.stringify(data) }),
   getProposals: async (id: number) => apiRequest<Array<any>>(`/leads/${id}/proposals`),
+  updateProposal: async (id: number, proposalId: number, data: any) => apiRequest<any>(`/leads/${id}/proposals/${proposalId}`, { method: 'PUT', body: JSON.stringify(data) }),
   confirmPayment: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/confirm-payment`, { method: 'POST', body: JSON.stringify(data) }),
 }
 

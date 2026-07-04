@@ -144,6 +144,7 @@ model Proposal {
   validUntil      DateTime @map("valid_until")
   salespersonId   Int?     @map("salesperson_id")
   specialistId    Int?     @map("specialist_id")
+  sdrId           Int?     @map("sdr_id")
   tags            String[] @default([])
   status          String   @default("pending")
   justification   String?
@@ -153,6 +154,7 @@ model Proposal {
   lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   salesperson     Usuario? @relation("SalespersonProposals", fields: [salespersonId], references: [id])
   specialist      Usuario? @relation("SpecialistProposals", fields: [specialistId], references: [id])
+  sdr             Usuario? @relation("SdrProposals", fields: [sdrId], references: [id])
 
   @@map("proposals")
 }
@@ -448,6 +450,7 @@ model Usuario {
   permissions            UserPermission[]
   proposalsAsSalesperson Proposal[]          @relation("SalespersonProposals")
   proposalsAsSpecialist  Proposal[]          @relation("SpecialistProposals")
+  proposalsAsSdr         Proposal[]          @relation("SdrProposals")
   assignedTasks          Task[]              @relation("AssignedUserTasks")
   createdTasks           Task[]              @relation("CreatedUserTasks")
   notifications          Notification[]      @relation("UserNotifications")
@@ -735,6 +738,8 @@ model RolePermission {
   module         Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   role           Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
+
+
   @@unique([roleId, moduleId])
   @@map("role_permissions")
 }
@@ -969,6 +974,7 @@ model CampaignRecipient {
   phone        String          // Telefone do destinatário
   sourceType   String          @map("source_type") // 'lead', 'client' ou 'spreadsheet'
   sourceId     Int?            @map("source_id")   // ID do lead/client; nulo para planilha
+
   status       RecipientStatus @default(pending)
   sentAt       DateTime?       @map("sent_at")
   errorMessage String?         @map("error_message")

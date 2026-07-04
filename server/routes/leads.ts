@@ -223,7 +223,7 @@ router.get('/:id/proposals', auth(false), async (req, res) => {
 router.post('/:id/proposals', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { title, value, validUntil, salespersonId, specialistId, tags, justification, discountApplied } = req.body
+    const { title, value, validUntil, salespersonId, specialistId, sdrId, tags, justification, discountApplied } = req.body
     
     const proposal = await prisma.proposal.create({
       data: {
@@ -233,7 +233,7 @@ router.post('/:id/proposals', auth(), async (req, res) => {
         validUntil: new Date(validUntil),
         salespersonId: salespersonId ? Number(salespersonId) : null,
         specialistId: specialistId ? Number(specialistId) : null,
-
+        sdrId: sdrId ? Number(sdrId) : null,
         tags: tags || [],
         justification,
         discountApplied: Boolean(discountApplied)
@@ -252,7 +252,7 @@ router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const proposalId = Number(req.params.proposalId)
-    const { title, value, validUntil, salespersonId, specialistId, tags, justification, discountApplied, stage, status } = req.body
+    const { title, value, validUntil, salespersonId, specialistId, sdrId, tags, justification, discountApplied, stage, status } = req.body
     
     const updateData: any = {}
     if (title !== undefined) updateData.title = title
@@ -260,7 +260,7 @@ router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
     if (validUntil !== undefined) updateData.validUntil = new Date(validUntil)
     if (salespersonId !== undefined) updateData.salespersonId = salespersonId ? Number(salespersonId) : null
     if (specialistId !== undefined) updateData.specialistId = specialistId ? Number(specialistId) : null
-
+    if (sdrId !== undefined) updateData.sdrId = sdrId ? Number(sdrId) : null
     if (tags !== undefined) updateData.tags = tags
     if (justification !== undefined) updateData.justification = justification
     if (discountApplied !== undefined) updateData.discountApplied = Boolean(discountApplied)
