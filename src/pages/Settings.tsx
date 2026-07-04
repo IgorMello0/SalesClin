@@ -203,6 +203,7 @@ const EquipeView = () => {
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
+
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [buyingUserExtra, setBuyingUserExtra] = useState(false);
   const [resendingInviteId, setResendingInviteId] = useState<number | null>(null);
@@ -748,46 +749,7 @@ const EquipeView = () => {
                   </div>
                 </div>
 
-                <Separator />
 
-                {/* Permissões Override */}
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-primary" />
-                      Permissões Individuais (Override)
-                    </h4>
-                    <Button 
-                      size="sm" 
-                      onClick={handleSavePermissions} 
-                      disabled={savingPermissions || loadingPermissions}
-                      className="h-7 text-xs px-4"
-                    >
-                      {savingPermissions ? 'Salvando...' : 'Salvar Permissões'}
-                    </Button>
-                  </div>
-
-                  {loadingPermissions ? (
-                    <div className="text-sm text-center py-3 text-muted-foreground">Carregando permissões...</div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {userPermissions.map(p => (
-                        <div 
-                          key={p.moduleId} 
-                          className={`flex items-center justify-between p-2.5 border rounded-lg text-sm transition-colors ${
-                            p.hasAccess ? 'bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900' : 'bg-muted/50 border-muted opacity-60'
-                          }`}
-                        >
-                          <span className="font-medium text-xs">{p.moduleName}</span>
-                          <Switch 
-                            checked={p.hasAccess} 
-                            onCheckedChange={() => handleTogglePermission(p.moduleId)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -942,6 +904,47 @@ const InfoNegocioView = () => {
   );
 };
 
+const SUB_PERMISSIONS_CONFIG: Record<string, Array<{ key: string; label: string }>> = {
+  dashboard: [
+    { key: 'verFaturamento', label: 'Ver Faturamento e Receita' },
+    { key: 'verDesempenhoEquipe', label: 'Ver Desempenho da Equipe' },
+    { key: 'verMetricasLeads', label: 'Ver Métricas Quantitativas de Leads' },
+  ],
+  agendamentos: [
+    { key: 'verAgendamentosAlheios', label: 'Ver Agenda de Outros Profissionais' },
+    { key: 'criarAgendamentos', label: 'Criar Agendamentos' },
+    { key: 'editarAgendamentos', label: 'Editar/Reagendar Agendamentos' },
+    { key: 'cancelarAgendamentos', label: 'Cancelar Agendamentos' },
+  ],
+  clientes: [
+    { key: 'verClientes', label: 'Acesso à aba de Clientes Ativos' },
+    { key: 'verLeads', label: 'Acesso à aba de Leads' },
+    { key: 'exportarContatos', label: 'Permitir Exportar Contatos' },
+    { key: 'editarContatos', label: 'Criar e Editar Fichas' },
+    { key: 'excluirContatos', label: 'Permitir Excluir Contatos' },
+  ],
+  funnel: [
+    { key: 'moverFases', label: 'Permitir Mover Oportunidades de Fase' },
+    { key: 'criarPropostas', label: 'Criar Novas Propostas' },
+    { key: 'aprovarPropostas', label: 'Fechar/Aprovar Propostas' },
+    { key: 'excluirOportunidades', label: 'Excluir Oportunidades do Funil' },
+  ],
+  tarefas: [
+    { key: 'atribuirParaOutros', label: 'Delegar Tarefas para Outros Membros' },
+    { key: 'verTarefasAlheias', label: 'Ver Tarefas de Outros Profissionais' },
+    { key: 'excluirTarefas', label: 'Excluir Tarefas' },
+  ],
+  metas: [
+    { key: 'gerenciarMetas', label: 'Gerenciar Metas da Clínica (Criar/Editar/Excluir)' },
+    { key: 'verMetasEquipe', label: 'Ver Metas de Outros Colaboradores' },
+  ],
+  campanhas: [
+    { key: 'criarCampanhas', label: 'Criar/Disparar Campanhas' },
+    { key: 'conectarWhatsApp', label: 'Conectar/Gerenciar Instância do WhatsApp' },
+    { key: 'excluirCampanhas', label: 'Excluir Campanhas do Histórico' },
+  ],
+};
+
 const CargosView = () => {
   const { toast } = useToast();
   const [roles, setRoles] = useState<any[]>([]);
@@ -1011,7 +1014,9 @@ const CargosView = () => {
           const currentPermissions = modules.map(m => ({
             moduleId: m.id,
             moduleName: m.name,
-            hasAccess: true
+            moduleCode: m.code,
+            hasAccess: true,
+            subPermissions: {}
           }));
           setRolePermissions(currentPermissions);
         }
@@ -1037,7 +1042,9 @@ const CargosView = () => {
       return {
         moduleId: m.id,
         moduleName: m.name,
-        hasAccess: existing ? existing.hasAccess : true
+        moduleCode: m.code,
+        hasAccess: existing ? existing.hasAccess : true,
+        subPermissions: existing ? (existing.subPermissions || {}) : {}
       };
     });
     setRolePermissions(currentPermissions);
@@ -1049,6 +1056,18 @@ const CargosView = () => {
     ));
   };
 
+  const handleToggleSubPermission = (moduleId: number, key: string) => {
+    setRolePermissions(prev => prev.map(p => {
+      if (p.moduleId === moduleId) {
+        const subPerms = { ...(p.subPermissions || {}) };
+        const currentVal = subPerms[key] !== undefined ? subPerms[key] : true;
+        subPerms[key] = !currentVal;
+        return { ...p, subPermissions: subPerms };
+      }
+      return p;
+    }));
+  };
+
   const handleSavePermissions = async () => {
     if (!selectedRoleId) return;
     setSavingPermissions(true);
@@ -1056,7 +1075,11 @@ const CargosView = () => {
       const role = roles.find(r => r.id === selectedRoleId);
       const res = await rolesApi.update(selectedRoleId, {
         name: role.name,
-        permissions: rolePermissions.map(p => ({ moduleId: p.moduleId, hasAccess: p.hasAccess }))
+        permissions: rolePermissions.map(p => ({ 
+          moduleId: p.moduleId, 
+          hasAccess: p.hasAccess,
+          subPermissions: p.subPermissions || {}
+        }))
       });
       if (res.success) {
         toast({ title: 'Salvo!', description: 'Permissões do cargo atualizadas.' });
@@ -1170,21 +1193,54 @@ const CargosView = () => {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {rolePermissions.map(p => (
-                    <div 
-                      key={p.moduleId} 
-                      className={`flex items-center justify-between p-2.5 border rounded-lg text-sm transition-colors ${
-                        p.hasAccess ? 'bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900' : 'bg-muted/50 border-muted opacity-60'
-                      }`}
-                    >
-                      <span className="font-medium text-xs">{p.moduleName}</span>
-                      <Switch 
-                        checked={p.hasAccess} 
-                        onCheckedChange={() => handleTogglePermission(p.moduleId)}
-                      />
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 gap-3">
+                  {rolePermissions.map(p => {
+                    const subPermsList = SUB_PERMISSIONS_CONFIG[p.moduleCode] || [];
+                    return (
+                      <div 
+                        key={p.moduleId} 
+                        className={`p-4 border rounded-2xl transition-all duration-300 ${
+                          p.hasAccess 
+                            ? 'bg-green-50/20 dark:bg-green-950/5 border-green-100 dark:border-green-900/60 shadow-sm' 
+                            : 'bg-muted/30 border-slate-100 dark:border-slate-800/40 opacity-70'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{p.moduleName}</span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">{p.moduleCode}</span>
+                          </div>
+                          <Switch 
+                            checked={p.hasAccess} 
+                            onCheckedChange={() => handleTogglePermission(p.moduleId)}
+                          />
+                        </div>
+
+                        {p.hasAccess && subPermsList.length > 0 && (
+                          <div className="mt-3.5 pt-3 border-t border-dashed border-green-100/50 dark:border-green-900/40 space-y-2.5 pl-2 animate-in fade-in slide-in-from-top-1">
+                            <h5 className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">Permissões Granulares</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {subPermsList.map(sub => {
+                                const isChecked = p.subPermissions?.[sub.key] !== undefined 
+                                  ? p.subPermissions[sub.key] 
+                                  : true;
+                                return (
+                                  <div key={sub.key} className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 shadow-xs hover:border-green-200/50 transition-colors">
+                                    <span className="text-xs text-slate-600 dark:text-slate-300 font-medium pr-2">{sub.label}</span>
+                                    <Switch 
+                                      checked={isChecked}
+                                      onCheckedChange={() => handleToggleSubPermission(p.moduleId, sub.key)}
+                                      className="scale-90"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -666,6 +666,7 @@ model ProfessionalPermission {
   professionalId Int          @map("professional_id")
   moduleId       Int          @map("module_id")
   hasAccess      Boolean      @default(true) @map("has_access")
+  subPermissions Json?        @map("sub_permissions")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   module         Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)

@@ -32,6 +32,7 @@ interface AuthContextType {
   logout: () => void;
   signup: (data: Omit<Professional, 'id'> & { password: string }) => Promise<{ success: boolean; error?: string; requiresEmailVerification?: boolean; email?: string }>;
   hasModuleAccess: (moduleCode: string) => boolean;
+  hasPermission: (moduleCode: string, permissionKey: string) => boolean;
   isLoading: boolean;
   loadPermissions: () => Promise<void>;
   updateProfileData: (data: Partial<Professional>) => void;
@@ -143,15 +144,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Verificar se o usuário tem acesso a um módulo
   const hasModuleAccess = (moduleCode: string): boolean => {
-    // Se não há permissões carregadas, por padrão liberamos para evitar instabilidade
-    // O backend fará a validação final de qualquer forma
+    // Admins (conta da Sellclin) têm acesso irrestrito a todos os módulos
+    if (professional?.role === 'admin') return true;
+    
+    if (!permissionsLoaded) return false;
+    const permission = permissions.find((p) => p.moduleCode === moduleCode);
+    return permission ? permission.hasAccess : false;
+  };
+
+  // Verificar se o usuário tem uma sub-permissão específica
+  const hasPermission = (moduleCode: string, permissionKey: string): boolean => {
     if (!permissionsLoaded) return false;
     
+    // Admins e profissionais têm acesso irrestrito
+    const userRole = professional?.role;
+    const type = localStorage.getItem('userType');
+    if (userRole === 'admin' || type === 'professional') return true;
+
     const permission = permissions.find((p) => p.moduleCode === moduleCode);
-    
-    // Se a permissão não foi encontrada na lista, liberamos por padrão
-    // Se foi encontrada, respeitamos o campo hasAccess
-    return permission ? permission.hasAccess : false;
+    if (!permission || !permission.hasAccess) return false;
+
+    const subPerms = permission.subPermissions;
+    if (!subPerms || subPerms[permissionKey] === undefined) return true;
+
+    return subPerms[permissionKey];
   };
 
   useEffect(() => {
@@ -443,6 +459,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       signup,
       hasModuleAccess,
+      hasPermission,
       isLoading,
       loadPermissions,
       updateProfileData,

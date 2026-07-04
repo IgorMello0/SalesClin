@@ -107,7 +107,8 @@ router.post('/', auth(), async (req, res) => {
           data: permissions.map((p: any) => ({
             roleId: newRole.id,
             moduleId: p.moduleId,
-            hasAccess: p.hasAccess
+            hasAccess: p.hasAccess,
+            subPermissions: p.subPermissions || null
           }))
         })
       }
@@ -148,7 +149,8 @@ router.put('/:id', auth(), async (req, res) => {
           data: permissions.map((p: any) => ({
             roleId: id,
             moduleId: p.moduleId,
-            hasAccess: p.hasAccess
+            hasAccess: p.hasAccess,
+            subPermissions: p.subPermissions || null
           }))
         })
       }

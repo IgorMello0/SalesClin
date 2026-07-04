@@ -58,6 +58,7 @@ router.get('/professional/:id', auth(), async (req, res) => {
         moduleName: module.name,
         moduleIcon: module.icon,
         hasAccess: permission?.hasAccess ?? true, // Por padrão, tem acesso
+        subPermissions: permission?.subPermissions ?? null,
       }
     })
 
@@ -215,6 +216,7 @@ router.get('/user/:id', auth(), async (req, res) => {
         moduleName: module.name,
         moduleIcon: module.icon,
         hasAccess: userPermission?.hasAccess ?? rolePermission?.hasAccess ?? true,
+        subPermissions: rolePermission?.subPermissions ?? null,
         canEdit: true,
       }
     })
@@ -340,7 +342,7 @@ router.get('/my-permissions', auth(), async (req, res) => {
       orderBy: { id: 'asc' },
     })
 
-    const withPlan = (module: { code: string; name: string }, internalHasAccess: boolean) => {
+    const withPlan = (module: { code: string; name: string }, internalHasAccess: boolean, subPermissions?: any) => {
       const planHasAccess = planContext.canAccessModule(module.code)
       return {
         moduleCode: module.code,
@@ -349,11 +351,12 @@ router.get('/my-permissions', auth(), async (req, res) => {
         blockedByPlan: !planHasAccess,
         planCode: planContext.planCode,
         subscriptionStatus: planContext.subscriptionStatus,
+        subPermissions: subPermissions || null
       }
     }
 
     if (req.user.role === 'admin') {
-      return res.json(createSuccessResponse(allModules.map((module) => withPlan(module, true))))
+      return res.json(createSuccessResponse(allModules.map((module) => withPlan(module, true, null))))
     }
 
     if (req.user.type === 'profissional') {
@@ -363,7 +366,7 @@ router.get('/my-permissions', auth(), async (req, res) => {
 
       const permissions = allModules.map((module) => {
         const perm = profPermissions.find((permission) => permission.moduleId === module.id)
-        return withPlan(module, perm?.hasAccess ?? true)
+        return withPlan(module, perm?.hasAccess ?? true, perm?.subPermissions)
       })
 
       return res.json(createSuccessResponse(permissions))
@@ -396,7 +399,7 @@ router.get('/my-permissions', auth(), async (req, res) => {
       const permissions = allModules.map((module) => {
         const individual = userPermissions.find((permission) => permission.moduleId === module.id)
         const rolePermission = rolePermissions.find((permission) => permission.moduleId === module.id)
-        return withPlan(module, individual?.hasAccess ?? rolePermission?.hasAccess ?? true)
+        return withPlan(module, individual?.hasAccess ?? rolePermission?.hasAccess ?? true, rolePermission?.subPermissions)
       })
 
       return res.json(createSuccessResponse(permissions))

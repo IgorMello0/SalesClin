@@ -238,4 +238,135 @@ export function requireModule(moduleCode: string) {
   }
 }
 
+export function requirePermission(moduleCode: string, permissionKey: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json(createErrorResponse('Não autenticado', 401))
+      }
+
+      // Importar prisma aqui para evitar circular dependency
+      const { prisma } = await import('../prisma.js')
+
+      // Buscar o módulo pelo código
+      const module = await prisma.module.findUnique({
+        where: { code: moduleCode },
+      })
+
+      if (!module) {
+        console.warn(`[Auth] Módulo "${moduleCode}" não encontrado no banco. Liberando acesso por padrão.`)
+        return next()
+      }
+
+      const planAccess = await canCompanyAccessModule(req.user.companyId, moduleCode)
+      if (!planAccess.hasAccess) {
+        return res.status(403).json(
+          createErrorResponse('Este modulo nao esta incluido no plano da clinica', 403)
+        )
+      }
+
+      // Admin tem acesso a tudo
+      if (req.user.role === 'admin') {
+        return next()
+      }
+
+      // Profissional tem acesso a tudo por padrão
+      if (req.user.type === 'profissional') {
+        const permission = await prisma.professionalPermission.findUnique({
+          where: {
+            professionalId_moduleId: {
+              professionalId: req.user.id,
+              moduleId: module.id,
+            },
+          },
+        })
+
+        if (permission && !permission.hasAccess) {
+          return res.status(403).json(createErrorResponse('Acesso negado a este módulo', 403))
+        }
+
+        const subPerms = permission?.subPermissions as Record<string, boolean> | null
+        const hasSubAccess = subPerms && subPerms[permissionKey] !== undefined ? subPerms[permissionKey] : true
+
+        if (!hasSubAccess) {
+          return res.status(403).json(createErrorResponse('Acesso negado a esta funcionalidade', 403))
+        }
+
+        return next()
+      } else if (req.user.type === 'usuario') {
+        // Buscar o acesso do usuário à clínica ativa com o respectivo cargo e permissões
+        const companyAccess = await prisma.userCompanyAccess.findUnique({
+          where: {
+            userId_companyId: {
+              userId: req.user.id,
+              companyId: req.user.companyId || 0,
+            },
+          },
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  where: { moduleId: module.id },
+                },
+              },
+            },
+          },
+        })
+
+        // Buscar o usuário global para fallback do cargo
+        const userWithRole = await prisma.usuario.findUnique({
+          where: { id: req.user.id },
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  where: { moduleId: module.id }
+                }
+              }
+            }
+          }
+        })
+
+        if (!userWithRole) {
+          return res.status(403).json(createErrorResponse('Usuário não encontrado', 403))
+        }
+
+        const activeRole = companyAccess?.role || userWithRole.role
+        const rolePermission = activeRole?.permissions[0]
+
+        // Buscar permissão individual (override)
+        const individualPermission = await prisma.userPermission.findUnique({
+          where: {
+            userId_moduleId: {
+              userId: req.user.id,
+              moduleId: module.id,
+            },
+          },
+        })
+
+        const hasAccess = individualPermission?.hasAccess ?? rolePermission?.hasAccess ?? true
+
+        if (!hasAccess) {
+          return res.status(403).json(createErrorResponse('Acesso negado a este módulo', 403))
+        }
+
+        // Se tem acesso ao módulo principal, verifica a sub-permissão granular
+        const subPerms = rolePermission?.subPermissions as Record<string, boolean> | null
+        const hasSubAccess = subPerms && subPerms[permissionKey] !== undefined ? subPerms[permissionKey] : true
+
+        if (!hasSubAccess) {
+          return res.status(403).json(createErrorResponse('Acesso negado a esta funcionalidade', 403))
+        }
+
+        return next()
+      }
+
+      return res.status(403).json(createErrorResponse('Tipo de usuário inválido', 403))
+    } catch (error) {
+      console.error('[Auth] Erro ao verificar sub-permissão:', error)
+      return res.status(500).json(createErrorResponse('Erro ao verificar permissão', 500))
+    }
+  }
+}
+
 
