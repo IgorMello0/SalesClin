@@ -11,6 +11,9 @@ import { Loader2 } from 'lucide-react';
 
 interface Lead {
   id: number;
+  cardId?: string;
+  isProposal?: boolean;
+  proposalId?: number;
   name: string;
   avatar?: string;
   phone?: string;
@@ -21,6 +24,7 @@ interface Lead {
   isPaid?: boolean;
   appointments?: any[];
   tags?: string[];
+  subtitle?: string;
 }
 
 interface FunnelCardProps {
@@ -29,7 +33,7 @@ interface FunnelCardProps {
   isSelected: boolean;
   onToggleSelection: (id: number) => void;
   onSelect: (lead: Lead) => void;
-  onDragStart: (e: React.DragEvent, id: number) => void;
+  onDragStart: (e: React.DragEvent, cardId: string) => void;
   isDragged: boolean;
   activeFunnel: string;
   stageId: string;
@@ -38,7 +42,7 @@ interface FunnelCardProps {
   onScheduleAppointment: (lead: Lead) => void;
   onOpenProposal: (leadId: number, leadValue: number, tags: string[]) => void;
   onOpenPayment: (lead: Lead) => void;
-  onMoveLead: (id: number, status: string) => void;
+  onMoveLead: (cardId: string, status: string) => void;
   onScheduleClosed: (lead: Lead) => void;
   onSetActiveFunnel: (funnelId: string) => void;
   isProcessingSchedule: boolean;
@@ -75,7 +79,7 @@ export function FunnelCard({
   return (
     <div 
       draggable
-      onDragStart={(e) => onDragStart(e, lead.id)}
+      onDragStart={(e) => onDragStart(e, lead.cardId || `lead-${lead.id}`)}
       onClick={() => onSelect(lead)}
       className={cn(
         "premium-card p-3 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",
@@ -99,6 +103,11 @@ export function FunnelCard({
           </div>
           <div>
             <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors flex items-center break-words">{lead.name}</h4>
+            {lead.isProposal && lead.subtitle && (
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md block mt-1 w-max">
+                {lead.subtitle}
+              </span>
+            )}
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="material-symbols-outlined text-[12px] text-emerald-500">chat</span>
               <p className="text-[10px] text-slate-500 font-bold tracking-tight">{lead.phone}</p>
@@ -239,7 +248,7 @@ export function FunnelCard({
           )
         )}
 
-        {stageId === 'comercial_consult' && (
+        {stageId === 'prospect_attended' && (
           <button 
             onClick={(e) => { 
               e.stopPropagation(); 
@@ -261,7 +270,7 @@ export function FunnelCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onMoveLead(lead.id, 'sales_payment');
+                onMoveLead(lead.cardId || `lead-${lead.id}`, 'sales_payment');
                 onSetActiveFunnel('sales');
               }}
               className="w-full py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-primary/20"

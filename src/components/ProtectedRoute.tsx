@@ -6,10 +6,11 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   moduleCode?: string; // Opcional: se fornecido, verifica permissão do módulo
   moduleName?: string; // Nome amigável do módulo para exibição
+  subPermissionKey?: string; // Novo: sub-permissão opcional para verificar
 }
 
-export function ProtectedRoute({ children, moduleCode, moduleName }: ProtectedRouteProps) {
-  const { professional, hasModuleAccess, permissions, permissionsLoaded, isLoading } = useAuth();
+export function ProtectedRoute({ children, moduleCode, moduleName, subPermissionKey }: ProtectedRouteProps) {
+  const { professional, hasModuleAccess, hasPermission, permissions, permissionsLoaded, isLoading } = useAuth();
 
   // Aguardar carregamento
   if (isLoading) {
@@ -43,6 +44,16 @@ export function ProtectedRoute({ children, moduleCode, moduleName }: ProtectedRo
         <ModuleBlockedPage
           moduleName={moduleName || moduleCode}
           reason={permission?.blockedByPlan ? 'plan' : 'permission'}
+        />
+      );
+    }
+
+    // Verificar sub-permissão se informada
+    if (subPermissionKey && !hasPermission(moduleCode, subPermissionKey)) {
+      return (
+        <ModuleBlockedPage
+          moduleName={`${moduleName || moduleCode} (Acesso Restrito)`}
+          reason="permission"
         />
       );
     }

@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Dashboard = () => {
-  const { professional, switchCompany } = useAuth();
+  const { professional, switchCompany, hasPermission } = useAuth();
+  const showBilling = hasPermission('dashboard', 'verFaturamento');
   const [filter, setFilter] = useState<'today' | '7days' | '30days' | 'this_month' | 'custom'>('30days');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -24,6 +25,7 @@ const Dashboard = () => {
     contratos: 0,
     faturamento: 0,
     receita: 0,
+    totalDiscount: 0,
     ticketOrcado: 0,
     ticketFechado: 0,
     conversao: 0,
@@ -49,7 +51,7 @@ const Dashboard = () => {
     }
     return { 
       leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, contratos: 0,
-      faturamento: 0, receita: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
+      faturamento: 0, receita: 0, totalDiscount: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
       conversaoPropostas: 0, conversaoFinanceira: 0, parcelamentoMedioBoleto: 0,
       metodos: { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
       funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
@@ -77,6 +79,7 @@ const Dashboard = () => {
         contratos: Math.floor(currentValues.contratos + ease * ((targets.contratos || 0) - currentValues.contratos)),
         faturamento: Math.floor(currentValues.faturamento + ease * (targets.faturamento - currentValues.faturamento)),
         receita: Math.floor(currentValues.receita + ease * (targets.receita - currentValues.receita)),
+        totalDiscount: Math.floor(currentValues.totalDiscount + ease * ((targets.totalDiscount || 0) - currentValues.totalDiscount)),
         ticketOrcado: Math.floor(currentValues.ticketOrcado + ease * (targets.ticketOrcado - currentValues.ticketOrcado)),
         ticketFechado: Math.floor(currentValues.ticketFechado + ease * (targets.ticketFechado - currentValues.ticketFechado)),
         conversao: Number((currentValues.conversao + ease * (targets.conversao - currentValues.conversao)).toFixed(1)),
@@ -129,6 +132,7 @@ const Dashboard = () => {
           contratos: Math.floor(ease * (targets.contratos || 0)),
           faturamento: Math.floor(ease * targets.faturamento),
           receita: Math.floor(ease * targets.receita),
+          totalDiscount: Math.floor(ease * (targets.totalDiscount || 0)),
           ticketOrcado: Math.floor(ease * targets.ticketOrcado),
           ticketFechado: Math.floor(ease * targets.ticketFechado),
           conversao: Number((ease * targets.conversao).toFixed(1)),
@@ -359,108 +363,136 @@ const Dashboard = () => {
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Propostas Geradas</p>
-            <h3 className="stats-value text-2xl font-black text-primary">{formatCurrency(counters.faturamento)}</h3>
-            <p className="text-slate-400 text-xs font-bold mt-1">
-              {counters.oportunidades} {counters.oportunidades === 1 ? 'proposta criada' : 'propostas criadas'}
-            </p>
+            {showBilling ? (
+              <>
+                <h3 className="stats-value text-2xl font-black text-primary">{formatCurrency(counters.faturamento)}</h3>
+                <p className="text-slate-400 text-xs font-bold mt-1">
+                  {counters.oportunidades} {counters.oportunidades === 1 ? 'proposta criada' : 'propostas criadas'}
+                </p>
+              </>
+            ) : (
+              <h3 className="stats-value text-2xl font-black text-primary">
+                {counters.oportunidades} {counters.oportunidades === 1 ? 'proposta' : 'propostas'}
+              </h3>
+            )}
           </div>
         </Card>
       </div>
 
       {/* Secondary Stats Grid (New Metrics & Double Conversion) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6 relative z-10">
-        {/* Card 5: Faturamento (Contratos Fechados) */}
-        <Card className="p-4 xl:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-lg">
-              <span className="material-symbols-outlined text-xl">handshake</span>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Faturamento Realizado</p>
-            <h4 className="stats-value text-2xl font-black text-emerald-600">{formatCurrency(counters.receita)}</h4>
-            <p className="text-slate-400 text-xs font-bold mt-1">
-              {counters.contratos} {counters.contratos === 1 ? 'contrato fechado' : 'contratos fechados'}
-            </p>
-          </div>
-        </Card>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${showBilling ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-2'} gap-4 lg:gap-6 relative z-10`}>
+        {showBilling && (
+          <>
+            {/* Card 5: Faturamento (Contratos Fechados) */}
+            <Card className="p-4 xl:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-lg">
+                  <span className="material-symbols-outlined text-xl">handshake</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Faturamento Realizado</p>
+                <h4 className="stats-value text-2xl font-black text-emerald-600">{formatCurrency(counters.receita)}</h4>
+                <p className="text-slate-400 text-xs font-bold mt-1">
+                  {counters.contratos} {counters.contratos === 1 ? 'contrato fechado' : 'contratos fechados'}
+                </p>
+              </div>
+            </Card>
 
-        {/* Card 6: Ticket (Orçado) */}
+            {/* Card 6: Ticket (Orçado) */}
+            <Card className="p-4 xl:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-accent/10 text-accent rounded-lg">
+                  <span className="material-symbols-outlined text-xl">calculate</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Ticket (Orçado)</p>
+                <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketOrcado)}</h4>
+                <p className="text-slate-400 text-[11px] font-medium mt-1">média por proposta</p>
+              </div>
+            </Card>
+
+            {/* Card 7: Ticket (Fechado) */}
+            <Card className="p-4 xl:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-accent/10 text-accent rounded-lg">
+                  <span className="material-symbols-outlined text-xl">payments</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Ticket (Fechado)</p>
+                <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketFechado)}</h4>
+                <p className="text-slate-400 text-[11px] font-medium mt-1">média por fechamento</p>
+              </div>
+            </Card>
+
+            {/* Card 8: Parcelamento Médio de Boleto */}
+            <Card className="p-4 xl:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-accent/10 text-accent rounded-lg">
+                  <span className="material-symbols-outlined text-xl">receipt_long</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Parc. Médio Boleto</p>
+                <h4 className="stats-value text-xl font-bold text-accent">{counters.parcelamentoMedioBoleto}x</h4>
+                <p className="text-slate-400 text-[11px] font-medium mt-1">parcelas por boleto</p>
+              </div>
+            </Card>
+
+            {/* Card 8.5: Desconto Concedido */}
+            <Card className="p-4 xl:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-red-500/10 text-red-500 rounded-lg">
+                  <span className="material-symbols-outlined text-xl">local_offer</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Desconto Concedido</p>
+                <h4 className="stats-value text-xl font-bold text-red-500">{formatCurrency(counters.totalDiscount)}</h4>
+                <p className="text-slate-400 text-[11px] font-medium mt-1">acumulado no período</p>
+              </div>
+            </Card>
+          </>
+        )}
+
+        {/* Card 9: Taxa de Conversão Dupla / Simples */}
         <Card className="p-4 xl:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">calculate</span>
+              <span className="material-symbols-outlined text-xl">{showBilling ? (conversionMode === 'percent' ? 'percent' : 'insights') : 'percent'}</span>
             </div>
-          </div>
-          <div className="space-y-1">
-            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Ticket (Orçado)</p>
-            <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketOrcado)}</h4>
-            <p className="text-slate-400 text-[11px] font-medium mt-1">média por proposta</p>
-          </div>
-        </Card>
-
-        {/* Card 7: Ticket (Fechado) */}
-        <Card className="p-4 xl:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">payments</span>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Ticket (Fechado)</p>
-            <h4 className="stats-value text-xl font-bold">{formatCurrency(counters.ticketFechado)}</h4>
-            <p className="text-slate-400 text-[11px] font-medium mt-1">média por fechamento</p>
-          </div>
-        </Card>
-
-        {/* Card 8: Parcelamento Médio de Boleto */}
-        <Card className="p-4 xl:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">receipt_long</span>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">Parc. Médio Boleto</p>
-            <h4 className="stats-value text-xl font-bold text-accent">{counters.parcelamentoMedioBoleto}x</h4>
-            <p className="text-slate-400 text-[11px] font-medium mt-1">parcelas por boleto</p>
-          </div>
-        </Card>
-
-        {/* Card 9: Taxa de Conversão Dupla */}
-        <Card className="p-4 xl:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <span className="material-symbols-outlined text-xl">{conversionMode === 'percent' ? 'percent' : 'insights'}</span>
-            </div>
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-               <button 
-                  onClick={() => setConversionMode('percent')}
-                  className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-all ${conversionMode === 'percent' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Conversão por Quantidade de Propostas"
-               >
-                  Qtd.
-               </button>
-               <button 
-                  onClick={() => setConversionMode('reais')}
-                  className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-all ${conversionMode === 'reais' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Conversão Financeira (Valor de Proposta vs Receita)"
-               >
-                  R$
-               </button>
-            </div>
+            {showBilling && (
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                 <button 
+                    onClick={() => setConversionMode('percent')}
+                    className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-all ${conversionMode === 'percent' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Conversão por Quantidade de Propostas"
+                 >
+                    Qtd.
+                 </button>
+                 <button 
+                    onClick={() => setConversionMode('reais')}
+                    className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-all ${conversionMode === 'reais' ? 'bg-white text-secondary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Conversão Financeira (Valor de Proposta vs Receita)"
+                 >
+                    R$
+                 </button>
+              </div>
+            )}
           </div>
           <div className="space-y-1">
             <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug">
-              {conversionMode === 'percent' ? 'Conversão (Qtd.)' : 'Conversão (Financ.)'}
+              {showBilling ? (conversionMode === 'percent' ? 'Conversão (Qtd.)' : 'Conversão (Financ.)') : 'Conversão de Propostas'}
             </p>
             <div className="flex items-baseline gap-2">
               <h4 className="stats-value text-xl font-bold text-secondary">
-                 {conversionMode === 'percent' ? `${counters.conversaoPropostas}%` : `${counters.conversaoFinanceira}%`}
+                 {showBilling ? (conversionMode === 'percent' ? `${counters.conversaoPropostas}%` : `${counters.conversaoFinanceira}%`) : `${counters.conversaoPropostas}%`}
               </h4>
             </div>
             <p className="text-slate-400 text-[10px] font-medium mt-1">
-              {conversionMode === 'percent' ? 'Contratos / Propostas' : 'Receita / Faturamento'}
+              {showBilling ? (conversionMode === 'percent' ? 'Contratos / Propostas' : 'Receita / Faturamento') : 'Contratos / Propostas'}
             </p>
           </div>
         </Card>
@@ -468,35 +500,37 @@ const Dashboard = () => {
 
 
       {/* Revenue Detail Section */}
-      <section className="space-y-6 relative z-10">
-        <div className="flex items-center gap-3">
-          <h3 className="text-xl font-bold text-primary font-headline">Detalhamento de Receita</h3>
-          <div className="flex-1 h-px bg-border"></div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6">
-          <div className="sm:col-span-2 md:col-span-1 bg-primary/95 backdrop-blur-lg p-4 sm:p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Receita Total</p>
-            <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.receita)}</h4>
+      {showBilling && (
+        <section className="space-y-6 relative z-10 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <h3 className="text-xl font-bold text-primary font-headline">Detalhamento de Receita</h3>
+            <div className="flex-1 h-px bg-border"></div>
           </div>
-          <div className="sm:col-span-2 md:col-span-4 grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6">
-            {[
-              { label: 'Boleto (Gerados)', value: extraData.metodos.boleto?.gerados || 0 },
-              { label: 'Boleto (Pagos)', value: extraData.metodos.boleto?.pagos || 0 },
-              { label: 'Cartão', value: extraData.metodos.cartao },
-              { label: 'Pix / Débito', value: extraData.metodos.pix },
-              { label: 'Dinheiro', value: extraData.metodos.dinheiro },
-            ].map((item) => (
-              <Card key={item.label} className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                  <span className="text-primary text-[10px] font-bold uppercase tracking-tight">{item.label}</span>
-                </div>
-                <h5 className="text-lg font-bold text-primary">{formatCurrency(item.value)}</h5>
-              </Card>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6">
+            <div className="sm:col-span-2 md:col-span-1 bg-primary/95 backdrop-blur-lg p-4 sm:p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Receita Total</p>
+              <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.receita)}</h4>
+            </div>
+            <div className="sm:col-span-2 md:col-span-4 grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6">
+              {[
+                { label: 'Boleto (Gerados)', value: extraData.metodos.boleto?.gerados || 0 },
+                { label: 'Boleto (Pagos)', value: extraData.metodos.boleto?.pagos || 0 },
+                { label: 'Cartão', value: extraData.metodos.cartao },
+                { label: 'Pix / Débito', value: extraData.metodos.pix },
+                { label: 'Dinheiro', value: extraData.metodos.dinheiro },
+              ].map((item) => (
+                <Card key={item.label} className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                    <span className="text-primary text-[10px] font-bold uppercase tracking-tight">{item.label}</span>
+                  </div>
+                  <h5 className="text-lg font-bold text-primary">{formatCurrency(item.value)}</h5>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Two Column Section: Funnel and Origin */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 relative z-10">

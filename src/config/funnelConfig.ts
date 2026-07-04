@@ -24,10 +24,9 @@ export const STAGES: Record<string, FunnelStage[]> = {
     { id: 'prospect_lead', label: 'Novos Leads', color: 'bg-blue-500' },
     { id: 'prospect_qualified', label: 'Qualificados', color: 'bg-indigo-500' },
     { id: 'prospect_scheduled', label: 'Agendados', color: 'bg-violet-500' },
-    { id: 'prospect_attended', label: 'Compareceu', color: 'bg-emerald-500', isTransition: true },
+    { id: 'prospect_attended', label: 'Compareceu', color: 'bg-emerald-500' },
   ],
   commercial: [
-    { id: 'comercial_consult', label: 'Consulta Feita', color: 'bg-emerald-500', isLinked: true },
     { id: 'comercial_proposal', label: 'Proposta', color: 'bg-orange-500' },
     { id: 'comercial_follow', label: 'Follow-up', color: 'bg-amber-500' },
     { id: 'comercial_closed', label: 'Fechado', color: 'bg-green-600' },

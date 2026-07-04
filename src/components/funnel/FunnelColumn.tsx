@@ -21,15 +21,15 @@ interface FunnelColumnProps {
   selectedLeadIds: number[];
   onToggleLeadSelection: (id: number) => void;
   onSelectLead: (lead: any) => void;
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  draggedLeadId: number | null;
+  onDragStart: (e: React.DragEvent, cardId: string) => void;
+  draggedCardId: string | null;
   activeFunnel: string;
   onOpenWhatsApp: (phone: string) => void;
   onSubStatusChange: (id: number, subStatus: string | null) => void;
   onScheduleAppointment: (lead: any) => void;
   onOpenProposal: (leadId: number, leadValue: number, tags: string[]) => void;
   onOpenPayment: (lead: any) => void;
-  onMoveLead: (id: number, status: string) => void;
+  onMoveLead: (cardId: string, status: string) => void;
   onScheduleClosed: (lead: any) => void;
   onSetActiveFunnel: (funnelId: string) => void;
   isProcessingSchedule: boolean;
@@ -51,7 +51,7 @@ export function FunnelColumn({
   onToggleLeadSelection,
   onSelectLead,
   onDragStart,
-  draggedLeadId,
+  draggedCardId,
   activeFunnel,
   onOpenWhatsApp,
   onSubStatusChange,
@@ -99,14 +99,14 @@ export function FunnelColumn({
       )}>
         {stageLeads.map((lead) => (
           <FunnelCard 
-            key={lead.id}
+            key={lead.cardId || lead.id}
             lead={lead}
             isMultiSelectMode={isMultiSelectMode}
             isSelected={selectedLeadIds.includes(lead.id)}
             onToggleSelection={onToggleLeadSelection}
             onSelect={onSelectLead}
             onDragStart={onDragStart}
-            isDragged={draggedLeadId === lead.id}
+            isDragged={draggedCardId === (lead.cardId || `lead-${lead.id}`)}
             activeFunnel={activeFunnel}
             stageId={stage.id}
             onOpenWhatsApp={onOpenWhatsApp}

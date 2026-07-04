@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { leadsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface ProposalDialogProps {
   open: boolean;
@@ -33,22 +34,10 @@ export function ProposalDialog({
   onSuccess
 }: ProposalDialogProps) {
   const { toast } = useToast();
-  const [showJustification, setShowJustification] = useState(false);
-  const [removedTags, setRemovedTags] = useState<string[]>([]);
   const [allProfessionals, setAllProfessionals] = useState<any[]>([]);
   const [specialists, setSpecialists] = useState<any[]>([]);
-  const [proposalData, setProposalData] = useState({
-    title: '',
-    value: '',
-    validUntil: '',
-    salesperson: '',
-    specialist: '',
-    treatment: '',
-    observations: '',
-    tags: [] as string[],
-    justification: '',
-    justificationType: '' as 'desconto' | 'remocao' | ''
-  });
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [proposals, setProposals] = useState<any[]>([]);
 
   // Carregar profissionais e especialistas internamente
   useEffect(() => {
@@ -61,8 +50,9 @@ export function ProposalDialog({
 
           const usrRes = await usuariosApi.getAll();
           if (usrRes.success && usrRes.data) {
+            setAllUsers(usrRes.data);
             const medics = usrRes.data.filter((u: any) => {
-              const role = (u.role || '').toLowerCase();
+              const role = (u.role?.name || u.role || '').toLowerCase();
               return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
             });
             setSpecialists(medics);
@@ -77,13 +67,22 @@ export function ProposalDialog({
 
   useEffect(() => {
     if (lead && open) {
-      setProposalData(prev => ({
-        ...prev,
-        title: `Proposta para ${lead.name}`,
-        value: lead.value > 0 ? (lead.value * 100).toString() : '',
-        salesperson: professional?.id?.toString() || '',
-        tags: lead.tags || []
-      }));
+      setProposals([
+        {
+          title: `Proposta para ${lead.name}`,
+          value: lead.value > 0 ? (lead.value * 100).toString() : '',
+          validUntil: '',
+          salesperson: '', // Changed to empty because Professional ID does not match Usuario ID
+          specialist: '',
+          sdr: '',
+          treatment: '',
+          tags: lead.tags || [] as string[],
+          justification: '',
+          justificationType: '' as 'desconto' | 'remocao' | '',
+          showJustification: false,
+          removedTags: [] as string[]
+        }
+      ]);
     }
   }, [lead, open, professional]);
 
@@ -98,229 +97,312 @@ export function ProposalDialog({
     return Number(value.replace(/\D/g, '')) / 100;
   };
 
+  const handleAddProposal = () => {
+    setProposals(prev => [
+      ...prev,
+      {
+        title: `Proposta para ${lead.name} (${prev.length + 1})`,
+        value: lead.value > 0 ? (lead.value * 100).toString() : '',
+        validUntil: '',
+        salesperson: professional?.id?.toString() || '',
+        specialist: '',
+        sdr: '',
+        treatment: '',
+        tags: lead.tags || [] as string[],
+        justification: '',
+        justificationType: '' as 'desconto' | 'remocao' | '',
+        showJustification: false,
+        removedTags: [] as string[]
+      }
+    ]);
+  };
+
+  const handleRemoveProposal = (index: number) => {
+    if (proposals.length === 1) return;
+    setProposals(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateProposalField = (index: number, field: string, value: any) => {
+    setProposals(prev => prev.map((p, i) => {
+      if (i === index) {
+        return { ...p, [field]: value };
+      }
+      return p;
+    }));
+  };
+
   const handleSaveProposal = async () => {
     if (!lead) return;
 
-    const newValue = parseCurrency(proposalData.value);
-    const isLowerValue = newValue < lead.value;
-    
-    if (isLowerValue && !proposalData.justification) {
-      setShowJustification(true);
-      toast({ 
-        title: "Justificativa Obrigatória", 
-        description: "O valor é menor que o atual. Por favor, informe o motivo.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    const discountApplied = isLowerValue && proposalData.justificationType === 'desconto';
-    
-    let remarketingData = null;
-    if (isLowerValue && proposalData.justificationType === 'remocao' && removedTags.length > 0) {
-      remarketingData = {
-        tags: removedTags,
-        date: new Date().toISOString(),
-        originalValue: lead.value
-      };
+    // Validar justificativas se o valor for menor
+    for (let i = 0; i < proposals.length; i++) {
+      const proposal = proposals[i];
+      const newValue = parseCurrency(proposal.value);
+      if (newValue < lead.value && !proposal.justification) {
+        toast({ 
+          title: `Justificativa Obrigatória (Proposta #${i + 1})`, 
+          description: "O valor é menor que o atual do Lead. Por favor, informe o motivo.", 
+          variant: "destructive" 
+        });
+        return;
+      }
     }
 
     try {
-      // 1. Salvar a Proposta Oficial
-      await leadsApi.addProposal(Number(lead.id), {
-        title: proposalData.title || `Proposta para ${lead.name}`,
-        value: newValue,
-        validUntil: proposalData.validUntil || new Date().toISOString(),
-        salespersonId: proposalData.salesperson,
-        specialistId: proposalData.specialist,
-        tags: proposalData.tags,
-        justification: proposalData.justification,
-        discountApplied: discountApplied
-      });
+      // Usar um loop for...of em vez de Promise.all com map para podermos lançar erro de forma simples e interromper
+      for (let index = 0; index < proposals.length; index++) {
+        const proposalData = proposals[index];
+        const newValue = parseCurrency(proposalData.value);
+        const isLowerValue = newValue < lead.value;
+        const discountApplied = isLowerValue && proposalData.justificationType === 'desconto';
 
-      // 2. Salvar Atividade
-      await leadsApi.addActivity(Number(lead.id), {
-        type: 'proposta',
-        content: `${proposalData.treatment || proposalData.title} - Valor: ${formatCurrency(proposalData.value)}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
-        createdBy: professional?.name || 'Vendedor'
-      });
+        // 1. Salvar a Proposta Oficial
+        const res = await leadsApi.addProposal(Number(lead.id), {
+          title: proposalData.title || `Proposta para ${lead.name} (${index + 1})`,
+          value: newValue,
+          validUntil: proposalData.validUntil || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          salespersonId: proposalData.salesperson ? Number(proposalData.salesperson) : null,
+          specialistId: proposalData.specialist ? Number(proposalData.specialist) : null,
+          sdrId: proposalData.sdr ? Number(proposalData.sdr) : null,
+          tags: proposalData.tags,
+          justification: proposalData.justification || null,
+          discountApplied: discountApplied
+        });
 
-      // 3. Atualizar Lead
-      const updateData: any = {
-        status: 'comercial_proposal',
-        value: newValue,
-        tags: proposalData.tags,
-        justification: proposalData.justification || undefined,
-        discountApplied: discountApplied
-      };
+        if (!res.success) {
+          throw new Error(res.error?.message || 'Erro ao criar proposta no servidor');
+        }
 
-      if (remarketingData) {
-        const existingRemarketing = (lead as any).remarketingProposals || [];
-        updateData.remarketingProposals = [...existingRemarketing, remarketingData];
+        // 2. Salvar Atividade
+        await leadsApi.addActivity(Number(lead.id), {
+          type: 'proposta',
+          content: `${proposalData.treatment || proposalData.title} - Valor: ${formatCurrency(proposalData.value)}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
+          createdBy: professional?.name || 'Vendedor'
+        });
       }
 
-      await leadsApi.update(Number(lead.id), updateData);
+      // 3. Atualizar Lead para comercial_proposal se ele não estiver numa fase mais avançada
+      const leadStatus = lead.status;
+      const statusesBeforeProposal = ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended'];
       
-      toast({ title: "Proposta Salva e Lead Atualizado!" });
+      if (statusesBeforeProposal.includes(leadStatus)) {
+        await leadsApi.update(Number(lead.id), {
+          status: 'comercial_proposal'
+        });
+      }
+      
+      toast({ title: "Propostas Salvas com Sucesso!" });
       onSuccess();
       onOpenChange(false);
     } catch (e) {
-      toast({ title: 'Erro ao salvar proposta', variant: 'destructive' });
+      console.error('[ProposalDialog] Erro ao salvar propostas:', e);
+      toast({ title: 'Erro ao salvar propostas', variant: 'destructive' });
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[750px] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 shadow-2xl">
-        <div className="p-4 sm:p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100">
-          <h3 className="text-lg sm:text-2xl font-extrabold text-primary font-headline tracking-tight">Criação de Proposta Comercial</h3>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1">Defina os termos do tratamento e valores para o paciente.</p>
+      <DialogContent className="sm:max-w-[850px] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 shadow-2xl">
+        <div className="p-4 sm:p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg sm:text-2xl font-extrabold text-primary font-headline tracking-tight">Proposta Comercial</h3>
+            <p className="text-slate-500 text-xs sm:text-sm mt-1">Defina os termos dos tratamentos para o paciente.</p>
+          </div>
+          <Button 
+            onClick={handleAddProposal}
+            variant="outline"
+            className="rounded-xl border-orange-200 text-primary hover:bg-orange-50 hover:text-primary gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Adicionar Outra Proposta
+          </Button>
         </div>
 
-        <div className="p-4 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Título da Proposta</Label>
-              <Input 
-                value={proposalData.title}
-                onChange={(e) => setProposalData({...proposalData, title: e.target.value})}
-                placeholder="Ex: Reabilitação Oral Completa" 
-                className="rounded-xl border-slate-200"
-              />
-            </div>
+        <div className="p-4 sm:p-8 space-y-8 divide-y divide-slate-100">
+          {proposals.map((proposal, index) => {
+            const newValue = parseCurrency(proposal.value);
+            const isLowerValue = newValue < lead.value;
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Total</Label>
-                <Input 
-                  value={formatCurrency(proposalData.value)}
-                  onChange={(e) => setProposalData({...proposalData, value: e.target.value.replace(/\D/g, '')})}
-                  placeholder="R$ 0,00" 
-                  className="rounded-xl border-slate-200"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Válido Até</Label>
-                <Input 
-                  type="date"
-                  value={proposalData.validUntil}
-                  onChange={(e) => setProposalData({...proposalData, validUntil: e.target.value})}
-                  className="rounded-xl border-slate-200"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Vendedor / Consultor</Label>
-              <Select 
-                value={proposalData.salesperson}
-                onValueChange={(v) => setProposalData({...proposalData, salesperson: v})}
-              >
-                <SelectTrigger className="rounded-xl border-slate-200 bg-white">
-                  <SelectValue placeholder="Selecione o consultor">
-                    {allProfessionals.find(p => p.id.toString() === proposalData.salesperson)?.name}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {allProfessionals.map(p => (
-                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {showJustification && (
-              <div className="space-y-4 p-4 bg-orange-50 rounded-2xl border border-orange-100 animate-in fade-in slide-in-from-top-2">
-                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Motivo do Valor Menor</Label>
-                  <Select 
-                    value={proposalData.justificationType}
-                    onValueChange={(v: any) => setProposalData({...proposalData, justificationType: v})}
-                  >
-                    <SelectTrigger className="rounded-xl border-orange-200 bg-white">
-                      <SelectValue placeholder="Selecione o motivo" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white">
-                      <SelectItem value="desconto">Desconto Financeiro</SelectItem>
-                      <SelectItem value="remocao">Remoção de Procedimentos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Justificativa Detalhada</Label>
-                  <Textarea 
-                    value={proposalData.justification}
-                    onChange={(e) => setProposalData({...proposalData, justification: e.target.value})}
-                    placeholder="Explique o motivo do valor reduzido..."
-                    className="rounded-xl border-orange-200 bg-white min-h-[80px]"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Profissional Especialista</Label>
-              <Select onValueChange={(v) => setProposalData({...proposalData, specialist: v})}>
-                <SelectTrigger className="rounded-xl border-slate-200 bg-white">
-                  <SelectValue placeholder="Selecione o especialista" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {specialists.length > 0 ? specialists.map(p => (
-                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                  )) : (
-                    <SelectItem value="none" disabled>Nenhum especialista encontrado</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tags da Proposta (Serviços)</Label>
-              <div className="flex flex-wrap gap-2 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 min-h-[60px] content-start">
-                {services.map((service) => {
-                  const isSelected = proposalData.tags.includes(service.name);
-                  return (
-                    <button
-                      key={service.id}
-                      onClick={() => {
-                        const isRemoving = isSelected;
-                        if (isRemoving) {
-                          setRemovedTags(prev => [...prev, service.name]);
-                        } else {
-                          setRemovedTags(prev => prev.filter(t => t !== service.name));
-                        }
-
-                        const newTags = isSelected
-                          ? proposalData.tags.filter(t => t !== service.name)
-                          : [...proposalData.tags, service.name];
-                        setProposalData({ ...proposalData, tags: newTags });
-                      }}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 border",
-                        isSelected
-                          ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
-                          : "bg-white text-slate-400 border-slate-200 hover:border-primary/30 hover:text-primary hover:bg-white shadow-sm"
-                      )}
+            return (
+              <div key={index} className={cn("space-y-6", index > 0 && "pt-8")}>
+                <div className="flex items-center justify-between">
+                  <span className="bg-orange-100 text-primary text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+                    Opção de Proposta #{index + 1}
+                  </span>
+                  {proposals.length > 1 && (
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleRemoveProposal(index)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl px-3"
                     >
-                      {service.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remover Opção
+                    </Button>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tratamento Proposto</Label>
-              <Textarea 
-                value={proposalData.treatment}
-                onChange={(e) => setProposalData({...proposalData, treatment: e.target.value})}
-                placeholder="Descreva o tratamento agendado..." 
-                className="rounded-xl border-slate-200 min-h-[100px]"
-              />
-            </div>
-          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Título da Proposta</Label>
+                      <Input 
+                        value={proposal.title}
+                        onChange={(e) => updateProposalField(index, 'title', e.target.value)}
+                        placeholder="Ex: Reabilitação Oral Completa" 
+                        className="rounded-xl border-slate-200"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Valor Total</Label>
+                        <Input 
+                          value={formatCurrency(proposal.value)}
+                          onChange={(e) => updateProposalField(index, 'value', e.target.value.replace(/\D/g, ''))}
+                          placeholder="R$ 0,00" 
+                          className="rounded-xl border-slate-200"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Válido Até</Label>
+                        <Input 
+                          type="date"
+                          value={proposal.validUntil}
+                          onChange={(e) => updateProposalField(index, 'validUntil', e.target.value)}
+                          className="rounded-xl border-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Vendedor / Consultor</Label>
+                        <Select 
+                          value={proposal.salesperson}
+                          onValueChange={(v) => updateProposalField(index, 'salesperson', v)}
+                        >
+                          <SelectTrigger className="rounded-xl border-slate-200 bg-white">
+                            <SelectValue placeholder="Selecione">
+                              {allUsers.find(u => u.id.toString() === proposal.salesperson)?.name}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            {allUsers.map(u => (
+                              <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">SDR (Abordagem)</Label>
+                        <Select 
+                          value={proposal.sdr}
+                          onValueChange={(v) => updateProposalField(index, 'sdr', v)}
+                        >
+                          <SelectTrigger className="rounded-xl border-slate-200 bg-white">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            {allUsers.map(u => (
+                              <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {isLowerValue && (
+                      <div className="space-y-4 p-4 bg-orange-50 rounded-2xl border border-orange-100 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Motivo do Valor Menor</Label>
+                          <Select 
+                            value={proposal.justificationType}
+                            onValueChange={(v: any) => updateProposalField(index, 'justificationType', v)}
+                          >
+                            <SelectTrigger className="rounded-xl border-orange-200 bg-white">
+                              <SelectValue placeholder="Selecione o motivo" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white">
+                              <SelectItem value="desconto">Desconto Financeiro</SelectItem>
+                              <SelectItem value="remocao">Remoção de Procedimentos</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Justificativa Detalhada</Label>
+                          <Textarea 
+                            value={proposal.justification}
+                            onChange={(e) => updateProposalField(index, 'justification', e.target.value)}
+                            placeholder="Explique o motivo do valor reduzido..."
+                            className="rounded-xl border-orange-200 bg-white min-h-[80px]"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Profissional Especialista</Label>
+                      <Select 
+                        value={proposal.specialist}
+                        onValueChange={(v) => updateProposalField(index, 'specialist', v)}
+                      >
+                        <SelectTrigger className="rounded-xl border-slate-200 bg-white">
+                          <SelectValue placeholder="Selecione o especialista" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          {specialists.length > 0 ? specialists.map(p => (
+                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                          )) : (
+                            <SelectItem value="none" disabled>Nenhum especialista encontrado</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tags da Proposta (Serviços)</Label>
+                      <div className="flex flex-wrap gap-2 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 min-h-[60px] content-start">
+                        {services.map((service) => {
+                          const isSelected = proposal.tags.includes(service.name);
+                          return (
+                            <button
+                              key={service.id}
+                              onClick={() => {
+                                const newTags = isSelected
+                                  ? proposal.tags.filter((t: string) => t !== service.name)
+                                  : [...proposal.tags, service.name];
+                                updateProposalField(index, 'tags', newTags);
+                              }}
+                              className={cn(
+                                "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 border",
+                                isSelected
+                                  ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
+                                  : "bg-white text-slate-400 border-slate-200 hover:border-primary/30 hover:text-primary hover:bg-white shadow-sm"
+                              )}
+                            >
+                              {service.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Tratamento Proposto</Label>
+                      <Textarea 
+                        value={proposal.treatment}
+                        onChange={(e) => updateProposalField(index, 'treatment', e.target.value)}
+                        placeholder="Descreva o tratamento agendado..." 
+                        className="rounded-xl border-slate-200 min-h-[100px]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <DialogFooter className="p-8 bg-slate-50/50 border-t border-slate-100">
@@ -330,7 +412,7 @@ export function ProposalDialog({
             variant="secondary"
             className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20"
           >
-            Gerar e Salvar Proposta
+            Gerar e Salvar Propostas
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -157,18 +157,18 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       .filter(m => m.status === 'pago')
       .reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0);
 
-    const faturamento = Number(faturamentoTotalAgg._sum.value) || 0;
-    const receita = receitaTotalPeriodo;
+    let faturamento = Number(faturamentoTotalAgg._sum.value) || 0;
+    let receita = receitaTotalPeriodo;
     
     // 4. KPIs de Eficiência Matemáticos
     
     // Ticket Orçado: Faturamento (Valor de Proposta) / Oportunidades (Número de Propostas)
-    const ticketOrcado = oportunidades > 0 
+    let ticketOrcado = oportunidades > 0 
       ? (faturamento / oportunidades) 
       : 0; 
       
     // Ticket Fechado: Receita (Valor Fechado) / Vendas Fechadas (Número de Contratos)
-    const ticketFechado = leadsFechados > 0 
+    let ticketFechado = leadsFechados > 0 
       ? (receita / leadsFechados) 
       : 0;
       
@@ -183,31 +183,69 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       : 0;
 
     // Taxa de Conversão Financeira: Receita Efetiva / Faturamento Orçado
-    const conversaoFinanceira = faturamento > 0 
+    let conversaoFinanceira = faturamento > 0 
       ? ((receita / faturamento) * 100) 
       : 0;
 
-    // Cálculo do Parcelamento Médio de Boleto:
-    // Dividir o número de boletos gerados (método 'transferencia') pelo número de contratos fechados que têm boleto
-    const boletosGrouped = await prisma.payment.groupBy({
-      by: ['clientId'],
-      where: {
-        method: 'transferencia',
-        professionalId: { in: professionalIds },
-        ...(companyId && { companyId }),
-        date: { gte: startDate, lte: endDate }
-      },
-      _count: { id: true }
-    });
+    // Validação de Permissão de Faturamento para Usuários
+    let hasBillingPermission = true;
+    if (req.user?.type === 'usuario' && req.user?.role !== 'admin') {
+      const userPermissions = await prisma.userCompanyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: req.user.id,
+            companyId: req.user.companyId || 0,
+          },
+        },
+        include: {
+          role: {
+            include: {
+              permissions: {
+                where: { module: { code: 'dashboard' } }
+              }
+            }
+          }
+        }
+      });
+      const perm = userPermissions?.role?.permissions[0];
+      const subPerms = perm?.subPermissions as Record<string, boolean> | null;
+      if (subPerms && subPerms.verFaturamento === false) {
+        hasBillingPermission = false;
+      }
+    }
 
-    const totalBoletos = boletosGrouped.reduce((acc, curr) => acc + curr._count.id, 0);
-    const uniqueContratosComBoleto = boletosGrouped.length;
-    const parcelamentoMedioBoleto = uniqueContratosComBoleto > 0 
-      ? Number((totalBoletos / uniqueContratosComBoleto).toFixed(1))
-      : 0;
+    if (!hasBillingPermission) {
+      faturamento = 0;
+      receita = 0;
+      ticketOrcado = 0;
+      ticketFechado = 0;
+      conversaoFinanceira = 0;
+    }
+
+    let parcelamentoMedioBoleto = 0;
+    if (hasBillingPermission) {
+      // Cálculo do Parcelamento Médio de Boleto:
+      // Dividir o número de boletos gerados (método 'transferencia') pelo número de contratos fechados que têm boleto
+      const boletosGrouped = await prisma.payment.groupBy({
+        by: ['clientId'],
+        where: {
+          method: 'transferencia',
+          professionalId: { in: professionalIds },
+          ...(companyId && { companyId }),
+          date: { gte: startDate, lte: endDate }
+        },
+        _count: { id: true }
+      });
+
+      const totalBoletos = boletosGrouped.reduce((acc, curr) => acc + curr._count.id, 0);
+      const uniqueContratosComBoleto = boletosGrouped.length;
+      parcelamentoMedioBoleto = uniqueContratosComBoleto > 0 
+        ? Number((totalBoletos / uniqueContratosComBoleto).toFixed(1))
+        : 0;
+    }
       
     // Processamento dos Agrupamentos (Sub-Métricas)
-    const metodos = {
+    const metodos = hasBillingPermission ? {
       transferencia: {
         gerados: faturamentoPorMetodo.filter(m => m.method === 'transferencia').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
         pagos: faturamentoPorMetodo.filter(m => m.method === 'transferencia' && m.status === 'pago').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0)
@@ -215,6 +253,11 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       cartao: faturamentoPorMetodo.filter(m => m.method === 'cartao' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
       pix: faturamentoPorMetodo.filter(m => m.method === 'pix' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
       dinheiro: faturamentoPorMetodo.filter(m => m.method === 'dinheiro' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
+    } : {
+      transferencia: { gerados: 0, pagos: 0 },
+      cartao: 0,
+      pix: 0,
+      dinheiro: 0
     };
 
     const totalLeadsGlobal = funilStatus.reduce((acc, curr) => acc + curr._count.id, 0);

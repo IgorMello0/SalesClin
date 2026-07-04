@@ -233,6 +233,7 @@ router.post('/:id/proposals', auth(), async (req, res) => {
         validUntil: new Date(validUntil),
         salespersonId: salespersonId ? Number(salespersonId) : null,
         specialistId: specialistId ? Number(specialistId) : null,
+
         tags: tags || [],
         justification,
         discountApplied: Boolean(discountApplied)
@@ -245,6 +246,40 @@ router.post('/:id/proposals', auth(), async (req, res) => {
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar proposta', 500))
   }
 })
+
+// Atualizar Proposta do Lead
+router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const proposalId = Number(req.params.proposalId)
+    const { title, value, validUntil, salespersonId, specialistId, tags, justification, discountApplied, stage, status } = req.body
+    
+    const updateData: any = {}
+    if (title !== undefined) updateData.title = title
+    if (value !== undefined) updateData.value = Number(value) || 0
+    if (validUntil !== undefined) updateData.validUntil = new Date(validUntil)
+    if (salespersonId !== undefined) updateData.salespersonId = salespersonId ? Number(salespersonId) : null
+    if (specialistId !== undefined) updateData.specialistId = specialistId ? Number(specialistId) : null
+
+    if (tags !== undefined) updateData.tags = tags
+    if (justification !== undefined) updateData.justification = justification
+    if (discountApplied !== undefined) updateData.discountApplied = Boolean(discountApplied)
+    if (stage !== undefined || status !== undefined) {
+      updateData.status = stage || status
+    }
+
+    const proposal = await prisma.proposal.update({
+      where: { id: proposalId },
+      data: updateData
+    })
+    
+    res.json(createSuccessResponse(proposal))
+  } catch (error: any) {
+    console.error('[Leads] Erro ao atualizar proposta:', error)
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar proposta', 500))
+  }
+})
+
 
 // Atualizar lead
 router.put('/:id', auth(), async (req, res) => {
@@ -299,7 +334,7 @@ router.put('/:id', auth(), async (req, res) => {
       }
 
       // 2. Se voltou para antes de Proposta (Novos Leads, Qualificados, Agendados, Consulta Feita)
-      const beforeProposalStatuses = ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'comercial_consult'];
+      const beforeProposalStatuses = ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended'];
       if (beforeProposalStatuses.includes(newStatus)) {
         // Cancelar todas as propostas pendentes/ativas do lead
         await prisma.proposal.updateMany({
@@ -314,7 +349,7 @@ router.put('/:id', auth(), async (req, res) => {
       // 3. Se voltou para antes de Fechado (Comercial ou Prospecção)
       const beforeClosedStatuses = [
         'prospect_lead', 'prospect_qualified', 'prospect_scheduled',
-        'comercial_consult', 'comercial_proposal', 'comercial_follow'
+        'prospect_attended', 'comercial_proposal', 'comercial_follow'
       ];
       if (beforeClosedStatuses.includes(newStatus)) {
         // Resetar o estado de conversão do lead para que possa ser convertido novamente

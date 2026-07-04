@@ -83,7 +83,7 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
-  const { professional, logout, hasModuleAccess, permissionsLoaded, switchCompany } = useAuth();
+  const { professional, logout, hasModuleAccess, hasPermission, permissionsLoaded, switchCompany } = useAuth();
   const { isMobileSidebarOpen, setMobileSidebarOpen, isSidebarCollapsed, setSidebarCollapsed } = useLayout();
   const navigate = useNavigate();
   const location = useLocation();
@@ -110,7 +110,19 @@ export function AppSidebar() {
     }
 
     if (!permissionsLoaded) return false;
-    return hasModuleAccess(item.moduleCode);
+    
+    const hasAccess = hasModuleAccess(item.moduleCode);
+    if (!hasAccess) return false;
+
+    // Validar sub-permissões para as abas Clientes e Leads
+    if (item.url === '/clients' && !hasPermission('clientes', 'verClientes')) {
+      return false;
+    }
+    if (item.url === '/leads' && !hasPermission('clientes', 'verLeads')) {
+      return false;
+    }
+
+    return true;
   });
 
   const handleLogout = () => {

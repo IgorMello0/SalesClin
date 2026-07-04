@@ -16,7 +16,7 @@ const DEFAULT_FUNNELS = [
       { code: 'prospect_lead', label: 'Novos Leads', color: 'bg-blue-500', order: 0 },
       { code: 'prospect_qualified', label: 'Qualificados', color: 'bg-indigo-500', order: 1 },
       { code: 'prospect_scheduled', label: 'Agendados', color: 'bg-violet-500', order: 2 },
-      { code: 'prospect_attended', label: 'Compareceu', color: 'bg-emerald-500', order: 3, isTransition: true },
+      { code: 'prospect_attended', label: 'Compareceu', color: 'bg-emerald-500', order: 3 },
     ]
   },
   {
@@ -25,10 +25,9 @@ const DEFAULT_FUNNELS = [
     icon: 'handshake',
     order: 1,
     stages: [
-      { code: 'comercial_consult', label: 'Consulta Feita', color: 'bg-emerald-500', order: 0 },
-      { code: 'comercial_proposal', label: 'Proposta', color: 'bg-orange-500', order: 1 },
-      { code: 'comercial_follow', label: 'Follow-up', color: 'bg-amber-500', order: 2 },
-      { code: 'comercial_closed', label: 'Fechado', color: 'bg-green-600', order: 3 },
+      { code: 'comercial_proposal', label: 'Proposta', color: 'bg-orange-500', order: 0 },
+      { code: 'comercial_follow', label: 'Follow-up', color: 'bg-amber-500', order: 1 },
+      { code: 'comercial_closed', label: 'Fechado', color: 'bg-green-600', order: 2 },
     ]
   },
   {

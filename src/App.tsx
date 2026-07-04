@@ -80,8 +80,8 @@ const App = () => (
                 <Route path="/" element={<AppLayout />}>
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="appointments" element={<ProtectedRoute moduleCode="agendamentos" moduleName="Agenda"><Appointments /></ProtectedRoute>} />
-                  <Route path="clients" element={<ProtectedRoute moduleCode="clientes" moduleName="Clientes"><Clients /></ProtectedRoute>} />
-                  <Route path="leads" element={<ProtectedRoute moduleCode="clientes" moduleName="Leads"><Leads /></ProtectedRoute>} />
+                  <Route path="clients" element={<ProtectedRoute moduleCode="clientes" moduleName="Clientes" subPermissionKey="verClientes"><Clients /></ProtectedRoute>} />
+                  <Route path="leads" element={<ProtectedRoute moduleCode="clientes" moduleName="Leads" subPermissionKey="verLeads"><Leads /></ProtectedRoute>} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="payments" element={<ProtectedRoute moduleCode="pagamentos" moduleName="Financeiro"><Payments /></ProtectedRoute>} />
                   <Route path="conversations" element={<ProtectedRoute moduleCode="conversas" moduleName="Conversas"><Conversations /></ProtectedRoute>} />

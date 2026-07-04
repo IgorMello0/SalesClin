@@ -117,12 +117,19 @@ const SalesFunnel = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [newLeadStage, setNewLeadStage] = useState<string | null>(null);
   const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: '', phone: '', email: '' });
-  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
+  const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConfiguringFunnels, setIsConfiguringFunnels] = useState(false);
   const [dynamicFunnels, setDynamicFunnels] = useState<any[]>([]);
   const [isLoadingFunnels, setIsLoadingFunnels] = useState(true);
+
+  // Proposal Selection State
+  const [proposalSelectionOpen, setProposalSelectionOpen] = useState(false);
+  const [leadForProposalSelection, setLeadForProposalSelection] = useState<any>(null);
+  const [targetStageForSelection, setTargetStageForSelection] = useState<string>("");
+  const [draggedCardIdForSelection, setDraggedCardIdForSelection] = useState<string>("");
+
 
   // Multi-select & Export State
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -232,6 +239,49 @@ const SalesFunnel = () => {
   const [noteText, setNoteText] = useState("");
   const [activityToDeleteId, setActivityToDeleteId] = useState<string | null>(null);
 
+  // Mapeamento de Leads e Orçamentos para os cartões do Funil Kanban
+  const boardCards = useMemo(() => {
+    return leads.flatMap((lead: any) => {
+      if (!lead.proposals || lead.proposals.length === 0) {
+        // Lead sem propostas
+        return [{
+          ...lead,
+          cardId: `lead-${lead.id}`, // Identificador único do cartão
+          isProposal: false,
+          value: Number(lead.value) || 0,
+          displayName: lead.name,
+          subtitle: 'Sem propostas',
+          displayValue: 0
+        }];
+      } else {
+        // Lead com propostas: cada proposta vira um cartão
+        return lead.proposals.map((prop: any) => {
+          // Se o status da proposta não for um ID de fase válido (por exemplo, "pending"), cai no status do lead ou comercial_proposal
+          const isStageId = (status: string) => {
+            return status && (status.startsWith('comercial_') || status.startsWith('sales_') || status.startsWith('prospect_'));
+          };
+          const stage = isStageId(prop.status) ? prop.status : 'comercial_proposal';
+          
+          return {
+            ...lead, // herda dados do lead (nome, telefone, etc.)
+            id: lead.id, // ID do lead (usado para cliques/seleções do lead)
+            cardId: `proposal-${prop.id}`, // Identificador único do cartão
+            isProposal: true,
+            proposalId: prop.id,
+            value: Number(prop.value) || 0,
+            originalValue: Number(prop.originalValue) || 0,
+            discountValue: Number(prop.discountValue) || 0,
+            status: stage, // Define a coluna da proposta!
+            displayName: lead.name,
+            subtitle: prop.title,
+            displayValue: Number(prop.value) || 0,
+            rawProposal: prop
+          };
+        });
+      }
+    });
+  }, [leads]);
+
   const getOriginLabel = (origin: string) => {
     return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
   };
@@ -326,25 +376,26 @@ const SalesFunnel = () => {
     return STAGES[bulkSelectedFunnel as keyof typeof STAGES] || [];
   }, [bulkSelectedFunnel, dynamicFunnels]);
 
-  const filteredAndSortedLeads = useMemo(() => {
-    let result = [...leads];
+    const filteredAndSortedLeads = useMemo(() => {
+    let result = [...boardCards];
 
     // Filter by search term
     if (searchTerm.trim() !== '') {
       const query = searchTerm.toLowerCase();
-      result = result.filter(lead => 
-        lead.name.toLowerCase().includes(query) || 
-        (lead.phone && lead.phone.toLowerCase().includes(query)) ||
-        (lead.email && lead.email.toLowerCase().includes(query))
+      result = result.filter(card => 
+        card.displayName.toLowerCase().includes(query) || 
+        (card.subtitle && card.subtitle.toLowerCase().includes(query)) ||
+        (card.phone && card.phone.toLowerCase().includes(query)) ||
+        (card.email && card.email.toLowerCase().includes(query))
       );
     }
 
     // Filter by origin
     if (filterOrigin !== 'todos') {
-      result = result.filter(lead => lead.origin && lead.origin.toLowerCase() === filterOrigin.toLowerCase());
+      result = result.filter(card => card.origin && card.origin.toLowerCase() === filterOrigin.toLowerCase());
     }
 
-    // Sort leads
+    // Sort cards
     result.sort((a: any, b: any) => {
       const dateA = new Date(a.rawDate || a.updatedAt || a.createdAt || 0).getTime();
       const dateB = new Date(b.rawDate || b.updatedAt || b.createdAt || 0).getTime();
@@ -352,7 +403,7 @@ const SalesFunnel = () => {
     });
 
     return result;
-  }, [leads, searchTerm, filterOrigin, sortOrder]);
+  }, [boardCards, searchTerm, filterOrigin, sortOrder]);
 
   useEffect(() => {
     if (selectedLead) {
@@ -529,9 +580,7 @@ const SalesFunnel = () => {
   };
 
   const moveLead = async (leadId: string, newStatus: string) => {
-    // REGRA DE NEGÓCIO: Se o lead foi para "Compareceu", mover automaticamente para "Consulta Feita"
-    // Isso tira o lead do funil de prospecção e o joga no comercial
-    const finalStatus = newStatus === 'prospect_attended' ? 'comercial_consult' : newStatus;
+    const finalStatus = newStatus;
 
     setLeads(prev => prev.map(lead => {
       if (lead.id === leadId) {
@@ -542,13 +591,6 @@ const SalesFunnel = () => {
 
     try {
       const res = await leadsApi.update(Number(leadId), { status: finalStatus });
-      
-      if (res.success && newStatus === 'prospect_attended') {
-        toast({ 
-          title: "Lead Movido!", 
-          description: "O lead compareceu e foi movido automaticamente para 'Consulta Feita' no Funil Comercial.",
-        });
-      }
 
       // Se o lead foi convertido automaticamente em cliente
       if (res.success && res.data?.converted) {
@@ -564,9 +606,117 @@ const SalesFunnel = () => {
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, leadId: string) => {
-    setDraggedLeadId(leadId);
-    e.dataTransfer.setData('leadId', leadId);
+    const moveCard = async (cardId: string, stageId: string) => {
+    const isProposal = cardId.startsWith('proposal-');
+    const dbId = Number(cardId.split('-')[1]);
+    const isClosingStage = stageId === 'comercial_closed' || stageId.startsWith('sales_');
+
+    // Buscar o lead correspondente
+    let targetLead: any = null;
+    if (isProposal) {
+      targetLead = leads.find(l => l.proposals && l.proposals.some((p: any) => p.id === dbId));
+    } else {
+      targetLead = leads.find(l => l.id === dbId.toString());
+    }
+
+    if (!targetLead) return;
+
+    // Se está movendo para uma fase de fechamento/venda e o lead tem propostas
+    if (isClosingStage && targetLead.proposals && targetLead.proposals.length > 0) {
+      setLeadForProposalSelection(targetLead);
+      setTargetStageForSelection(stageId);
+      setDraggedCardIdForSelection(cardId);
+      setProposalSelectionOpen(true);
+      return;
+    }
+
+    if (isProposal) {
+      const finalStageId = stageId;
+
+      // Atualizar localmente
+      setLeads(prev => prev.map(lead => {
+        if (lead.proposals && lead.proposals.some((p: any) => p.id === dbId)) {
+          return {
+            ...lead,
+            proposals: lead.proposals.map((p: any) => {
+              if (p.id === dbId) {
+                return { ...p, status: finalStageId };
+              }
+              return p;
+            })
+          };
+        }
+        return lead;
+      }));
+
+      try {
+        const res = await leadsApi.updateProposal(Number(targetLead.id), dbId, { stage: finalStageId });
+
+        // Se a proposta foi movida para "Fechado"
+        if (finalStageId === 'comercial_closed') {
+          setPaymentLead({ id: targetLead.id, value: Number(res.data.value), proposalId: dbId } as any);
+          setIsConfirmingPayment(true);
+        }
+      } catch (error) {
+        toast({ title: "Erro ao mover proposta", variant: "destructive" });
+        loadLeads();
+      }
+    } else {
+      // Se for um lead puro sendo movido para fase de fechamento sem propostas
+      if (isClosingStage) {
+        toast({
+          title: "Proposta Necessária",
+          description: "Crie uma proposta para este lead antes de movê-lo para a fase de Fechamento.",
+          variant: "destructive"
+        });
+        return;
+      }
+      await moveLead(dbId.toString(), stageId);
+    }
+  };
+
+  const handleConfirmProposalSelection = async (proposalId: number) => {
+    setProposalSelectionOpen(false);
+    const stageId = targetStageForSelection;
+    const finalStageId = stageId;
+
+    // Atualizar localmente a proposta selecionada para a nova fase
+    setLeads(prev => prev.map(lead => {
+      if (lead.id === leadForProposalSelection.id) {
+        return {
+          ...lead,
+          proposals: lead.proposals.map((p: any) => {
+            if (p.id === proposalId) {
+              return { ...p, status: finalStageId };
+            }
+            return p;
+          })
+        };
+      }
+      return lead;
+    }));
+
+    try {
+      const res = await leadsApi.updateProposal(Number(leadForProposalSelection.id), proposalId, { stage: finalStageId });
+      
+      toast({ 
+        title: "Proposta Avançada!", 
+        description: `A proposta "${res.data.title}" foi movida para a fase selecionada.`,
+      });
+
+      if (finalStageId === 'comercial_closed') {
+        setPaymentLead({ id: leadForProposalSelection.id, value: Number(res.data.value), proposalId } as any);
+        setIsConfirmingPayment(true);
+      }
+    } catch (error) {
+      toast({ title: "Erro ao mover proposta", variant: "destructive" });
+      loadLeads();
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, cardId: string) => {
+    setDraggedCardId(cardId);
+    e.dataTransfer.setData('cardId', cardId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -575,13 +725,13 @@ const SalesFunnel = () => {
     setDropTargetStage(stageId);
   };
 
-  const handleDrop = (e: React.DragEvent, stageId: string) => {
+    const handleDrop = (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
-    const leadId = e.dataTransfer.getData('leadId') || draggedLeadId;
-    if (leadId) {
-      moveLead(leadId, stageId);
+    const cardId = e.dataTransfer.getData('cardId') || draggedCardId;
+    if (cardId) {
+      moveCard(cardId, stageId);
     }
-    setDraggedLeadId(null);
+    setDraggedCardId(null);
     setDropTargetStage(null);
   };
 
@@ -599,7 +749,7 @@ const SalesFunnel = () => {
       return;
     }
 
-    const finalStatus = newLeadStage === 'prospect_attended' ? 'comercial_consult' : (newLeadStage || 'prospect_lead');
+    const finalStatus = newLeadStage || 'prospect_lead';
     
     try {
       const res = await leadsApi.create({
@@ -1288,7 +1438,7 @@ const SalesFunnel = () => {
       </div>
 
       {/* Board */}
-      <FunnelBoard 
+            <FunnelBoard 
         stages={activeStages}
         leads={filteredAndSortedLeads}
         onAddLead={openAddLead}
@@ -1301,7 +1451,7 @@ const SalesFunnel = () => {
         onToggleLeadSelection={toggleLeadSelection}
         onSelectLead={setSelectedLead}
         onDragStart={handleDragStart}
-        draggedLeadId={draggedLeadId}
+        draggedCardId={draggedCardId}
         activeFunnel={activeFunnel}
         onOpenWhatsApp={openWhatsApp}
         onSubStatusChange={handleSubStatusChange}
@@ -1310,11 +1460,11 @@ const SalesFunnel = () => {
           setProposalLeadId(id);
           setIsCreatingProposal(true);
         }}
-        onOpenPayment={(lead) => {
-          setPaymentLead({ id: lead.id, value: lead.value });
+        onOpenPayment={(card) => {
+          setPaymentLead({ id: card.id, value: card.value, proposalId: card.proposalId || null } as any);
           setIsConfirmingPayment(true);
         }}
-        onMoveLead={moveLead}
+        onMoveLead={moveCard}
         onScheduleClosed={(lead) => {
           setClosedLeadToSchedule(lead);
           setIsSchedulingClosed(true);
@@ -2090,10 +2240,57 @@ const SalesFunnel = () => {
         onOpenChange={setIsConfirmingPayment}
         leadId={paymentLead?.id || null}
         leadValue={paymentLead?.value || 0}
+        proposalId={(paymentLead as any)?.proposalId || null}
         onSuccess={() => {
           loadLeads();
         }}
       />
+
+      {/* Modal de Seleção de Proposta para Avançar de Fase */}
+      <Dialog open={proposalSelectionOpen} onOpenChange={setProposalSelectionOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-3xl border-0 bg-white p-6 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-extrabold text-primary">
+              Selecionar Proposta
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <p className="text-slate-500 text-sm">
+              O lead <strong>{leadForProposalSelection?.name}</strong> possui múltiplas propostas. Escolha qual delas será avançada para a fase de <strong>{getStageLabel(targetStageForSelection)}</strong>:
+            </p>
+
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              {leadForProposalSelection?.proposals?.map((prop: any) => (
+                <button
+                  key={prop.id}
+                  onClick={() => handleConfirmProposalSelection(prop.id)}
+                  className="w-full text-left p-4 rounded-2xl border border-slate-200 hover:border-primary hover:bg-orange-50/50 transition-all duration-200 group flex justify-between items-center"
+                >
+                  <div>
+                    <h4 className="font-bold text-slate-800 group-hover:text-primary transition-colors text-sm">
+                      {prop.title}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1 font-bold">
+                      {Number(prop.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </div>
+                  <span className="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors">
+                    arrow_forward_ios
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button variant="ghost" onClick={() => setProposalSelectionOpen(false)} className="rounded-xl w-full sm:w-auto">
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <ProposalViewer
         open={isViewingProposal}
