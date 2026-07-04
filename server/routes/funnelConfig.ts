@@ -366,7 +366,7 @@ async function seedDefaults(companyId: number) {
             label: s.label,
             color: s.color,
             order: s.order,
-            isTransition: s.isTransition || false
+            isTransition: (s as any).isTransition || false
           }))
         }
       }
