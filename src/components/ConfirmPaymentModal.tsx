@@ -156,23 +156,31 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-white border-0 shadow-2xl rounded-3xl p-0 overflow-hidden">
-        <div className="p-6 bg-[#0B1525] relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent pointer-events-none" />
-          <DialogTitle className="text-xl font-bold text-white font-headline flex items-center gap-2 relative z-10">
-            <span className="material-symbols-outlined text-emerald-400">payments</span>
-            Confirmar Recebimento
-          </DialogTitle>
-          <p className="text-emerald-100/70 text-sm mt-1 relative z-10">Defina a forma de pagamento e as parcelas para o valor de R$ {activeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.</p>
+      <DialogContent className="max-w-2xl bg-white border-0 shadow-2xl rounded-3xl p-0 overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+        <div className="p-6 border-b border-slate-100 flex items-start gap-4 bg-white shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 shadow-inner">
+            <span className="material-symbols-outlined text-[24px]">payments</span>
+          </div>
+          <div>
+            <DialogTitle className="text-xl font-bold text-slate-800 font-headline">
+              Confirmar Recebimento
+            </DialogTitle>
+            <p className="text-slate-500 text-sm mt-1">
+              Defina a forma de pagamento e as parcelas para o valor de <strong className="text-emerald-600">R$ {activeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>.
+            </p>
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 bg-slate-50/30 flex-1 overflow-y-auto custom-scrollbar">
           {/* Seletor de Proposta */}
           {proposals.length > 0 && (
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Proposta Vinculada</Label>
+            <div className="space-y-3 animate-in fade-in slide-in-from-top-2 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+              <Label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[14px]">description</span>
+                Proposta Vinculada
+              </Label>
               <Select value={selectedProposalId} onValueChange={setSelectedProposalId}>
-                <SelectTrigger className="h-11 rounded-xl border-orange-200 bg-orange-50/50">
+                <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors">
                   <SelectValue placeholder="Selecione uma proposta...">
                     {selectedProposalId === 'none' 
                       ? 'Nenhuma proposta (usar valor do lead)' 
@@ -185,15 +193,15 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhuma proposta (usar valor do lead)</SelectItem>
-                  {proposals.map(p => (
+                  {proposals.filter(p => p.status !== 'rejected').map(p => (
                     <SelectItem key={p.id} value={p.id.toString()}>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-block w-2 h-2 rounded-full ${p.status === 'pending' ? 'bg-orange-400' : p.status === 'accepted' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                        <span className={`inline-block w-2 h-2 rounded-full ${(p.status === 'pending' || p.status === 'comercial_closed' || p.status === 'sales_payment') ? 'bg-orange-400' : p.status === 'accepted' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                         <span>{p.title}</span>
                         <span className="text-slate-400">—</span>
                         <span className="font-semibold">R$ {Number(p.value).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${p.status === 'pending' ? 'bg-orange-100 text-orange-600' : p.status === 'accepted' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                          {p.status === 'pending' ? 'Pendente' : p.status === 'accepted' ? 'Aceita' : 'Rejeitada'}
+                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${(p.status === 'pending' || p.status === 'comercial_closed' || p.status === 'sales_payment') ? 'bg-orange-100 text-orange-600' : p.status === 'accepted' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                          {(p.status === 'pending' || p.status === 'comercial_closed' || p.status === 'sales_payment') ? 'Pendente' : p.status === 'accepted' ? 'Aceita' : 'Rejeitada'}
                         </span>
                       </div>
                     </SelectItem>
@@ -201,121 +209,134 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                 </SelectContent>
               </Select>
               {selectedProposalId !== 'none' && (
-                <p className="text-xs text-emerald-600 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                  Esta proposta será marcada como <strong>Aceita</strong> ao confirmar o pagamento.
-                </p>
+                <div className="text-xs text-emerald-700 flex items-start gap-2 mt-2 bg-emerald-50/80 p-3 rounded-xl border border-emerald-100">
+                  <span className="material-symbols-outlined text-[16px] mt-0.5 text-emerald-500">check_circle</span>
+                  <span className="leading-relaxed">Esta proposta será marcada como <strong className="text-emerald-800">Aceita</strong> ao confirmar o pagamento.</span>
+                </div>
               )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Forma de Pagamento</Label>
-              <Select value={method} onValueChange={(val) => { setMethod(val); if(val !== 'cartao') setInstallmentsCount(1); }}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Selecione...">
-                    {method === 'cartao' ? 'Cartão de Crédito' : 
-                     method === 'pix' ? 'PIX' : 
-                     method === 'dinheiro' ? 'Dinheiro' : 
-                     method === 'transferencia' ? 'Boleto' : method}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cartao">Cartão de Crédito</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="transferencia">Boleto</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {method === 'cartao' && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-right-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Parcelas</Label>
-                <Select 
-                  value={installmentsCount.toString()} 
-                  onValueChange={(val) => setInstallmentsCount(Number(val))}
-                >
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue placeholder="Parcelas">
-                      {installmentsCount}x
+          <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <Label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="material-symbols-outlined text-[14px]">credit_card</span>
+                  Forma de Pagamento
+                </Label>
+                <Select value={method} onValueChange={(val) => { setMethod(val); if(val !== 'cartao') setInstallmentsCount(1); }}>
+                  <SelectTrigger className="h-12 rounded-xl bg-slate-50 border-slate-200">
+                    <SelectValue placeholder="Selecione...">
+                      {method === 'cartao' ? 'Cartão de Crédito' : 
+                       method === 'pix' ? 'PIX' : 
+                       method === 'dinheiro' ? 'Dinheiro' : 
+                       method === 'transferencia' ? 'Boleto' : method}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
-                      <SelectItem key={n} value={n.toString()}>{n}x</SelectItem>
-                    ))}
+                    <SelectItem value="cartao">Cartão de Crédito</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="transferencia">Boleto</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
-          </div>
 
-          <div className="space-y-3 mt-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Detalhamento das Parcelas</Label>
-            
-            {installments.map((inst, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0">
-                  {idx + 1}
-                </div>
-                
-                <div className="flex-1">
-                  <Input 
-                    type="date"
-                    value={inst.date}
-                    onChange={(e) => handleInstallmentChange(idx, 'date', e.target.value)}
-                    className="h-9 text-sm"
-                  />
-                </div>
-                
-                <div className="flex-1 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
-                  <Input 
-                    type="number"
-                    value={inst.amount}
-                    onChange={(e) => handleInstallmentChange(idx, 'amount', Number(e.target.value))}
-                    className="h-9 text-sm pl-8"
-                    step="0.01"
-                  />
-                </div>
-
-                <div className="flex-1">
-                  <Select value={inst.status} onValueChange={(val) => handleInstallmentChange(idx, 'status', val)}>
-                    <SelectTrigger className="h-9 text-sm">
-                      <SelectValue>
-                        {inst.status === 'pago' ? 'Pago' : 'Pendente'}
+              {method === 'cartao' && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-right-2">
+                  <Label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="material-symbols-outlined text-[14px]">format_list_numbered</span>
+                    Parcelas
+                  </Label>
+                  <Select 
+                    value={installmentsCount.toString()} 
+                    onValueChange={(val) => setInstallmentsCount(Number(val))}
+                  >
+                    <SelectTrigger className="h-12 rounded-xl bg-slate-50 border-slate-200">
+                      <SelectValue placeholder="Parcelas">
+                        {installmentsCount}x
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="pago">Pago</SelectItem>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                        <SelectItem key={n} value={n.toString()}>{n}x</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
 
-          <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-            <div className="text-sm font-medium text-slate-500">
-              Total das parcelas: <span className={Math.abs(installments.reduce((acc, curr) => acc + Number(curr.amount), 0) - activeValue) > 0.1 ? "text-red-500 font-bold" : "text-emerald-500 font-bold"}>
+          <div className="space-y-3 mt-4">
+            <Label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 pl-1">
+              <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+              Detalhamento das Parcelas
+            </Label>
+            <div className="space-y-2.5">
+              {installments.map((inst, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-emerald-200 hover:shadow-md">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 self-start sm:self-auto">
+                    {idx + 1}
+                  </div>
+                  
+                  <div className="flex-1 w-full">
+                    <Input 
+                      type="date"
+                      value={inst.date}
+                      onChange={(e) => handleInstallmentChange(idx, 'date', e.target.value)}
+                      className="h-10 text-sm bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                    />
+                  </div>
+                  
+                  <div className="flex-1 relative w-full">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">R$</span>
+                    <Input 
+                      type="number"
+                      value={inst.amount}
+                      onChange={(e) => handleInstallmentChange(idx, 'amount', Number(e.target.value))}
+                      className="h-10 text-sm pl-9 bg-slate-50 border-slate-200 font-semibold text-slate-700 focus:bg-white transition-colors"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div className="flex-1 w-full">
+                    <Select value={inst.status} onValueChange={(val) => handleInstallmentChange(idx, 'status', val)}>
+                      <SelectTrigger className="h-10 text-sm bg-slate-50 border-slate-200 focus:bg-white transition-colors">
+                        <SelectValue>
+                          {inst.status === 'pago' ? 'Pago' : 'Pendente'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="pago">Pago</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-5 bg-white border-t border-slate-200 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.02)] z-10">
+            <div className="text-sm font-medium text-slate-500 bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm w-full sm:w-auto text-center sm:text-left">
+              Total: <span className={Math.abs(installments.reduce((acc, curr) => acc + Number(curr.amount), 0) - activeValue) > 0.1 ? "text-red-500 font-bold ml-1" : "text-emerald-600 font-extrabold text-base ml-1"}>
                 R$ {installments.reduce((acc, curr) => acc + Number(curr.amount), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
               </span>
             </div>
             
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl font-bold">
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl font-bold flex-1 sm:flex-none">
                 Cancelar
               </Button>
-              <Button onClick={handleSubmit} disabled={loading} className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 border-0 shadow-md shadow-emerald-500/20">
+              <Button onClick={handleSubmit} disabled={loading} className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 border-0 shadow-lg shadow-emerald-500/20 text-white flex-1 sm:flex-none h-10 px-6 transition-all hover:scale-[1.02]">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <span className="material-symbols-outlined text-[18px] mr-1.5">check_circle</span>}
-                Confirmar Recebimento
+                Confirmar
               </Button>
             </div>
           </div>
-        </div>
       </DialogContent>
     </Dialog>
   );

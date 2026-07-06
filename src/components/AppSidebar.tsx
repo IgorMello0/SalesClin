@@ -218,93 +218,71 @@ export function AppSidebar() {
         {/* Clinic Switcher */}
         {professional?.companies && professional.companies.length > 0 && (
           <div className="px-4 py-2 relative z-50">
-            {isSidebarCollapsed && !isMobileSidebarOpen ? (
-              <div className="relative group/company flex justify-center">
-                <button 
-                  onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                  title="Mudar de Clínica"
-                >
-                  <span className="material-symbols-outlined text-[22px]">storefront</span>
-                </button>
-                {companyMenuOpen && (
-                  <div className="absolute left-13 top-0 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-2 text-slate-700 animate-fade-in-up z-[100]">
-                    <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mudar de Clínica</p>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto py-1">
-                      {professional.companies.map((company) => (
-                        <button
-                          key={company.id}
-                          onClick={() => {
-                            setCompanyMenuOpen(false);
-                            switchCompany(company.id);
-                          }}
-                          className={cn(
-                            "w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold transition-colors text-left",
-                            company.id === professional.companyId 
-                              ? "bg-primary/5 text-primary" 
-                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                          )}
-                        >
-                          <span className="material-symbols-outlined text-[16px] shrink-0">
-                            {company.id === professional.companyId ? 'check_circle' : 'business'}
-                          </span>
-                          <span className="truncate">{company.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            {/* Unified Animated Clinic Switcher */}
+            <div className="relative group/company flex flex-col w-full">
+              <button 
+                onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
+                className={cn(
+                  "flex items-center transition-all duration-300 ease-in-out rounded-xl text-left group h-10 overflow-hidden",
+                  isSidebarCollapsed && !isMobileSidebarOpen 
+                    ? "w-10 mx-auto justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-900" 
+                    : "w-full px-3 justify-between bg-transparent hover:bg-slate-50"
                 )}
-              </div>
-            ) : (
-              <div className="relative">
-                <button 
-                  onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
-                  className="w-full flex items-center justify-between bg-transparent hover:bg-slate-50 px-3 py-2.5 rounded-xl transition-colors text-left group"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden flex-1">
-                    <span className="material-symbols-outlined text-[20px] text-slate-400 group-hover:text-slate-700 transition-colors">storefront</span>
-                    <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition-colors truncate">
-                      {professional.companies.find(c => c.id === professional.companyId)?.name || professional.companyName || 'Clínica'}
-                    </span>
-                  </div>
-                  <span className="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-slate-600 transition-colors shrink-0 ml-1">
-                    expand_more
+                title={isSidebarCollapsed && !isMobileSidebarOpen ? "Mudar de Clínica" : undefined}
+              >
+                <div className="flex items-center overflow-hidden">
+                  <span className={cn(
+                    "material-symbols-outlined shrink-0 transition-all duration-300 ease-in-out",
+                    isSidebarCollapsed && !isMobileSidebarOpen ? "text-[22px]" : "text-[20px] text-slate-400 group-hover:text-slate-700"
+                  )}>storefront</span>
+                  <span className={cn(
+                    "text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition-all duration-300 ease-in-out truncate",
+                    isSidebarCollapsed && !isMobileSidebarOpen ? "max-w-0 opacity-0 ml-0 pointer-events-none" : "max-w-[150px] opacity-100 ml-3"
+                  )}>
+                    {professional.companies.find(c => c.id === professional.companyId)?.name || professional.companyName || 'Clínica'}
                   </span>
-                </button>
-                
-                {companyMenuOpen && (
-                  <div className="absolute top-10 left-0 right-0 bg-white rounded-xl shadow-xl border border-slate-200 py-2 text-slate-700 animate-fade-in-up z-[100]">
-                    <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mudar de Clínica</p>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto py-1">
-                      {professional.companies.map((company) => (
-                        <button
-                          key={company.id}
-                          onClick={() => {
-                            setCompanyMenuOpen(false);
-                            switchCompany(company.id);
-                          }}
-                          className={cn(
-                            "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold transition-colors text-left",
-                            company.id === professional.companyId 
-                              ? "bg-primary/5 text-primary" 
-                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                          )}
-                        >
-                          <span className="material-symbols-outlined text-[16px] shrink-0">
-                            {company.id === professional.companyId ? 'check_circle' : 'business'}
-                          </span>
-                          <span className="truncate">{company.name}</span>
-                        </button>
-                      ))}
-                    </div>
+                </div>
+                <span className={cn(
+                  "material-symbols-outlined text-[18px] text-slate-400 group-hover:text-slate-600 transition-all duration-300 ease-in-out shrink-0 overflow-hidden",
+                  isSidebarCollapsed && !isMobileSidebarOpen ? "max-w-0 opacity-0 ml-0 pointer-events-none" : "max-w-[24px] opacity-100 ml-1"
+                )}>
+                  expand_more
+                </span>
+              </button>
+              
+              {companyMenuOpen && (
+                <div className={cn(
+                  "absolute bg-white rounded-xl shadow-xl border border-slate-200 py-2 text-slate-700 animate-fade-in-up z-[100] transition-all duration-300",
+                  isSidebarCollapsed && !isMobileSidebarOpen ? "left-13 top-0 w-60" : "top-10 left-0 right-0"
+                )}>
+                  <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mudar de Clínica</p>
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="max-h-48 overflow-y-auto py-1">
+                    {professional.companies.map((company) => (
+                      <button
+                        key={company.id}
+                        onClick={() => {
+                          setCompanyMenuOpen(false);
+                          switchCompany(company.id);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold transition-colors text-left",
+                          company.id === professional.companyId 
+                            ? "bg-primary/5 text-primary" 
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        )}
+                      >
+                        <span className="material-symbols-outlined text-[16px] shrink-0">
+                          {company.id === professional.companyId ? 'check_circle' : 'business'}
+                        </span>
+                        <span className="truncate">{company.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
         
@@ -325,8 +303,8 @@ export function AppSidebar() {
                 key={item.title}
                 to={item.url}
                 className={cn(
-                  "flex items-center transition-all rounded-xl overflow-hidden group/item",
-                  showOnlyIcons ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2",
+                  "flex items-center transition-all duration-300 ease-in-out rounded-xl overflow-hidden group/item h-10",
+                  showOnlyIcons ? "w-10 mx-auto justify-center px-0" : "w-full px-3",
                   isActive 
                     ? 'bg-slate-50 text-slate-900' 
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
@@ -334,16 +312,16 @@ export function AppSidebar() {
                 title={showOnlyIcons ? item.title : undefined}
               >
                 <span className={cn(
-                  "material-symbols-outlined shrink-0 transition-transform duration-300",
+                  "material-symbols-outlined shrink-0 transition-transform duration-300 ease-in-out",
                   showOnlyIcons ? "text-[22px]" : "text-[18px]",
                   isActive ? "text-secondary" : "group-hover/item:scale-110"
                 )}>{item.icon}</span>
-                {!showOnlyIcons && (
-                  <span className={cn(
-                    "truncate text-xs font-semibold tracking-wide font-headline",
-                    isActive ? "font-bold" : ""
-                  )}>{item.title}</span>
-                )}
+                
+                <span className={cn(
+                  "truncate text-xs font-semibold tracking-wide font-headline transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden",
+                  showOnlyIcons ? "max-w-0 opacity-0 ml-0 pointer-events-none" : "max-w-[200px] opacity-100 ml-3",
+                  isActive ? "font-bold" : ""
+                )}>{item.title}</span>
               </Link>
             );
           })}
@@ -354,130 +332,91 @@ export function AppSidebar() {
           "p-4 mt-auto shrink-0 relative",
           isSidebarCollapsed && !isMobileSidebarOpen ? "p-2 flex justify-center" : "p-4"
         )}>
-          {isSidebarCollapsed && !isMobileSidebarOpen ? (
-            // Collapsed Profile (Only avatar showing, clicking opens the absolute menu)
-            <div className="relative group/profile flex justify-center">
-              <button 
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="w-10 h-10 rounded-full hover:ring-2 hover:ring-primary/20 transition-all flex items-center justify-center bg-slate-50 overflow-hidden border border-slate-200"
-              >
-                {professional?.photoUrl ? (
-                  <img src={getImageUrl(professional.photoUrl)} alt={professional.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xs font-bold text-slate-500">
-                    {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
-                  </span>
-                )}
-              </button>
-              
-              {profileMenuOpen && (
-                <div className="absolute left-12 bottom-0 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 text-slate-700 animate-fade-in-up z-[100]">
-                  <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
-                    <p className="text-xs font-bold text-slate-800 truncate">{professional?.name || 'Usuário'}</p>
-                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{professional?.email}</p>
-                  </div>
-                  <div className="py-1">
-                    <Link
-                      to="/settings?tab=profile"
-                      onClick={() => setProfileMenuOpen(false)}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">person</span>
-                      Meu Perfil
-                    </Link>
-                    {(professional?.role === 'admin' || professional?.role === 'profissional') && (
-                      <Link
-                        to="/settings"
-                        onClick={() => setProfileMenuOpen(false)}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">settings</span>
-                        Configurações
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">logout</span>
-                      Sair
-                    </button>
-                  </div>
-                </div>
+          {/* Unified Animated Profile Footer */}
+          <div className="relative group/profile flex flex-col w-full">
+            <button 
+              onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+              className={cn(
+                "flex items-center transition-all duration-300 ease-in-out overflow-hidden group",
+                isSidebarCollapsed && !isMobileSidebarOpen 
+                  ? "w-10 h-10 rounded-full mx-auto justify-center hover:ring-2 hover:ring-primary/20 bg-slate-50 border border-slate-200" 
+                  : "w-full rounded-xl justify-between bg-transparent hover:bg-slate-50 px-2 py-2"
               )}
-            </div>
-          ) : (
-            // Expanded Profile Card - FLATTENED
-            <div className="relative">
-              <button 
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="w-full flex items-center justify-between bg-transparent hover:bg-slate-50 px-2 py-2 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 overflow-hidden">
-                    {professional?.photoUrl ? (
-                      <img src={getImageUrl(professional.photoUrl)} alt={professional.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-xs font-bold text-slate-400">
-                        {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-start overflow-hidden">
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-slate-900 transition-colors truncate">
-                      {professional?.name || 'Usuário'}
+            >
+              <div className="flex items-center overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 overflow-hidden">
+                  {professional?.photoUrl ? (
+                    <img src={getImageUrl(professional.photoUrl)} alt={professional.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-slate-500">
+                      {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
                     </span>
-                    <span className="text-[10px] text-slate-400 group-hover:text-slate-500 transition-colors truncate">
-                      {professional?.specialization || 'Profissional'}
-                    </span>
-                  </div>
+                  )}
                 </div>
-                
-                <span className="material-symbols-outlined text-[20px] text-slate-400 group-hover:text-slate-600 transition-colors shrink-0">
-                  expand_less
-                </span>
-              </button>
+                <div className={cn(
+                  "flex flex-col items-start overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap",
+                  isSidebarCollapsed && !isMobileSidebarOpen ? "max-w-0 opacity-0 ml-0 pointer-events-none" : "max-w-[150px] opacity-100 ml-3"
+                )}>
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-slate-900 transition-colors truncate w-full text-left">
+                    {professional?.name || 'Usuário'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 group-hover:text-slate-500 transition-colors truncate w-full text-left">
+                    {professional?.specialization || 'Profissional'}
+                  </span>
+                </div>
+              </div>
+              
+              <span className={cn(
+                "material-symbols-outlined text-[20px] text-slate-400 group-hover:text-slate-600 transition-all duration-300 ease-in-out shrink-0 overflow-hidden",
+                isSidebarCollapsed && !isMobileSidebarOpen ? "max-w-0 opacity-0 ml-0 pointer-events-none" : "max-w-[24px] opacity-100 ml-1"
+              )}>
+                expand_less
+              </span>
+            </button>
 
-              {profileMenuOpen && (
-                <div className="absolute bottom-14 left-0 right-0 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 text-slate-700 animate-fade-in-up z-[100]">
-                  <div className="py-1">
+            {profileMenuOpen && (
+              <div className={cn(
+                "absolute bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 text-slate-700 animate-fade-in-up z-[100] transition-all duration-300",
+                isSidebarCollapsed && !isMobileSidebarOpen ? "left-12 bottom-0 w-48" : "bottom-14 left-0 right-0"
+              )}>
+                <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+                  <p className="text-xs font-bold text-slate-800 truncate">{professional?.name || 'Usuário'}</p>
+                  <p className="text-[10px] text-slate-500 truncate mt-0.5">{professional?.email}</p>
+                </div>
+                <div className="py-1">
+                  <Link
+                    to="/settings?tab=profile"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
+                    Meu Perfil
+                  </Link>
+                  {(professional?.role === 'admin' || professional?.role === 'profissional') && (
                     <Link
-                      to="/settings?tab=profile"
+                      to="/settings"
                       onClick={() => setProfileMenuOpen(false)}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-                      Meu Perfil
+                      <span className="material-symbols-outlined text-[16px] text-slate-400">settings</span>
+                      Configurações
                     </Link>
-                    {(professional?.role === 'admin' || professional?.role === 'profissional') && (
-                      <Link
-                        to="/settings"
-                        onClick={() => setProfileMenuOpen(false)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[16px] text-slate-400">settings</span>
-                        Configurações
-                      </Link>
-                    )}
-                    <div className="border-t border-slate-100 my-1" />
-                    <button
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-slate-400">logout</span>
-                      Sair
-                    </button>
-                  </div>
+                  )}
+                  <div className="border-t border-slate-100 my-1" />
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-slate-400">logout</span>
+                    Sair
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </>

@@ -592,6 +592,18 @@ const SalesFunnel = () => {
     try {
       const res = await leadsApi.update(Number(leadId), { status: finalStatus });
 
+      if (finalStatus === 'prospect_scheduled') {
+        setCurrentSchedulingLeadId(Number(leadId));
+        setIsSchedulingAppointment(true);
+      } else if (finalStatus === 'prospect_attended') {
+        setProposalLeadId(Number(leadId));
+        setProposalLeadValue(res.data.value ? Number(res.data.value) : 0);
+        setIsAddingProposal(true);
+      } else if (finalStatus === 'comercial_closed') {
+        setPaymentLead({ id: leadId, value: res.data.value ? Number(res.data.value) : 0 } as any);
+        setIsConfirmingPayment(true);
+      }
+
       // Se o lead foi convertido automaticamente em cliente
       if (res.success && res.data?.converted) {
         toast({ 
@@ -621,9 +633,17 @@ const SalesFunnel = () => {
 
     if (!targetLead) return;
 
-    // Se está movendo para uma fase de fechamento/venda e o lead tem propostas
-    if (isClosingStage && targetLead.proposals && targetLead.proposals.length > 0) {
-      setLeadForProposalSelection(targetLead);
+    // Filtrar propostas ativas (não fechadas nem rejeitadas)
+    const activeProposals = targetLead.proposals ? targetLead.proposals.filter((p: any) => 
+      p.status !== 'accepted' && 
+      p.status !== 'rejected' && 
+      p.status !== 'comercial_closed' &&
+      p.status !== 'sales_payment'
+    ) : [];
+
+    // Se está movendo um LEAD para uma fase de fechamento e ele tem propostas ativas
+    if (!isProposal && isClosingStage && activeProposals.length > 0) {
+      setLeadForProposalSelection({ ...targetLead, proposals: activeProposals });
       setTargetStageForSelection(stageId);
       setDraggedCardIdForSelection(cardId);
       setProposalSelectionOpen(true);
@@ -663,14 +683,7 @@ const SalesFunnel = () => {
       }
     } else {
       // Se for um lead puro sendo movido para fase de fechamento sem propostas
-      if (isClosingStage) {
-        toast({
-          title: "Proposta Necessária",
-          description: "Crie uma proposta para este lead antes de movê-lo para a fase de Fechamento.",
-          variant: "destructive"
-        });
-        return;
-      }
+      // Permitimos que o lead seja movido mesmo sem proposta, para poder cobrar direto
       await moveLead(dbId.toString(), stageId);
     }
   };

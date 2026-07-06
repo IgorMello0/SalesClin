@@ -87,10 +87,10 @@ export function FunnelCard({
         isDropdownOpen && "z-30"
       )}
     >
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex justify-between items-start mb-2 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {isMultiSelectMode && (
-            <div onClick={(e) => e.stopPropagation()} className="animate-in zoom-in-95 duration-200">
+            <div onClick={(e) => e.stopPropagation()} className="animate-in zoom-in-95 duration-200 shrink-0">
               <Checkbox 
                 checked={isSelected} 
                 onCheckedChange={() => onToggleSelection(lead.id)}
@@ -98,23 +98,25 @@ export function FunnelCard({
               />
             </div>
           )}
-          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary border border-primary/5">
+          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary border border-primary/5 shrink-0">
             {lead.avatar || lead.name.charAt(0)}
           </div>
-          <div>
-            <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors flex items-center break-words">{lead.name}</h4>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors truncate">{lead.name}</h4>
             {lead.isProposal && lead.subtitle && (
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md block mt-1 w-max">
-                {lead.subtitle}
-              </span>
+              <div className="mt-1">
+                <span className="inline-block max-w-full truncate text-[9px] font-extrabold uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">
+                  {lead.subtitle}
+                </span>
+              </div>
             )}
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="material-symbols-outlined text-[12px] text-emerald-500">chat</span>
-              <p className="text-[10px] text-slate-500 font-bold tracking-tight">{lead.phone}</p>
+              <span className="material-symbols-outlined text-[12px] text-emerald-500 shrink-0">chat</span>
+              <p className="text-[10px] text-slate-500 font-bold tracking-tight truncate">{lead.phone}</p>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button 
             onClick={(e) => {
               e.stopPropagation();
@@ -267,17 +269,23 @@ export function FunnelCard({
               <span className="material-symbols-outlined text-xs">how_to_reg</span>
               Cliente Ativo
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onMoveLead(lead.cardId || `lead-${lead.id}`, 'sales_payment');
-                onSetActiveFunnel('sales');
-              }}
-              className="w-full py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-primary/20"
-            >
-              <span className="material-symbols-outlined text-xs">payments</span>
-              Iniciar Pagamento
-            </button>
+            {!lead.isPaid ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPayment(lead);
+                }}
+                className="w-full py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-primary/20"
+              >
+                <span className="material-symbols-outlined text-xs">payments</span>
+                Baixar Pagamento
+              </button>
+            ) : (
+              <div className="w-full py-2 bg-green-500/10 text-green-600 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200">
+                <span className="material-symbols-outlined text-xs">check_circle</span>
+                Pagamento Realizado
+              </div>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();

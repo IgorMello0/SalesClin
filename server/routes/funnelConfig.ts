@@ -29,17 +29,6 @@ const DEFAULT_FUNNELS = [
       { code: 'comercial_follow', label: 'Follow-up', color: 'bg-amber-500', order: 1 },
       { code: 'comercial_closed', label: 'Fechado', color: 'bg-green-600', order: 2 },
     ]
-  },
-  {
-    code: 'sales',
-    label: 'Vendas',
-    icon: 'payments',
-    order: 2,
-    stages: [
-      { code: 'sales_payment', label: 'Pagamento', color: 'bg-cyan-500', order: 0 },
-      { code: 'sales_contract', label: 'Contrato', color: 'bg-blue-600', order: 1 },
-      { code: 'sales_post', label: 'Pós-Venda', color: 'bg-purple-500', order: 2 },
-    ]
   }
 ]
 

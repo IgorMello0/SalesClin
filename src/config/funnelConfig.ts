@@ -16,7 +16,6 @@ export interface FunnelDefinition {
 export const FUNNELS: FunnelDefinition[] = [
   { id: 'prospecting', label: 'Prospecção', icon: 'person_search', moduleCode: 'funnel' },
   { id: 'commercial', label: 'Comercial', icon: 'handshake', moduleCode: 'commercial_funnel' },
-  { id: 'sales', label: 'Vendas', icon: 'payments', moduleCode: 'sales_funnel' },
 ];
 
 export const STAGES: Record<string, FunnelStage[]> = {
@@ -30,11 +29,6 @@ export const STAGES: Record<string, FunnelStage[]> = {
     { id: 'comercial_proposal', label: 'Proposta', color: 'bg-orange-500' },
     { id: 'comercial_follow', label: 'Follow-up', color: 'bg-amber-500' },
     { id: 'comercial_closed', label: 'Fechado', color: 'bg-green-600' },
-  ],
-  sales: [
-    { id: 'sales_payment', label: 'Pagamento', color: 'bg-cyan-500' },
-    { id: 'sales_contract', label: 'Contrato', color: 'bg-blue-600' },
-    { id: 'sales_post', label: 'Pós-Venda', color: 'bg-purple-500' },
   ]
 };
 

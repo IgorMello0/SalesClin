@@ -126,7 +126,7 @@ const Signup = () => {
 
       <section className="relative flex-grow flex items-center pt-24 lg:pt-28 pb-16 overflow-hidden bg-white">
         <div className="max-w-7xl mx-auto px-8 w-full relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
             <div className="lg:col-span-6 space-y-8 py-4">
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100/50">
