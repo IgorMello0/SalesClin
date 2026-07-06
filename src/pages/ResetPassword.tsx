@@ -56,7 +56,7 @@ const ResetPassword = () => {
         </Link>
 
         <div className="mt-8 space-y-2">
-          <img src="/logo-site.png" alt="SellClin" className="h-9 w-auto" />
+          <img src="/logo-site.png" alt="SellClin" className="h-7 w-auto translate-y-0.5" />
           <h1 className="text-3xl font-black text-slate-900">Criar nova senha</h1>
           <p className="text-sm leading-relaxed text-slate-500">
             Defina uma senha para acessar sua conta tambem pelo login com e-mail.

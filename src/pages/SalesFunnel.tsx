@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { NewAppointmentModal } from '@/components/NewAppointmentModal';
 import { ConfirmPaymentModal } from '@/components/ConfirmPaymentModal';
-import { clientsApi, leadsApi } from '@/lib/api';
+import { clientsApi, leadsApi, tasksApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from "lucide-react";
 import { useEffect } from 'react';
@@ -49,7 +49,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ExportModal } from "@/components/ExportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, History, FileDown, Edit2, Check, X, Eye, Plus, Trash2 } from "lucide-react";
+import { FileText, History, FileDown, Edit2, Check, X, Eye, Plus, Trash2, CheckSquare, Calendar } from "lucide-react";
 import { FunnelBoard } from '@/components/funnel/FunnelBoard';
 import { ProposalDialog } from '@/components/funnel/ProposalDialog';
 import { FunnelSettingsDialog } from '@/components/funnel/FunnelSettingsDialog';
@@ -238,6 +238,14 @@ const SalesFunnel = () => {
   const [tempActivityContent, setTempActivityContent] = useState("");
   const [noteText, setNoteText] = useState("");
   const [activityToDeleteId, setActivityToDeleteId] = useState<string | null>(null);
+
+  // Tasks State
+  const [leadTasks, setLeadTasks] = useState<any[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
+  const [newTaskDate, setNewTaskDate] = useState("");
+  const [isSavingTask, setIsSavingTask] = useState(false);
 
   // Mapeamento de Leads e Orçamentos para os cartões do Funil Kanban
   const boardCards = useMemo(() => {
@@ -556,9 +564,60 @@ const SalesFunnel = () => {
   useEffect(() => {
     if (selectedLead) {
       loadProposals(Number(selectedLead.id));
+      loadTasks(Number(selectedLead.id));
       setActiveDetailsTab("activities");
     }
   }, [selectedLead]);
+
+  const loadTasks = async (leadId: number) => {
+    try {
+      const res = await tasksApi.getAll({ leadId });
+      if (res.success) {
+        setLeadTasks(res.data || []);
+      }
+    } catch (e) {
+      console.error("Error loading tasks:", e);
+    }
+  };
+
+  const handleSaveTask = async () => {
+    if (!newTaskTitle.trim() || !selectedLead) return;
+    setIsSavingTask(true);
+    try {
+      const payload = {
+        title: newTaskTitle,
+        description: newTaskDescription,
+        status: 'pending',
+        priority: newTaskPriority,
+        dueDate: newTaskDate || new Date().toISOString(),
+        leadId: selectedLead.id,
+        assignedToId: professional?.id
+      };
+      const res = await tasksApi.create(payload);
+      if (res.success) {
+        setNewTaskTitle("");
+        setNewTaskDescription("");
+        setNewTaskPriority("medium");
+        setNewTaskDate("");
+        loadTasks(Number(selectedLead.id));
+        toast({ title: "Tarefa adicionada com sucesso" });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao adicionar tarefa", variant: "destructive" });
+    } finally {
+      setIsSavingTask(false);
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'low': return 'Baixa';
+      case 'medium': return 'Média';
+      case 'high': return 'Alta';
+      case 'urgent': return 'Urgente';
+      default: return 'Média';
+    }
+  };
 
   const loadProposals = async (leadId: number) => {
     setIsLoadingProposals(true);
@@ -1653,24 +1712,24 @@ const SalesFunnel = () => {
 
       {/* Lead Details Modal */}
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-        <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 flex flex-col w-full h-full sm:h-auto">
+        <DialogContent className="sm:max-w-6xl max-h-[95vh] sm:h-[90vh] overflow-hidden rounded-none sm:rounded-[2rem] border-0 sm:border sm:border-slate-100 bg-slate-50 p-0 flex flex-col lg:flex-row w-full shadow-2xl">
           {selectedLead && (
             <>
-              {/* Header Profile Section */}
-              <div className="p-4 sm:p-8 bg-gradient-to-br from-primary/5 to-transparent border-b border-slate-100">
-                <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 items-start">
-                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-primary flex items-center justify-center text-2xl sm:text-3xl font-extrabold text-white">
+              {/* Left Sidebar */}
+              <div className="w-full lg:w-[400px] shrink-0 h-auto lg:h-full overflow-y-auto custom-scrollbar bg-white lg:border-r border-b lg:border-b-0 border-slate-100 flex flex-col p-6 sm:p-8 z-20 relative">
+                <div className="flex flex-col gap-6 items-center w-full">
+                  <div className="w-24 h-24 rounded-[1.75rem] bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-4xl font-extrabold text-white shadow-xl shadow-primary/20 ring-4 ring-slate-50 shrink-0">
                     {selectedLead.avatar}
                   </div>
-                  <div className="flex-1 space-y-4">
-                    <div className="flex justify-between items-start w-full">
-                      <div className="flex-1">
+                  <div className="flex-1 space-y-4 w-full flex flex-col items-center">
+                    <div className="flex flex-col items-center justify-center w-full gap-3">
+                      <div className="w-full flex items-center justify-center">
                         {isEditingName ? (
-                          <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2">
+                          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 w-full">
                             <Input 
                               value={tempName}
                               onChange={(e) => setTempName(e.target.value)}
-                              className="text-xl sm:text-2xl font-extrabold text-primary font-headline tracking-tighter h-12 rounded-xl border-secondary focus-visible:ring-secondary/20 bg-white"
+                              className="text-2xl text-center font-extrabold text-primary font-headline tracking-tighter h-12 rounded-xl border-secondary focus-visible:ring-secondary/20 bg-white w-full"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleUpdateName();
@@ -1697,9 +1756,9 @@ const SalesFunnel = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 group/name">
+                          <div className="flex items-center gap-3 group/name relative justify-center w-full">
                             <h3 
-                              className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tighter cursor-pointer hover:text-primary/80 transition-colors"
+                              className="text-2xl font-extrabold text-primary font-headline tracking-tighter cursor-pointer hover:text-primary/80 transition-colors text-center"
                               onClick={() => setIsEditingName(true)}
                             >
                               {selectedLead.name}
@@ -1712,13 +1771,15 @@ const SalesFunnel = () => {
                             </button>
                           </div>
                         )}
-                        <div className="flex flex-col sm:flex-row gap-2 mt-1 w-full items-start sm:items-center">
+                      </div>
+                      
+                      <div className="flex flex-col gap-2 mt-2 w-full items-center justify-center">
                           <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-secondary animate-pulse-subtle"></span>
                             <span className="text-on-surface-variant font-medium text-xs sm:text-sm">Estágio:</span>
                           </div>
                           
-                          <div className="flex gap-2 items-center flex-wrap">
+                          <div className="flex gap-2 items-center justify-center flex-wrap w-full">
                             <Select
                               value={selectedFunnelForEdit}
                               onValueChange={(newFunnel) => {
@@ -1769,12 +1830,11 @@ const SalesFunnel = () => {
                             </Select>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex gap-2 mr-8 sm:mr-6">
+                      <div className="flex gap-3 w-full mt-2">
                         <Button 
                           onClick={() => openWhatsApp(selectedLead.phone)}
                           variant="outline" 
-                          className="rounded-full h-10 w-10 p-0 border-slate-200 text-emerald-500 hover:bg-emerald-50"
+                          className="rounded-full flex-1 h-12 p-0 border-slate-200 text-emerald-500 hover:bg-emerald-50 shadow-sm"
                           title="Abrir WhatsApp"
                         >
                           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -1784,7 +1844,7 @@ const SalesFunnel = () => {
                         <Button 
                           onClick={() => window.open(`tel:${selectedLead.phone}`)}
                           variant="outline" 
-                          className="rounded-full h-10 w-10 p-0 border-slate-200 text-blue-500 hover:bg-blue-50"
+                          className="rounded-full flex-1 h-12 p-0 border-slate-200 text-blue-500 hover:bg-blue-50 shadow-sm"
                           title="Ligar"
                         >
                           <span className="material-symbols-outlined text-xl">call</span>
@@ -1792,7 +1852,8 @@ const SalesFunnel = () => {
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 pt-3 sm:pt-4">
+                    <hr className="border-slate-100 my-4 w-full" />
+                    <div className="flex flex-col gap-4 w-full">
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</p>
                         {isEditingPhone ? (
@@ -1853,9 +1914,9 @@ const SalesFunnel = () => {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2 group/email h-8">
+                          <div className="flex items-center gap-2 group/email">
                             <p 
-                              className="text-sm font-bold text-primary truncate max-w-[150px] cursor-pointer hover:text-secondary transition-colors"
+                              className="text-sm font-bold text-primary break-all cursor-pointer hover:text-secondary transition-colors"
                               onClick={() => setIsEditingEmail(true)}
                               title={selectedLead.email}
                             >
@@ -1879,84 +1940,8 @@ const SalesFunnel = () => {
                 </div>
               </div>
 
-              {/* Main Body: Info vs Timeline */}
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 bg-white">
-                {/* Left Side: General Info */}
-                <div className="p-4 sm:p-8 border-b lg:border-b-0 lg:border-r border-slate-100 space-y-4 sm:space-y-8">
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Observações do Sistema</h4>
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      <p className={cn("text-xs leading-relaxed italic", selectedLead.notes ? "text-slate-600" : "text-slate-400")}>
-                        {selectedLead.notes || "Nenhuma observação registrada para este lead no momento."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Detalhes Adicionais</h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center text-xs group/origin h-6">
-                        <span className="text-slate-400">Conversão de Origem</span>
-                        {isEditingOrigin ? (
-                          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-1">
-                            <Select 
-                              value={tempOrigin} 
-                              onValueChange={(val) => {
-                                setTempOrigin(val);
-                                // Auto save on change for better UX with Select
-                                const saveOrigin = async (newVal: string) => {
-                                  try {
-                                    const res = await leadsApi.update(Number(selectedLead.id), { origin: newVal });
-                                    if (res.success) {
-                                      toast({ title: "Origem atualizada!" });
-                                      setSelectedLead({ ...selectedLead, origin: newVal });
-                                      setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, origin: newVal } : l));
-                                      setIsEditingOrigin(false);
-                                    }
-                                  } catch (e) {
-                                    toast({ title: "Erro ao atualizar", variant: "destructive" });
-                                  }
-                                };
-                                saveOrigin(val);
-                              }}
-                            >
-                              <SelectTrigger className="h-7 py-0 px-2 text-xs font-bold border-secondary focus-visible:ring-secondary/20 w-32 bg-white">
-                                <SelectValue placeholder="Origem">
-                                  {getOriginLabel(tempOrigin)}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent className="z-[300]">
-                                {ORIGIN_OPTIONS.map(opt => (
-                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <button onClick={() => setIsEditingOrigin(false)} className="text-slate-400 hover:text-slate-500 transition-colors">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-secondary capitalize">{getOriginLabel(selectedLead.origin || "Não informado")}</span>
-                            <button 
-                              onClick={() => setIsEditingOrigin(true)}
-                              className="opacity-0 group-hover/origin:opacity-100 text-slate-300 hover:text-secondary transition-all"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400">Responsável Atual</span>
-                        <span className="font-bold text-primary">{selectedLead.responsible || professional?.name || "Sistema"}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Side: Vertical Timeline (As requested) */}
-                <div className="lg:col-span-2 bg-slate-50/30 flex flex-col min-h-0 h-full">
+                {/* Right Side: Main Area (Tabs + Timeline) */}
+                <div className="flex-1 bg-slate-50/50 flex flex-col min-w-0 h-full relative overflow-hidden">
                   <div className="flex flex-col h-full">
                     {/* Activity Top Action */}
                     <div className="p-4 sm:p-8 border-b border-slate-100 bg-white/50 space-y-3 sm:space-y-4">
@@ -1992,8 +1977,8 @@ const SalesFunnel = () => {
                     {/* Scrollable Timeline / Proposals */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
                       <Tabs value={activeDetailsTab} onValueChange={setActiveDetailsTab} className="w-full flex-1 flex flex-col">
-                        <div className="px-4 sm:px-8 border-b border-slate-100 bg-white">
-                          <TabsList className="bg-transparent border-0 h-14 p-0 gap-8">
+                        <div className="px-6 sm:px-8 border-b border-slate-200 bg-white shrink-0 z-10 sticky top-0 flex items-center h-16 shadow-sm">
+                          <TabsList className="bg-transparent border-0 h-full p-0 gap-8 w-full justify-start">
                             <TabsTrigger 
                               value="activities" 
                               className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0 text-xs font-bold uppercase tracking-widest text-slate-400 gap-2"
@@ -2010,6 +1995,18 @@ const SalesFunnel = () => {
                               {leadProposals.length > 0 && (
                                 <span className="bg-secondary text-white text-[9px] px-1.5 py-0.5 rounded-full">
                                   {leadProposals.length}
+                                </span>
+                              )}
+                            </TabsTrigger>
+                            <TabsTrigger 
+                              value="tasks" 
+                              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0 text-xs font-bold uppercase tracking-widest text-slate-400 gap-2"
+                            >
+                              <CheckSquare className="w-4 h-4" />
+                              Tarefas
+                              {leadTasks.filter(t => t.status !== 'completed').length > 0 && (
+                                <span className="bg-secondary text-white text-[9px] px-1.5 py-0.5 rounded-full">
+                                  {leadTasks.filter(t => t.status !== 'completed').length}
                                 </span>
                               )}
                             </TabsTrigger>
@@ -2178,11 +2175,113 @@ const SalesFunnel = () => {
                             )}
                           </div>
                         </TabsContent>
+
+                        <TabsContent value="tasks" className="m-0 p-6 sm:p-8 outline-none min-h-full bg-slate-50/50 flex flex-col gap-6">
+                          {/* Add Task Form */}
+                          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Adicionar Nova Tarefa</h4>
+                            
+                            <div className="space-y-3">
+                              <Input 
+                                placeholder="Título da tarefa..." 
+                                value={newTaskTitle}
+                                onChange={(e) => setNewTaskTitle(e.target.value)}
+                                className="h-10 text-xs rounded-xl bg-slate-50 border border-slate-100 focus-visible:ring-secondary/20"
+                              />
+                              <Textarea 
+                                placeholder="Descrição (opcional)..." 
+                                value={newTaskDescription}
+                                onChange={(e) => setNewTaskDescription(e.target.value)}
+                                className="text-xs rounded-xl bg-slate-50 border border-slate-100 focus-visible:ring-secondary/20 min-h-[60px]"
+                              />
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase">Prioridade</label>
+                                  <Select value={newTaskPriority} onValueChange={(val: any) => setNewTaskPriority(val)}>
+                                    <SelectTrigger className="h-10 text-xs rounded-xl bg-slate-50 border border-slate-100 focus:ring-secondary/20">
+                                      <SelectValue>{getPriorityLabel(newTaskPriority)}</SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl">
+                                      <SelectItem value="low">Baixa</SelectItem>
+                                      <SelectItem value="medium">Média</SelectItem>
+                                      <SelectItem value="high">Alta</SelectItem>
+                                      <SelectItem value="urgent">Urgente</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase">Data e Hora</label>
+                                  <Input 
+                                    type="datetime-local" 
+                                    value={newTaskDate}
+                                    onChange={(e) => setNewTaskDate(e.target.value)}
+                                    className="h-10 text-xs rounded-xl bg-slate-50 border border-slate-100 focus-visible:ring-secondary/20 font-headline"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="flex justify-end pt-2">
+                                <Button 
+                                  onClick={handleSaveTask}
+                                  disabled={!newTaskTitle.trim() || isSavingTask}
+                                  variant="secondary"
+                                  className="rounded-xl px-6 font-bold h-10 gap-2"
+                                >
+                                  {isSavingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
+                                  Adicionar Tarefa
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* List of Tasks */}
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Tarefas do Lead</h4>
+                            
+                            {leadTasks.length === 0 ? (
+                              <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 border-dashed">
+                                <p className="text-sm text-slate-400 italic">Nenhuma tarefa registrada.</p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-3">
+                                {leadTasks.map(task => (
+                                  <div key={task.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-start gap-3 shadow-sm hover:border-secondary/20 transition-colors">
+                                    <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${task.status === 'completed' ? 'bg-secondary border-secondary text-white' : 'border-slate-300'}`}>
+                                      {task.status === 'completed' && <Check className="w-3 h-3" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-sm font-bold ${task.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</p>
+                                      {task.description && (
+                                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{task.description}</p>
+                                      )}
+                                      <div className="flex flex-wrap items-center gap-3 mt-3">
+                                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${
+                                            task.priority === 'urgent' ? 'bg-red-500' :
+                                            task.priority === 'high' ? 'bg-orange-500' :
+                                            task.priority === 'medium' ? 'bg-blue-500' : 'bg-slate-400'
+                                          }`}></span>
+                                          {getPriorityLabel(task.priority)}
+                                        </div>
+                                        {task.dueDate && (
+                                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">
+                                            <Calendar className="w-3 h-3" />
+                                            {safeFormatDate(task.dueDate)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </TabsContent>
                       </Tabs>
                     </div>
                   </div>
                 </div>
-              </div>
             </>
           )}
         </DialogContent>

@@ -133,7 +133,7 @@ export default function Tasks() {
     description: '',
     status: 'pending' as 'pending' | 'in_progress' | 'completed',
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
-    dueDate: format(new Date(), 'yyyy-MM-dd'),
+    dueDate: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     assignedToId: '',
     clientId: '',
     leadId: '',
@@ -321,7 +321,7 @@ export default function Tasks() {
         description: task.description || '',
         status: task.status,
         priority: task.priority,
-        dueDate: format(new Date(task.dueDate), 'yyyy-MM-dd'),
+        dueDate: format(new Date(task.dueDate), "yyyy-MM-dd'T'HH:mm"),
         assignedToId: task.assignedTo ? (isUserAssignee ? `user-${task.assignedTo.id}` : `prof-${task.assignedTo.id}`) : '',
         clientId: task.clientId ? String(task.clientId) : '',
         leadId: task.leadId ? String(task.leadId) : '',
@@ -336,7 +336,7 @@ export default function Tasks() {
         description: '',
         status: 'pending',
         priority: 'medium',
-        dueDate: format(new Date(), 'yyyy-MM-dd'),
+        dueDate: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
         assignedToId: professional ? (userType === 'user' ? `user-${professional.id}` : `prof-${professional.id}`) : '',
         clientId: '',
         leadId: '',
@@ -639,7 +639,7 @@ export default function Tasks() {
                       {taskOverdue ? 'error' : 'calendar_today'}
                     </span>
                     <span>
-                      {format(new Date(task.dueDate), 'dd/MM/yyyy')}
+                      {format(new Date(task.dueDate), 'dd/MM/yyyy HH:mm')}
                     </span>
                   </div>
 
@@ -1009,7 +1009,7 @@ export default function Tasks() {
                           <span className="material-symbols-outlined text-[14px]">
                             {taskOverdue ? 'error' : 'calendar_today'}
                           </span>
-                          <span>{format(new Date(task.dueDate), 'dd/MM/yyyy')}</span>
+                          <span>{format(new Date(task.dueDate), 'dd/MM/yyyy HH:mm')}</span>
                         </div>
                       </TableCell>
 
@@ -1159,7 +1159,7 @@ export default function Tasks() {
                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Data de Vencimento *</Label>
                 <div className="relative">
                   <Input
-                    type="date"
+                    type="datetime-local"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                     className="h-11 rounded-xl bg-muted border border-border text-foreground text-sm pr-10 font-headline focus-visible:ring-secondary"

@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await permissionsApi.getMyPermissions();
       if (response.success && response.data) {
-        setPermissions(response.data);
+        setPermissions(Array.isArray(response.data) ? response.data : []);
         console.log('[Auth] Permissions loaded:', response.data);
       }
     } catch (error) {
@@ -148,7 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (professional?.role === 'admin') return true;
     
     if (!permissionsLoaded) return false;
-    const permission = permissions.find((p) => p.moduleCode === moduleCode);
+    const perms = Array.isArray(permissions) ? permissions : [];
+    const permission = perms.find((p) => p.moduleCode === moduleCode);
     return permission ? permission.hasAccess : false;
   };
 
@@ -161,7 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const type = localStorage.getItem('userType');
     if (userRole === 'admin' || type === 'professional') return true;
 
-    const permission = permissions.find((p) => p.moduleCode === moduleCode);
+    const perms = Array.isArray(permissions) ? permissions : [];
+    const permission = perms.find((p) => p.moduleCode === moduleCode);
     if (!permission || !permission.hasAccess) return false;
 
     const subPerms = permission.subPermissions;

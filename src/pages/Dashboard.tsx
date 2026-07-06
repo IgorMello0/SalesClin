@@ -202,8 +202,8 @@ const Dashboard = () => {
     return 'Personalizado';
   };
 
-  const hasMultipleClinics = professional?.companies && professional.companies.length > 1;
-  const activeCompany = professional?.companies?.find(c => c.id === professional?.companyId);
+  const hasMultipleClinics = Array.isArray(professional?.companies) && professional?.companies.length > 1;
+  const activeCompany = Array.isArray(professional?.companies) ? professional?.companies?.find(c => c.id === professional?.companyId) : null;
 
   return (
     <div className="relative space-y-10 pb-10 overflow-hidden">

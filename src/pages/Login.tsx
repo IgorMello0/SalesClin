@@ -235,7 +235,7 @@ const Login = () => {
               <img
                 src="/logo-site.png"
                 alt="SellClin Logo"
-                className="h-9 w-auto"
+                className="h-7 w-auto translate-y-0.5"
               />
             </Link>
           </div>

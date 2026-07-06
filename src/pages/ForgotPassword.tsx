@@ -43,7 +43,7 @@ const ForgotPassword = () => {
         </Link>
 
         <div className="mt-8 space-y-2">
-          <img src="/logo-site.png" alt="SellClin" className="h-9 w-auto" />
+          <img src="/logo-site.png" alt="SellClin" className="h-7 w-auto translate-y-0.5" />
           <h1 className="text-3xl font-black text-slate-900">Recuperar senha</h1>
           <p className="text-sm leading-relaxed text-slate-500">
             Informe seu e-mail para receber um link seguro e criar uma nova senha.

@@ -151,9 +151,8 @@ export function AppSidebar() {
         <Link to="/dashboard" className="flex items-center">
           <img
             alt="SellClin Logo"
-            className="h-8 w-auto object-contain"
+            className="h-6 w-auto object-contain translate-y-0.5"
             src="/logo-oficial-v3.png"
-            style={{ filter: 'brightness(0)' }}
           />
         </Link>
       </div>
@@ -188,9 +187,8 @@ export function AppSidebar() {
             <Link to="/dashboard" className="flex-1">
               <img 
                 alt="SellClin Logo"
-                className="h-8 w-auto object-contain max-w-[140px]" 
+                className="h-6 w-auto object-contain max-w-[140px] translate-y-0.5" 
                 src="/logo-oficial-v3.png" 
-                style={{ filter: 'brightness(0)' }}
               />
             </Link>
           )}
@@ -216,7 +214,7 @@ export function AppSidebar() {
         <div className="mx-6 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-60 mb-2" />
         
         {/* Clinic Switcher */}
-        {professional?.companies && professional.companies.length > 0 && (
+        {Array.isArray(professional?.companies) && professional.companies.length > 0 && (
           <div className="px-4 py-2 relative z-50">
             {/* Unified Animated Clinic Switcher */}
             <div className="relative group/company flex flex-col w-full">
@@ -239,7 +237,7 @@ export function AppSidebar() {
                     "text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition-all duration-300 ease-in-out truncate",
                     isSidebarCollapsed && !isMobileSidebarOpen ? "max-w-0 opacity-0 ml-0 pointer-events-none" : "max-w-[150px] opacity-100 ml-3"
                   )}>
-                    {professional.companies.find(c => c.id === professional.companyId)?.name || professional.companyName || 'Clínica'}
+                    {Array.isArray(professional?.companies) ? professional.companies.find(c => c.id === professional?.companyId)?.name || professional?.companyName || 'Clínica' : professional?.companyName || 'Clínica'}
                   </span>
                 </div>
                 <span className={cn(
@@ -259,7 +257,7 @@ export function AppSidebar() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mudar de Clínica</p>
                   </div>
                   <div className="max-h-48 overflow-y-auto py-1">
-                    {professional.companies.map((company) => (
+                    {Array.isArray(professional?.companies) && professional.companies.map((company) => (
                       <button
                         key={company.id}
                         onClick={() => {
@@ -286,7 +284,7 @@ export function AppSidebar() {
           </div>
         )}
         
-        {professional?.companies && professional.companies.length > 0 && (
+        {Array.isArray(professional?.companies) && professional.companies.length > 0 && (
           <div className="mx-6 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-60 my-1" />
         )}
         
@@ -349,7 +347,7 @@ export function AppSidebar() {
                     <img src={getImageUrl(professional.photoUrl)} alt={professional.name} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-xs font-bold text-slate-500">
-                      {professional?.name ? professional.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
+                      {professional?.name ? String(professional.name).trim().split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
                     </span>
                   )}
                 </div>
