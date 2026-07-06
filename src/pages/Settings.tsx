@@ -36,6 +36,7 @@ import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 import Profile from './Profile';
+import FunnelsSettingsView from './settings/FunnelsSettingsView';
 
 // -- CARGOS HELPERS REMOVIDOS (Agora vêm do banco) --
 
@@ -3330,29 +3331,27 @@ export const IntegrationsView = () => {
     <div className="space-y-6 animate-fade-in-up">
       {!activeIntegration ? (
         <>
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-4">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-                  <Zap className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F97316]">Central de integracoes</p>
-                  <h3 className="mt-1 text-xl font-black text-slate-900 dark:text-white">Conecte os canais da sua clinica</h3>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Escolha um canal para configurar agenda, mensagens, captura de leads e automacoes sem misturar os fluxos.
-                  </p>
-                </div>
+          <div className="flex flex-col gap-5 bg-transparent mb-8">
+            <div className="flex items-start gap-4">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-orange-50 text-orange-500">
+                <Zap className="h-6 w-6" />
               </div>
+              <div>
+                <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Central de Integrações</h3>
+                <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  Conecte canais para configurar agenda, mensagens, captura de leads e automações da sua clínica.
+                </p>
+              </div>
+            </div>
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center justify-between">
                 <div className="relative lg:max-w-xs lg:flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="Buscar integracao..."
-                    className="h-11 rounded-2xl border-slate-200 bg-slate-50 pl-9 shadow-none"
+                    className="h-10 rounded-xl border-slate-200 bg-white pl-9 shadow-sm"
                   />
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -3361,10 +3360,10 @@ export const IntegrationsView = () => {
                       key={filter.key}
                       type="button"
                       onClick={() => setActiveFilter(filter.key)}
-                      className={`rounded-2xl px-3 py-2 text-xs font-black transition ${
+                      className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                         activeFilter === filter.key
-                          ? 'bg-slate-950 text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300'
+                          ? 'bg-slate-900 text-white shadow-md'
+                          : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                       }`}
                     >
                       {filter.label}
@@ -3372,7 +3371,6 @@ export const IntegrationsView = () => {
                   ))}
                 </div>
               </div>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -3382,30 +3380,31 @@ export const IntegrationsView = () => {
                 key={card.key}
                 onClick={() => card.available && setActiveIntegration(card.key)}
                 disabled={!card.available}
-                className={`group overflow-hidden rounded-3xl border bg-white text-left shadow-sm transition-all ${
-                  card.available ? 'hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-not-allowed opacity-70'
+                className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-left transition-all duration-300 flex flex-col p-5 ${
+                  card.available ? 'hover:-translate-y-0.5 hover:shadow-lg hover:border-slate-300' : 'cursor-not-allowed opacity-60'
                 }`}
               >
-                <div className={`h-16 border-b bg-gradient-to-br ${card.bannerClassName}`} />
-                <div className="-mt-7 flex items-start justify-between gap-4 p-5 pt-0">
-                  <div className="flex min-w-0 items-start gap-4">
-                    <IntegrationLogo card={card} />
-                    <div className="min-w-0 pt-8">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{card.eyebrow}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ring-1 ${card.badgeClassName}`}>
-                          {card.status}
-                        </span>
-                      </div>
-                      <h4 className="mt-2 truncate text-base font-black text-slate-900 dark:text-white">{card.name}</h4>
-                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{card.description}</p>
-                      <div className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm">
-                        {card.actionLabel}
-                        {card.available && <ArrowRight className="h-3.5 w-3.5" />}
-                      </div>
+                <div className="flex items-start gap-4">
+                  <IntegrationLogo card={card} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{card.eyebrow}</span>
+                      <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide border ${card.badgeClassName}`}>
+                        {card.status}
+                      </span>
                     </div>
+                    <h4 className="truncate text-base font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{card.name}</h4>
+                    <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500">{card.description}</p>
                   </div>
-                  <div className="mt-8 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-50 text-slate-500 shadow-sm transition group-hover:bg-slate-950 group-hover:text-white">
+                </div>
+                
+                <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                  <span className={`text-xs font-bold transition-colors ${card.available ? 'text-primary' : 'text-slate-400'}`}>
+                    {card.actionLabel}
+                  </span>
+                  <div className={`grid h-8 w-8 place-items-center rounded-full transition-all ${
+                    card.available ? 'bg-slate-50 text-slate-400 group-hover:bg-primary group-hover:text-white group-hover:shadow-md' : 'bg-slate-50 text-slate-300'
+                  }`}>
                     <ArrowRight className="h-4 w-4" />
                   </div>
                 </div>
@@ -3486,6 +3485,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   clinics: ClinicasView,
   business: InfoNegocioView,
   appearance: AparenciaView,
+  funnels: FunnelsSettingsView,
 };
 
 const Settings = () => {
@@ -3516,6 +3516,12 @@ const Settings = () => {
         { key: 'team', name: 'Equipe', description: 'Usuarios e convites', icon: 'group', ownerOnly: true },
         { key: 'roles', name: 'Cargos', description: 'Funcoes e permissoes', icon: 'badge', ownerOnly: true },
         { key: 'clinics', name: 'Minhas clinicas', description: 'Filiais e multi-clinica', icon: 'apartment', ownerOnly: true },
+      ],
+    },
+    {
+      title: 'Comercial',
+      items: [
+        { key: 'funnels', name: 'Funis de Vendas', description: 'Pipelines e etapas do comercial', icon: 'view_kanban', ownerOnly: true },
       ],
     },
     {

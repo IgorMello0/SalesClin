@@ -26,7 +26,7 @@ const menuItems = [
   {
     title: 'Agenda',
     url: '/appointments',
-    icon: 'calendar_today',
+    icon: 'calendar_month',
     moduleCode: 'agendamentos',
   },
   {
@@ -68,13 +68,13 @@ const menuItems = [
   {
     title: 'Metas',
     url: '/metas',
-    icon: 'trending_up',
+    icon: 'track_changes',
     moduleCode: 'metas',
   },
   {
     title: 'Campanhas',
     url: '/campaigns',
-    icon: 'campaign',
+    icon: 'rocket_launch',
     moduleCode: 'campanhas',
   },
 ];
