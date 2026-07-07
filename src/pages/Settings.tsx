@@ -3205,7 +3205,8 @@ const integrationCards: Array<{
     actionLabel: 'Em breve',
     bannerClassName: 'from-pink-100 via-white to-orange-100 border-pink-200',
     badgeClassName: 'bg-slate-100 text-slate-500 ring-slate-200',
-    fallbackIcon: 'photo_camera',
+    logo: '/integrations/instagram-icon.png',
+    logoAlt: 'Instagram',
   },
   {
     key: 'email',
@@ -3231,7 +3232,8 @@ const integrationCards: Array<{
     actionLabel: 'Em breve',
     bannerClassName: 'from-indigo-100 via-white to-sky-100 border-indigo-200',
     badgeClassName: 'bg-slate-100 text-slate-500 ring-slate-200',
-    fallbackIcon: 'forum',
+    logo: '/integrations/facebook-messenger-logo.png',
+    logoAlt: 'Facebook Messenger',
   },
   {
     key: 'liveChat',
