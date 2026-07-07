@@ -3264,10 +3264,10 @@ const WhatsAppBenefits = () => (
       { icon: 'rule', title: 'Sem duplicar', desc: 'A verificacao usa telefone + clinica.' },
       { icon: 'forum', title: 'Historico salvo', desc: 'Mensagem e conversa ficam vinculadas ao lead.' },
     ].map((item) => (
-      <div key={item.title} className="rounded-2xl border border-slate-200/70 dark:border-slate-800 p-4 bg-white/70 dark:bg-slate-900/40">
+      <div key={item.title} className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
         <span className="material-symbols-outlined text-[#F97316] text-xl mb-2 block">{item.icon}</span>
-        <p className="text-sm font-bold text-primary">{item.title}</p>
-        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{item.desc}</p>
+        <p className="text-sm font-bold text-slate-900">{item.title}</p>
+        <p className="text-xs text-slate-500 leading-relaxed mt-1">{item.desc}</p>
       </div>
     ))}
   </div>
@@ -3342,8 +3342,8 @@ export const IntegrationsView = () => {
                 <Zap className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Central de Integrações</h3>
-                <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                <h3 className="text-xl font-bold tracking-tight text-slate-950">Central de Integrações</h3>
+                <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600">
                   Conecte canais para configurar agenda, mensagens, captura de leads e automações da sua clínica.
                 </p>
               </div>
@@ -3398,7 +3398,7 @@ export const IntegrationsView = () => {
                         {card.status}
                       </span>
                     </div>
-                    <h4 className="truncate text-base font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{card.name}</h4>
+                    <h4 className="truncate text-base font-bold text-slate-950 group-hover:text-primary transition-colors">{card.name}</h4>
                     <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500">{card.description}</p>
                   </div>
                 </div>
@@ -3440,8 +3440,8 @@ export const IntegrationsView = () => {
                 <IntegrationLogo card={activeCard} />
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{activeCard.eyebrow}</p>
-                  <h3 className="mt-1 text-xl font-black text-slate-900 dark:text-white">{activeCard.name}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{activeCard.description}</p>
+                  <h3 className="mt-1 text-xl font-black text-slate-950">{activeCard.name}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{activeCard.description}</p>
                 </div>
               </div>
             </div>

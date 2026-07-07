@@ -152,7 +152,7 @@ export function AppSidebar() {
           <img
             alt="SellClin Logo"
             className="h-6 w-auto object-contain translate-y-0.5"
-            src="/logo-oficial-v3.png"
+            src="/logo-site.png"
           />
         </Link>
       </div>
@@ -188,7 +188,7 @@ export function AppSidebar() {
               <img 
                 alt="SellClin Logo"
                 className="h-6 w-auto object-contain max-w-[140px] translate-y-0.5" 
-                src="/logo-oficial-v3.png" 
+                src="/logo-site.png"
               />
             </Link>
           )}
