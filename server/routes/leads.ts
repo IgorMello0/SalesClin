@@ -461,6 +461,7 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
         data: {
           clientId: clientId,
           professionalId: lead.professionalId,
+          companyId: lead.companyId,
           amount: p.amount,
           date: new Date(p.date),
           method: p.method, // 'cartao', 'pix', 'transferencia', 'dinheiro'
@@ -481,7 +482,10 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
     // Atualiza status do Lead para pago e move para o funil pós-venda ou similar se quiser
     const updatedLead = await prisma.lead.update({
       where: { id },
-      data: { isPaid: true } // Mantendo o status onde está, apenas marcando como pago
+      data: { 
+        isPaid: true,
+        status: 'comercial_closed' // Garantir que não volte pra trás devido a race condition do drag and drop
+      } 
     })
 
     res.json(createSuccessResponse({ payments: paymentRecords, lead: updatedLead }))
