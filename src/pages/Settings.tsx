@@ -3191,8 +3191,8 @@ const integrationCards: Array<{
     actionLabel: 'Configurar',
     bannerClassName: 'from-emerald-100 via-white to-lime-100 border-emerald-200',
     badgeClassName: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-    fallbackLabel: 'EVO',
-    fallbackClassName: 'bg-slate-950 text-emerald-300 ring-slate-800',
+    logo: '/integrations/evolution-logo.png',
+    logoAlt: 'Evolution API',
   },
   {
     key: 'instagram',
