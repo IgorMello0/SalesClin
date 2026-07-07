@@ -2034,15 +2034,15 @@ const WhatsAppStatusManager = () => {
     </Card>
 
     {evolutionConfigured && (
-    <Card className="border border-emerald-500/20 bg-emerald-50/5 dark:bg-slate-900/40 backdrop-blur-md shadow-lg rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
-      <CardHeader className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-b border-slate-100 dark:border-slate-800 pb-4">
+    <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm animate-in fade-in slide-in-from-top-4">
+      <CardHeader className="border-b border-slate-100 bg-white pb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl text-white shadow-md shadow-emerald-500/20">
+          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
             <span className="material-symbols-outlined block text-xl">settings_input_antenna</span>
           </div>
           <div>
-            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100">Status da Conexão WhatsApp</CardTitle>
-            <CardDescription className="text-xs">Monitore a conexao e configure o webhook para capturar leads</CardDescription>
+            <CardTitle className="text-sm font-bold text-slate-900">Status da Conexão WhatsApp</CardTitle>
+            <CardDescription className="text-xs text-slate-500">Monitore a conexao e configure o webhook para capturar leads</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -2056,11 +2056,11 @@ const WhatsAppStatusManager = () => {
 
         {statusInfo.status !== 'LOADING' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className={`p-3 rounded-2xl border text-xs ${
+            <div className={`rounded-2xl border p-3 text-xs shadow-sm ${
               webhookOk
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                 : webhookProblem
-                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                  ? 'bg-orange-50 border-orange-200 text-orange-800'
                   : 'bg-slate-50 border-slate-200 text-slate-700'
             }`}>
               <div className="flex items-start gap-2">
@@ -2082,17 +2082,17 @@ const WhatsAppStatusManager = () => {
               </div>
             </div>
 
-            <div className="p-3 rounded-2xl border bg-white dark:bg-slate-950 text-xs">
+            <div className="p-3 rounded-2xl border border-slate-200 bg-slate-950 text-xs text-white shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-bold text-slate-800 dark:text-slate-100">Diagnostico Evolution</p>
-                  <p className="mt-1 text-muted-foreground break-words">
+                  <p className="font-bold text-white">Diagnostico Evolution</p>
+                  <p className="mt-1 text-slate-400 break-words">
                     {diagnostics
                       ? `${diagnostics.apiKeyAccepted ? 'API key OK' : 'API key/base URL pendente'} · ${diagnostics.instance || statusInfo.instance || 'sem instancia'}`
                       : 'Teste a VPS para ver URL, instancia e endpoint aceito.'}
                   </p>
                 </div>
-                <Button type="button" size="sm" variant="outline" onClick={handleTestEvolution} disabled={testingEvolution} className="shrink-0 h-8 text-xs">
+                <Button type="button" size="sm" variant="outline" onClick={handleTestEvolution} disabled={testingEvolution} className="shrink-0 h-8 border-white/15 bg-white text-xs text-slate-700 hover:bg-slate-100">
                   <span className="material-symbols-outlined text-sm mr-1">{testingEvolution ? 'progress_activity' : 'science'}</span>
                   {testingEvolution ? 'Testando' : 'Testar'}
                 </Button>
@@ -2102,7 +2102,7 @@ const WhatsAppStatusManager = () => {
         )}
 
         {diagnostics && (
-          <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 dark:bg-slate-900/40 text-xs space-y-2">
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div><strong>Base URL:</strong> <span className="break-all">{diagnostics.baseUrl || 'Nao configurada'}</span></div>
               <div><strong>Instancia:</strong> <span className="break-all">{diagnostics.instance || statusInfo.instance || 'Nao definida'}</span></div>
@@ -2130,16 +2130,16 @@ const WhatsAppStatusManager = () => {
 
         {statusInfo.status === 'NOT_CONFIGURED' && (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-              <span className="material-symbols-outlined text-amber-500 mt-0.5">settings_alert</span>
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <span className="material-symbols-outlined mt-0.5 text-amber-600">settings_alert</span>
               <div className="flex-1">
-                <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Evolution API nao configurada</p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                <p className="text-sm font-bold text-amber-800">Evolution API nao configurada</p>
+                <p className="text-xs leading-relaxed text-amber-700">
                   {statusInfo.message || 'Informe URL da Evolution, API key e nome da instancia acima para liberar status e webhook.'}
                 </p>
               </div>
             </div>
-            <Button type="button" onClick={handleSetupWebhook} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold">
+            <Button type="button" onClick={handleSetupWebhook} className="w-full bg-emerald-600 font-bold text-white hover:bg-emerald-700">
               <span className="material-symbols-outlined text-sm mr-2">webhook</span>
               Configurar Webhook
             </Button>
@@ -2148,23 +2148,23 @@ const WhatsAppStatusManager = () => {
 
         {statusInfo.status === 'CONNECTED' && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-4 bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-2xl">
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <span className="relative flex h-3.5 w-3.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
               </span>
               <div className="flex-1">
-                <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">WhatsApp Conectado e Ativo</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 leading-relaxed">Sua clínica está integrada. Leads e mensagens automáticas estão funcionando normalmente.</p>
+                <p className="text-sm font-bold text-emerald-800">WhatsApp Conectado e Ativo</p>
+                <p className="text-xs leading-relaxed text-emerald-700">Sua clínica está integrada. Leads e mensagens automáticas estão funcionando normalmente.</p>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2.5 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={fetchStatus} className="flex-1 min-w-[140px] border-emerald-500/20 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400 font-semibold transition-all">
+              <Button type="button" variant="outline" size="sm" onClick={fetchStatus} className="flex-1 min-w-[140px] border-slate-200 bg-white font-semibold text-slate-700 transition-all hover:bg-slate-50">
                 <span className="material-symbols-outlined text-sm mr-2">refresh</span>
                 Atualizar Status
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={handleRestart} className="flex-1 min-w-[140px] hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold transition-all">
+              <Button type="button" variant="outline" size="sm" onClick={handleRestart} className="flex-1 min-w-[140px] border-slate-200 bg-white font-semibold text-slate-700 transition-all hover:bg-slate-50">
                 <span className="material-symbols-outlined text-sm mr-2">restart_alt</span>
                 Reiniciar Conexão
               </Button>
@@ -2178,26 +2178,26 @@ const WhatsAppStatusManager = () => {
 
         {statusInfo.status === 'DISCONNECTED' && (
           <div className="space-y-4">
-            <div className="p-4 bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 rounded-2xl space-y-1.5">
-              <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+            <div className="space-y-1.5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
                 <span className="material-symbols-outlined text-sm">info</span>
                 WhatsApp nao conectado na Evolution
               </p>
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+              <p className="text-[11px] leading-relaxed text-amber-700">
                 Conecte o numero diretamente no painel da Evolution do cliente. Depois volte aqui para atualizar o status e configurar o webhook do SellClin.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 pt-1">
-              <Button type="button" onClick={handleSetupWebhook} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-md shadow-emerald-500/10">
+              <Button type="button" onClick={handleSetupWebhook} className="flex-1 bg-emerald-600 font-bold text-white shadow-sm transition-all hover:bg-emerald-700">
                 <span className="material-symbols-outlined text-sm mr-2">webhook</span>
                 Configurar Webhook
               </Button>
-              <Button type="button" variant="outline" onClick={fetchStatus} className="flex-1 font-semibold border-emerald-200 hover:bg-emerald-50 transition-all text-emerald-700 dark:text-emerald-300">
+              <Button type="button" variant="outline" onClick={fetchStatus} className="flex-1 border-slate-200 bg-white font-semibold text-slate-700 transition-all hover:bg-slate-50">
                 <span className="material-symbols-outlined text-sm mr-2">refresh</span>
                 Atualizar Status
               </Button>
-              <Button type="button" variant="outline" onClick={handleRestart} className="flex-1 font-semibold border-slate-200 hover:bg-slate-50 transition-all text-slate-600 dark:text-slate-300">
+              <Button type="button" variant="outline" onClick={handleRestart} className="flex-1 border-slate-200 bg-white font-semibold text-slate-500 transition-all hover:bg-slate-50">
                 <span className="material-symbols-outlined text-sm mr-2">restart_alt</span>
                 Reiniciar Evolution
               </Button>
