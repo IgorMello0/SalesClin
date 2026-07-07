@@ -3147,6 +3147,8 @@ const integrationCards: Array<{
   secondaryLogoAlt?: string;
   logoClassName?: string;
   fallbackIcon?: string;
+  fallbackLabel?: string;
+  fallbackClassName?: string;
 }> = [
   {
     key: 'googleCalendar',
@@ -3189,9 +3191,8 @@ const integrationCards: Array<{
     actionLabel: 'Configurar',
     bannerClassName: 'from-emerald-100 via-white to-lime-100 border-emerald-200',
     badgeClassName: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-    logo: '/integrations/evolution-logo.webp',
-    logoAlt: 'Evolution API',
-    logoClassName: 'scale-[2.2]',
+    fallbackLabel: 'EVO',
+    fallbackClassName: 'bg-slate-950 text-emerald-300 ring-slate-800',
   },
   {
     key: 'instagram',
@@ -3271,7 +3272,7 @@ const WhatsAppBenefits = () => (
 );
 
 const IntegrationLogo = ({ card }: { card: (typeof integrationCards)[number] }) => (
-  <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+  <div className={`relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 ${!card.logo && card.fallbackClassName ? card.fallbackClassName : ''}`}>
     {card.logo ? (
       <img
         src={card.logo}
@@ -3279,6 +3280,8 @@ const IntegrationLogo = ({ card }: { card: (typeof integrationCards)[number] }) 
         className={`h-9 w-9 object-contain ${card.logoClassName || ''}`}
         loading="lazy"
       />
+    ) : card.fallbackLabel ? (
+      <span className="text-sm font-black tracking-tight">{card.fallbackLabel}</span>
     ) : (
       <span className="material-symbols-outlined text-[24px] text-slate-500">{card.fallbackIcon || 'extension'}</span>
     )}
