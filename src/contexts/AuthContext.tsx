@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { professionalsApi, permissionsApi, usuariosApi, authApi, type ModulePermission } from '@/lib/api';
+import { canAccessHiddenDevelopmentPages, isHiddenDevelopmentModule } from '@/lib/internalAccess';
 
 interface CompanyAccess {
   id: number;
@@ -146,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasModuleAccess = (moduleCode: string): boolean => {
     // Admins (conta da Sellclin) têm acesso irrestrito a todos os módulos
     if (professional?.role === 'admin') return true;
+    if (isHiddenDevelopmentModule(moduleCode) && canAccessHiddenDevelopmentPages(professional?.email)) return true;
     
     if (!permissionsLoaded) return false;
     const perms = Array.isArray(permissions) ? permissions : [];

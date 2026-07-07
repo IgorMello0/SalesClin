@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import { getImageUrl, notificationsApi } from '@/lib/api';
+import { canAccessHiddenDevelopmentPages, HIDDEN_DEVELOPMENT_MODULES } from '@/lib/internalAccess';
 
 const menuItems = [
   {
@@ -66,6 +67,12 @@ const menuItems = [
     moduleCode: 'contratos',
   },
   {
+    title: 'Análises',
+    url: '/reports',
+    icon: 'bar_chart',
+    moduleCode: 'relatorios',
+  },
+  {
     title: 'Metas',
     url: '/metas',
     icon: 'track_changes',
@@ -102,9 +109,9 @@ export function AppTopNavbar() {
   const visibleMenuItems = menuItems.filter((item) => {
     // Módulos que NÃO estão no MVP (Gestão Financeira, Conversas, Catálogos, Contratos, Relatórios)
     // Devem aparecer APENAS para a conta do desenvolvedor (admin@admin.com)
-    const nonMVPModules = ['pagamentos', 'conversas', 'catalogos', 'contratos', 'relatorios'];
+    const nonMVPModules = HIDDEN_DEVELOPMENT_MODULES;
     // Definido como false para ocultar funções antigas e simular a visão real do cliente/profissional
-    const isDeveloper = false;
+    const isDeveloper = canAccessHiddenDevelopmentPages(professional?.email);
     
     if (nonMVPModules.includes(item.moduleCode) && !isDeveloper) {
       return false;

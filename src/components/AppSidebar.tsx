@@ -4,6 +4,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { getImageUrl } from '@/lib/api';
+import { canAccessHiddenDevelopmentPages, HIDDEN_DEVELOPMENT_MODULES } from '@/lib/internalAccess';
 
 const menuItems = [
   {
@@ -55,6 +56,18 @@ const menuItems = [
     moduleCode: 'conversas',
   },
   {
+    title: 'Catálogos',
+    url: '/catalogs',
+    icon: 'inventory_2',
+    moduleCode: 'catalogos',
+  },
+  {
+    title: 'Contratos',
+    url: '/contracts',
+    icon: 'description',
+    moduleCode: 'contratos',
+  },
+  {
     title: 'Análises',
     url: '/reports',
     icon: 'bar_chart', // Classic and very clear
@@ -99,10 +112,9 @@ export function AppSidebar() {
       return true;
     }
 
-    const nonMVPModules = ['pagamentos', 'conversas', 'relatorios'];
-    const isDeveloper = false;
+    const isDeveloper = canAccessHiddenDevelopmentPages(professional?.email);
     
-    if (nonMVPModules.includes(item.moduleCode) && !isDeveloper) {
+    if (HIDDEN_DEVELOPMENT_MODULES.includes(item.moduleCode) && !isDeveloper) {
       return false;
     }
 
