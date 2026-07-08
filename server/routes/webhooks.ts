@@ -26,12 +26,25 @@ export const router = Router();
 function planAndCycleFromProductId(productId?: string | null) {
   if (!productId) return null;
 
-  for (const planCode of ['start', 'pro'] as PlanCode[]) {
+  const matches: Array<{ planCode: PlanCode; billingCycle: BillingCycle }> = [];
+
+  for (const planCode of ['start', 'pro', 'enterprise'] as PlanCode[]) {
     for (const billingCycle of ['monthly', 'yearly'] as BillingCycle[]) {
       if (productId === getProductIdForPlan(planCode, billingCycle)) {
-        return { planCode, billingCycle };
+        matches.push({ planCode, billingCycle });
       }
     }
+  }
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  if (matches.length > 1) {
+    console.warn('[Webhook/AbacatePay] Product ID reused across plans; using metadata or pending signup instead.', {
+      productId,
+      matches,
+    });
   }
 
   return null;
