@@ -46,7 +46,7 @@ const PrecosPage = () => {
     },
     {
       name: "Enterprise",
-      price: "Custom",
+      price: "497",
       plan: "enterprise",
       desc: "Soluções personalizadas para redes de clínicas e multiclínicas.",
       features: [
@@ -147,7 +147,7 @@ const PrecosPage = () => {
                   </div>
 
                   <Link
-                    to={p.price === "Custom" ? "/signup" : `/signup?plan=${p.plan}`}
+                    to={`/signup?plan=${p.plan}&cycle=monthly`}
                     className={`w-full py-5 rounded-2xl text-[11px] font-black uppercase tracking-[0.25em] transition-all duration-500 flex items-center justify-center gap-2 relative z-10 overflow-hidden group/btn ${p.featured ? 'bg-[#F97316] text-white hover:shadow-[0_0_40px_rgba(249,115,22,0.3)] hover:-translate-y-1' : 'bg-slate-50 border border-slate-200 text-[#0F172A] hover:bg-slate-100 hover:border-slate-300'}`}
                   >
                     <span className="relative z-10 flex items-center gap-2">

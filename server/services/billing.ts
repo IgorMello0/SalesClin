@@ -285,6 +285,12 @@ export function getProductIdForPlan(planCode: PlanCode, billingCycle: BillingCyc
       : process.env.ABACATEPAY_PRO_MONTHLY_PRODUCT_ID || process.env.ABACATEPAY_PRO_PRODUCT_ID
   }
 
+  if (planCode === 'enterprise') {
+    return billingCycle === 'yearly'
+      ? process.env.ABACATEPAY_ENTERPRISE_YEARLY_PRODUCT_ID
+      : process.env.ABACATEPAY_ENTERPRISE_MONTHLY_PRODUCT_ID || process.env.ABACATEPAY_ENTERPRISE_PRODUCT_ID
+  }
+
   return undefined
 }
 
@@ -597,10 +603,6 @@ export async function createAbacateSubscriptionCheckout(
   planCode: PlanCode,
   billingCycle: BillingCycle = 'monthly'
 ) {
-  if (planCode === 'enterprise') {
-    throw new Error('O plano Enterprise e gerenciado manualmente.')
-  }
-
   const apiKey = process.env.ABACATEPAY_API_KEY
   const productId = getProductIdForPlan(planCode, billingCycle)
 
@@ -708,10 +710,6 @@ export async function changeCompanyAbacateSubscriptionPlan(
   planCode: PlanCode,
   billingCycle: BillingCycle
 ) {
-  if (planCode === 'enterprise') {
-    throw new Error('O plano Enterprise e gerenciado manualmente.')
-  }
-
   const apiKey = process.env.ABACATEPAY_API_KEY
   const productId = getProductIdForPlan(planCode, billingCycle)
   if (!apiKey || !productId) {
@@ -763,10 +761,6 @@ export async function createPendingSignupCheckout(input: {
   planCode: PlanCode
   billingCycle: BillingCycle
 }) {
-  if (input.planCode === 'enterprise') {
-    throw new Error('O plano Enterprise e gerenciado manualmente.')
-  }
-
   const apiKey = process.env.ABACATEPAY_API_KEY
   const productId = getProductIdForPlan(input.planCode, input.billingCycle)
 

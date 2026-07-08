@@ -12,7 +12,10 @@ import {
 
 const SelectPlan = () => {
   const [searchParams] = useSearchParams();
-  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'start' | 'enterprise'>('pro');
+  const requestedPlan = searchParams.get('plan');
+  const initialPlan: 'pro' | 'start' | 'enterprise' =
+    requestedPlan === 'start' || requestedPlan === 'enterprise' ? requestedPlan : 'pro';
+  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'start' | 'enterprise'>(initialPlan);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(
     searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'
   );
@@ -77,11 +80,10 @@ const SelectPlan = () => {
   }, [isActivating]);
 
   const handleActivate = async () => {
-    if (selectedPlan !== 'enterprise') {
-      if (!localStorage.getItem('token')) {
-        navigate(`/signup?plan=${selectedPlan}&cycle=${billingCycle}`);
-        return;
-      }
+    if (!localStorage.getItem('token')) {
+      navigate(`/signup?plan=${selectedPlan}&cycle=${billingCycle}`);
+      return;
+    }
 
       const response = await billingApi.createCheckout(selectedPlan, billingCycle);
       if (!response.success) {
@@ -104,9 +106,6 @@ const SelectPlan = () => {
         variant: 'destructive',
       });
       return;
-    }
-
-    setIsActivating(true);
   };
 
   const plans = [
@@ -153,8 +152,8 @@ const SelectPlan = () => {
       id: 'enterprise',
       name: "Plano Enterprise",
       badge: "Redes e Multiclínicas",
-      monthly: null,
-      yearly: null,
+      monthly: 497,
+      yearly: 4970,
       desc: "Soluções personalizadas para redes de clínicas e operações de alta escala.",
       features: [
         "Módulos Multiclínicas integrados",
@@ -166,12 +165,12 @@ const SelectPlan = () => {
       ],
       glow: "hover:shadow-[0_20px_50px_rgba(15,23,42,0.08)]",
       borderColor: "border-slate-800",
-      cta: "Falar com Time de Vendas"
+      cta: "Ativar Licença Enterprise"
     }
   ];
 
   const selectedPlanData = plans.find((plan) => plan.id === selectedPlan);
-  const selectedPrice = selectedPlanData && selectedPlan !== 'enterprise'
+  const selectedPrice = selectedPlanData
     ? billingCycle === 'yearly'
       ? selectedPlanData.yearly
       : selectedPlanData.monthly
@@ -375,7 +374,7 @@ const SelectPlan = () => {
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Licença Selecionada</span>
                 <span className="text-[#0F172A] font-black">
                   {plans.find(p => p.id === selectedPlan)?.name}
-                  {selectedPlan !== 'enterprise' ? ` ${cycleLabel}` : ''}
+                  {` ${cycleLabel}`}
                 </span>
               </div>
               <div className="space-y-1">

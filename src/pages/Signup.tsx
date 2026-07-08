@@ -40,11 +40,19 @@ const PLAN_OPTIONS: Array<{
     yearly: 2970,
     description: 'Para clínicas que querem escala e automação.',
   },
+  {
+    code: 'enterprise',
+    name: 'Enterprise',
+    monthly: 497,
+    yearly: 4970,
+    description: 'Para redes, multiclínicas e operações avançadas.',
+  },
 ];
 
 const Signup = () => {
   const [searchParams] = useSearchParams();
-  const initialPlan = searchParams.get('plan') === 'start' ? 'start' : 'pro';
+  const requestedPlan = searchParams.get('plan');
+  const initialPlan: PublicPlanCode = requestedPlan === 'start' || requestedPlan === 'enterprise' ? requestedPlan : 'pro';
   const initialBillingCycle = searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly';
 
   const [formData, setFormData] = useState({

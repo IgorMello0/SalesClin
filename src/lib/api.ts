@@ -44,7 +44,7 @@ export interface BillingStatus {
 }
 
 export type BillingCycle = 'monthly' | 'yearly'
-export type PublicPlanCode = 'start' | 'pro'
+export type PublicPlanCode = 'start' | 'pro' | 'enterprise'
 export type BillingAddonCode = 'extra_clinic' | 'extra_user'
 
 export interface BillingUsage {

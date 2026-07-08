@@ -31,7 +31,7 @@ router.post('/signup-checkout', async (req, res) => {
       return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
     }
 
-    if (!isPlanCode(requestedPlanCode) || requestedPlanCode === 'enterprise') {
+    if (!isPlanCode(requestedPlanCode)) {
       return res.status(400).json(createErrorResponse('Plano invalido para checkout automatico', 400))
     }
 
@@ -99,10 +99,6 @@ router.post('/checkout', auth(), requireCompany, async (req, res) => {
       ? requestedBillingCycle
       : currentStatus.billingCycle || 'monthly'
 
-    if (planCode === 'enterprise') {
-      return res.status(400).json(createErrorResponse('Plano Enterprise e gerenciado manualmente', 400))
-    }
-
     const checkout = await createAbacateSubscriptionCheckout(companyId, planCode, billingCycle)
     return res.json(createSuccessResponse(checkout))
   } catch (error: any) {
@@ -118,7 +114,7 @@ router.post('/change-plan', auth(), requireCompany, async (req, res) => {
     const requestedPlanCode = req.body?.planCode
     const requestedBillingCycle = req.body?.billingCycle
 
-    if (!isPlanCode(requestedPlanCode) || requestedPlanCode === 'enterprise') {
+    if (!isPlanCode(requestedPlanCode)) {
       return res.status(400).json(createErrorResponse('Plano invalido para alteracao automatica', 400))
     }
 
@@ -193,10 +189,6 @@ router.post('/select-plan', auth(), requireCompany, async (req, res) => {
 
     if (!isBillingCycle(requestedBillingCycle)) {
       return res.status(400).json(createErrorResponse('Ciclo de cobranca invalido', 400))
-    }
-
-    if (requestedPlanCode === 'enterprise') {
-      return res.status(400).json(createErrorResponse('Plano Enterprise e gerenciado manualmente', 400))
     }
 
     const subscription = await prisma.companySubscription.findUnique({
