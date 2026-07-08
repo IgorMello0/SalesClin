@@ -272,26 +272,47 @@ export function getPeriodEndForCycle(cycle: BillingCycle, baseDate = new Date())
   return addDays(baseDate, cycle === 'yearly' ? 365 : 30)
 }
 
+function getPlanProductEnvNames(planCode: PlanCode, billingCycle: BillingCycle) {
+  const envPrefixByPlan: Record<PlanCode, string> = {
+    start: 'ABACATEPAY_START',
+    pro: 'ABACATEPAY_PRO',
+    enterprise: 'ABACATEPAY_ENTERPRISE',
+  }
+  const prefix = envPrefixByPlan[planCode]
+  const primary = `${prefix}_${billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY'}_PRODUCT_ID`
+  const legacy = billingCycle === 'monthly' ? `${prefix}_PRODUCT_ID` : null
+
+  return { primary, legacy }
+}
+
 export function getProductIdForPlan(planCode: PlanCode, billingCycle: BillingCycle) {
-  if (planCode === 'start') {
-    return billingCycle === 'yearly'
-      ? process.env.ABACATEPAY_START_YEARLY_PRODUCT_ID
-      : process.env.ABACATEPAY_START_MONTHLY_PRODUCT_ID || process.env.ABACATEPAY_START_PRODUCT_ID
+  const envNames = getPlanProductEnvNames(planCode, billingCycle)
+  return process.env[envNames.primary] || (envNames.legacy ? process.env[envNames.legacy] : undefined)
+}
+
+function assertPlanCheckoutConfig(
+  context: 'criar checkout' | 'alterar plano',
+  planCode: PlanCode,
+  billingCycle: BillingCycle,
+  apiKey: string | undefined,
+  productId: string | undefined
+): { apiKey: string; productId: string } {
+  if (!apiKey) {
+    throw new Error(`Configuracao da Abacate Pay incompleta para ${context}: defina ABACATEPAY_API_KEY no ambiente da VPS.`)
   }
 
-  if (planCode === 'pro') {
-    return billingCycle === 'yearly'
-      ? process.env.ABACATEPAY_PRO_YEARLY_PRODUCT_ID
-      : process.env.ABACATEPAY_PRO_MONTHLY_PRODUCT_ID || process.env.ABACATEPAY_PRO_PRODUCT_ID
+  if (!productId) {
+    const envNames = getPlanProductEnvNames(planCode, billingCycle)
+    const expectedEnv = envNames.legacy
+      ? `${envNames.primary} ou ${envNames.legacy}`
+      : envNames.primary
+
+    throw new Error(
+      `Configuracao da Abacate Pay incompleta para ${context} do plano ${planCode} ${billingCycle}: defina ${expectedEnv} no ambiente da VPS.`
+    )
   }
 
-  if (planCode === 'enterprise') {
-    return billingCycle === 'yearly'
-      ? process.env.ABACATEPAY_ENTERPRISE_YEARLY_PRODUCT_ID
-      : process.env.ABACATEPAY_ENTERPRISE_MONTHLY_PRODUCT_ID || process.env.ABACATEPAY_ENTERPRISE_PRODUCT_ID
-  }
-
-  return undefined
+  return { apiKey, productId }
 }
 
 export function getProductIdForAddon(addonCode: AddonCode, billingCycle: BillingCycle) {
@@ -606,9 +627,7 @@ export async function createAbacateSubscriptionCheckout(
   const apiKey = process.env.ABACATEPAY_API_KEY
   const productId = getProductIdForPlan(planCode, billingCycle)
 
-  if (!apiKey || !productId) {
-    throw new Error('Configuracao da Abacate Pay incompleta para criar checkout.')
-  }
+  const abacateConfig = assertPlanCheckoutConfig('criar checkout', planCode, billingCycle, apiKey, productId)
 
   const company = await prisma.empresa.findUnique({
     where: { id: companyId },
@@ -624,7 +643,7 @@ export async function createAbacateSubscriptionCheckout(
   const externalId = `sellclin-${companyId}-${subscription.id}`
 
   const payload = {
-    items: [{ id: productId, quantity: 1 }],
+    items: [{ id: abacateConfig.productId, quantity: 1 }],
     externalId,
     returnUrl: `${appUrl}/dashboard?billing=return`,
     completionUrl: `${appUrl}/dashboard?billing=success`,
@@ -637,7 +656,7 @@ export async function createAbacateSubscriptionCheckout(
     },
   }
 
-  const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, apiKey)
+  const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, abacateConfig.apiKey)
 
   await prisma.companySubscription.update({
     where: { companyId },
@@ -712,9 +731,7 @@ export async function changeCompanyAbacateSubscriptionPlan(
 ) {
   const apiKey = process.env.ABACATEPAY_API_KEY
   const productId = getProductIdForPlan(planCode, billingCycle)
-  if (!apiKey || !productId) {
-    throw new Error('Configuracao da Abacate Pay incompleta para alterar plano.')
-  }
+  const abacateConfig = assertPlanCheckoutConfig('alterar plano', planCode, billingCycle, apiKey, productId)
 
   const subscription = await prisma.companySubscription.findUnique({
     where: { companyId },
@@ -728,7 +745,11 @@ export async function changeCompanyAbacateSubscriptionPlan(
     throw new Error('Somente assinaturas ativas da Abacate Pay podem trocar de plano.')
   }
 
-  const change = await changeAbacateSubscriptionPlan(subscription.abacateSubscriptionId, productId, apiKey)
+  const change = await changeAbacateSubscriptionPlan(
+    subscription.abacateSubscriptionId,
+    abacateConfig.productId,
+    abacateConfig.apiKey
+  )
   const planChangeId = change?.id || null
   const planChangeStatus = change?.status || 'PENDING'
 
@@ -764,9 +785,7 @@ export async function createPendingSignupCheckout(input: {
   const apiKey = process.env.ABACATEPAY_API_KEY
   const productId = getProductIdForPlan(input.planCode, input.billingCycle)
 
-  if (!apiKey || !productId) {
-    throw new Error('Configuracao da Abacate Pay incompleta para criar checkout.')
-  }
+  const abacateConfig = assertPlanCheckoutConfig('criar checkout', input.planCode, input.billingCycle, apiKey, productId)
 
   const email = input.email.trim().toLowerCase()
   const existingProfessional = await prisma.professional.findUnique({ where: { email } })
@@ -807,7 +826,7 @@ export async function createPendingSignupCheckout(input: {
   const externalId = `sellclin-signup-${pending.id}-${Date.now()}`
 
   const payload = {
-    items: [{ id: productId, quantity: 1 }],
+    items: [{ id: abacateConfig.productId, quantity: 1 }],
     externalId,
     returnUrl: `${appUrl}/login?signup=return`,
     completionUrl: `${appUrl}/login?signup=success`,
@@ -820,7 +839,7 @@ export async function createPendingSignupCheckout(input: {
     },
   }
 
-  const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, apiKey)
+  const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, abacateConfig.apiKey)
 
   await prisma.pendingSignup.update({
     where: { id: pending.id },
