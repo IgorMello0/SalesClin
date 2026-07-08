@@ -76,6 +76,12 @@ export const DEFAULT_MODULES = [
     description: 'Campanhas de mensagens em massa',
     icon: 'Megaphone',
   },
+  {
+    code: 'integrations',
+    name: 'Integracoes',
+    description: 'Configuracao de canais, agendas e automacoes',
+    icon: 'Plug',
+  },
 ]
 
 const DEFAULT_ROLES = [

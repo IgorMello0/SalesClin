@@ -91,7 +91,6 @@ const menuItems = [
     icon: 'extension', // Puzzle piece is universally understood for integrations
     moduleCode: 'integrations',
     ownerOnly: true,
-    skipPermission: true,
   },
 ];
 

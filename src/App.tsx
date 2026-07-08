@@ -88,7 +88,7 @@ const App = () => (
                   <Route path="catalogs" element={<ProtectedRoute moduleCode="catalogos" moduleName="Catálogos"><Catalogs /></ProtectedRoute>} />
                   <Route path="catalogs/:id" element={<ProtectedRoute moduleCode="catalogos" moduleName="Catálogos"><CatalogDetail /></ProtectedRoute>} />
                   <Route path="settings" element={<Settings />} />
-                  <Route path="integrations" element={<Integrations />} />
+                  <Route path="integrations" element={<ProtectedRoute moduleCode="integrations" moduleName="Integrações"><Integrations /></ProtectedRoute>} />
                   <Route
                     path="admin"
                     element={
