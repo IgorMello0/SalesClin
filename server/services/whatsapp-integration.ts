@@ -96,8 +96,8 @@ function buildManagedEvolutionInstance(company: Pick<CompanyRef, 'id' | 'webhook
 
 function getEvolutionMode(company: Pick<CompanyRef, 'evolutionMode' | 'evolutionApiUrl' | 'apiKey' | 'evolutionInstance'>): 'managed' | 'custom' {
   if (company.evolutionMode === 'managed') return 'managed'
-  if (isCustomEvolutionConfigured(company)) return 'custom'
   if (hasManagedEvolutionConfig()) return 'managed'
+  if (isCustomEvolutionConfigured(company)) return 'custom'
   return 'custom'
 }
 
