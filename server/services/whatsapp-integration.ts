@@ -152,6 +152,7 @@ function normalizeQrCode(value: any): string | null {
 function extractQrCode(payload: any): string | null {
   return normalizeQrCode(
     payload?.base64 ||
+    payload?.raw ||
     payload?.qrcode?.base64 ||
     payload?.qrcode?.code ||
     payload?.qrcode ||
@@ -496,7 +497,14 @@ async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string 
   let lastOkEndpoint: string | null = null
 
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const encodedInstance = encodeURIComponent(instance)
     const candidates = [
+      { method: 'GET' as const, url: `${baseUrl}/instance/qr/${encodedInstance}` },
+      { method: 'GET' as const, url: `${baseUrl}/instance/qr?instance=${encodedInstance}` },
+      { method: 'GET' as const, url: `${baseUrl}/instance/qr?instanceName=${encodedInstance}` },
+      { method: 'GET' as const, url: `${baseUrl}/instance/qr` },
+      { method: 'POST' as const, url: `${baseUrl}/instance/qr`, body: { instanceName: instance } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/qr`, body: { instance } },
       { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}` },
       { method: 'POST' as const, url: `${baseUrl}/instance/connect/${instance}` },
     ]
