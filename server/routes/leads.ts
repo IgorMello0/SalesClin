@@ -11,38 +11,26 @@ router.get('/', auth(false), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     const { search, status, professionalId } = req.query as any
-    let profId: number | undefined;
-    let companyId: number | undefined;
+    let companyId = req.user?.companyId;
 
-    if (req.user?.type === 'profissional') {
-      profId = req.user.id;
-      companyId = req.user.companyId;
-    } else if (req.user?.type === 'usuario') {
-      // Buscar o dono da empresa do usuário
-      const empresa = await prisma.empresa.findUnique({
-        where: { id: req.user.companyId! },
-        select: { ownerId: true }
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({
+        where: { id: req.user.id },
+        select: { companyId: true }
       });
-      profId = empresa?.ownerId || undefined;
-      companyId = req.user.companyId;
-    } else if (professionalId) {
-      profId = Number(professionalId);
-      companyId = req.user?.companyId;
+      companyId = prof?.companyId || undefined;
     }
 
-    if (!profId) {
-      return res.json(createSuccessResponse([], { page, pageSize, total: 0 }));
+    if (!companyId) {
+      return res.status(400).json(createErrorResponse('Clínica não identificada.', 400));
     }
 
-    const where: any = { professionalId: profId };
-    if (companyId) {
-      where.companyId = companyId;
-    }
+    const where: any = { companyId: companyId };
 
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } }
+        { name: { contains: String(search), mode: 'insensitive' } },
+        { phone: { contains: String(search), mode: 'insensitive' } }
       ]
     }
     if (status) {
@@ -82,6 +70,16 @@ router.get('/:id', auth(false), async (req, res) => {
       }
     })
     if (!item) return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    if (_companyId && item.companyId && item.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+    
     res.json(createSuccessResponse(item))
   } catch (error: any) {
     console.error('[Leads] Erro ao buscar lead:', error)

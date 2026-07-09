@@ -11,36 +11,26 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     const { search } = req.query as any
 
-    let profId: number | undefined;
-    let companyId: number | undefined;
+    let companyId = req.user?.companyId;
 
-    if (req.user?.type === 'profissional') {
-      profId = req.user.id;
-      companyId = req.user.companyId;
-    } else if (req.user?.type === 'usuario') {
-      // Buscar o dono da empresa do usuário
-      const empresa = await prisma.empresa.findUnique({
-        where: { id: req.user.companyId! },
-        select: { ownerId: true }
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({
+        where: { id: req.user.id },
+        select: { companyId: true }
       });
-      profId = empresa?.ownerId || undefined;
-      companyId = req.user.companyId;
+      companyId = prof?.companyId || undefined;
     }
 
-    if (!profId) {
-      return res.json(createSuccessResponse([], { page, pageSize, total: 0 }));
+    if (!companyId) {
+      return res.status(400).json(createErrorResponse('Clínica não identificada.', 400));
     }
 
-    const where: any = { professionalId: profId };
-    if (companyId) {
-      where.companyId = companyId;
-    }
-
+    const where: any = { companyId: companyId };
 
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } }
+        { name: { contains: String(search), mode: 'insensitive' } },
+        { phone: { contains: String(search), mode: 'insensitive' } }
       ]
     }
     

@@ -233,7 +233,7 @@ export default function Campaigns() {
       try {
         const tagsSet = new Set<string>();
         const [rLeads, rClients] = await Promise.all([
-          leadsApi.getAll({ professionalId: Number(professional.id), pageSize: 1000 }),
+          leadsApi.getAll({ pageSize: 1000 }),
           clientsApi.getAll({ pageSize: 1000 })
         ]);
         if (rLeads.success && rLeads.data) {

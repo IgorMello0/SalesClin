@@ -148,7 +148,7 @@ const Leads = () => {
     if (!professional?.id) return;
     setIsLoading(true);
     try {
-      const response = await leadsApi.getAll({ professionalId: Number(professional.id), search: searchQuery || undefined });
+      const response = await leadsApi.getAll({ search: searchQuery || undefined, pageSize: 1000 });
       if (response.success && response.data) {
         setLeads(response.data);
       } else {

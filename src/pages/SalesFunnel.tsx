@@ -450,7 +450,7 @@ const SalesFunnel = () => {
     if (!professional?.id) return;
     setIsLoading(true);
     try {
-      const res = await leadsApi.getAll({ professionalId: Number(professional.id) });
+      const res = await leadsApi.getAll({ pageSize: 1000 });
       if (res.success) {
         const mappedLeads = res.data.map((l: any) => ({
           ...l,
