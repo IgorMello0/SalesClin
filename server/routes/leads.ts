@@ -150,6 +150,20 @@ router.post('/', auth(), async (req, res) => {
 router.post('/:id/activities', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const { type, content, createdBy } = req.body
     
     const activity = await prisma.leadActivity.create({
@@ -172,6 +186,20 @@ router.post('/:id/activities', auth(), async (req, res) => {
 router.put('/:id/activities/:activityId', auth(), async (req, res) => {
   try {
     const activityId = Number(req.params.activityId)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const { content } = req.body
     
     const updated = await prisma.leadActivity.update({
@@ -190,6 +218,20 @@ router.put('/:id/activities/:activityId', auth(), async (req, res) => {
 router.delete('/:id/activities/:activityId', auth(), async (req, res) => {
   try {
     const activityId = Number(req.params.activityId)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     await prisma.leadActivity.delete({
       where: { id: activityId }
     })
@@ -223,6 +265,20 @@ router.get('/:id/proposals', auth(false), async (req, res) => {
 router.post('/:id/proposals', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const { title, value, validUntil, salespersonId, specialistId, sdrId, tags, justification, discountApplied } = req.body
     
     const proposal = await prisma.proposal.create({
@@ -251,6 +307,20 @@ router.post('/:id/proposals', auth(), async (req, res) => {
 router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const proposalId = Number(req.params.proposalId)
     const { title, value, validUntil, salespersonId, specialistId, sdrId, tags, justification, discountApplied, stage, status } = req.body
     
@@ -285,6 +355,20 @@ router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
 router.put('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const data = req.body
 
     // Map snake_case to camelCase if needed for Prisma
@@ -423,6 +507,20 @@ router.put('/:id', auth(), async (req, res) => {
 router.post('/:id/confirm-payment', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const { payments, proposalId } = req.body // Array of { amount, date, method, status } + optional proposalId
 
     const lead = await prisma.lead.findUnique({ where: { id } })
@@ -499,6 +597,20 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
 router.delete('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     await prisma.lead.delete({ where: { id } })
     
     if (req.user?.type === 'profissional') {

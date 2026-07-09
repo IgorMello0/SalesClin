@@ -163,6 +163,20 @@ router.post('/', auth(), requireModule('clientes'), async (req, res) => {
 router.put('/:id', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.client.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('client não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const { professionalId, name, email, phone, dateOfBirth, document, notes } = req.body
     
     const updated = await prisma.client.update({
@@ -187,6 +201,20 @@ router.put('/:id', auth(), requireModule('clientes'), async (req, res) => {
 router.delete('/:id', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const id = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.client.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('client não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     await prisma.client.delete({ where: { id } })
     
     if (req.user?.type === 'profissional') {
@@ -370,6 +398,20 @@ router.get('/:id/dossier', auth(false), async (req, res) => {
 router.post('/:id/proposals', auth(false), async (req, res) => {
   try {
     const clientId = Number(req.params.id)
+
+    let _companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !_companyId) {
+      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      _companyId = _prof?.companyId || undefined;
+    }
+    const _checkEntity = await prisma.client.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
+    if (!_checkEntity) return res.status(404).json(createErrorResponse('client não encontrado', 404));
+    if (_companyId && _checkEntity.companyId !== _companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
     const { title, value, status, validUntil } = req.body
 
     const client = await prisma.client.findUnique({
@@ -388,6 +430,7 @@ router.post('/:id/proposals', auth(false), async (req, res) => {
       const newLead = await prisma.lead.create({
         data: {
           professionalId: client.professionalId,
+          companyId: client.companyId,
           name: client.name,
           email: client.email,
           phone: client.phone,

@@ -319,6 +319,24 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
 
 router.delete('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
+
+  const current = await prisma.appointment.findUnique({ where: { id } });
+  if (!current) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404));
+
+  let canEdit = false;
+  if (req.user?.type === 'profissional' && current.professionalId === req.user.id) {
+    canEdit = true;
+  } else if (req.user?.type === 'usuario') {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.user.companyId! } });
+    if (empresa?.ownerId === current.professionalId) {
+      canEdit = true;
+    }
+  }
+
+  if (!canEdit && req.user?.role !== 'admin') {
+    return res.status(403).json(createErrorResponse('Acesso negado', 403));
+  }
+
   await deleteAppointmentFromGoogle(id)
   await prisma.appointment.delete({ where: { id } })
   
