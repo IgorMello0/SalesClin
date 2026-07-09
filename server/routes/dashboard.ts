@@ -19,6 +19,14 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         select: { id: true }
       });
       professionalIds = professionalsInCompany.map(p => p.id);
+      
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: companyId },
+        select: { ownerId: true }
+      });
+      if (empresa?.ownerId && !professionalIds.includes(empresa.ownerId)) {
+        professionalIds.push(empresa.ownerId);
+      }
     } else {
       // Fallback para quando o token não tem companyId (ex: Administrador ou profissional autônomo)
       professionalIds = [req.user!.id];
