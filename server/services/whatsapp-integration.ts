@@ -85,7 +85,19 @@ function isCustomEvolutionConfigured(company: Pick<CompanyRef, 'evolutionApiUrl'
   return Boolean(company.evolutionApiUrl && company.apiKey && company.evolutionInstance)
 }
 
-function getEvolutionMode(_company: Pick<CompanyRef, 'evolutionMode' | 'evolutionApiUrl' | 'apiKey' | 'evolutionInstance'>): 'custom' {
+function hasManagedEvolutionConfig() {
+  return Boolean(process.env.EVOLUTION_CENTRAL_API_URL && process.env.EVOLUTION_CENTRAL_API_KEY)
+}
+
+function buildManagedEvolutionInstance(company: Pick<CompanyRef, 'id' | 'webhookToken'>) {
+  const token = (company.webhookToken || String(company.id)).replace(/-/g, '').slice(0, 8)
+  return `sellclin-company-${company.id}-${token}`
+}
+
+function getEvolutionMode(company: Pick<CompanyRef, 'evolutionMode' | 'evolutionApiUrl' | 'apiKey' | 'evolutionInstance'>): 'managed' | 'custom' {
+  if (company.evolutionMode === 'managed') return 'managed'
+  if (isCustomEvolutionConfigured(company)) return 'custom'
+  if (hasManagedEvolutionConfig()) return 'managed'
   return 'custom'
 }
 
@@ -205,12 +217,16 @@ async function ensureCompanyWhatsappToken(companyId: number) {
     throw new Error('Empresa nao encontrada.')
   }
 
-  if (company.evolutionMode !== 'custom') {
+  const mode = getEvolutionMode(company)
+  const managedInstance = buildManagedEvolutionInstance(company)
+
+  if (mode === 'managed') {
     return prisma.empresa.update({
       where: { id: companyId },
       data: {
         whatsappProvider: 'evolution',
-        evolutionMode: 'custom',
+        evolutionMode: 'managed',
+        evolutionInstance: company.evolutionInstance || managedInstance,
       },
       select: {
         id: true,
@@ -231,7 +247,24 @@ async function ensureCompanyWhatsappToken(companyId: number) {
 
 function getEvolutionRuntime(company: CompanyRef): EvolutionRuntime {
   const mode = getEvolutionMode(company)
-  const instance = company.evolutionInstance
+  const instance = mode === 'managed'
+    ? company.evolutionInstance || buildManagedEvolutionInstance(company)
+    : company.evolutionInstance
+
+  if (mode === 'managed') {
+    const baseUrl = process.env.EVOLUTION_CENTRAL_API_URL
+    const apiKey = process.env.EVOLUTION_CENTRAL_API_KEY
+    if (!baseUrl || !apiKey || !instance) {
+      throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY no ambiente da VPS.')
+    }
+
+    return {
+      mode,
+      baseUrl: trimTrailingSlash(baseUrl),
+      apiKey,
+      instance,
+    }
+  }
 
   if (!isCustomEvolutionConfigured(company) || !instance || !company.evolutionApiUrl || !company.apiKey) {
     throw new Error('Evolution propria nao configurada. Informe URL da Evolution, API key e nome da instancia.')
@@ -684,13 +717,54 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
 export async function startCentralWhatsappConnection(companyId: number) {
   const company = await ensureCompanyWhatsappToken(companyId)
   const runtime = getEvolutionRuntime(company)
+  const webhookUrl = getWebhookUrl(company.webhookToken)
+  let webhookStatus: WhatsAppStatus['webhookStatus'] = webhookUrl ? 'pending' : 'not_configured'
+  let webhookEndpoint: string | null = null
+  let webhookError: string | null = null
+
   await createEvolutionInstanceIfNeeded(runtime)
   try {
-    await setupEvolutionWebhookForCompany(company)
+    const webhook = await setupEvolutionWebhookForCompany(company)
+    webhookStatus = 'configured'
+    webhookEndpoint = webhook.endpoint
   } catch (error) {
     console.warn('[WhatsApp Connect] Webhook nao configurado:', error)
+    webhookStatus = 'error'
+    webhookError = error instanceof Error ? error.message : 'Webhook nao configurado.'
   }
-  return getCentralWhatsappStatus(companyId)
+
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const qr = await requestEvolutionQrCode(config, runtime.instance, true)
+  if (qr.connected) {
+    return {
+      status: 'CONNECTED',
+      instance: runtime.instance,
+      evolutionMode: runtime.mode,
+      webhookUrl,
+      webhookStatus,
+      webhookEndpoint,
+      webhookError,
+      message: 'WhatsApp conectado na instancia Evolution.',
+    } satisfies WhatsAppStatus
+  }
+
+  return {
+    status: 'DISCONNECTED',
+    qrcode: qr.qrcode,
+    pairingCode: qr.pairingCode,
+    qrcodeStatus: qr.qrcode || qr.pairingCode ? 'ready' : 'empty',
+    qrcodeEndpoint: qr.endpoint,
+    qrcodeError: qr.qrcode || qr.pairingCode ? null : formatQrFailure(qr.attempts),
+    instance: runtime.instance,
+    evolutionMode: runtime.mode,
+    webhookUrl,
+    webhookStatus,
+    webhookEndpoint,
+    webhookError,
+    message: qr.qrcode || qr.pairingCode
+      ? 'Escaneie o QR Code ou use o codigo de pareamento para conectar o WhatsApp.'
+      : 'A Evolution respondeu, mas nao retornou QR Code.',
+  } satisfies WhatsAppStatus
 }
 
 export async function getCentralEvolutionRuntime(companyId: number) {
