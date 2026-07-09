@@ -75,10 +75,17 @@ function getPublicAppUrl() {
 
 function getCandidateBaseUrls(baseUrl: string) {
   const normalized = trimTrailingSlash(baseUrl)
-  const candidates = [normalized]
   const withoutManager = normalized.replace(/\/manager$/i, '')
+  const candidates = withoutManager && withoutManager !== normalized
+    ? [withoutManager, normalized]
+    : [normalized]
   if (withoutManager && withoutManager !== normalized) candidates.push(withoutManager)
   return Array.from(new Set(candidates))
+}
+
+function isHtmlResponse(text: string) {
+  const normalized = String(text || '').trim().toLowerCase()
+  return normalized.startsWith('<!doctype') || normalized.startsWith('<html') || normalized.includes('<body')
 }
 
 function isCustomEvolutionConfigured(company: Pick<CompanyRef, 'evolutionApiUrl' | 'apiKey' | 'evolutionInstance'>) {
@@ -319,13 +326,13 @@ async function createEvolutionInstance(config: { baseUrl: string; apiKey: string
         method: 'POST',
         url: candidate.url,
         status: response.status,
-        ok: response.ok,
+        ok: response.ok && !isHtmlResponse(text),
         response: text.slice(0, 220),
       })
 
-      if (response.ok || response.status === 409 || errorText.includes('already') || errorText.includes('existe')) {
+      if ((response.ok && !isHtmlResponse(text)) || response.status === 409 || errorText.includes('already') || errorText.includes('existe')) {
         return {
-          ok: response.ok,
+          ok: response.ok && !isHtmlResponse(text),
           alreadyExists: response.status === 409 || errorText.includes('already') || errorText.includes('existe'),
           data,
           endpoint: candidate.url,
@@ -452,11 +459,11 @@ async function probeEvolutionApi(config: { baseUrl: string; apiKey: string }, in
           method: 'GET',
           url,
           status: response.status,
-          ok: response.ok,
+          ok: response.ok && !isHtmlResponse(body),
           response: body,
         }
         attempts.push(result)
-        if (response.ok) return { ok: true, baseUrl, attempts }
+        if (response.ok && !isHtmlResponse(body)) return { ok: true, baseUrl, attempts }
       } catch (error: any) {
         attempts.push({ label: 'api probe', method: 'GET', url, ok: false, error: error.message })
       }
@@ -557,6 +564,12 @@ async function requestEvolutionPairingCode(config: { baseUrl: string; apiKey: st
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
     const encodedNumber = encodeURIComponent(number)
     const candidates = [
+      { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instanceName: instance, number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instanceName: instance, phoneNumber: number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instanceName: instance, phone: number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instance, number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instance, phoneNumber: number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instance, phone: number } },
       { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}?number=${encodedNumber}` },
       { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}?phoneNumber=${encodedNumber}` },
       { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}?phone=${encodedNumber}` },
