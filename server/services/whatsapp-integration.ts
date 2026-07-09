@@ -164,7 +164,19 @@ function extractQrCode(payload: any): string | null {
 }
 
 function extractPairingCode(payload: any): string | null {
-  return payload?.pairingCode || payload?.pairing_code || payload?.codePairing || null
+  const value =
+    payload?.pairingCode ||
+    payload?.pairing_code ||
+    payload?.codePairing ||
+    payload?.pairing?.code ||
+    payload?.pairing?.pairingCode ||
+    payload?.code ||
+    null
+
+  if (!value || typeof value !== 'string') return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > 40 || normalized.startsWith('data:image/')) return null
+  return normalized
 }
 
 function getWebhookUrl(token?: string | null) {
@@ -226,7 +238,7 @@ async function ensureCompanyWhatsappToken(companyId: number) {
       data: {
         whatsappProvider: 'evolution',
         evolutionMode: 'managed',
-        evolutionInstance: company.evolutionInstance || managedInstance,
+        evolutionInstance: managedInstance,
       },
       select: {
         id: true,
@@ -248,7 +260,7 @@ async function ensureCompanyWhatsappToken(companyId: number) {
 function getEvolutionRuntime(company: CompanyRef): EvolutionRuntime {
   const mode = getEvolutionMode(company)
   const instance = mode === 'managed'
-    ? company.evolutionInstance || buildManagedEvolutionInstance(company)
+    ? buildManagedEvolutionInstance(company)
     : company.evolutionInstance
 
   if (mode === 'managed') {
@@ -529,6 +541,54 @@ async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string 
   return { connected: false, qrcode: null, pairingCode: null, endpoint: lastOkEndpoint, attempts }
 }
 
+async function requestEvolutionPairingCode(config: { baseUrl: string; apiKey: string }, instance: string, phone: string) {
+  const attempts: EvolutionAttemptResult[] = []
+  const number = normalizePhone(phone)
+  let lastOkEndpoint: string | null = null
+
+  for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
+    const encodedNumber = encodeURIComponent(number)
+    const candidates = [
+      { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}?number=${encodedNumber}` },
+      { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}?phoneNumber=${encodedNumber}` },
+      { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}?phone=${encodedNumber}` },
+      { method: 'POST' as const, url: `${baseUrl}/instance/connect/${instance}`, body: { number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/connect/${instance}`, body: { phoneNumber: number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/connect/${instance}`, body: { phone: number } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/connect/${instance}`, body: { number, pairingCode: true, qrcode: false } },
+    ]
+
+    for (const candidate of candidates) {
+      try {
+        const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, candidate.method, candidate.body)
+        const pairingCode = extractPairingCode(data)
+        const qrcode = extractQrCode(data)
+        attempts.push({
+          label: 'pairing code connect',
+          method: candidate.method,
+          url: candidate.url,
+          status: response.status,
+          ok: response.ok,
+          response: text.slice(0, 220),
+        })
+        if (response.ok) lastOkEndpoint = candidate.url
+
+        if (response.ok && isConnectedPayload(data)) {
+          return { connected: true, qrcode: null, pairingCode: null, endpoint: candidate.url, attempts }
+        }
+
+        if (response.ok && (pairingCode || qrcode)) {
+          return { connected: false, qrcode, pairingCode, endpoint: candidate.url, attempts }
+        }
+      } catch (error: any) {
+        attempts.push({ label: 'pairing code connect', method: candidate.method, url: candidate.url, ok: false, error: error.message })
+      }
+    }
+  }
+
+  return { connected: false, qrcode: null, pairingCode: null, endpoint: lastOkEndpoint, attempts }
+}
+
 async function recreateEvolutionInstanceForQr(config: { baseUrl: string; apiKey: string }, instance: string, attempts: EvolutionAttemptResult[]) {
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
     const cleanup = [
@@ -710,7 +770,9 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
     webhookStatus,
     webhookEndpoint,
     webhookError,
-    message: 'WhatsApp ainda nao conectado na Evolution. Conecte o numero pelo painel da sua Evolution e atualize o status no SellClin.',
+    message: runtime.mode === 'managed'
+      ? 'WhatsApp ainda nao conectado. Gere o QR Code ou use o codigo de pareamento pelo telefone.'
+      : 'WhatsApp ainda nao conectado na Evolution. Conecte o numero pelo painel da sua Evolution e atualize o status no SellClin.',
   }
 }
 
@@ -764,6 +826,66 @@ export async function startCentralWhatsappConnection(companyId: number) {
     message: qr.qrcode || qr.pairingCode
       ? 'Escaneie o QR Code ou use o codigo de pareamento para conectar o WhatsApp.'
       : 'A Evolution respondeu, mas nao retornou QR Code.',
+  } satisfies WhatsAppStatus
+}
+
+export async function startCentralWhatsappPairingCode(companyId: number, phone: string) {
+  const normalizedPhone = normalizePhone(phone)
+  if (normalizedPhone.length < 10) {
+    throw new Error('Informe um telefone com DDI e DDD para gerar o codigo de pareamento.')
+  }
+
+  const company = await ensureCompanyWhatsappToken(companyId)
+  const runtime = getEvolutionRuntime(company)
+  const webhookUrl = getWebhookUrl(company.webhookToken)
+  let webhookStatus: WhatsAppStatus['webhookStatus'] = webhookUrl ? 'pending' : 'not_configured'
+  let webhookEndpoint: string | null = null
+  let webhookError: string | null = null
+
+  await createEvolutionInstanceIfNeeded(runtime)
+  try {
+    const webhook = await setupEvolutionWebhookForCompany(company)
+    webhookStatus = 'configured'
+    webhookEndpoint = webhook.endpoint
+  } catch (error) {
+    console.warn('[WhatsApp Pairing] Webhook nao configurado:', error)
+    webhookStatus = 'error'
+    webhookError = error instanceof Error ? error.message : 'Webhook nao configurado.'
+  }
+
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const pairing = await requestEvolutionPairingCode(config, runtime.instance, normalizedPhone)
+  if (pairing.connected) {
+    return {
+      status: 'CONNECTED',
+      instance: runtime.instance,
+      evolutionMode: runtime.mode,
+      webhookUrl,
+      webhookStatus,
+      webhookEndpoint,
+      webhookError,
+      message: 'WhatsApp conectado na instancia Evolution.',
+    } satisfies WhatsAppStatus
+  }
+
+  return {
+    status: 'DISCONNECTED',
+    qrcode: pairing.qrcode,
+    pairingCode: pairing.pairingCode,
+    qrcodeStatus: pairing.qrcode || pairing.pairingCode ? 'ready' : 'empty',
+    qrcodeEndpoint: pairing.endpoint,
+    qrcodeError: pairing.qrcode || pairing.pairingCode ? null : formatQrFailure(pairing.attempts),
+    instance: runtime.instance,
+    evolutionMode: runtime.mode,
+    webhookUrl,
+    webhookStatus,
+    webhookEndpoint,
+    webhookError,
+    message: pairing.pairingCode
+      ? 'Use o codigo de pareamento no WhatsApp para conectar este numero.'
+      : pairing.qrcode
+        ? 'A Evolution retornou QR Code como alternativa ao codigo de pareamento.'
+        : 'A Evolution nao retornou codigo de pareamento.',
   } satisfies WhatsAppStatus
 }
 

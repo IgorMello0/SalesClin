@@ -15,6 +15,7 @@ import { empresasApi, googleCalendarApi, whatsappMetaApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 type IntegrationKey = 'whatsappQr' | 'whatsappOfficial' | 'instagram' | 'messenger' | 'googleCalendar';
 
@@ -106,6 +107,7 @@ const Integrations = () => {
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationKey | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsappStatus>({ status: 'LOADING' });
   const [workingKey, setWorkingKey] = useState<IntegrationKey | null>(null);
+  const [pairingPhone, setPairingPhone] = useState('');
   const selectedOption = integrationOptions.find((option) => option.id === selectedIntegration);
   const qrImage = useMemo(() => normalizeQrImage(whatsappStatus.qrcode), [whatsappStatus.qrcode]);
 
@@ -153,6 +155,37 @@ const Integrations = () => {
       await loadWhatsappStatus();
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setWorkingKey(null);
+    }
+  };
+
+  const startWhatsappPairing = async () => {
+    const phone = pairingPhone.replace(/\D/g, '');
+    if (phone.length < 10) {
+      toast({
+        title: 'Telefone obrigatorio',
+        description: 'Informe o numero com DDI e DDD, por exemplo 5511999999999.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setWorkingKey('whatsappQr');
+    try {
+      const response = await empresasApi.startWhatsappPairingCode(phone);
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Nao foi possivel gerar o codigo de pareamento.');
+      }
+
+      setWhatsappStatus(response.data || {});
+      toast({
+        title: response.data?.pairingCode ? 'Codigo gerado' : 'Status atualizado',
+        description: response.data?.message || 'Confira o codigo de pareamento ou o status da conexao.',
+      });
+    } catch (error: any) {
+      setWhatsappStatus((current) => ({ ...current, status: 'ERROR', message: error.message }));
+      toast({ title: 'Erro no WhatsApp', description: error.message, variant: 'destructive' });
     } finally {
       setWorkingKey(null);
     }
@@ -323,7 +356,7 @@ const Integrations = () => {
                         <QrCode className="mx-auto text-slate-300" size={44} />
                         <p className="mt-3 font-black text-slate-900">Pronto para gerar conexao</p>
                         <p className="mt-1 max-w-sm text-sm text-slate-500">
-                          Clique em conectar para criar a sessao e buscar QR Code na Evolution central.
+                          Clique em conectar para buscar QR Code, ou gere um codigo de pareamento pelo telefone.
                         </p>
                       </div>
                     )}
@@ -352,6 +385,35 @@ const Integrations = () => {
                     {workingKey === 'whatsappQr' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <QrCode size={16} className="mr-2" />}
                     {whatsappStatus.status === 'CONNECTED' ? 'Atualizar conexao' : 'Conectar WhatsApp'}
                   </Button>
+
+                  {whatsappStatus.status !== 'CONNECTED' && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Sem QR Code</p>
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+                        Use o telefone com DDI para tentar o codigo de pareamento do WhatsApp.
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        <Input
+                          value={pairingPhone}
+                          onChange={(event) => setPairingPhone(event.target.value)}
+                          placeholder="5511999999999"
+                          inputMode="tel"
+                          className="h-11 bg-white font-medium"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={startWhatsappPairing}
+                          disabled={workingKey === 'whatsappQr'}
+                          className="w-full font-bold"
+                        >
+                          {workingKey === 'whatsappQr' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Smartphone size={16} className="mr-2" />}
+                          Gerar codigo
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <Button variant="outline" onClick={loadWhatsappStatus} disabled={workingKey === 'whatsappQr'} className="w-full">
                     <RefreshCcw size={16} className="mr-2" />
                     Atualizar status

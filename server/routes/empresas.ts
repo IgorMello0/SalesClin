@@ -11,6 +11,7 @@ import {
   restartCentralWhatsapp,
   setupEvolutionWebhookForCompany,
   startCentralWhatsappConnection,
+  startCentralWhatsappPairingCode,
 } from '../services/whatsapp-integration.js'
 
 export const router = Router()
@@ -89,6 +90,19 @@ router.post('/my-company/whatsapp/connect/start', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[WhatsApp Connect] Erro:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao iniciar conexao do WhatsApp', 500))
+  }
+})
+
+router.post('/my-company/whatsapp/connect/pairing-code', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const status = await startCentralWhatsappPairingCode(companyId, String(req.body?.phone || ''))
+    return res.json(createSuccessResponse(status))
+  } catch (error: any) {
+    console.error('[WhatsApp Pairing] Erro:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao gerar codigo de pareamento do WhatsApp', 500))
   }
 })
 
