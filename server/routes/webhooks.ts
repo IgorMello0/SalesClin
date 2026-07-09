@@ -536,32 +536,40 @@ async function processIncomingMessage(opts: {
 async function handleEvolutionPayload(body: any, empresa: { id: number; ownerId: number | null; name: string }) {
   // ── Validar evento ──
   const event = body.event || '';
-  if (!event.includes('messages') && !event.includes('MESSAGES')) {
+  const normalizedEvent = String(event).toLowerCase();
+  const isEvolutionApiMessage = normalizedEvent.includes('messages');
+  const isEvolutionGoMessage = normalizedEvent === 'message';
+  if (!isEvolutionApiMessage && !isEvolutionGoMessage) {
     return { received: true, ignored: true, reason: 'not_message_event' };
   }
 
   const data = body.data || body;
+  const goInfo = data.Info || data.info;
   const key = data.key || {};
 
   // Ignorar mensagens enviadas por mim (fromMe)
-  if (key.fromMe === true) {
+  if (key.fromMe === true || goInfo?.IsFromMe === true) {
     return { received: true, ignored: true, reason: 'fromMe' };
   }
 
   // Ignorar mensagens de grupo
-  const remoteJid = key.remoteJid || '';
+  const remoteJid = key.remoteJid || goInfo?.Sender || goInfo?.Chat || '';
   if (remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) {
+    return { received: true, ignored: true, reason: 'group' };
+  }
+  if (goInfo?.IsGroup === true) {
     return { received: true, ignored: true, reason: 'group' };
   }
 
   // ── Extrair dados ──
   const phone = normalizePhone(remoteJid);
-  const pushName = data.pushName || data.senderName || '';
-  const messageObj = data.message || {};
+  const pushName = data.pushName || data.senderName || goInfo?.PushName || '';
+  const messageObj = data.message || data.Message || {};
   const messageText = messageObj.conversation
     || messageObj.extendedTextMessage?.text
     || messageObj.imageMessage?.caption
     || messageObj.videoMessage?.caption
+    || messageObj.documentMessage?.caption
     || '';
 
   if (!phone) {

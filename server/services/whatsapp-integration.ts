@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { prisma } from '../prisma.js'
 
 type CompanyRef = {
@@ -57,6 +58,7 @@ type EvolutionRuntime = {
   mode: 'managed' | 'custom'
   baseUrl: string
   apiKey: string
+  controlApiKey?: string
   instance: string
 }
 
@@ -96,6 +98,10 @@ function hasManagedEvolutionConfig() {
   return Boolean(process.env.EVOLUTION_CENTRAL_API_URL && process.env.EVOLUTION_CENTRAL_API_KEY)
 }
 
+function isUuidLike(value?: string | null) {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))
+}
+
 function buildManagedEvolutionInstance(company: Pick<CompanyRef, 'id' | 'webhookToken'>) {
   const token = (company.webhookToken || String(company.id)).replace(/-/g, '').slice(0, 8)
   return `sellclin-company-${company.id}-${token}`
@@ -108,10 +114,11 @@ function getEvolutionMode(company: Pick<CompanyRef, 'evolutionMode' | 'evolution
   return 'custom'
 }
 
-function evolutionHeaders(apiKey: string) {
+function evolutionHeaders(apiKey: string, extraHeaders?: Record<string, string>) {
   return {
     'Content-Type': 'application/json',
     apikey: apiKey,
+    ...(extraHeaders || {}),
   }
 }
 
@@ -124,10 +131,16 @@ async function responseSnippet(response: Response) {
   return text.slice(0, 220)
 }
 
-async function fetchEvolutionJson(url: string, apiKey: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', body?: any) {
+async function fetchEvolutionJson(
+  url: string,
+  apiKey: string,
+  method: 'GET' | 'POST' | 'DELETE' = 'GET',
+  body?: any,
+  extraHeaders?: Record<string, string>
+) {
   const response = await fetch(url, {
     method,
-    headers: evolutionHeaders(apiKey),
+    headers: evolutionHeaders(apiKey, extraHeaders),
     body: body ? JSON.stringify(body) : undefined,
   })
   const text = await response.text().catch(() => '')
@@ -142,8 +155,11 @@ async function fetchEvolutionJson(url: string, apiKey: string, method: 'GET' | '
 }
 
 function isConnectedPayload(payload: any) {
-  const state = payload?.instance?.state || payload?.state || payload?.connectionState || payload?.status
-  return String(state || '').toLowerCase() === 'open' || String(state || '').toLowerCase() === 'connected'
+  const state = payload?.instance?.state || payload?.state || payload?.connectionState || payload?.status || payload?.data?.status
+  return payload?.data?.connected === true
+    || payload?.connected === true
+    || String(state || '').toLowerCase() === 'open'
+    || String(state || '').toLowerCase() === 'connected'
 }
 
 function normalizeQrCode(value: any): string | null {
@@ -160,6 +176,10 @@ function extractQrCode(payload: any): string | null {
   return normalizeQrCode(
     payload?.base64 ||
     payload?.raw ||
+    payload?.data?.qrcode ||
+    payload?.data?.qrCode ||
+    payload?.data?.base64 ||
+    payload?.data?.code ||
     payload?.qrcode?.base64 ||
     payload?.qrcode?.code ||
     payload?.qrcode ||
@@ -176,6 +196,10 @@ function extractPairingCode(payload: any): string | null {
     payload?.pairingCode ||
     payload?.pairing_code ||
     payload?.codePairing ||
+    payload?.data?.PairingCode ||
+    payload?.data?.pairingCode ||
+    payload?.data?.pairing_code ||
+    payload?.data?.code ||
     payload?.pairing?.code ||
     payload?.pairing?.pairingCode ||
     payload?.code ||
@@ -238,7 +262,10 @@ async function ensureCompanyWhatsappToken(companyId: number) {
   }
 
   const mode = getEvolutionMode(company)
-  const managedInstance = buildManagedEvolutionInstance(company)
+  const managedInstance = isUuidLike(company.evolutionInstance)
+    ? company.evolutionInstance
+    : buildManagedEvolutionInstance(company)
+  const managedInstanceToken = company.apiKey || randomBytes(24).toString('hex')
 
   if (mode === 'managed') {
     return prisma.empresa.update({
@@ -247,6 +274,7 @@ async function ensureCompanyWhatsappToken(companyId: number) {
         whatsappProvider: 'evolution',
         evolutionMode: 'managed',
         evolutionInstance: managedInstance,
+        apiKey: managedInstanceToken,
       },
       select: {
         id: true,
@@ -268,20 +296,22 @@ async function ensureCompanyWhatsappToken(companyId: number) {
 function getEvolutionRuntime(company: CompanyRef): EvolutionRuntime {
   const mode = getEvolutionMode(company)
   const instance = mode === 'managed'
-    ? buildManagedEvolutionInstance(company)
+    ? (isUuidLike(company.evolutionInstance) ? company.evolutionInstance : buildManagedEvolutionInstance(company))
     : company.evolutionInstance
 
   if (mode === 'managed') {
     const baseUrl = process.env.EVOLUTION_CENTRAL_API_URL
-    const apiKey = process.env.EVOLUTION_CENTRAL_API_KEY
-    if (!baseUrl || !apiKey || !instance) {
+    const controlApiKey = process.env.EVOLUTION_CENTRAL_API_KEY
+    const instanceApiKey = company.apiKey || controlApiKey
+    if (!baseUrl || !controlApiKey || !instance || !instanceApiKey) {
       throw new Error('Evolution central nao configurada. Defina EVOLUTION_CENTRAL_API_URL e EVOLUTION_CENTRAL_API_KEY no ambiente da VPS.')
     }
 
     return {
       mode,
       baseUrl: trimTrailingSlash(baseUrl),
-      apiKey,
+      apiKey: instanceApiKey,
+      controlApiKey,
       instance,
     }
   }
@@ -299,12 +329,66 @@ function getEvolutionRuntime(company: CompanyRef): EvolutionRuntime {
 }
 
 async function createEvolutionInstanceIfNeeded(runtime: EvolutionRuntime) {
-  const result = await createEvolutionInstance({ baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }, runtime.instance)
-  return result.data
+  return createEvolutionInstance(
+    { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey },
+    runtime.instance,
+    runtime.apiKey
+  )
 }
 
-async function createEvolutionInstance(config: { baseUrl: string; apiKey: string }, instance: string, attempts: EvolutionAttemptResult[] = []) {
+async function ensureEvolutionInstanceReady(company: CompanyRef, runtime: EvolutionRuntime) {
+  if (runtime.mode === 'managed' && isUuidLike(runtime.instance)) {
+    return {
+      ok: true,
+      alreadyExists: true,
+      data: null,
+      endpoint: null,
+      instanceId: runtime.instance,
+      instanceName: company.name,
+      instanceToken: runtime.apiKey,
+    }
+  }
+
+  const result = await createEvolutionInstanceIfNeeded(runtime)
+  if (runtime.mode === 'managed' && result.instanceId && result.instanceId !== runtime.instance) {
+    const instanceToken = result.instanceToken || runtime.apiKey
+    await prisma.empresa.update({
+      where: { id: company.id },
+      data: {
+        evolutionInstance: result.instanceId,
+        apiKey: instanceToken,
+      },
+    })
+    company.evolutionInstance = result.instanceId
+    company.apiKey = instanceToken
+    runtime.instance = result.instanceId
+    runtime.apiKey = instanceToken
+  }
+
+  return result
+}
+
+function extractEvolutionInstanceInfo(data: any, fallbackToken?: string) {
+  const payload = data?.data || data || {}
+  return {
+    id: typeof payload.id === 'string' ? payload.id : null,
+    name: typeof payload.name === 'string' ? payload.name : null,
+    token: typeof payload.token === 'string' ? payload.token : fallbackToken || null,
+  }
+}
+
+async function createEvolutionInstance(
+  config: { baseUrl: string; apiKey: string },
+  instance: string,
+  instanceToken?: string,
+  attempts: EvolutionAttemptResult[] = []
+) {
   const candidates = getCandidateBaseUrls(config.baseUrl).flatMap((baseUrl) => [
+    {
+      label: 'go instance create',
+      url: `${baseUrl}/instance/create`,
+      body: { name: instance, token: instanceToken },
+    },
     {
       label: 'instance create baileys',
       url: `${baseUrl}/instance/create`,
@@ -331,11 +415,15 @@ async function createEvolutionInstance(config: { baseUrl: string; apiKey: string
       })
 
       if ((response.ok && !isHtmlResponse(text)) || response.status === 409 || errorText.includes('already') || errorText.includes('existe')) {
+        const instanceInfo = extractEvolutionInstanceInfo(data, instanceToken)
         return {
           ok: response.ok && !isHtmlResponse(text),
           alreadyExists: response.status === 409 || errorText.includes('already') || errorText.includes('existe'),
           data,
           endpoint: candidate.url,
+          instanceId: instanceInfo.id,
+          instanceName: instanceInfo.name,
+          instanceToken: instanceInfo.token,
         }
       }
     } catch (error: any) {
@@ -354,7 +442,11 @@ export async function setupEvolutionWebhookForCompany(company: CompanyRef) {
     throw new Error('Instancia ou webhook token ausente para configurar webhook.')
   }
 
-  const result = await tryConfigureEvolutionWebhook({ baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }, instance, webhookUrl)
+  const result = await tryConfigureEvolutionWebhook(
+    { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey },
+    instance,
+    webhookUrl
+  )
   if (result.ok) {
     return { webhookUrl, endpoint: result.endpoint }
   }
@@ -377,6 +469,12 @@ function buildWebhookAttempts(baseUrl: string, instance: string, webhookUrl: str
   const flatCamel = { url: webhookUrl, enabled: true, webhookByEvents: true, events }
 
   return [
+    {
+      label: 'go instance connect webhook',
+      url: `${baseUrl}/instance/connect`,
+      body: { webhookUrl, subscribe: ['ALL'], immediate: true },
+      headers: { instanceId: instance },
+    },
     { label: 'v2 webhook/set object', url: `${baseUrl}/webhook/set/${instance}`, body: webhookObject },
     { label: 'v2 webhook/set snake', url: `${baseUrl}/webhook/set/${instance}`, body: flatSnake },
     { label: 'v2 webhook/set camel', url: `${baseUrl}/webhook/set/${instance}`, body: flatCamel },
@@ -399,7 +497,7 @@ async function tryConfigureEvolutionWebhook(
     try {
       const response = await fetch(attempt.url, {
         method: 'POST',
-        headers: evolutionHeaders(config.apiKey),
+        headers: evolutionHeaders(config.apiKey, attempt.headers),
         body: JSON.stringify(attempt.body),
       })
       const body = await responseSnippet(response)
@@ -446,13 +544,17 @@ async function probeEvolutionApi(config: { baseUrl: string; apiKey: string }, in
   const attempts: EvolutionAttemptResult[] = []
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
     const urls = [
+      { url: `${baseUrl}/instance/all`, headers: undefined },
+      instance ? { url: `${baseUrl}/instance/status`, headers: { instanceId: instance } } : null,
       `${baseUrl}/instance/fetchInstances`,
-      instance ? `${baseUrl}/instance/connectionState/${instance}` : null,
+      instance ? { url: `${baseUrl}/instance/connectionState/${instance}`, headers: undefined } : null,
     ].filter(Boolean) as string[]
 
-    for (const url of urls) {
+    for (const candidate of urls as any[]) {
+      const url = typeof candidate === 'string' ? candidate : candidate.url
+      const extraHeaders = typeof candidate === 'string' ? undefined : candidate.headers
       try {
-        const response = await fetch(url, { method: 'GET', headers: { apikey: config.apiKey } })
+        const response = await fetch(url, { method: 'GET', headers: evolutionHeaders(config.apiKey, extraHeaders) })
         const body = await responseSnippet(response)
         const result = {
           label: 'api probe',
@@ -476,23 +578,28 @@ async function getEvolutionConnectionState(config: { baseUrl: string; apiKey: st
   const attempts: EvolutionAttemptResult[] = []
 
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
-    const url = `${baseUrl}/instance/connectionState/${instance}`
+    const candidates = [
+      { url: `${baseUrl}/instance/status`, headers: { instanceId: instance } },
+      { url: `${baseUrl}/instance/connectionState/${instance}`, headers: undefined },
+    ]
+    for (const candidate of candidates) {
     try {
-      const { response, data, text } = await fetchEvolutionJson(url, config.apiKey)
+      const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, 'GET', undefined, candidate.headers)
       attempts.push({
         label: 'connection state',
         method: 'GET',
-        url,
+        url: candidate.url,
         status: response.status,
         ok: response.ok,
         response: text.slice(0, 220),
       })
 
       if (response.ok && isConnectedPayload(data)) {
-        return { connected: true, endpoint: url, attempts }
+        return { connected: true, endpoint: candidate.url, attempts }
       }
     } catch (error: any) {
-      attempts.push({ label: 'connection state', method: 'GET', url, ok: false, error: error.message })
+      attempts.push({ label: 'connection state', method: 'GET', url: candidate.url, ok: false, error: error.message })
+    }
     }
   }
 
@@ -506,10 +613,10 @@ async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string 
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
     const encodedInstance = encodeURIComponent(instance)
     const candidates = [
+      { method: 'GET' as const, url: `${baseUrl}/instance/qr`, headers: { instanceId: instance } },
       { method: 'GET' as const, url: `${baseUrl}/instance/qr/${encodedInstance}` },
       { method: 'GET' as const, url: `${baseUrl}/instance/qr?instance=${encodedInstance}` },
       { method: 'GET' as const, url: `${baseUrl}/instance/qr?instanceName=${encodedInstance}` },
-      { method: 'GET' as const, url: `${baseUrl}/instance/qr` },
       { method: 'POST' as const, url: `${baseUrl}/instance/qr`, body: { instanceName: instance } },
       { method: 'POST' as const, url: `${baseUrl}/instance/qr`, body: { instance } },
       { method: 'GET' as const, url: `${baseUrl}/instance/connect/${instance}` },
@@ -518,7 +625,7 @@ async function requestEvolutionQrCode(config: { baseUrl: string; apiKey: string 
 
     for (const candidate of candidates) {
       try {
-        const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, candidate.method)
+        const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, candidate.method, candidate.body, candidate.headers)
         const qrcode = extractQrCode(data)
         const pairingCode = extractPairingCode(data)
         attempts.push({
@@ -564,6 +671,8 @@ async function requestEvolutionPairingCode(config: { baseUrl: string; apiKey: st
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
     const encodedNumber = encodeURIComponent(number)
     const candidates = [
+      { method: 'POST' as const, url: `${baseUrl}/instance/connect`, body: { webhookUrl: undefined, subscribe: ['ALL'], immediate: true, phone: number }, headers: { instanceId: instance } },
+      { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { phone: number, subscribe: ['ALL'] }, headers: { instanceId: instance } },
       { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instanceName: instance, number } },
       { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instanceName: instance, phoneNumber: number } },
       { method: 'POST' as const, url: `${baseUrl}/instance/pair`, body: { instanceName: instance, phone: number } },
@@ -581,7 +690,7 @@ async function requestEvolutionPairingCode(config: { baseUrl: string; apiKey: st
 
     for (const candidate of candidates) {
       try {
-        const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, candidate.method, candidate.body)
+        const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, candidate.method, candidate.body, candidate.headers)
         const pairingCode = extractPairingCode(data)
         const qrcode = extractQrCode(data)
         attempts.push({
@@ -708,7 +817,7 @@ export async function diagnoseCentralEvolution(companyId: number): Promise<Evolu
     }
   }
 
-  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey }
   const instance = runtime.instance
   const webhookUrl = getWebhookUrl(company.webhookToken)
   const probe = await probeEvolutionApi(config, instance)
@@ -751,15 +860,16 @@ export async function getCentralWhatsappStatus(companyId: number): Promise<Whats
     }
   }
 
-  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
-  const instance = runtime.instance
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey }
+  let instance = runtime.instance
   const webhookUrl = getWebhookUrl(company.webhookToken)
   let webhookStatus: WhatsAppStatus['webhookStatus'] = webhookUrl ? 'pending' : 'not_configured'
   let webhookEndpoint: string | null = null
   let webhookError: string | null = null
 
   try {
-    await createEvolutionInstanceIfNeeded(runtime)
+    await ensureEvolutionInstanceReady(company, runtime)
+    instance = runtime.instance
     const webhook = await setupEvolutionWebhookForCompany(company)
     webhookStatus = 'configured'
     webhookEndpoint = webhook.endpoint
@@ -805,7 +915,7 @@ export async function startCentralWhatsappConnection(companyId: number) {
   let webhookEndpoint: string | null = null
   let webhookError: string | null = null
 
-  await createEvolutionInstanceIfNeeded(runtime)
+  await ensureEvolutionInstanceReady(company, runtime)
   try {
     const webhook = await setupEvolutionWebhookForCompany(company)
     webhookStatus = 'configured'
@@ -816,7 +926,7 @@ export async function startCentralWhatsappConnection(companyId: number) {
     webhookError = error instanceof Error ? error.message : 'Webhook nao configurado.'
   }
 
-  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey }
   const qr = await requestEvolutionQrCode(config, runtime.instance, true)
   if (qr.connected) {
     return {
@@ -863,7 +973,7 @@ export async function startCentralWhatsappPairingCode(companyId: number, phone: 
   let webhookEndpoint: string | null = null
   let webhookError: string | null = null
 
-  await createEvolutionInstanceIfNeeded(runtime)
+  await ensureEvolutionInstanceReady(company, runtime)
   try {
     const webhook = await setupEvolutionWebhookForCompany(company)
     webhookStatus = 'configured'
@@ -874,7 +984,7 @@ export async function startCentralWhatsappPairingCode(companyId: number, phone: 
     webhookError = error instanceof Error ? error.message : 'Webhook nao configurado.'
   }
 
-  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey }
   const pairing = await requestEvolutionPairingCode(config, runtime.instance, normalizedPhone)
   if (pairing.connected) {
     return {
@@ -913,8 +1023,8 @@ export async function startCentralWhatsappPairingCode(companyId: number, phone: 
 export async function getCentralEvolutionRuntime(companyId: number) {
   const company = await ensureCompanyWhatsappToken(companyId)
   const runtime = getEvolutionRuntime(company)
-  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
-  await createEvolutionInstanceIfNeeded(runtime)
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey }
+  await ensureEvolutionInstanceReady(company, runtime)
   const probe = await probeEvolutionApi(config, runtime.instance)
 
   return {
@@ -928,13 +1038,19 @@ export async function getCentralEvolutionRuntime(companyId: number) {
 export async function restartCentralWhatsapp(companyId: number) {
   const company = await ensureCompanyWhatsappToken(companyId)
   const runtime = getEvolutionRuntime(company)
-  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey }
 
   let lastError = 'Erro ao reiniciar instancia Evolution.'
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
-    const { response, data, text } = await fetchEvolutionJson(`${baseUrl}/instance/restart/${runtime.instance}`, config.apiKey, 'POST')
-    if (response.ok) return data
-    lastError = data?.message || data?.error || `HTTP ${response.status}: ${text.slice(0, 180)}`
+    const candidates = [
+      { url: `${baseUrl}/instance/restart`, headers: { instanceId: runtime.instance } },
+      { url: `${baseUrl}/instance/restart/${runtime.instance}`, headers: undefined },
+    ]
+    for (const candidate of candidates) {
+      const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, 'POST', undefined, candidate.headers)
+      if (response.ok) return data
+      lastError = data?.message || data?.error || `HTTP ${response.status}: ${text.slice(0, 180)}`
+    }
   }
 
   throw new Error(lastError)
@@ -943,13 +1059,19 @@ export async function restartCentralWhatsapp(companyId: number) {
 export async function disconnectCentralWhatsapp(companyId: number) {
   const company = await ensureCompanyWhatsappToken(companyId)
   const runtime = getEvolutionRuntime(company)
-  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.apiKey }
+  const config = { baseUrl: runtime.baseUrl, apiKey: runtime.controlApiKey || runtime.apiKey }
 
   let lastError = 'Erro ao desconectar WhatsApp.'
   for (const baseUrl of getCandidateBaseUrls(config.baseUrl)) {
-    const { response, data, text } = await fetchEvolutionJson(`${baseUrl}/instance/logout/${runtime.instance}`, config.apiKey, 'DELETE')
-    if (response.ok) return data
-    lastError = data?.message || data?.error || `HTTP ${response.status}: ${text.slice(0, 180)}`
+    const candidates = [
+      { url: `${baseUrl}/instance/logout`, headers: { instanceId: runtime.instance } },
+      { url: `${baseUrl}/instance/logout/${runtime.instance}`, headers: undefined },
+    ]
+    for (const candidate of candidates) {
+      const { response, data, text } = await fetchEvolutionJson(candidate.url, config.apiKey, 'DELETE', undefined, candidate.headers)
+      if (response.ok) return data
+      lastError = data?.message || data?.error || `HTTP ${response.status}: ${text.slice(0, 180)}`
+    }
   }
 
   throw new Error(lastError)
