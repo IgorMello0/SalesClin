@@ -33,10 +33,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { leadsApi, catalogsApi } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { ProposalViewer } from '@/components/ProposalViewer';
+import { LeadDetailsModal } from '@/components/LeadDetailsModal';
 import { FileText, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { STAGES } from '@/config/funnelConfig';
+import { STAGES, FUNNELS } from '@/config/funnelConfig';
 import { useMemo } from 'react';
 
 const safeFormatDate = (dateStr: any, formatStr: string = "dd/MM/yyyy") => {
@@ -91,11 +92,39 @@ const Leads = () => {
   const [leadProposals, setLeadProposals] = useState<any[]>([]);
   const [selectedLeadForProposals, setSelectedLeadForProposals] = useState<Lead | null>(null);
   const [isProposalsListOpen, setIsProposalsListOpen] = useState(false);
+
+  const [selectedDetailsLead, setSelectedDetailsLead] = useState<Lead | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
+
+
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
   const [isViewingProposal, setIsViewingProposal] = useState(false);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
 
   const [dynamicFunnels, setDynamicFunnels] = useState<any[]>([]);
+
+  const funnelList = useMemo(() => {
+    if (dynamicFunnels.length > 0) return dynamicFunnels;
+    return FUNNELS.map(f => ({ ...f, code: f.id }));
+  }, [dynamicFunnels]);
+
+  const editStages = useMemo(() => {
+    // Return all stages for all funnels so the modal can find what it needs
+    let all: any[] = [];
+    if (dynamicFunnels.length > 0) {
+      dynamicFunnels.forEach(f => {
+        const stages = (f.stages || []).map((s: any) => ({ ...s, id: s.code, funnelId: f.code || f.id }));
+        all = [...all, ...stages];
+      });
+    } else {
+      Object.keys(STAGES).forEach(funnelId => {
+        const stages = STAGES[funnelId as keyof typeof STAGES].map((s: any) => ({ ...s, funnelId }));
+        all = [...all, ...stages];
+      });
+    }
+    return all;
+  }, [dynamicFunnels]);
 
   const loadFunnelConfigs = async () => {
     try {
@@ -628,10 +657,11 @@ const Leads = () => {
               <TableBody>
                 {filteredLeads.map((lead) => (
                   <TableRow key={lead.id} className="hover:bg-muted/50 border-b-border transition-colors">
-                    <TableCell className="px-6 py-4 cursor-pointer group/lead" onClick={() => handleOpenProposals(lead)}>
+                    <TableCell className="px-6 py-4 cursor-pointer group/lead" onClick={() => { setSelectedDetailsLead(lead); setIsDetailsModalOpen(true); }}>
                       <div className="flex items-center space-x-3">
                         <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 flex-shrink-0 group-hover/lead:bg-secondary/10 group-hover/lead:border-secondary/20 transition-all">
                           <span className="text-sm font-bold text-primary font-headline group-hover/lead:text-secondary">
+
                             {lead.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -687,7 +717,7 @@ const Leads = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleOpenDialog(lead)}
+                          onClick={() => { setSelectedDetailsLead(lead); setIsDetailsModalOpen(true); }}
                           className="h-9 w-9 p-0 text-slate-400 hover:text-primary hover:bg-slate-100 rounded-lg"
                         >
                           <span className="material-symbols-outlined text-[18px]">edit</span>
@@ -717,6 +747,16 @@ const Leads = () => {
         </div>
       </div>
     </div>
+
+      
+      <LeadDetailsModal
+        lead={selectedDetailsLead}
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        onUpdate={() => fetchLeads()}
+        funnels={funnelList}
+        allStages={editStages}
+      />
 
       {/* Proposals List Dialog */}
       <Dialog open={isProposalsListOpen} onOpenChange={setIsProposalsListOpen}>
