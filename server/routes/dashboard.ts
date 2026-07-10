@@ -254,7 +254,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       
     // Processamento dos Agrupamentos (Sub-Métricas)
     const metodos = hasBillingPermission ? {
-      transferencia: {
+      boleto: {
         gerados: faturamentoPorMetodo.filter(m => m.method === 'transferencia').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
         pagos: faturamentoPorMetodo.filter(m => m.method === 'transferencia' && m.status === 'pago').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0)
       },
@@ -262,7 +262,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       pix: faturamentoPorMetodo.filter(m => m.method === 'pix' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
       dinheiro: faturamentoPorMetodo.filter(m => m.method === 'dinheiro' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
     } : {
-      transferencia: { gerados: 0, pagos: 0 },
+      boleto: { gerados: 0, pagos: 0 },
       cartao: 0,
       pix: 0,
       dinheiro: 0
@@ -275,7 +275,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       contatados: funilStatus.filter(s => ![
         'prospect_lead'
       ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
-      agendados: funilStatus.filter(s => ![
+      agendamentos: funilStatus.filter(s => ![
         'prospect_lead', 
         'prospect_qualified'
       ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),

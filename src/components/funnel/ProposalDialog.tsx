@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { leadsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 
 interface ProposalDialogProps {
   open: boolean;
@@ -38,6 +38,7 @@ export function ProposalDialog({
   const [specialists, setSpecialists] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [proposals, setProposals] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Carregar profissionais e especialistas internamente
   useEffect(() => {
@@ -132,7 +133,7 @@ export function ProposalDialog({
   };
 
   const handleSaveProposal = async () => {
-    if (!lead) return;
+    if (!lead || isSaving) return;
 
     // Validar justificativas se o valor for menor
     for (let i = 0; i < proposals.length; i++) {
@@ -148,6 +149,7 @@ export function ProposalDialog({
       }
     }
 
+    setIsSaving(true);
     try {
       // Usar um loop for...of em vez de Promise.all com map para podermos lançar erro de forma simples e interromper
       for (let index = 0; index < proposals.length; index++) {
@@ -197,6 +199,8 @@ export function ProposalDialog({
     } catch (e) {
       console.error('[ProposalDialog] Erro ao salvar propostas:', e);
       toast({ title: 'Erro ao salvar propostas', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -300,7 +304,9 @@ export function ProposalDialog({
                           onValueChange={(v) => updateProposalField(index, 'sdr', v)}
                         >
                           <SelectTrigger className="rounded-xl border-slate-200 bg-white">
-                            <SelectValue placeholder="Selecione" />
+                            <SelectValue placeholder="Selecione">
+                              {allUsers.find(u => u.id.toString() === proposal.sdr)?.name}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="bg-white">
                             {allUsers.map(u => (
@@ -349,7 +355,9 @@ export function ProposalDialog({
                         onValueChange={(v) => updateProposalField(index, 'specialist', v)}
                       >
                         <SelectTrigger className="rounded-xl border-slate-200 bg-white">
-                          <SelectValue placeholder="Selecione o especialista" />
+                          <SelectValue placeholder="Selecione o especialista">
+                            {specialists.find(p => p.id.toString() === proposal.specialist)?.name}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="bg-white">
                           {specialists.length > 0 ? specialists.map(p => (
@@ -409,9 +417,11 @@ export function ProposalDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">Cancelar</Button>
           <Button 
             onClick={handleSaveProposal}
+            disabled={isSaving}
             variant="secondary"
-            className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20"
+            className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20 gap-2"
           >
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
             Gerar e Salvar Propostas
           </Button>
         </DialogFooter>

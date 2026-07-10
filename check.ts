@@ -1,0 +1,1 @@
+import { prisma } from './server/prisma.js'; async function run() { const p = await prisma.payment.findMany({ orderBy: { id: 'desc' }, take: 10 }); console.log(p); } run();

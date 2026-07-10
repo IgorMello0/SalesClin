@@ -12,6 +12,7 @@ import { leadsApi, tasksApi, clientsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { ORIGIN_OPTIONS } from '@/config/funnelConfig';
 import { ProposalDialog } from '@/components/funnel/ProposalDialog';
 import { ExportModal } from "@/components/ExportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
@@ -56,16 +57,18 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   const [services, setServices] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!professional?.id) return;
     const loadServices = async () => {
       try {
-        const res = await clientsApi.getAllServices();
+        const { catalogsApi } = await import('@/lib/api');
+        const res = await catalogsApi.getAll({ professionalId: Number(professional.id) });
         if (res.success) setServices(res.data || []);
       } catch (e) {
         console.error("Error loading services:", e);
       }
     };
     loadServices();
-  }, []);
+  }, [professional]);
 
   
   useEffect(() => {
@@ -89,7 +92,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
     }
   }, [lead, funnels]);
 
-  const editStages = allStages.filter(s => s.funnelId === selectedFunnelForEdit) || [];
+  const editStages = funnels?.find(f => (f.code || f.id) === selectedFunnelForEdit)?.stages || [];
 
   const handleUpdate = (field, value) => {
     setSelectedLead(prev => ({ ...prev, [field]: value }));
@@ -482,6 +485,58 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                           </div>
                         )}
                       </div>
+
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Canal / Origem</p>
+                        {isEditingOrigin ? (
+                          <div className="flex items-center gap-1.5 animate-in fade-in duration-200 h-8">
+                            <Select
+                              value={tempOrigin}
+                              onValueChange={setTempOrigin}
+                            >
+                              <SelectTrigger className="h-8 py-0 px-2 text-xs font-bold border-secondary focus:ring-secondary/20 w-44 bg-white">
+                                <SelectValue placeholder="Selecione o canal" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ORIGIN_OPTIONS.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <button onClick={handleUpdateOrigin} className="text-emerald-500 hover:text-emerald-600 transition-colors">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setIsEditingOrigin(false)} className="text-slate-400 hover:text-slate-500 transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 group/origin">
+                            <p 
+                              className="text-sm font-bold text-primary break-all cursor-pointer hover:text-secondary transition-colors"
+                              onClick={() => {
+                                setTempOrigin(selectedLead.origin || "");
+                                setIsEditingOrigin(true);
+                              }}
+                              title={selectedLead.origin}
+                            >
+                              {ORIGIN_OPTIONS.find(o => o.value === selectedLead.origin)?.label || selectedLead.origin || "Não informada"}
+                            </p>
+                            <button 
+                              onClick={() => {
+                                setTempOrigin(selectedLead.origin || "");
+                                setIsEditingOrigin(true);
+                              }}
+                              className="opacity-0 group-hover/origin:opacity-100 text-slate-300 hover:text-secondary transition-all animate-in fade-in"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor do Lead</p>
                         <p className="text-sm font-bold text-secondary">{selectedLead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>

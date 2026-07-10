@@ -312,11 +312,11 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
                                   <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">calendar_today</span> {new Date(proposal.createdAt).toLocaleDateString('pt-BR')}</span>
                                   <span className={cn(
                                     "px-1.5 py-0.5 rounded-sm",
-                                    proposal.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
+                                    (proposal.status === 'accepted' || proposal.status === 'comercial_closed') ? 'bg-emerald-100 text-emerald-700' :
                                     proposal.status === 'rejected' ? 'bg-red-100 text-red-700' :
                                     'bg-orange-100 text-orange-700'
                                   )}>
-                                    {proposal.status === 'accepted' ? 'Aceita' : proposal.status === 'rejected' ? 'Recusada' : 'Pendente'}
+                                    {(proposal.status === 'accepted' || proposal.status === 'comercial_closed') ? 'Paga' : proposal.status === 'rejected' ? 'Cancelada' : 'Pendente'}
                                   </span>
                                 </div>
                               </div>

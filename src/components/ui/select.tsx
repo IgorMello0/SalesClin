@@ -52,7 +52,19 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
   const { open, setOpen } = React.useContext(SelectContext)
   const contentRef = React.useRef<HTMLDivElement>(null)
   const triggerRef = React.useRef<HTMLButtonElement | null>(null)
-  const [coords, setCoords] = React.useState({ top: 0, left: 0, width: 0 })
+  const [coords, setCoords] = React.useState({ top: 0, left: 0, width: 0, maxHeight: 300, transform: 'none' })
+
+  const calculatePosition = (trigger: HTMLButtonElement) => {
+    const rect = trigger.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom - 10
+    const spaceAbove = rect.top - 10
+    
+    if (spaceBelow < 250 && spaceAbove > spaceBelow) {
+      return { top: rect.top - 4, left: rect.left, width: rect.width, transform: 'translateY(-100%)', maxHeight: spaceAbove }
+    } else {
+      return { top: rect.bottom + 4, left: rect.left, width: rect.width, transform: 'none', maxHeight: spaceBelow }
+    }
+  }
 
   React.useEffect(() => {
     if (!open) return
@@ -60,15 +72,13 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
     const trigger = document.querySelector('[role="combobox"][aria-expanded="true"]') as HTMLButtonElement
     if (trigger) {
       triggerRef.current = trigger
-      const rect = trigger.getBoundingClientRect()
-      setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+      setCoords(calculatePosition(trigger))
     }
 
     // Recalculate on scroll (handles scrollable containers like Sheet)
     const updatePosition = () => {
       if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect()
-        setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+        setCoords(calculatePosition(triggerRef.current))
       }
     }
 
@@ -101,10 +111,10 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
         else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node
       }}
       className={cn(
-        "fixed z-[9999] min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
+        "fixed z-[9999] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
         className
       )}
-      style={{ top: coords.top, left: coords.left, width: coords.width }}
+      style={{ top: coords.top, left: coords.left, width: coords.width, maxHeight: coords.maxHeight, transform: coords.transform }}
       {...props}
     >
       <div className="p-1">{children}</div>

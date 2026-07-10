@@ -294,6 +294,11 @@ router.post('/:id/proposals', auth(), async (req, res) => {
       }
     })
     
+    await prisma.lead.update({
+      where: { id },
+      data: { value: Number(value) || 0 }
+    })
+    
     res.status(201).json(createSuccessResponse(proposal))
   } catch (error: any) {
     console.error('[Leads] Erro ao criar proposta:', error)
@@ -340,6 +345,13 @@ router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
       where: { id: proposalId },
       data: updateData
     })
+    
+    if (value !== undefined) {
+      await prisma.lead.update({
+        where: { id },
+        data: { value: Number(value) || 0 }
+      })
+    }
     
     res.json(createSuccessResponse(proposal))
   } catch (error: any) {

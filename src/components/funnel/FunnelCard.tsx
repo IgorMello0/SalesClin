@@ -286,16 +286,7 @@ export function FunnelCard({
                 Pagamento Realizado
               </div>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onScheduleClosed(lead);
-              }}
-              className="w-full py-2 bg-indigo-100 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-indigo-200"
-            >
-              <span className="material-symbols-outlined text-xs">calendar_add_on</span>
-              Agendar Agora
-            </button>
+
           </div>
         )}
 
