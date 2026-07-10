@@ -97,7 +97,7 @@ router.get('/:id', auth(false), async (req, res) => {
     if (!item) return res.status(404).json(createErrorResponse('Cliente não encontrado', 404))
 
     if (companyId) {
-      if (item.professional.companyId !== companyId) {
+      if (item.companyId !== companyId) {
         return res.status(403).json(createErrorResponse('Acesso negado', 403))
       }
     } else if (req.user?.id && item.professionalId !== req.user.id) {
@@ -257,7 +257,7 @@ router.get('/:id/dossier', auth(false), async (req, res) => {
     
     if (!client) return res.status(404).json(createErrorResponse('Cliente não encontrado', 404))
 
-    if (companyId && client.professional.companyId !== companyId) {
+    if (companyId && client.companyId !== companyId) {
       return res.status(403).json(createErrorResponse('Acesso negado', 403))
     } else if (!companyId && req.user?.id && client.professionalId !== req.user.id) {
       return res.status(403).json(createErrorResponse('Acesso negado', 403))
