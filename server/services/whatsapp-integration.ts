@@ -743,7 +743,7 @@ async function recreateEvolutionInstanceForQr(config: { baseUrl: string; apiKey:
     }
   }
 
-  const created = await createEvolutionInstance(config, instance, attempts)
+  const created = await createEvolutionInstance(config, instance, undefined, attempts)
   const qrcode = extractQrCode(created.data)
   const pairingCode = extractPairingCode(created.data)
 
