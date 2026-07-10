@@ -101,13 +101,14 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
       const valuePerInstallment = block.totalValue / count;
       
       for (let i = 0; i < count; i++) {
+        const isBoleto = block.method === 'transferencia';
         newInstallments.push({
           blockId: block.id,
           installmentNumber: i + 1,
           amount: valuePerInstallment,
           date: format(addMonths(today, i), 'yyyy-MM-dd'),
           method: block.method,
-          status: 'pago'
+          status: isBoleto && i > 0 ? 'pendente' : 'pago' // Exemplo: se for boleto, deixa pendente por padrão nas próximas
         });
       }
     });
@@ -432,6 +433,18 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                         onChange={(e) => handleCurrencyChange(e.target.value, (val) => handleInstallmentChange(idx, 'amount', val))}
                         className="h-10 text-sm pl-9 bg-slate-50 border-slate-200 font-semibold text-slate-700 focus:bg-white transition-colors disabled:opacity-70"
                       />
+                    </div>
+                    
+                    <div className="w-full sm:w-auto">
+                      <Select value={inst.status || 'pago'} onValueChange={(val) => handleInstallmentChange(idx, 'status', val)}>
+                        <SelectTrigger className="h-10 text-[11px] font-bold uppercase rounded-xl border-slate-200 w-full sm:w-32 bg-slate-50">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pago">PAGO</SelectItem>
+                          <SelectItem value="pendente">PENDENTE</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 );

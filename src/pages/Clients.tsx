@@ -81,6 +81,7 @@ const Clients = () => {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'inadimplente'>('todos');
   const [searchDebounce, setSearchDebounce] = useState('');
 
   // Carregar clientes do banco
@@ -99,7 +100,12 @@ const Clients = () => {
   const loadClients = async () => {
     setIsLoading(true);
     try {
-      const response = await clientsApi.getAll({ page: 1, pageSize: 100, search: searchQuery || undefined });
+      const response = await clientsApi.getAll({ 
+        page: 1, 
+        pageSize: 100, 
+        search: searchQuery || undefined,
+        status: statusFilter !== 'todos' ? statusFilter : undefined
+      });
       if (response.success && response.data) {
         const clientsData = response.data.map((client: any) => ({
           ...client,
@@ -131,12 +137,12 @@ const Clients = () => {
     }
   };
 
-  // Recarregar quando searchQuery mudar
+  // Recarregar quando searchQuery ou statusFilter mudar
   useEffect(() => {
     if (!isLoading) {
       loadClients();
     }
-  }, [searchQuery]);
+  }, [searchQuery, statusFilter]);
 
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -464,19 +470,28 @@ const Clients = () => {
 
       {/* Clients Table Area */}
       <div className="premium-card overflow-hidden rounded-3xl border-0 shadow-sm">
-        <div className="p-6 border-b border-border bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-6 border-b border-border bg-muted/30 flex flex-col gap-4">
           <h3 className="text-lg font-bold text-primary font-headline flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">list_alt</span>
             Lista de Pacientes
           </h3>
-          <div id="clients-search" className="relative w-full sm:w-80">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-            <Input
-              placeholder="Buscar por nome, email ou telefone..."
-              className="pl-10 bg-card border-border focus-visible:ring-secondary/20 transition-all rounded-xl h-11 shadow-sm"
-              value={searchDebounce}
-              onChange={(e) => setSearchDebounce(e.target.value)}
-            />
+          <div id="clients-search" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="relative w-full sm:w-96 group">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-[#F97316] transition-colors" size={18} />
+              <Input
+                placeholder="Buscar pacientes por nome, email ou telefone..."
+                className="pl-10 bg-white border-slate-200 h-11 focus:ring-2 focus:ring-[#F97316]/20 transition-all rounded-xl"
+                value={searchDebounce}
+                onChange={(e) => setSearchDebounce(e.target.value)}
+              />
+            </div>
+            
+            <Tabs value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)} className="w-full sm:w-auto">
+              <TabsList className="grid w-full sm:w-auto grid-cols-2 bg-slate-100 p-1 rounded-xl">
+                <TabsTrigger value="todos" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Todos</TabsTrigger>
+                <TabsTrigger value="inadimplente" className="rounded-lg data-[state=active]:bg-red-500 data-[state=active]:text-white data-[state=active]:shadow-sm">Boletos Pendentes</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
         

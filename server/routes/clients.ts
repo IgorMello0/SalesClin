@@ -9,8 +9,6 @@ export const router = Router()
 router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
-    const { search } = req.query as any
-
     let companyId = req.user?.companyId;
 
     if (req.user?.type === 'profissional' && !companyId) {
@@ -34,9 +32,19 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
       ]
     }
     
+    const { search, status } = req.query as any
+    
     // TEMPORARY DEBUG:
     if (req.query.debug === 'true') {
       return res.json({ success: true, debug: { user: req.user, where } });
+    }
+
+    if (status === 'inadimplente') {
+      where.payments = {
+        some: {
+          status: { in: ['pendente', 'atrasado'] }
+        }
+      }
     }
 
     const [items, total] = await Promise.all([
@@ -321,15 +329,27 @@ router.get('/:id/dossier', auth(false), async (req, res) => {
       });
     });
 
-    // Pagamentos Realizados
-    client.payments.filter(p => p.status === 'pago').forEach(pay => {
+    // Pagamentos (Todos os status)
+    client.payments.forEach(pay => {
+      let icon = 'payments';
+      let title = 'Pagamento Realizado';
+      
+      if (pay.status === 'pendente') {
+        icon = 'schedule';
+        title = 'Pagamento Pendente';
+      } else if (pay.status === 'atrasado') {
+        icon = 'warning';
+        title = 'Pagamento Atrasado';
+      }
+      
       timeline.push({
         id: `pay-${pay.id}`,
         type: 'payment',
-        title: 'Pagamento Realizado',
+        title: title,
         date: pay.date,
-        description: `Valor: R$ ${Number(pay.amount).toFixed(2).replace('.', ',')}`,
-        icon: 'payments'
+        description: `Valor: R$ ${Number(pay.amount).toFixed(2).replace('.', ',')} | Status: ${pay.status}`,
+        icon: icon,
+        rawStatus: pay.status
       });
     });
 

@@ -1013,3 +1013,5 @@ export const campaignsApi = {
     return response.json()
   }
 }
+
+export const paymentsApi = { update: async (id: number, data: any) => apiRequest<any>(/pagamentos/, { method: 'PUT', body: JSON.stringify(data) }) };

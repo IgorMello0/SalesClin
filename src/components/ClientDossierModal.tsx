@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { clientsApi } from '@/lib/api';
+import { clientsApi, paymentsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -62,6 +62,21 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTogglePaymentStatus = async (paymentId: number, currentStatus: string) => {
+    const newStatus = currentStatus === 'pago' ? 'pendente' : 'pago';
+    try {
+      const res = await paymentsApi.update(paymentId, { status: newStatus });
+      if (res.success) {
+        toast({ title: "Sucesso", description: `Pagamento marcado como ${newStatus}.` });
+        loadDossier();
+      } else {
+        toast({ title: "Erro", description: res.error?.message, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Erro", description: "Falha ao alterar status.", variant: "destructive" });
     }
   };
 
@@ -383,6 +398,19 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
                                 <div className="mt-3 pl-2 flex gap-2">
                                   <Button onClick={() => { onOpenChange(false); navigate('/appointments'); }} size="sm" className="h-7 px-3 text-[10px] bg-secondary hover:bg-secondary/90 rounded-md font-bold">
                                     Agendar Agora
+                                  </Button>
+                                </div>
+                              )}
+                              
+                              {isPayment && (
+                                <div className="mt-3 pl-2 flex gap-2">
+                                  <Button 
+                                    onClick={() => handleTogglePaymentStatus(Number(item.id.replace('pay-', '')), item.rawStatus)} 
+                                    size="sm" 
+                                    className={cn("h-7 px-3 text-[10px] rounded-md font-bold", item.rawStatus === 'pago' ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-emerald-500 hover:bg-emerald-600 text-white")}
+                                  >
+                                    <span className="material-symbols-outlined text-[14px] mr-1">{item.rawStatus === 'pago' ? 'close' : 'check'}</span>
+                                    {item.rawStatus === 'pago' ? 'Desmarcar (Pendente)' : 'Marcar como Pago'}
                                   </Button>
                                 </div>
                               )}
