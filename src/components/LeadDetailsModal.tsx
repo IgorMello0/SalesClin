@@ -583,7 +583,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                     {/* Scrollable Timeline / Proposals */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
                       <Tabs value={activeDetailsTab} onValueChange={setActiveDetailsTab} className="w-full flex-1 flex flex-col">
-                        <div className="px-6 sm:px-8 border-b border-slate-200 bg-white shrink-0 z-10 sticky top-0 flex items-center h-16 shadow-sm">
+                        <div className="px-6 sm:px-8 border-b border-slate-200 bg-white shrink-0 z-20 sticky top-0 flex items-center h-16 shadow-sm">
                           <TabsList className="bg-transparent border-0 h-full p-0 gap-8 w-full justify-start">
                             <TabsTrigger 
                               value="activities" 
@@ -624,7 +624,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             {/* The Vertical Line */}
                             <div className="absolute left-[15px] top-2 bottom-4 w-[2px] bg-slate-200"></div>
 
-                            {selectedLead.activities.map((act, idx) => (
+                            {[...selectedLead.activities].reverse().map((act, idx) => (
                               <div key={act.id} className="relative animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
                                 {/* Node Dot/Icon */}
                                 <div className={cn(

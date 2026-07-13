@@ -268,7 +268,7 @@ const SalesFunnel = () => {
         return lead.proposals.map((prop: any) => {
           // Se o status da proposta não for um ID de fase válido (por exemplo, "pending"), cai no status do lead ou comercial_proposal
           const isStageId = (status: string) => {
-            return status && (status.startsWith('comercial_') || status.startsWith('sales_') || status.startsWith('prospect_'));
+            return status && status !== 'pending' && status !== 'accepted' && status !== 'rejected';
           };
           const stage = isStageId(prop.status) ? prop.status : 'comercial_proposal';
           
