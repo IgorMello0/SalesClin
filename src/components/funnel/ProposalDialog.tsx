@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { leadsApi } from '@/lib/api';
+import { leadsApi, clientsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
@@ -23,6 +23,7 @@ interface ProposalDialogProps {
   professional: any;
   services: any[];
   onSuccess: () => void;
+  targetType?: 'lead' | 'client';
 }
 
 export function ProposalDialog({
@@ -53,6 +54,7 @@ export function ProposalDialog({
           if (usrRes.success && usrRes.data) {
             setAllUsers(usrRes.data);
             const medics = usrRes.data.filter((u: any) => {
+              if (u.role?.isSpecialist) return true;
               const role = (u.role?.name || u.role || '').toLowerCase();
               return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
             });
@@ -159,7 +161,7 @@ export function ProposalDialog({
         const discountApplied = isLowerValue && proposalData.justificationType === 'desconto';
 
         // 1. Salvar a Proposta Oficial
-        const res = await leadsApi.addProposal(Number(lead.id), {
+        const res = await (targetType === 'client' ? clientsApi : leadsApi).addProposal(Number(lead.id), {
           title: proposalData.title || `Proposta para ${lead.name} (${index + 1})`,
           value: newValue,
           validUntil: proposalData.validUntil || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -176,7 +178,7 @@ export function ProposalDialog({
         }
 
         // 2. Salvar Atividade
-        await leadsApi.addActivity(Number(lead.id), {
+        await (targetType === 'client' ? clientsApi : leadsApi).addActivity(Number(lead.id), {
           type: 'proposta',
           content: `${proposalData.treatment || proposalData.title} - Valor: ${formatCurrency(proposalData.value)}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
           createdBy: professional?.name || 'Vendedor'
@@ -185,14 +187,15 @@ export function ProposalDialog({
 
       // 3. Atualizar Lead para comercial_proposal se ele não estiver numa fase mais avançada
       const leadStatus = lead.status;
-      const statusesBeforeProposal = ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended'];
-      
-      if (statusesBeforeProposal.includes(leadStatus)) {
-        await leadsApi.update(Number(lead.id), {
-          status: 'comercial_proposal'
-        });
+      if (targetType === 'lead') {
+        const statusesBeforeProposal = ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended'];
+        
+        if (statusesBeforeProposal.includes(leadStatus)) {
+          await leadsApi.update(Number(lead.id), {
+            status: 'comercial_proposal'
+          });
+        }
       }
-      
       toast({ title: "Propostas Salvas com Sucesso!" });
       onSuccess();
       onOpenChange(false);

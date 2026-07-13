@@ -38,16 +38,25 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     
     if (filter === 'today') {
       startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      endDate.setDate(endDate.getDate() + 1);
+      // Adiciona 1 dia para evitar problemas com fuso horário (banco em UTC vs servidor)
+      endDate.setDate(endDate.getDate() + 1);
     } else if (filter === '7days') {
       startDate.setDate(startDate.getDate() - 7);
       startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      endDate.setDate(endDate.getDate() + 1);
     } else if (filter === '30days') {
       startDate.setDate(startDate.getDate() - 30);
       startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      endDate.setDate(endDate.getDate() + 1);
     } else if (filter === 'custom' && req.query.startDate && req.query.endDate) {
       startDate = new Date(req.query.startDate as string);
       endDate = new Date(req.query.endDate as string);
       endDate.setHours(23, 59, 59, 999);
+      endDate.setDate(endDate.getDate() + 1);
     } else {
       // Custom / Mês Atual (fallback)
       startDate.setDate(1);
@@ -160,9 +169,13 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       })
     ]);
 
-    // Cálculo da Receita Real (Soma de todos os pagamentos realizados no período)
+    // Cálculo da Receita Real
+    // Regra: Boleto (transferencia) no entra na Receita Total nem no Faturamento Total. Carto, Pix e Dinheiro entram sempre (pago ou pendente).
     const receitaTotalPeriodo = faturamentoPorMetodo
-      .filter(m => m.status === 'pago')
+      .filter(m => {
+        if (m.method === 'transferencia') return false; // Boletos isolados
+        return ['pago', 'pendente'].includes(m.status);
+      })
       .reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0);
 
     let faturamento = Number(faturamentoTotalAgg._sum.value) || 0;
@@ -255,8 +268,8 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     // Processamento dos Agrupamentos (Sub-Métricas)
     const metodos = hasBillingPermission ? {
       boleto: {
-        gerados: faturamentoPorMetodo.filter(m => m.method === 'transferencia').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
-        pagos: faturamentoPorMetodo.filter(m => m.method === 'transferencia' && m.status === 'pago').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0)
+        gerados: faturamentoPorMetodo.filter(m => m.method === 'transferencia').reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0)
+        // Removido boleto.pagos conforme solicitado
       },
       cartao: faturamentoPorMetodo.filter(m => m.method === 'cartao' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),
       pix: faturamentoPorMetodo.filter(m => m.method === 'pix' && ['pago', 'pendente'].includes(m.status)).reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0),

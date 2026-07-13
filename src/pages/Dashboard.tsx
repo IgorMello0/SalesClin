@@ -35,7 +35,7 @@ const Dashboard = () => {
   });
 
   const [extraData, setExtraData] = useState({
-    metodos: { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
+    metodos: { boleto: { gerados: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
     funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
     origem: [] as { origin: string, count: number }[]
   });
@@ -53,7 +53,7 @@ const Dashboard = () => {
       leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, contratos: 0,
       faturamento: 0, receita: 0, totalDiscount: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
       conversaoPropostas: 0, conversaoFinanceira: 0, parcelamentoMedioBoleto: 0,
-      metodos: { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
+      metodos: { boleto: { gerados: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
       funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
       origem: []
     };
@@ -90,7 +90,7 @@ const Dashboard = () => {
 
       if (progress === 1) {
         setExtraData({
-          metodos: targets.metodos || { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
+          metodos: targets.metodos || { boleto: { gerados: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
           funil: targets.funil || { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
           origem: targets.origem || []
         });
@@ -143,7 +143,7 @@ const Dashboard = () => {
         
         if (progress === 1) {
           setExtraData({
-            metodos: targets.metodos || { boleto: { gerados: 0, pagos: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
+            metodos: targets.metodos || { boleto: { gerados: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
             funil: targets.funil || { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
             origem: targets.origem || []
           });
@@ -513,8 +513,7 @@ const Dashboard = () => {
             </div>
             <div className="sm:col-span-2 md:col-span-4 grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6">
               {[
-                { label: 'Boleto (Gerados)', value: extraData.metodos.boleto?.gerados || 0 },
-                { label: 'Boleto (Pagos)', value: extraData.metodos.boleto?.pagos || 0 },
+                { label: 'Boletos Gerados', value: extraData.metodos.boleto?.gerados || 0 },
                 { label: 'Cartão', value: extraData.metodos.cartao },
                 { label: 'Pix / Débito', value: extraData.metodos.pix },
                 { label: 'Dinheiro', value: extraData.metodos.dinheiro },

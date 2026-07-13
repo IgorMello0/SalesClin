@@ -124,6 +124,7 @@ const SalesFunnel = () => {
   const [isConfiguringFunnels, setIsConfiguringFunnels] = useState(false);
   const [dynamicFunnels, setDynamicFunnels] = useState<any[]>([]);
   const [isLoadingFunnels, setIsLoadingFunnels] = useState(true);
+  const [dynamicStatuses, setDynamicStatuses] = useState<any[]>(QUICK_STATUSES);
 
   // Proposal Selection State
   const [proposalSelectionOpen, setProposalSelectionOpen] = useState(false);
@@ -503,6 +504,22 @@ const SalesFunnel = () => {
     }
   };
 
+  const loadStatuses = async () => {
+    try {
+      const { leadStatusesApi } = await import('@/lib/api');
+      const res = await leadStatusesApi.getAll();
+      if (res.success && res.data && res.data.length > 0) {
+        setDynamicStatuses(res.data.map((s: any) => ({
+          id: s.code,
+          label: s.label,
+          color: s.color
+        })));
+      }
+    } catch (e) {
+      console.error("Error loading statuses:", e);
+    }
+  };
+
   const loadServices = async () => {
     if (!professional?.id) return;
     try {
@@ -515,12 +532,13 @@ const SalesFunnel = () => {
   };
 
   useEffect(() => {
-    if (professional) {
+    if (professional?.id) {
       loadLeads();
       loadServices();
       loadFunnelConfigs();
+      loadStatuses();
     }
-  }, [professional]);
+  }, [professional, activeFunnel]);
 
   const handleScheduleAppointment = async (lead: Lead) => {
     const lastAppt = lead.appointments && lead.appointments[0];
@@ -1511,9 +1529,10 @@ const SalesFunnel = () => {
       </div>
 
       {/* Board */}
-            <FunnelBoard 
+      <FunnelBoard 
         stages={activeStages}
         leads={filteredAndSortedLeads}
+        quickStatuses={dynamicStatuses}
         onAddLead={openAddLead}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -1546,7 +1565,6 @@ const SalesFunnel = () => {
         isProcessingSchedule={isProcessingSchedule}
         currentSchedulingLeadId={currentSchedulingLeadId}
         professionalName={professional?.name}
-        quickStatuses={QUICK_STATUSES}
       />
 
       {/* Add Lead Dialog */}

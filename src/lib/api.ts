@@ -575,6 +575,7 @@ export const clientsApi = {
   getById: async (id: number) => apiRequest<any>(`/clientes/${id}`),
   getDossier: async (id: number) => apiRequest<any>(`/clientes/${id}/dossier`),
   addProposal: async (id: number, data: any) => apiRequest<any>(`/clientes/${id}/proposals`, { method: 'POST', body: JSON.stringify(data) }),
+  sendToFunnel: async (id: number) => apiRequest<any>(`/clientes/${id}/send-to-funnel`, { method: 'POST' }),
   create: async (data: any) => apiRequest<any>('/clientes', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) => apiRequest<any>(`/clientes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: number) => apiRequest<{ id: number }>(`/clientes/${id}`, { method: 'DELETE' }),
@@ -894,6 +895,19 @@ export const funnelConfigApi = {
     apiRequest<any>('/funnel-config/seed', { method: 'POST' }),
 }
 
+// Configuração de Status de Leads
+export const leadStatusesApi = {
+  getAll: async () => apiRequest<Array<any>>('/lead-statuses'),
+  create: async (data: { label: string; color: string }) =>
+    apiRequest<any>('/lead-statuses', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: { label: string; color: string }) =>
+    apiRequest<any>(`/lead-statuses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  reorder: async (statuses: { id: number; order: number }[]) =>
+    apiRequest<any>('/lead-statuses/reorder/all', { method: 'PUT', body: JSON.stringify({ statuses }) }),
+  delete: async (id: number) =>
+    apiRequest<any>(`/lead-statuses/${id}`, { method: 'DELETE' }),
+}
+
 // Upload de Arquivos
 export const uploadApi = {
   uploadImage: async (file: File): Promise<ApiResponse<{ url: string }>> => {
@@ -1014,4 +1028,6 @@ export const campaignsApi = {
   }
 }
 
-export const paymentsApi = { update: async (id: number, data: any) => apiRequest<any>(/pagamentos/, { method: 'PUT', body: JSON.stringify(data) }) };
+export const paymentsApi = { 
+  update: async (id: number, data: any) => apiRequest<any>(`/pagamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }) 
+};

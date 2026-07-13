@@ -30,13 +30,15 @@ import {
   Search
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import InfoNegocioView from './settings/InfoNegocioView';
+import FunnelsSettingsView from './settings/FunnelsSettingsView';
+import LeadStatusesSettingsView from './settings/LeadStatusesSettingsView';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, modulesApi, billingApi, googleCalendarApi, whatsappMetaApi, type BillingStatus, type BillingUsage } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 import Profile from './Profile';
-import FunnelsSettingsView from './settings/FunnelsSettingsView';
 
 // -- CARGOS HELPERS REMOVIDOS (Agora vêm do banco) --
 
@@ -191,7 +193,7 @@ const ServicosView = () => {
   );
 };
 
-const EquipeView = () => {
+const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }) => {
   const { toast } = useToast();
   const { professional } = useAuth();
   const [team, setTeam] = useState<any[]>([]);
@@ -199,6 +201,7 @@ const EquipeView = () => {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newMember, setNewMember] = useState({ name: '', email: '', roleId: '', companyIds: [] as number[] });
+  const [isSavingMember, setIsSavingMember] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
@@ -209,7 +212,12 @@ const EquipeView = () => {
   const [buyingUserExtra, setBuyingUserExtra] = useState(false);
   const [resendingInviteId, setResendingInviteId] = useState<number | null>(null);
 
-  const validRoles = roles.filter((role) => role?.id !== undefined && role?.id !== null);
+  const validRoles = roles.filter((role) => role?.id !== undefined && role?.id !== null && (isSpecialistMode ? role.isSpecialist : !role.isSpecialist));
+  
+  const filteredTeam = team.filter((user) => {
+    const isSpec = user.role?.isSpecialist || false;
+    return isSpecialistMode ? isSpec : !isSpec;
+  });
   const getUserDisplayName = (user: any) => String(user?.name || user?.email || 'Usuario');
   const getUserEmail = (user: any) => String(user?.email || 'E-mail nao informado');
   const getUserInitials = (user: any) => {
@@ -309,6 +317,7 @@ const EquipeView = () => {
       return;
     }
     
+    setIsSavingMember(true);
     try {
       const res = await usuariosApi.create({
         name: newMember.name,
@@ -328,6 +337,8 @@ const EquipeView = () => {
       }
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsSavingMember(false);
     }
   };
 
@@ -503,7 +514,7 @@ const EquipeView = () => {
 
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="font-medium text-sm">Funcionários ({team.length})</h3>
+          <h3 className="font-medium text-sm">{isSpecialistMode ? 'Especialistas' : 'Membros da Equipe'} ({filteredTeam.length})</h3>
           {billingUsage && (
             <p className="text-xs text-muted-foreground mt-1">
               {billingUsage.users.used} / {billingUsage.users.limit ?? 'ilimitado'} usuários nesta clínica
@@ -516,7 +527,7 @@ const EquipeView = () => {
           </Button>
         ) : (
           <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
-            <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : 'Novo Funcionário'}
+            <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : (isSpecialistMode ? 'Novo Especialista' : 'Novo Membro')}
           </Button>
         )}
       </div>
@@ -575,19 +586,22 @@ const EquipeView = () => {
             )}
           </div>
           <div className="flex justify-end pt-2">
-            <Button onClick={handleAddMember}>Enviar convite</Button>
+            <Button onClick={handleAddMember} disabled={isSavingMember}>
+              {isSavingMember ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Enviar convite
+            </Button>
           </div>
         </div>
       )}
 
       <div className="space-y-3">
         {loading ? (
-          <div className="text-sm text-center py-4 text-muted-foreground">Carregando equipe...</div>
-        ) : team.length === 0 ? (
-          <div className="text-sm text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-            Nenhum funcionário cadastrado.
+          <div className="text-sm text-center py-4 text-muted-foreground">Carregando {isSpecialistMode ? 'especialistas' : 'equipe'}...</div>
+        ) : filteredTeam.length === 0 ? (
+          <div className="text-sm text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+            Nenhum {isSpecialistMode ? 'especialista' : 'membro'} cadastrado.
           </div>
-        ) : team.map((u) => (
+        ) : filteredTeam.map((u) => (
           <div key={u.id}>
             <div 
               className={`flex justify-between items-center p-3 border rounded-lg hover:bg-muted transition-colors cursor-pointer ${selectedUserId === u.id ? 'border-primary bg-primary/5' : ''}`}
@@ -956,6 +970,7 @@ const CargosView = () => {
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [rolePermissions, setRolePermissions] = useState<any[]>([]);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  const [isSpecialistRole, setIsSpecialistRole] = useState(false);
 
   const loadModules = async () => {
     try {
@@ -1001,11 +1016,13 @@ const CargosView = () => {
       const res = await rolesApi.create({ 
         name: trimmed, 
         value,
-        permissions: modules.map(m => ({ moduleId: m.id, hasAccess: true }))
+        permissions: modules.map(m => ({ moduleId: m.id, hasAccess: true })),
+        isSpecialist: isSpecialistRole
       });
       if (res.success) {
         toast({ title: 'Cargo criado!', description: `"${trimmed}" agora está salvo no banco de dados.` });
         setNewRoleName('');
+        setIsSpecialistRole(false);
         setIsAdding(false);
         
         // Selecionar e expandir automaticamente as permissões do novo cargo
@@ -1125,15 +1142,30 @@ const CargosView = () => {
       {isAdding && (
         <div className="p-4 border rounded-lg bg-muted/50 space-y-4">
           <h4 className="font-medium text-sm">Novo Cargo</h4>
-          <div className="flex gap-3">
-            <Input 
-              value={newRoleName} 
-              onChange={e => setNewRoleName(e.target.value)} 
-              placeholder="Ex: Auxiliar, Dentista, Marketing..."
-              className="flex-1"
-              onKeyDown={e => e.key === 'Enter' && handleAddRole()}
-            />
-            <Button onClick={handleAddRole}>Adicionar</Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <Input 
+                value={newRoleName} 
+                onChange={e => setNewRoleName(e.target.value)} 
+                placeholder="Ex: Auxiliar, Dentista, Marketing..."
+                className="flex-1"
+                onKeyDown={e => e.key === 'Enter' && handleAddRole()}
+              />
+              <Button onClick={handleAddRole}>Adicionar</Button>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isSpecialist" 
+                checked={isSpecialistRole}
+                onCheckedChange={(checked) => setIsSpecialistRole(checked as boolean)}
+              />
+              <label 
+                htmlFor="isSpecialist" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Este cargo representa um Especialista (ex: Médico, Dentista)?
+              </label>
+            </div>
           </div>
         </div>
       )}
@@ -3480,17 +3512,21 @@ const PlaceholderSettingsView = ({ title, description, icon }: { title: string; 
   </div>
 );
 
+const EspecialistasView = () => <EquipeView isSpecialistMode={true} />;
+
 const ViewsMap: Record<string, React.FC<any>> = {
   profile: ProfileSettingsView,
   security: () => <PlaceholderSettingsView title="Seguranca" description="A troca de senha e controles de acesso ficam concentrados aqui em uma proxima etapa." icon="lock" />,
   notifications: () => <PlaceholderSettingsView title="Notificacoes" description="Preferencias de alertas, lembretes e avisos serao organizadas nesta area." icon="notifications" />,
   services: ServicosView,
   team: EquipeView,
+  specialists: EspecialistasView,
   roles: CargosView,
   clinics: ClinicasView,
   business: InfoNegocioView,
   appearance: AparenciaView,
   funnels: FunnelsSettingsView,
+  lead_statuses: LeadStatusesSettingsView,
 };
 
 const Settings = () => {
@@ -3519,6 +3555,7 @@ const Settings = () => {
         { key: 'business', name: 'Clinica', description: 'Dados comerciais da empresa', icon: 'business', ownerOnly: true },
         { key: 'services', name: 'Servicos', description: 'Servicos oferecidos', icon: 'medical_services', ownerOnly: true },
         { key: 'team', name: 'Equipe', description: 'Usuarios e convites', icon: 'group', ownerOnly: true },
+        { key: 'specialists', name: 'Especialistas', description: 'Gerenciar prestadores', icon: 'medical_information', ownerOnly: true },
         { key: 'roles', name: 'Cargos', description: 'Funcoes e permissoes', icon: 'badge', ownerOnly: true },
         { key: 'clinics', name: 'Minhas clinicas', description: 'Filiais e multi-clinica', icon: 'apartment', ownerOnly: true },
       ],
@@ -3527,6 +3564,7 @@ const Settings = () => {
       title: 'Comercial',
       items: [
         { key: 'funnels', name: 'Funis de Vendas', description: 'Pipelines e etapas do comercial', icon: 'view_kanban', ownerOnly: true },
+        { key: 'lead_statuses', name: 'Status', description: 'Status rápidos dos negócios', icon: 'label', ownerOnly: true },
       ],
     },
     {

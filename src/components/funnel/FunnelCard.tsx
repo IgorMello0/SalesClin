@@ -7,7 +7,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Star } from 'lucide-react';
 
 interface Lead {
   id: number;
@@ -18,6 +18,7 @@ interface Lead {
   avatar?: string;
   phone?: string;
   value: number;
+  convertedToClientId?: number | null;
   lastUpdate?: string;
   subStatus?: string | null;
   isScheduled?: boolean;
@@ -102,7 +103,17 @@ export function FunnelCard({
             {lead.avatar || lead.name.charAt(0)}
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors truncate">{lead.name}</h4>
+            <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors truncate flex items-center gap-1.5">
+              {lead.name}
+              {lead.convertedToClientId && (
+                <div 
+                  className="flex items-center justify-center bg-gradient-to-b from-amber-100 to-yellow-200 border border-yellow-400/40 rounded-full w-[16px] h-[16px] shadow-sm shadow-yellow-500/20 shrink-0 cursor-help transition-transform hover:scale-110" 
+                  title="Este lead já é um cliente"
+                >
+                  <Star className="w-[10px] h-[10px] text-amber-600 fill-amber-500" />
+                </div>
+              )}
+            </h4>
             {lead.isProposal && lead.subtitle && (
               <div className="mt-1">
                 <span className="inline-block max-w-full truncate text-[9px] font-extrabold uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">

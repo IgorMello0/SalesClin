@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ProposalDialog } from '@/components/funnel/ProposalDialog';
 
 interface ClientDossierModalProps {
   clientId: number | null;
@@ -25,8 +26,6 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
   const [savingNotes, setSavingNotes] = useState(false);
   
   const [showProposalModal, setShowProposalModal] = useState(false);
-  const [proposalData, setProposalData] = useState({ title: '', value: '' });
-  const [savingProposal, setSavingProposal] = useState(false);
 
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -65,18 +64,22 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
     }
   };
 
-  const handleTogglePaymentStatus = async (paymentId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'pago' ? 'pendente' : 'pago';
+  const [sendingToFunnel, setSendingToFunnel] = useState(false);
+
+  const handleSendToFunnel = async () => {
+    if (!clientId) return;
+    setSendingToFunnel(true);
     try {
-      const res = await paymentsApi.update(paymentId, { status: newStatus });
-      if (res.success) {
-        toast({ title: "Sucesso", description: `Pagamento marcado como ${newStatus}.` });
-        loadDossier();
+      const response = await clientsApi.sendToFunnel(clientId);
+      if (response.success) {
+        toast({ title: "Sucesso", description: response.data?.message || "Lead retornado ao funil!" });
       } else {
-        toast({ title: "Erro", description: res.error?.message, variant: "destructive" });
+        toast({ title: "Erro", description: response.error?.message, variant: "destructive" });
       }
     } catch (e) {
-      toast({ title: "Erro", description: "Falha ao alterar status.", variant: "destructive" });
+      toast({ title: "Erro", description: "Falha ao enviar para o funil.", variant: "destructive" });
+    } finally {
+      setSendingToFunnel(false);
     }
   };
 
@@ -108,38 +111,6 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
       toast({ title: "Erro", description: "Falha ao salvar notas.", variant: "destructive" });
     } finally {
       setSavingNotes(false);
-    }
-  };
-
-  const handleSaveProposal = async () => {
-    if (!clientId || !proposalData.title || !proposalData.value) {
-      toast({ title: "Aviso", description: "Preencha título e valor.", variant: "destructive" });
-      return;
-    }
-    setSavingProposal(true);
-    try {
-      // Valor needs to be numeric
-      const numericValue = parseFloat(proposalData.value.replace(/\D/g, '')) / 100 || 0;
-      const response = await clientsApi.addProposal(clientId, { 
-        title: proposalData.title, 
-        value: numericValue 
-      });
-      
-      if (response.success) {
-        setDossier((prev: any) => ({
-          ...prev,
-          proposals: [response.data, ...prev.proposals]
-        }));
-        setShowProposalModal(false);
-        setProposalData({ title: '', value: '' });
-        toast({ title: "Sucesso", description: "Nova proposta criada." });
-      } else {
-        toast({ title: "Erro", description: response.error?.message, variant: "destructive" });
-      }
-    } catch (error) {
-      toast({ title: "Erro", description: "Falha ao criar proposta.", variant: "destructive" });
-    } finally {
-      setSavingProposal(false);
     }
   };
 
@@ -183,8 +154,14 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
                   </div>
                 </div>
                 <div className="flex w-full md:w-auto gap-2">
-                  <Button onClick={() => setShowProposalModal(true)} variant="outline" className="flex-1 md:flex-none bg-white/10 hover:bg-white/20 border-white/20 text-white rounded-xl font-bold h-9 px-4 text-xs transition-all">
-                    <span className="material-symbols-outlined text-[16px] mr-1.5">edit_document</span> Orçamento
+                  <Button 
+                    onClick={handleSendToFunnel}
+                    disabled={sendingToFunnel}
+                    variant="outline"
+                    className="flex-1 md:flex-none bg-white/10 hover:bg-white/20 border-white/20 text-white rounded-xl font-bold h-9 px-4 text-xs transition-all"
+                  >
+                    {sendingToFunnel ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <span className="material-symbols-outlined text-[16px] mr-1.5">arrow_forward</span>}
+                    Voltar para o Funil
                   </Button>
                   <Button onClick={handleWhatsAppClick} className="flex-1 md:flex-none bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl font-bold h-9 px-4 text-xs shadow-md shadow-[#25D366]/20 border-0 transition-all">
                     <span className="material-symbols-outlined text-[16px] mr-1.5">chat</span> WhatsApp
@@ -402,18 +379,7 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
                                 </div>
                               )}
                               
-                              {isPayment && (
-                                <div className="mt-3 pl-2 flex gap-2">
-                                  <Button 
-                                    onClick={() => handleTogglePaymentStatus(Number(item.id.replace('pay-', '')), item.rawStatus)} 
-                                    size="sm" 
-                                    className={cn("h-7 px-3 text-[10px] rounded-md font-bold", item.rawStatus === 'pago' ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-emerald-500 hover:bg-emerald-600 text-white")}
-                                  >
-                                    <span className="material-symbols-outlined text-[14px] mr-1">{item.rawStatus === 'pago' ? 'close' : 'check'}</span>
-                                    {item.rawStatus === 'pago' ? 'Desmarcar (Pendente)' : 'Marcar como Pago'}
-                                  </Button>
-                                </div>
-                              )}
+
                             </div>
                           </div>
                         );
@@ -434,51 +400,18 @@ export function ClientDossierModal({ clientId, open, onOpenChange }: ClientDossi
           </>
         )}
       </DialogContent>
-
       {/* Nova Proposta Modal */}
-      <Dialog open={showProposalModal} onOpenChange={setShowProposalModal}>
-        <DialogContent className="max-w-[400px] p-6 rounded-3xl border-0 shadow-2xl bg-white">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold font-headline text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary">request_quote</span>
-              Nova Proposta
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Título da Proposta</Label>
-              <Input 
-                value={proposalData.title}
-                onChange={(e) => setProposalData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Ex: Tratamento Invisalign"
-                className="h-11 rounded-xl"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Valor (R$)</Label>
-              <Input 
-                value={proposalData.value}
-                onChange={(e) => {
-                  let v = e.target.value.replace(/\D/g, '');
-                  v = (Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                  setProposalData(prev => ({ ...prev, value: v }));
-                }}
-                placeholder="0,00"
-                className="h-11 rounded-xl"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-2">
-            <Button variant="ghost" onClick={() => setShowProposalModal(false)} className="rounded-xl font-bold">
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveProposal} disabled={savingProposal} className="rounded-xl font-bold bg-secondary hover:bg-secondary/90">
-              {savingProposal ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Salvar Proposta
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {showProposalModal && dossier?.client && (
+        <ProposalDialog
+          open={showProposalModal}
+          onOpenChange={setShowProposalModal}
+          lead={{ id: dossier.client.id, name: dossier.client.name, value: 0, tags: [] }}
+          professional={dossier.professional || {}}
+          services={[]}
+          onSuccess={loadDossier}
+          targetType="client"
+        />
+      )}
     </Dialog>
   );
 }

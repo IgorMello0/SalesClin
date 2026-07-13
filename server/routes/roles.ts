@@ -63,7 +63,7 @@ router.get('/:id', auth(), async (req, res) => {
 // Criar novo cargo
 router.post('/', auth(), async (req, res) => {
   try {
-    const { name, value, permissions } = req.body // permissions: Array<{ moduleId: number, hasAccess: boolean }>
+    const { name, value, permissions, isSpecialist } = req.body // permissions: Array<{ moduleId: number, hasAccess: boolean }>
     let companyId: number | undefined
     let professionalId: number | undefined
 
@@ -98,7 +98,8 @@ router.post('/', auth(), async (req, res) => {
           companyId,
           professionalId,
           name,
-          value
+          value,
+          isSpecialist: isSpecialist || false
         }
       })
 
@@ -130,13 +131,16 @@ router.put('/:id', auth(), async (req, res) => {
       return res.status(403).json(createErrorResponse('Somente o profissional pode editar cargos', 403))
     }
     const id = Number(req.params.id)
-    const { name, permissions } = req.body
+    const { name, permissions, isSpecialist } = req.body
 
     const updated = await prisma.$transaction(async (tx) => {
       // Atualizar nome do cargo
       const role = await tx.role.update({
         where: { id },
-        data: { name }
+        data: { 
+          name,
+          isSpecialist: isSpecialist !== undefined ? isSpecialist : undefined
+        }
       })
 
       // Atualizar permissões (deleta e recria para simplificar)

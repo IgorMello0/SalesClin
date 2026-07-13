@@ -24,6 +24,8 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
     }
 
     const where: any = { companyId: companyId };
+    
+    const { search, status } = req.query as any
 
     if (search) {
       where.OR = [
@@ -31,8 +33,6 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
         { phone: { contains: String(search), mode: 'insensitive' } }
       ]
     }
-    
-    const { search, status } = req.query as any
     
     // TEMPORARY DEBUG:
     if (req.query.debug === 'true') {
@@ -476,3 +476,64 @@ router.post('/:id/proposals', auth(false), async (req, res) => {
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar proposta', 500))
   }
 })
+
+
+router.post('/:id/send-to-funnel', auth(false), async (req, res) => {
+  try {
+    const clientId = Number(req.params.id);
+    let companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      companyId = prof?.companyId || undefined;
+    }
+    
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      include: { originLead: true }
+    });
+    
+    if (!client) {
+      return res.status(404).json(createErrorResponse('Cliente não encontrado', 404));
+    }
+    
+    if (companyId && client.companyId !== companyId) {
+      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    }
+
+    if (client.originLead) {
+      await prisma.lead.update({
+        where: { id: client.originLead.id },
+        data: { status: 'prospect_lead' }
+      });
+      return res.json(createSuccessResponse({ success: true, message: 'Lead retornado ao funil' }));
+    } else {
+      const existingLead = client.phone ? await prisma.lead.findFirst({
+        where: { phone: client.phone, companyId: client.companyId }
+      }) : null;
+
+      if (existingLead) {
+        await prisma.lead.update({
+          where: { id: existingLead.id },
+          data: { status: 'prospect_lead', convertedToClientId: client.id }
+        });
+        return res.json(createSuccessResponse({ success: true, message: 'Lead existente atualizado e retornado ao funil' }));
+      } else {
+        const newLead = await prisma.lead.create({
+          data: {
+            professionalId: client.professionalId,
+            companyId: client.companyId,
+            name: client.name,
+            email: client.email,
+            phone: client.phone || `${client.id}-nophone`,
+            status: 'prospect_lead',
+            convertedToClientId: client.id
+          }
+        });
+        return res.json(createSuccessResponse({ success: true, message: 'Novo lead criado e adicionado ao funil', lead: newLead }));
+      }
+    }
+  } catch (error: any) {
+    console.error('[Clients] Erro ao enviar para o funil:', error);
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao enviar para o funil', 500));
+  }
+});
