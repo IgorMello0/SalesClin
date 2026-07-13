@@ -244,12 +244,22 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Profissional</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Especialista</p>
                   <p className="text-slate-700 text-xs font-bold flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-slate-400 text-[14px]">badge</span>
                     Dr(a). {profName}
                   </p>
                 </div>
+
+                {data.sdr && (
+                  <div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">SDR</p>
+                    <p className="text-slate-700 text-xs font-bold flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-slate-400 text-[14px]">support_agent</span>
+                      {data.sdr.name}
+                    </p>
+                  </div>
+                )}
 
                 {data.googleSyncStatus && !['synced', 'not_synced', 'deleted'].includes(data.googleSyncStatus) && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 flex gap-2">

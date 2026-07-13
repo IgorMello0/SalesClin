@@ -46,7 +46,16 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
       skip,
       take,
       orderBy: { startTime: 'desc' },
-      include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
+      include: { 
+        professional: true, 
+        client: true, 
+        lead: true, 
+        service: true, 
+        appointmentLogs: true, 
+        payments: true,
+        sdr: { select: { id: true, name: true,  } },
+        especialista: { select: { id: true, name: true,  } }
+      }
     }),
     prisma.appointment.count({ where })
   ])
@@ -168,7 +177,7 @@ router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) 
 
 router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
-    const { clientId, leadId, tags, serviceId, startTime, endTime, status, notes } = req.body
+    const { clientId, leadId, tags, serviceId, startTime, endTime, status, notes, sdrId, especialistaId } = req.body
     
     let professionalId: number;
 
@@ -222,9 +231,15 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
         startTime: new Date(startTime), 
         endTime: new Date(endTime), 
         status: status || 'agendado', 
-        notes 
+        notes,
+        sdrId: sdrId ? Number(sdrId) : null,
+        especialistaId: especialistaId ? Number(especialistaId) : null
       },
-      include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
+      include: { 
+        professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true,
+        sdr: { select: { id: true, name: true,  } },
+        especialista: { select: { id: true, name: true,  } }
+      }
     })
 
     const synced = await syncAppointmentToGoogle(created.id)
@@ -241,7 +256,7 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
 router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const { clientId, serviceId, startTime, endTime, status, notes } = req.body
+    const { clientId, serviceId, startTime, endTime, status, notes, sdrId, especialistaId } = req.body
 
     const current = await prisma.appointment.findUnique({ where: { id } });
     if (!current) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404));
@@ -284,9 +299,15 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
         startTime: startTime ? new Date(startTime) : undefined, 
         endTime: endTime ? new Date(endTime) : undefined, 
         status, 
-        notes 
+        notes,
+        sdrId: sdrId !== undefined ? (sdrId ? Number(sdrId) : null) : undefined,
+        especialistaId: especialistaId !== undefined ? (especialistaId ? Number(especialistaId) : null) : undefined
       },
-      include: { lead: true, professional: true, client: true, service: true, appointmentLogs: true, payments: true }
+      include: { 
+        lead: true, professional: true, client: true, service: true, appointmentLogs: true, payments: true,
+        sdr: { select: { id: true, name: true,  } },
+        especialista: { select: { id: true, name: true,  } }
+      }
     })
 
     const synced = await syncAppointmentToGoogle(updated.id)

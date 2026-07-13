@@ -32,7 +32,7 @@ import {
 import { Check, ChevronsUpDown, Loader2, Plus, Clock, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { clientsApi, catalogsApi, appointmentsApi, professionalsApi } from "@/lib/api";
+import { clientsApi, catalogsApi, appointmentsApi, professionalsApi, usuariosApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -80,6 +80,8 @@ export function NewAppointmentModal({
 
   // Form state
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>("");
+  const [selectedSdrId, setSelectedSdrId] = useState<string>("none");
+  const [sdrs, setSdrs] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clientOpen, setClientOpen] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
@@ -125,15 +127,38 @@ export function NewAppointmentModal({
     if (!professional?.id) return;
     setDataLoading(true);
     try {
-      const [clientsRes, profsRes] = await Promise.all([
+      const [clientsRes, profsRes, usrRes] = await Promise.all([
         clientsApi.getAll({ pageSize: 100 }),
         professionalsApi.getAll({ pageSize: 50 }),
+        usuariosApi.getAll({ pageSize: 100 })
       ]);
       if (clientsRes.success) setClients(clientsRes.data || []);
+      
+      let allProfs: any[] = [];
       if (profsRes.success && profsRes.data) {
-        setCompanyProfessionals(profsRes.data);
+        allProfs = [...profsRes.data];
+      }
+      if (usrRes.success && usrRes.data) {
+        const medics = usrRes.data.filter((u: any) => {
+          if (u.role?.isSpecialist) return true;
+          const role = (u.role?.name || u.role || '').toLowerCase();
+          return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
+        });
+        const sdrUsers = usrRes.data.filter((u: any) => u.role && !u.role.isSpecialist);
+        setSdrs(sdrUsers);
+        const existingIds = new Set(allProfs.map(p => p.id.toString()));
+        medics.forEach((m: any) => {
+          if (!existingIds.has(m.id.toString())) {
+            allProfs.push(m);
+            existingIds.add(m.id.toString());
+          }
+        });
+      }
+      
+      if (allProfs.length > 0) {
+        setCompanyProfessionals(allProfs);
         const defaultProf =
-          profsRes.data.find((p: any) => p.id.toString() === professional.id) || profsRes.data[0];
+          allProfs.find((p: any) => p.id.toString() === professional.id) || allProfs[0];
         setSelectedProfessionalId(defaultProf?.id.toString() || professional.id);
       } else {
         setSelectedProfessionalId(professional.id);
@@ -217,6 +242,8 @@ export function NewAppointmentModal({
 
       const response = await appointmentsApi.create({
         professionalId: Number(selectedProfessionalId),
+        especialistaId: Number(selectedProfessionalId), // Add it here too since selected professional could be the specialist
+        sdrId: selectedSdrId !== "none" ? Number(selectedSdrId) : undefined,
         clientId: initialLeadId ? null : Number(selectedClient),
         leadId: initialLeadId ? Number(initialLeadId) : null,
         serviceId: selectedServiceId ? Number(selectedServiceId) : null,
@@ -278,29 +305,48 @@ export function NewAppointmentModal({
         </div>
 
         <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
-          {/* Professional Selector */}
-          {companyProfessionals.length > 1 && (
-            <div className="space-y-2 flex flex-col">
-              <Label className="text-sm font-medium">Profissional Responsável *</Label>
-              <Select value={selectedProfessionalId} onValueChange={setSelectedProfessionalId} disabled={dataLoading}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o profissional">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-slate-700">
+                Especialista Responsável *
+              </Label>
+              <Select value={selectedProfessionalId} onValueChange={setSelectedProfessionalId}>
+                <SelectTrigger className="w-full h-11 bg-slate-50 border-slate-200">
+                  <SelectValue placeholder="Selecione...">
                     {companyProfessionals.find(p => p.id.toString() === selectedProfessionalId)?.name}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {companyProfessionals.map((prof) => (
-                    <SelectItem key={prof.id} value={prof.id.toString()} className="py-2">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-slate-700">{prof.name}</span>
-                        {prof.specialization && <span className="text-[10px] text-slate-500 font-medium">{prof.specialization}</span>}
-                      </div>
+                    <SelectItem key={prof.id} value={prof.id.toString()}>
+                      {prof.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-slate-700">
+                SDR Responsável (Opcional)
+              </Label>
+              <Select value={selectedSdrId} onValueChange={setSelectedSdrId}>
+                <SelectTrigger className="w-full h-11 bg-slate-50 border-slate-200">
+                  <SelectValue placeholder="Selecione o SDR...">
+                    {selectedSdrId === "none" ? "Nenhum" : sdrs.find(s => s.id.toString() === selectedSdrId)?.name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {sdrs.map((sdr) => (
+                    <SelectItem key={sdr.id} value={sdr.id.toString()}>
+                      {sdr.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {/* Patient Selector */}
           <div className="space-y-2 flex flex-col">

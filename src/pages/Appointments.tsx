@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { appointmentsApi, professionalsApi } from '@/lib/api';
+import { appointmentsApi, professionalsApi, usuariosApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NewAppointmentModal } from '@/components/NewAppointmentModal';
 import { AppointmentQuickView } from '@/components/AppointmentQuickView';
@@ -69,10 +69,32 @@ const Appointments = () => {
 
   const loadProfessionals = async () => {
     try {
-      const res = await professionalsApi.getAll({ pageSize: 50 });
-      if (res.success && res.data) {
-        setProfessionalsList(res.data);
+      const [profRes, usrRes] = await Promise.all([
+        professionalsApi.getAll({ pageSize: 50 }),
+        usuariosApi.getAll({ pageSize: 100 })
+      ]);
+      
+      let allProfs: any[] = [];
+      if (profRes.success && profRes.data) {
+        allProfs = [...profRes.data];
       }
+      
+      if (usrRes.success && usrRes.data) {
+        const medics = usrRes.data.filter((u: any) => {
+          if (u.role?.isSpecialist) return true;
+          const role = (u.role?.name || u.role || '').toLowerCase();
+          return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
+        });
+        
+        const existingIds = new Set(allProfs.map(p => p.id.toString()));
+        medics.forEach((m: any) => {
+          if (!existingIds.has(m.id.toString())) {
+            allProfs.push(m);
+            existingIds.add(m.id.toString());
+          }
+        });
+      }
+      setProfessionalsList(allProfs);
     } catch (error) {
       console.error("Erro ao carregar profissionais", error);
     }
@@ -186,8 +208,8 @@ const Appointments = () => {
           {professionalsList.length > 1 && (
             <Select value={selectedProfFilter} onValueChange={setSelectedProfFilter}>
               <SelectTrigger className="w-[160px] sm:w-[200px] border-slate-200 bg-white text-xs sm:text-sm">
-                <SelectValue placeholder="Filtrar por profissional">
-                  {professionalsList.find(p => p.id.toString() === selectedProfFilter)?.name || "Todos os profissionais"}
+                <SelectValue placeholder="Filtrar por especialista">
+                  {professionalsList.find(p => p.id.toString() === selectedProfFilter)?.name || "Todos os especialistas"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
