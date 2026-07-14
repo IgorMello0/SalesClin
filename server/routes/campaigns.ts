@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma.js'
 import { auth } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
+import { sendUazapiRequest } from '../services/uazapi-whatsapp.js'
 
 export const router = Router()
 
@@ -290,6 +291,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
         apiKey: true,
         evolutionApiUrl: true,
         evolutionInstance: true,
+        uazapiToken: true,
         metaToken: true,
         metaPhoneNumberId: true,
       }
@@ -300,8 +302,10 @@ router.post('/:id/send', auth(false), async (req, res) => {
       empresa?.evolutionApiUrl && empresa?.apiKey && empresa?.evolutionInstance
     )
     const isMetaConfigured = provider === 'meta' && empresa?.metaToken && empresa?.metaPhoneNumberId
+    const uazapiUrl = process.env.UAZAPI_API_URL || process.env.UAZAPI_BASE_URL || ''
+    const isUazapiConfigured = provider === 'uazapi' && Boolean(uazapiUrl && empresa?.uazapiToken)
 
-    if (!isEvolutionConfigured && !isMetaConfigured) {
+    if (!isEvolutionConfigured && !isMetaConfigured && !isUazapiConfigured) {
       return res.status(400).json(createErrorResponse(
         'WhatsApp API não configurada. Vá em Configurações → Integração WhatsApp para configurar.'
       ))
@@ -365,6 +369,8 @@ router.post('/:id/send', auth(false), async (req, res) => {
       evolutionUrl: empresa!.evolutionApiUrl!,
       evolutionKey: empresa!.apiKey!,
       evolutionInstance: empresa!.evolutionInstance!,
+      uazapiUrl,
+      uazapiToken: empresa!.uazapiToken!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
       mediaUrl: absoluteMediaUrl,
@@ -801,6 +807,8 @@ interface WhatsAppConfig {
   evolutionUrl: string
   evolutionKey: string
   evolutionInstance: string
+  uazapiUrl: string
+  uazapiToken: string
   metaToken: string
   metaPhoneId: string
   mediaUrl?: string | null
@@ -1047,6 +1055,62 @@ async function sendEvolutionMessage(config: WhatsAppConfig, formattedPhone: stri
   return { success: true }
 }
 
+async function sendUazapiMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
+  type MediaAttachment = { url: string; type: 'image' | 'video' | 'audio' }
+  let attachments: MediaAttachment[] = []
+
+  if (config.mediaUrl) {
+    try {
+      const parsed = JSON.parse(config.mediaUrl)
+      attachments = Array.isArray(parsed)
+        ? parsed.map((item: any) => ({ url: item.url, type: item.type || 'image' }))
+        : [{ url: config.mediaUrl, type: (config.mediaType as MediaAttachment['type']) || 'image' }]
+    } catch {
+      attachments = [{ url: config.mediaUrl, type: (config.mediaType as MediaAttachment['type']) || 'image' }]
+    }
+  }
+
+  const send = async (path: '/send/text' | '/send/media', body: any) => {
+    const result = await sendUazapiRequest({
+      baseUrl: config.uazapiUrl,
+      token: config.uazapiToken,
+      path,
+      body,
+    })
+    if (!result.response.ok) {
+      const error = result.data?.message || result.data?.error || result.text || `HTTP ${result.response.status}`
+      throw new Error(error)
+    }
+  }
+
+  try {
+    if (attachments.length === 0) {
+      await send('/send/text', { number: formattedPhone, text: message, linkPreview: false })
+      return { success: true }
+    }
+
+    if (attachments.length > 1 && message.trim()) {
+      await send('/send/text', { number: formattedPhone, text: message, linkPreview: false })
+    }
+
+    for (let index = 0; index < attachments.length; index++) {
+      const attachment = attachments[index]
+      if (index > 0) await new Promise(resolve => setTimeout(resolve, 1200))
+      await send('/send/media', {
+        number: formattedPhone,
+        type: attachment.type,
+        file: attachment.url,
+        text: attachments.length === 1 ? message : '',
+      })
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error(`[whatsapp-uazapi] send failed for ${formattedPhone}:`, error)
+    return { success: false, error: error.message || 'Falha no envio pela UAZAPI' }
+  }
+}
+
 async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
   // A Meta Cloud API usa a graph API para envios.
   const url = `https://graph.facebook.com/v19.0/${config.metaPhoneId}/messages`
@@ -1087,6 +1151,8 @@ async function sendWhatsAppMessage(
   try {
     if (config.provider === 'meta') {
       return await sendMetaMessage(config, formattedPhone, message)
+    } else if (config.provider === 'uazapi') {
+      return await sendUazapiMessage(config, formattedPhone, message)
     } else {
       return await sendEvolutionMessage(config, formattedPhone, message)
     }

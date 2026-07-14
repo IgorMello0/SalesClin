@@ -20,6 +20,7 @@ import {
   findCompanyByInstance as findWhatsappCompanyByInstance,
   handleEvolutionPayload as handleWhatsappEvolutionPayload,
   handleMetaMessages as handleWhatsappMetaMessages,
+  handleUazapiPayload as handleWhatsappUazapiPayload,
 } from '../services/whatsapp-integration.js';
 
 export const router = Router();
@@ -654,7 +655,33 @@ router.post('/evolution', async (req, res) => {
 
 
 // ═══════════════════════════════════════════════════════════
-// 2) WEBHOOK — META OFFICIAL WHATSAPP BUSINESS API
+// 2) WEBHOOK — UAZAPI
+// ═══════════════════════════════════════════════════════════
+router.post('/uazapi/:token', async (req, res) => {
+  try {
+    const empresa = await prisma.empresa.findFirst({
+      where: {
+        webhookToken: req.params.token,
+        whatsappProvider: 'uazapi',
+        isActive: true,
+      },
+      select: { id: true, ownerId: true, name: true },
+    });
+
+    if (!empresa) {
+      return res.json({ received: true, ignored: true, reason: 'invalid_token' });
+    }
+
+    const result = await handleWhatsappUazapiPayload(req.body, empresa);
+    return res.json(result);
+  } catch (error: any) {
+    console.error('[Webhook/UAZAPI] Erro:', error);
+    // UAZAPI retries non-2xx deliveries. Acknowledge malformed events after logging.
+    return res.status(200).json({ received: true, error: error.message });
+  }
+});
+
+// 3) WEBHOOK — META OFFICIAL WHATSAPP BUSINESS API
 // ═══════════════════════════════════════════════════════════
 //
 // URL SEGURA (com token):

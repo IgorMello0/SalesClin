@@ -31,6 +31,7 @@ import { router as authRouter } from './routes/auth.js'
 import { router as billingRouter } from './routes/billing.js'
 import { router as googleCalendarRouter } from './routes/google-calendar.js'
 import { router as whatsappMetaRouter } from './routes/whatsapp-meta.js'
+import { router as whatsappUazapiRouter } from './routes/whatsapp-uazapi.js'
 import leadStatusesRouter from './routes/lead-statuses.js'
 import { createErrorResponse } from './utils/response.js'
 import { prisma } from './prisma.js'
@@ -80,6 +81,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/billing', billingRouter)
 app.use('/api/google-calendar', googleCalendarRouter)
 app.use('/api/whatsapp/meta', whatsappMetaRouter)
+app.use('/api/whatsapp/uazapi', whatsappUazapiRouter)
 app.use('/api/lead-statuses', leadStatusesRouter)
 
 // Servir arquivos estáticos da pasta uploads

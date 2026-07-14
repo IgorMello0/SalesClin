@@ -883,6 +883,16 @@ export const whatsappMetaApi = {
   disconnect: async () => apiRequest<any>('/whatsapp/meta/disconnect', { method: 'POST' }),
 }
 
+export const whatsappUazapiApi = {
+  status: async () => apiRequest<any>('/whatsapp/uazapi/status'),
+  connect: async (phone?: string) => apiRequest<any>('/whatsapp/uazapi/connect', {
+    method: 'POST',
+    body: JSON.stringify(phone ? { phone } : {}),
+  }),
+  setupWebhook: async () => apiRequest<any>('/whatsapp/uazapi/webhook/setup', { method: 'POST' }),
+  disconnect: async () => apiRequest<any>('/whatsapp/uazapi/disconnect', { method: 'POST' }),
+}
+
 // Configuração de Funis
 export const funnelConfigApi = {
   getAll: async () => apiRequest<Array<any>>('/funnel-config'),

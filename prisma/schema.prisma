@@ -387,6 +387,11 @@ model Empresa {
   metaTwoStepPin           String?   @map("meta_two_step_pin")
   metaConnectedAt          DateTime? @map("meta_connected_at")
   metaConnectionStatus     String?   @map("meta_connection_status")
+  uazapiInstanceId         String?   @map("uazapi_instance_id")
+  uazapiInstanceName       String?   @map("uazapi_instance_name")
+  uazapiToken              String?   @map("uazapi_token") @db.Text
+  uazapiConnectionStatus   String?   @map("uazapi_connection_status")
+  uazapiConnectedAt        DateTime? @map("uazapi_connected_at")
   webhookToken             String?   @unique @default(uuid()) @map("webhook_token")
   plan                     String?
   openHour                 String    @default("08:00") @map("open_hour")

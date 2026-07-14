@@ -1224,6 +1224,61 @@ export async function handleEvolutionPayload(body: any, empresa: { id: number; o
   return { success: true, ...result }
 }
 
+export async function handleUazapiPayload(body: any, empresa: { id: number; ownerId: number | null; name: string }) {
+  const event = String(body?.event || body?.EventType || body?.eventType || '').toLowerCase()
+  if (event && event !== 'messages' && event !== 'message') {
+    return { received: true, ignored: true, reason: 'not_message_event' }
+  }
+
+  const message = body?.message || body?.data?.message || body?.data || body
+  if (!message || typeof message !== 'object') {
+    return { received: true, ignored: true, reason: 'no_message' }
+  }
+
+  if (message.fromMe === true || message.wasSentByApi === true) {
+    return { received: true, ignored: true, reason: 'fromMe' }
+  }
+
+  const chatId = String(message.chatid || message.chatId || message.remoteJid || '')
+  if (message.isGroup === true || chatId.includes('@g.us') || chatId.includes('@broadcast')) {
+    return { received: true, ignored: true, reason: 'group' }
+  }
+
+  // UAZAPI may send a privacy-protected LID in sender. chatid contains the real contact JID.
+  const phone = normalizePhone(chatId || message.sender || message.from || '')
+  if (!phone) {
+    return { received: true, ignored: true, reason: 'no_phone' }
+  }
+
+  const content = message.content || {}
+  const messageText = message.text
+    || message.body
+    || message.caption
+    || content.text
+    || content.caption
+    || content.conversation
+    || ''
+  const pushName = message.senderName
+    || message.pushName
+    || message.chatName
+    || body?.senderName
+    || ''
+  const providerMessageId = message.messageid || message.messageId || message.id || body?.id || null
+
+  const result = await processIncomingMessage({
+    companyId: empresa.id,
+    ownerId: empresa.ownerId,
+    phone,
+    pushName,
+    messageText,
+    rawPayload: body,
+    origin: 'WhatsApp UAZAPI',
+    providerMessageId,
+  })
+
+  return { success: true, ...result }
+}
+
 export async function handleMetaMessages(body: any, empresaOverride?: { id: number; ownerId: number | null; name: string }) {
   if (!body.entry || !Array.isArray(body.entry)) return
 

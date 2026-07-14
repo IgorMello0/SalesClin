@@ -9,18 +9,20 @@ import {
   EyeOff,
   Loader2,
   MessageCircle,
+  QrCode,
+  RefreshCcw,
   ShieldCheck,
   Unplug,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { googleCalendarApi, whatsappMetaApi } from '@/lib/api';
+import { googleCalendarApi, whatsappMetaApi, whatsappUazapiApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type IntegrationKey = 'whatsappOfficial' | 'instagram' | 'messenger' | 'googleCalendar';
+type IntegrationKey = 'whatsappOfficial' | 'whatsappUazapi' | 'instagram' | 'messenger' | 'googleCalendar';
 
 type MetaStatus = {
   connected?: boolean;
@@ -44,6 +46,23 @@ type MetaForm = {
   webhookVerifyToken: string;
   twoStepPin: string;
   displayPhoneNumber: string;
+};
+
+type UazapiStatus = {
+  serverConfigured?: boolean;
+  configured?: boolean;
+  connected?: boolean;
+  loggedIn?: boolean;
+  status?: string;
+  providerStatus?: string;
+  instanceId?: string | null;
+  instanceName?: string | null;
+  webhookUrl?: string | null;
+  qrcode?: string | null;
+  pairingCode?: string | null;
+  profileName?: string | null;
+  owner?: string | null;
+  message?: string;
 };
 
 type IntegrationOption = {
@@ -70,6 +89,20 @@ const integrationOptions: IntegrationOption[] = [
       <span className="relative flex h-8 w-8 items-center justify-center">
         <img src="/integrations/whatsapp.webp" alt="WhatsApp" className="h-7 w-7 object-contain" />
         <img src="/integrations/meta-logo.png" alt="Meta" className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-white p-0.5 shadow-sm" />
+      </span>
+    ),
+  },
+  {
+    id: 'whatsappUazapi',
+    title: 'WhatsApp via UAZAPI',
+    eyebrow: 'WhatsApp alternativo',
+    description: 'Conecte por QR Code ou codigo de pareamento, sem preencher credenciais tecnicas.',
+    status: 'Disponivel',
+    available: true,
+    logo: (
+      <span className="relative flex h-8 w-8 items-center justify-center">
+        <img src="/integrations/whatsapp.webp" alt="WhatsApp" className="h-7 w-7 object-contain" />
+        <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-950 px-1 text-[8px] font-black text-white shadow-sm">U</span>
       </span>
     ),
   },
@@ -118,9 +151,11 @@ const Integrations = () => {
   const navigate = useNavigate();
   const canManageIntegrations = professional?.role === 'admin' || professional?.role === 'profissional';
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationKey | null>(null);
-  const [workingKey, setWorkingKey] = useState<IntegrationKey | 'meta-save' | 'meta-disconnect' | null>(null);
+  const [workingKey, setWorkingKey] = useState<IntegrationKey | 'meta-save' | 'meta-disconnect' | 'uazapi-qr' | 'uazapi-pair' | 'uazapi-disconnect' | null>(null);
   const [metaStatus, setMetaStatus] = useState<MetaStatus | null>(null);
   const [metaForm, setMetaForm] = useState<MetaForm>(emptyMetaForm);
+  const [uazapiStatus, setUazapiStatus] = useState<UazapiStatus | null>(null);
+  const [uazapiPhone, setUazapiPhone] = useState('');
   const [showToken, setShowToken] = useState(false);
   const selectedOption = integrationOptions.find((option) => option.id === selectedIntegration);
 
@@ -144,11 +179,22 @@ const Integrations = () => {
     }));
   };
 
+  const loadUazapiStatus = async () => {
+    const response = await whatsappUazapiApi.status();
+    if (!response.success) {
+      throw new Error(response.error?.message || 'Nao foi possivel consultar a UAZAPI.');
+    }
+    setUazapiStatus((current) => ({ ...current, ...(response.data || {}) }));
+  };
+
   useEffect(() => {
     if (!canManageIntegrations) return;
 
-    loadMetaStatus().catch((error: any) => {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    Promise.allSettled([loadMetaStatus(), loadUazapiStatus()]).then((results) => {
+      const failed = results.find((result) => result.status === 'rejected');
+      if (failed?.status === 'rejected') {
+        toast({ title: 'Erro ao carregar integracoes', description: failed.reason?.message, variant: 'destructive' });
+      }
     });
   }, [canManageIntegrations]);
 
@@ -198,6 +244,51 @@ const Integrations = () => {
       setWorkingKey(null);
     }
   };
+
+  const connectUazapi = async (usePairingCode = false) => {
+    if (usePairingCode && uazapiPhone.replace(/\D/g, '').length < 10) {
+      toast({ title: 'Informe o telefone', description: 'Use DDI e DDD, por exemplo 5511999999999.', variant: 'destructive' });
+      return;
+    }
+
+    setWorkingKey(usePairingCode ? 'uazapi-pair' : 'uazapi-qr');
+    try {
+      const response = await whatsappUazapiApi.connect(usePairingCode ? uazapiPhone : undefined);
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel conectar pela UAZAPI.');
+      setUazapiStatus(response.data || {});
+      toast({
+        title: usePairingCode ? 'Codigo solicitado' : 'QR Code solicitado',
+        description: response.data?.message || 'Conexao iniciada.',
+      });
+    } catch (error: any) {
+      toast({ title: 'Erro na UAZAPI', description: error.message, variant: 'destructive' });
+    } finally {
+      setWorkingKey(null);
+    }
+  };
+
+  const disconnectUazapi = async () => {
+    if (!confirm('Remover a instancia UAZAPI desta clinica?')) return;
+    setWorkingKey('uazapi-disconnect');
+    try {
+      const response = await whatsappUazapiApi.disconnect();
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel desconectar.');
+      setUazapiStatus(null);
+      await loadUazapiStatus();
+      toast({ title: 'UAZAPI desconectada' });
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setWorkingKey(null);
+    }
+  };
+
+  const qrCodeSource = (() => {
+    const value = uazapiStatus?.qrcode?.trim();
+    if (!value) return null;
+    if (value.startsWith('data:image/')) return value;
+    return /^[A-Za-z0-9+/=]+$/.test(value) ? `data:image/png;base64,${value}` : null;
+  })();
 
   const connectGoogleCalendar = async () => {
     setWorkingKey('googleCalendar');
@@ -461,6 +552,151 @@ const Integrations = () => {
                     <p className="mt-1 leading-relaxed">
                       O webhook identifica a clinica pelo Phone Number ID ou pela URL unica, cria o lead e salva a conversa.
                     </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedIntegration === 'whatsappUazapi' && (
+              <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+                <div className="space-y-5">
+                  <div className={`rounded-2xl border p-4 text-sm ${
+                    uazapiStatus?.connected
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                      : 'border-blue-200 bg-blue-50 text-blue-900'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <MessageCircle className="mt-0.5 h-5 w-5" />
+                      <div>
+                        <p className="font-black">
+                          {uazapiStatus?.connected ? 'WhatsApp conectado pela UAZAPI' : 'Conexao simples gerenciada pelo SellClin'}
+                        </p>
+                        <p className="mt-1 leading-relaxed">
+                          O SellClin cria uma instancia exclusiva para esta clinica, configura o webhook e captura novos leads automaticamente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {uazapiStatus?.serverConfigured === false && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+                      Defina `UAZAPI_API_URL` e `UAZAPI_ADMIN_TOKEN` na VPS para liberar a conexao.
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                    <div className="flex items-start gap-3">
+                      <QrCode className="mt-0.5 h-5 w-5 text-emerald-600" />
+                      <div>
+                        <p className="font-black text-slate-950">Conectar com QR Code</p>
+                        <p className="mt-1 text-sm font-medium text-slate-600">
+                          Abra WhatsApp no celular, acesse Aparelhos conectados e escaneie o codigo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex min-h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white p-5">
+                      {qrCodeSource ? (
+                        <img src={qrCodeSource} alt="QR Code para conectar WhatsApp" className="h-56 w-56 object-contain" />
+                      ) : uazapiStatus?.connected ? (
+                        <div className="text-center">
+                          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+                          <p className="mt-3 font-black text-slate-950">WhatsApp conectado</p>
+                          <p className="mt-1 text-sm text-slate-500">{uazapiStatus.profileName || uazapiStatus.owner || 'Instancia ativa'}</p>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <QrCode className="mx-auto h-12 w-12 text-slate-300" />
+                          <p className="mt-3 font-black text-slate-900">Pronto para gerar o QR Code</p>
+                          <p className="mt-1 max-w-sm text-sm text-slate-500">Clique no botao abaixo para criar a instancia e iniciar a conexao.</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {!uazapiStatus?.connected && (
+                      <Button
+                        onClick={() => connectUazapi(false)}
+                        disabled={!!workingKey || uazapiStatus?.serverConfigured === false}
+                        className="mt-4 w-full bg-emerald-600 font-bold hover:bg-emerald-700"
+                      >
+                        {workingKey === 'uazapi-qr' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <QrCode size={16} className="mr-2" />}
+                        Gerar QR Code
+                      </Button>
+                    )}
+                  </div>
+
+                  {!uazapiStatus?.connected && (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                      <p className="font-black text-slate-950">Conectar sem QR Code</p>
+                      <p className="mt-1 text-sm font-medium text-slate-500">
+                        Informe o telefone com DDI e DDD para gerar um codigo de pareamento.
+                      </p>
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          value={uazapiPhone}
+                          onChange={(event) => setUazapiPhone(event.target.value.replace(/\D/g, '').slice(0, 15))}
+                          placeholder="5511999999999"
+                          inputMode="numeric"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => connectUazapi(true)}
+                          disabled={!!workingKey || uazapiStatus?.serverConfigured === false}
+                          className="font-bold"
+                        >
+                          {workingKey === 'uazapi-pair' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <RefreshCcw size={16} className="mr-2" />}
+                          Gerar codigo
+                        </Button>
+                      </div>
+                      {uazapiStatus?.pairingCode && (
+                        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-center">
+                          <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">Codigo de pareamento</p>
+                          <p className="mt-2 font-mono text-2xl font-black tracking-widest text-slate-950">{uazapiStatus.pairingCode}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {uazapiStatus?.message && (
+                    <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600">
+                      {uazapiStatus.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Status</p>
+                    <p className={`mt-2 text-sm font-black ${uazapiStatus?.connected ? 'text-emerald-700' : 'text-slate-900'}`}>
+                      {uazapiStatus?.connected ? 'Conectado' : uazapiStatus?.configured ? 'Aguardando conexao' : 'Nao configurado'}
+                    </p>
+                    <p className="mt-3 text-xs font-black uppercase tracking-[0.25em] text-slate-400">Instancia</p>
+                    <p className="mt-2 break-all font-mono text-xs text-slate-900">{uazapiStatus?.instanceName || '-'}</p>
+                    <p className="mt-3 text-xs font-black uppercase tracking-[0.25em] text-slate-400">Webhook</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">{uazapiStatus?.configured ? 'Configurado automaticamente' : 'Pendente'}</p>
+                  </div>
+
+                  <Button variant="outline" onClick={loadUazapiStatus} disabled={!!workingKey} className="w-full font-bold">
+                    <RefreshCcw size={16} className="mr-2" />
+                    Atualizar status
+                  </Button>
+
+                  {uazapiStatus?.configured && (
+                    <Button
+                      variant="outline"
+                      onClick={disconnectUazapi}
+                      disabled={workingKey === 'uazapi-disconnect'}
+                      className="w-full font-bold text-red-600 hover:text-red-700"
+                    >
+                      {workingKey === 'uazapi-disconnect' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Unplug size={16} className="mr-2" />}
+                      Remover instancia
+                    </Button>
+                  )}
+
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    <MessageCircle className="mb-2 h-5 w-5" />
+                    <p className="font-black">Mensagem recebida vira lead</p>
+                    <p className="mt-1 leading-relaxed">Numeros novos entram no funil e a conversa fica salva sem duplicar mensagens.</p>
                   </div>
                 </div>
               </div>
