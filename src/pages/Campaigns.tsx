@@ -206,6 +206,10 @@ export default function Campaigns() {
   const [randomize, setRandomize] = useState(false);
   const [variations, setVariations] = useState<string[]>([]);
   const [newVariation, setNewVariation] = useState('');
+  const [useMetaTemplate, setUseMetaTemplate] = useState(false);
+  const [metaTemplateName, setMetaTemplateName] = useState('');
+  const [metaTemplateLanguage, setMetaTemplateLanguage] = useState('pt_BR');
+  const [metaTemplateParameters, setMetaTemplateParameters] = useState('{{nome}}');
 
   // Tags filter states
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -303,6 +307,7 @@ export default function Campaigns() {
   const resetForm = () => {
     setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both');
     setMediaUrl(''); setMediaType(''); setMinDelay(180); setMaxDelay(200); setRandomize(false); setVariations([]); setNewVariation('');
+    setUseMetaTemplate(false); setMetaTemplateName(''); setMetaTemplateLanguage('pt_BR'); setMetaTemplateParameters('{{nome}}');
     setAttachments([]); setSpreadsheetContacts([]); setSpreadsheetFileName(''); setSpreadsheetStats(null);
     setIsCreating(false);
   };
@@ -343,13 +348,30 @@ export default function Campaigns() {
     if (audienceType === 'spreadsheet' && spreadsheetContacts.length === 0) {
       toast({ title: 'Importe uma planilha', description: 'Use CSV ou TSV com colunas nome, telefone, data, hora e especialista.', variant: 'destructive' }); return;
     }
+    if (useMetaTemplate && !metaTemplateName.trim()) {
+      toast({ title: 'Informe o template da Meta', description: 'Use o nome exato do template aprovado no WhatsApp Manager.', variant: 'destructive' }); return;
+    }
     setIsSending(true);
     try {
-      const audienceFilter = audienceType === 'by_tags'
+      const baseAudienceFilter = audienceType === 'by_tags'
         ? { tags: selectedTags, target: tagTarget }
         : audienceType === 'spreadsheet'
           ? { source: spreadsheetFileName, contacts: spreadsheetContacts, stats: spreadsheetStats }
           : undefined;
+      const metaTemplate = useMetaTemplate
+        ? {
+            enabled: true,
+            name: metaTemplateName.trim(),
+            languageCode: metaTemplateLanguage.trim() || 'pt_BR',
+            parameters: metaTemplateParameters
+              .split(',')
+              .map(item => item.trim())
+              .filter(Boolean),
+          }
+        : undefined;
+      const audienceFilter = metaTemplate
+        ? { ...(baseAudienceFilter || {}), metaTemplate }
+        : baseAudienceFilter;
       
       let finalMediaUrl = null;
       let finalMediaType = null;
@@ -773,6 +795,61 @@ export default function Campaigns() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl space-y-3">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="chk-meta-template"
+                      checked={useMetaTemplate}
+                      onChange={e => setUseMetaTemplate(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-blue-200 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                    />
+                    <label htmlFor="chk-meta-template" className="cursor-pointer">
+                      <span className="block text-xs font-bold text-blue-900 uppercase tracking-wide">
+                        Usar template aprovado da Meta
+                      </span>
+                      <span className="block text-xs text-blue-700 leading-relaxed mt-0.5">
+                        Necessario para iniciar conversas/campanhas pela API Oficial fora da janela de 24h.
+                      </span>
+                    </label>
+                  </div>
+
+                  {useMetaTemplate && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Nome do template</label>
+                        <Input
+                          value={metaTemplateName}
+                          onChange={e => setMetaTemplateName(e.target.value)}
+                          placeholder="ex: confirmacao_agendamento"
+                          className="rounded-xl h-10 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Idioma</label>
+                        <Input
+                          value={metaTemplateLanguage}
+                          onChange={e => setMetaTemplateLanguage(e.target.value)}
+                          placeholder="pt_BR"
+                          className="rounded-xl h-10 bg-white"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Parametros do corpo, em ordem</label>
+                        <Input
+                          value={metaTemplateParameters}
+                          onChange={e => setMetaTemplateParameters(e.target.value)}
+                          placeholder="{{nome}}, {{data}}, {{hora}}, {{especialista}}"
+                          className="rounded-xl h-10 bg-white"
+                        />
+                        <p className="mt-1 text-[10px] text-blue-600 leading-relaxed">
+                          Separe por virgula. A quantidade precisa bater com as variaveis do template aprovado na Meta.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Media Attachment section */}

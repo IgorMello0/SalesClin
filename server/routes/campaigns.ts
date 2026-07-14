@@ -373,6 +373,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
       uazapiToken: empresa!.uazapiToken!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
+      metaTemplate: getMetaTemplateFromAudienceFilter(campaign.audienceFilter),
       mediaUrl: absoluteMediaUrl,
       mediaType: campaign.mediaType,
       minDelay: campaign.minDelay,
@@ -551,6 +552,7 @@ function normalizeSpreadsheetContacts(audienceFilter: any): {
     recipients,
     metadata: {
       source: audienceFilter?.source || audienceFilter?.fileName || null,
+      ...(audienceFilter?.metaTemplate ? { metaTemplate: audienceFilter.metaTemplate } : {}),
       totalImported: Number.isFinite(totalImported) ? totalImported : rawContacts.length,
       totalReceived: rawContacts.length,
       totalProcessed: contacts.length,
@@ -811,6 +813,12 @@ interface WhatsAppConfig {
   uazapiToken: string
   metaToken: string
   metaPhoneId: string
+  metaTemplate?: {
+    enabled: boolean
+    name: string
+    languageCode: string
+    parameters: string[]
+  } | null
   mediaUrl?: string | null
   mediaType?: string | null
   minDelay?: number
@@ -870,6 +878,50 @@ function getEvolutionAuthHeaders(apiKey: string) {
     { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     { 'Content-Type': 'application/json', 'x-api-key': apiKey },
   ]
+}
+
+function getMetaTemplateFromAudienceFilter(audienceFilter: any): WhatsAppConfig['metaTemplate'] {
+  const raw = audienceFilter?.metaTemplate
+  if (!raw?.enabled || !raw?.name) return null
+
+  const parameters = Array.isArray(raw.parameters)
+    ? raw.parameters.map((item: unknown) => String(item || '').trim()).filter(Boolean)
+    : String(raw.parameters || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+  return {
+    enabled: true,
+    name: String(raw.name).trim(),
+    languageCode: String(raw.languageCode || raw.language || 'pt_BR').trim() || 'pt_BR',
+    parameters,
+  }
+}
+
+function formatMetaApiError(status: number, body: any) {
+  const error = body?.error || body
+  const code = error?.code
+  const subcode = error?.error_subcode
+  const message = String(error?.message || body?.message || `Meta Cloud API HTTP ${status}`)
+
+  if (code === 131047 || /24\s*h|24h|customer service window|janela/i.test(message)) {
+    return 'A Meta bloqueou texto livre fora da janela de 24h. Para iniciar conversa/campanha pela API Oficial, use um template aprovado.'
+  }
+
+  if (code === 132001 || (/template/i.test(message) && /not found|inexistente|does not exist/i.test(message))) {
+    return 'Template Meta nao encontrado. Confira o nome exato do template e o idioma aprovado no WhatsApp Manager.'
+  }
+
+  if (code === 131008 || /parameter/i.test(message)) {
+    return 'Parametros do template Meta invalidos ou incompletos. Confira se a quantidade de variaveis bate com o template aprovado.'
+  }
+
+  if (code === 190 || status === 401) {
+    return 'Token permanente da Meta invalido, expirado ou sem permissao whatsapp_business_messaging.'
+  }
+
+  return subcode ? `${message} (Meta code ${code}/${subcode})` : `${message}${code ? ` (Meta code ${code})` : ''}`
 }
 
 async function postEvolution(
@@ -1111,9 +1163,42 @@ async function sendUazapiMessage(config: WhatsAppConfig, formattedPhone: string,
   }
 }
 
-async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, message: string) {
+function buildMetaTemplatePayload(config: WhatsAppConfig, formattedPhone: string, recipient: any) {
+  const template = config.metaTemplate
+  if (!template?.enabled || !template.name) return null
+
+  const parameters = template.parameters.map((param) => ({
+    type: 'text',
+    text: renderMessage(param, recipient),
+  }))
+
+  const payload: any = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: formattedPhone,
+    type: 'template',
+    template: {
+      name: template.name,
+      language: { code: template.languageCode || 'pt_BR' },
+    },
+  }
+
+  if (parameters.length > 0) {
+    payload.template.components = [
+      {
+        type: 'body',
+        parameters,
+      },
+    ]
+  }
+
+  return payload
+}
+
+async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, message: string, recipient: any) {
   // A Meta Cloud API usa a graph API para envios.
   const url = `https://graph.facebook.com/v19.0/${config.metaPhoneId}/messages`
+  const templatePayload = buildMetaTemplatePayload(config, formattedPhone, recipient)
   
   const response = await fetch(url, {
     method: 'POST',
@@ -1121,7 +1206,7 @@ async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, m
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.metaToken}`
     },
-    body: JSON.stringify({
+    body: JSON.stringify(templatePayload || {
       messaging_product: "whatsapp",
       recipient_type: "individual",
       to: formattedPhone,
@@ -1134,9 +1219,9 @@ async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, m
   })
 
   if (!response.ok) {
-    const errorData = await response.json()
+    const errorData = await response.json().catch(() => ({}))
     console.error(`[whatsapp-meta] send failed for ${formattedPhone}:`, errorData)
-    return { success: false, error: errorData?.error?.message || `HTTP ${response.status}` }
+    return { success: false, error: formatMetaApiError(response.status, errorData) }
   }
   return { success: true }
 }
@@ -1144,13 +1229,14 @@ async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, m
 async function sendWhatsAppMessage(
   config: WhatsAppConfig,
   phone: string,
-  message: string
+  message: string,
+  recipient: any
 ): Promise<{ success: boolean; error?: string }> {
   const formattedPhone = formatPhoneForWhatsApp(phone, config.provider)
 
   try {
     if (config.provider === 'meta') {
-      return await sendMetaMessage(config, formattedPhone, message)
+      return await sendMetaMessage(config, formattedPhone, message, recipient)
     } else if (config.provider === 'uazapi') {
       return await sendUazapiMessage(config, formattedPhone, message)
     } else {
@@ -1208,7 +1294,7 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
     }
 
     try {
-      const result = await sendWhatsAppMessage(config, recipient.phone, messageToSend)
+      const result = await sendWhatsAppMessage(config, recipient.phone, messageToSend, recipient)
 
       if (result.success) {
         await prisma.campaignRecipient.update({
