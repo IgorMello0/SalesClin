@@ -871,6 +871,15 @@ export const googleCalendarApi = {
 export const whatsappMetaApi = {
   status: async () => apiRequest<any>('/whatsapp/meta/status'),
   connect: async () => apiRequest<{ url: string }>('/whatsapp/meta/connect'),
+  configure: async (data: {
+    phoneNumberId: string
+    wabaId: string
+    businessId?: string
+    accessToken?: string
+    webhookVerifyToken: string
+    twoStepPin?: string
+    displayPhoneNumber?: string
+  }) => apiRequest<any>('/whatsapp/meta/configure', { method: 'POST', body: JSON.stringify(data) }),
   disconnect: async () => apiRequest<any>('/whatsapp/meta/disconnect', { method: 'POST' }),
 }
 

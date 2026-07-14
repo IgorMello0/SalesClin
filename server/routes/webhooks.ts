@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { prisma } from '../prisma.js';
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js';
@@ -666,11 +667,42 @@ router.post('/evolution', async (req, res) => {
 //
 
 /** Lógica compartilhada de verificação do Meta challenge */
-function handleMetaVerification(req: any, res: any) {
+function verifyMetaSignature(req: any) {
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appSecret) return true;
+
+  const signature = String(req.headers['x-hub-signature-256'] || '');
+  if (!signature.startsWith('sha256=')) return false;
+
+  const expected = crypto
+    .createHmac('sha256', appSecret)
+    .update(req.rawBody || '')
+    .digest('hex');
+  const received = signature.slice('sha256='.length);
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(received, 'hex'), Buffer.from(expected, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+async function handleMetaVerification(req: any, res: any, webhookToken?: string) {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN || 'sellclin-verify';
+  let expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN || 'sellclin-verify';
+
+  if (webhookToken) {
+    const empresa = await prisma.empresa.findUnique({
+      where: { webhookToken },
+      select: { metaWebhookVerifyToken: true, isActive: true },
+    });
+    if (!empresa?.isActive || !empresa.metaWebhookVerifyToken) {
+      return res.sendStatus(403);
+    }
+    expectedToken = empresa.metaWebhookVerifyToken;
+  }
 
   if (mode === 'subscribe' && token === expectedToken && challenge) {
     console.log('[Webhook/Meta] Challenge verificado com sucesso.');
@@ -736,13 +768,18 @@ async function handleMetaMessages(body: any, empresaOverride?: { id: number; own
 }
 
 // Verificação (GET) — com token
-router.get('/meta/:token', (req, res) => handleMetaVerification(req, res));
+router.get('/meta/:token', (req, res) => handleMetaVerification(req, res, req.params.token));
 // Verificação (GET) — legada
 router.get('/meta', (req, res) => handleMetaVerification(req, res));
 
 // Receber mensagens (POST) — com token
 router.post('/meta/:token', async (req, res) => {
   try {
+    if (!verifyMetaSignature(req)) {
+      console.warn('[Webhook/Meta] Assinatura invalida.');
+      return res.sendStatus(403);
+    }
+
     const { token } = req.params;
     const empresa = await prisma.empresa.findUnique({
       where: { webhookToken: token },
@@ -766,6 +803,11 @@ router.post('/meta/:token', async (req, res) => {
 // Receber mensagens (POST) — legada (busca por phone_number_id)
 router.post('/meta', async (req, res) => {
   try {
+    if (!verifyMetaSignature(req)) {
+      console.warn('[Webhook/Meta] Assinatura invalida.');
+      return res.sendStatus(403);
+    }
+
     await handleWhatsappMetaMessages(req.body);
     return res.sendStatus(200);
   } catch (error: any) {

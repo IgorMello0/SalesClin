@@ -9,6 +9,16 @@ type MetaStatePayload = {
   userId?: number | null
 }
 
+type ManualMetaWhatsappInput = {
+  phoneNumberId?: string
+  wabaId?: string
+  businessId?: string
+  accessToken?: string
+  webhookVerifyToken?: string
+  twoStepPin?: string
+  displayPhoneNumber?: string
+}
+
 function getPublicAppUrl() {
   return (
     process.env.PUBLIC_APP_URL ||
@@ -20,6 +30,12 @@ function getPublicAppUrl() {
 
 function getRedirectUri() {
   return process.env.META_WHATSAPP_REDIRECT_URI || `${getPublicAppUrl()}/api/whatsapp/meta/callback`
+}
+
+function buildMetaWebhookUrl(webhookToken?: string | null) {
+  return webhookToken
+    ? `${getPublicAppUrl()}/api/webhooks/meta/${webhookToken}`
+    : `${getPublicAppUrl()}/api/webhooks/meta`
 }
 
 function getJwtSecret() {
@@ -38,6 +54,17 @@ function requireMetaEnv() {
   }
 
   return { appId, appSecret, configId, redirectUri: getRedirectUri() }
+}
+
+function cleanOptional(value?: string | null) {
+  const trimmed = String(value || '').trim()
+  return trimmed || null
+}
+
+function cleanRequired(value: unknown, label: string) {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) throw new Error(`${label} e obrigatorio.`)
+  return trimmed
 }
 
 async function graphGet<T = any>(path: string, accessToken: string, params: Record<string, string> = {}): Promise<T> {
@@ -171,11 +198,15 @@ export async function getMetaWhatsappStatus(companyId: number) {
   const company = await prisma.empresa.findUnique({
     where: { id: companyId },
     select: {
+      webhookToken: true,
       whatsappProvider: true,
+      metaToken: true,
       metaPhoneNumberId: true,
       metaWabaId: true,
       metaBusinessId: true,
       metaPhoneDisplayNumber: true,
+      metaWebhookVerifyToken: true,
+      metaTwoStepPin: true,
       metaConnectedAt: true,
       metaConnectionStatus: true,
     },
@@ -183,19 +214,87 @@ export async function getMetaWhatsappStatus(companyId: number) {
 
   if (!company) throw new Error('Empresa nao encontrada.')
 
-  const configured = Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_WHATSAPP_CONFIG_ID)
-  const connected = company.whatsappProvider === 'meta' && Boolean(company.metaPhoneNumberId)
+  const serverSecretConfigured = Boolean(process.env.META_APP_SECRET)
+  const hasAccessToken = Boolean(company.metaToken)
+  const connected = company.whatsappProvider === 'meta' && Boolean(company.metaPhoneNumberId && company.metaToken)
+  const configured = serverSecretConfigured
 
   return {
     configured,
+    serverSecretConfigured,
     connected,
-    status: connected ? (company.metaConnectionStatus || 'connected') : configured ? 'disconnected' : 'not_configured',
-    provider: company.whatsappProvider || 'evolution',
+    status: connected ? (company.metaConnectionStatus || 'connected') : 'disconnected',
+    provider: company.whatsappProvider || 'meta',
     phoneNumberId: company.metaPhoneNumberId,
     wabaId: company.metaWabaId,
     businessId: company.metaBusinessId,
     displayPhoneNumber: company.metaPhoneDisplayNumber,
+    webhookVerifyToken: company.metaWebhookVerifyToken,
+    hasAccessToken,
+    hasTwoStepPin: Boolean(company.metaTwoStepPin),
+    webhookUrl: buildMetaWebhookUrl(company.webhookToken),
     connectedAt: company.metaConnectedAt,
+  }
+}
+
+export async function saveManualMetaWhatsappConfig(companyId: number, input: ManualMetaWhatsappInput) {
+  const current = await prisma.empresa.findUnique({
+    where: { id: companyId },
+    select: {
+      id: true,
+      metaToken: true,
+      webhookToken: true,
+    },
+  })
+
+  if (!current) throw new Error('Empresa nao encontrada.')
+
+  const phoneNumberId = cleanRequired(input.phoneNumberId, 'Phone Number ID')
+  const wabaId = cleanRequired(input.wabaId, 'WhatsApp Business Account ID')
+  const webhookVerifyToken = cleanRequired(input.webhookVerifyToken, 'Webhook Verify Token')
+  const accessToken = cleanOptional(input.accessToken)
+
+  if (!accessToken && !current.metaToken) {
+    throw new Error('Permanent Access Token e obrigatorio na primeira configuracao.')
+  }
+
+  const data: any = {
+    whatsappProvider: 'meta',
+    metaPhoneNumberId: phoneNumberId,
+    metaWabaId: wabaId,
+    metaBusinessId: cleanOptional(input.businessId),
+    metaPhoneDisplayNumber: cleanOptional(input.displayPhoneNumber),
+    metaWebhookVerifyToken: webhookVerifyToken,
+    metaTwoStepPin: cleanOptional(input.twoStepPin),
+    metaConnectionStatus: 'connected',
+    metaConnectedAt: new Date(),
+  }
+
+  if (accessToken) {
+    data.metaToken = accessToken
+  }
+
+  const updated = await prisma.empresa.update({
+    where: { id: companyId },
+    data,
+    select: {
+      id: true,
+      whatsappProvider: true,
+      metaPhoneNumberId: true,
+      metaWabaId: true,
+      metaBusinessId: true,
+      metaPhoneDisplayNumber: true,
+      metaWebhookVerifyToken: true,
+      metaConnectedAt: true,
+      metaConnectionStatus: true,
+      webhookToken: true,
+    },
+  })
+
+  return {
+    ...updated,
+    webhookUrl: buildMetaWebhookUrl(updated.webhookToken),
+    hasAccessToken: true,
   }
 }
 
@@ -203,12 +302,14 @@ export async function disconnectMetaWhatsapp(companyId: number) {
   return prisma.empresa.update({
     where: { id: companyId },
     data: {
-      whatsappProvider: 'evolution',
+      whatsappProvider: 'meta',
       metaToken: null,
       metaPhoneNumberId: null,
       metaWabaId: null,
       metaBusinessId: null,
       metaPhoneDisplayNumber: null,
+      metaWebhookVerifyToken: null,
+      metaTwoStepPin: null,
       metaConnectedAt: null,
       metaConnectionStatus: 'disconnected',
     },

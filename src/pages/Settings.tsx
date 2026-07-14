@@ -2893,8 +2893,16 @@ const MetaWhatsAppManager = () => {
   const [status, setStatus] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [manual, setManual] = useState({ metaPhoneNumberId: '', metaToken: '', metaWabaId: '', metaBusinessId: '', metaPhoneDisplayNumber: '' });
+  const [showToken, setShowToken] = useState(false);
+  const [manual, setManual] = useState({
+    phoneNumberId: '',
+    wabaId: '',
+    businessId: '',
+    accessToken: '',
+    webhookVerifyToken: '',
+    twoStepPin: '',
+    displayPhoneNumber: '',
+  });
 
   const loadStatus = async () => {
     try {
@@ -2903,11 +2911,13 @@ const MetaWhatsAppManager = () => {
       if (!res.success) throw new Error(res.error?.message || 'Nao foi possivel consultar a Meta');
       setStatus(res.data);
       setManual({
-        metaPhoneNumberId: res.data?.phoneNumberId || '',
-        metaToken: '',
-        metaWabaId: res.data?.wabaId || '',
-        metaBusinessId: res.data?.businessId || '',
-        metaPhoneDisplayNumber: res.data?.displayPhoneNumber || '',
+        phoneNumberId: res.data?.phoneNumberId || '',
+        wabaId: res.data?.wabaId || '',
+        businessId: res.data?.businessId || '',
+        accessToken: '',
+        webhookVerifyToken: res.data?.webhookVerifyToken || '',
+        twoStepPin: '',
+        displayPhoneNumber: res.data?.displayPhoneNumber || '',
       });
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
@@ -2929,28 +2939,13 @@ const MetaWhatsAppManager = () => {
     }
   }, []);
 
-  const handleConnect = async () => {
-    setIsWorking(true);
-    try {
-      const res = await whatsappMetaApi.connect();
-      if (res.success && res.data?.url) {
-        window.location.href = res.data.url;
-        return;
-      }
-      throw new Error(res.error?.message || 'Nao foi possivel iniciar a conexao com a Meta');
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-      setIsWorking(false);
-    }
-  };
-
   const handleDisconnect = async () => {
-    if (!confirm('Desconectar a API Oficial Meta desta clinica? A Evolution, se existir, sera preservada.')) return;
+    if (!confirm('Desconectar a API Oficial Meta desta clinica?')) return;
     setIsWorking(true);
     try {
       const res = await whatsappMetaApi.disconnect();
       if (!res.success) throw new Error(res.error?.message || 'Erro ao desconectar Meta');
-      toast({ title: 'Meta desconectada', description: 'A clinica voltou para Evolution como provedor padrao.' });
+      toast({ title: 'Meta desconectada', description: 'As credenciais oficiais foram removidas desta clinica.' });
       await loadStatus();
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
@@ -2962,19 +2957,17 @@ const MetaWhatsAppManager = () => {
   const handleManualSave = async () => {
     setIsWorking(true);
     try {
-      const company = await empresasApi.getMyCompany();
-      if (!company.success || !company.data?.id) throw new Error('Empresa nao encontrada');
-      const res = await empresasApi.update(company.data.id, {
-        whatsappProvider: 'meta',
-        metaPhoneNumberId: manual.metaPhoneNumberId,
-        metaToken: manual.metaToken,
-        metaWabaId: manual.metaWabaId,
-        metaBusinessId: manual.metaBusinessId,
-        metaPhoneDisplayNumber: manual.metaPhoneDisplayNumber,
-        metaConnectionStatus: 'connected',
+      const res = await whatsappMetaApi.configure({
+        phoneNumberId: manual.phoneNumberId,
+        wabaId: manual.wabaId,
+        businessId: manual.businessId,
+        accessToken: manual.accessToken,
+        webhookVerifyToken: manual.webhookVerifyToken,
+        twoStepPin: manual.twoStepPin,
+        displayPhoneNumber: manual.displayPhoneNumber,
       });
       if (!res.success) throw new Error(res.error?.message || 'Erro ao salvar Meta manualmente');
-      toast({ title: 'Credenciais Meta salvas', description: 'O provedor da clinica agora e API Oficial Meta.' });
+      toast({ title: 'Credenciais Meta salvas', description: 'Cole a URL de webhook e o verify token no app da Meta.' });
       await loadStatus();
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
@@ -2996,10 +2989,10 @@ const MetaWhatsAppManager = () => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base">API Oficial Meta</CardTitle>
-            <CardDescription>Conecte a conta WhatsApp Business da clinica pelo fluxo oficial da Meta.</CardDescription>
+            <CardDescription>Configure Phone Number ID, WABA ID, token permanente e webhook da propria clinica.</CardDescription>
           </div>
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-            {connected ? 'Conectado' : configured ? 'Desconectado' : 'Servidor pendente'}
+            {connected ? 'Conectado' : 'Pendente'}
           </span>
         </div>
       </CardHeader>
@@ -3009,85 +3002,96 @@ const MetaWhatsAppManager = () => {
             <span className="material-symbols-outlined text-xl">{connected ? 'verified' : configured ? 'add_link' : 'settings_alert'}</span>
             <div className="space-y-1">
               <p className="font-bold">
-                {connected ? 'WhatsApp Oficial conectado' : configured ? 'Pronto para conectar' : 'Credenciais Meta faltando no servidor'}
+                {connected ? 'WhatsApp Oficial configurado' : configured ? 'Servidor pronto para receber webhook' : 'META_APP_SECRET pendente na VPS'}
               </p>
               <p className="text-xs leading-relaxed">
                 {connected
                   ? `Numero: ${status.displayPhoneNumber || status.phoneNumberId || 'Meta WhatsApp'}. Mensagens e campanhas usam a Cloud API oficial.`
                   : configured
-                    ? 'O cliente sera direcionado para a Meta para autorizar o numero da propria clinica.'
-                    : 'Defina META_APP_ID, META_APP_SECRET e META_WHATSAPP_CONFIG_ID no ambiente da VPS.'}
+                    ? 'Preencha as credenciais da clinica e configure o callback no painel da Meta.'
+                    : 'Defina META_APP_SECRET no ambiente da VPS para validar a assinatura dos webhooks.'}
               </p>
             </div>
           </div>
         </div>
 
-        {connected && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="rounded-xl border p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Phone Number ID</p>
-              <p className="text-xs font-mono mt-1 break-all">{status.phoneNumberId || '-'}</p>
-            </div>
-            <div className="rounded-xl border p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">WABA</p>
-              <p className="text-xs font-mono mt-1 break-all">{status.wabaId || '-'}</p>
-            </div>
+        <div className="rounded-2xl border bg-slate-50 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Webhook Callback URL</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <Input value={status?.webhookUrl || 'Salve a configuracao para gerar a URL'} readOnly className="bg-white font-mono text-xs" />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (!status?.webhookUrl) return;
+                navigator.clipboard.writeText(status.webhookUrl);
+                toast({ title: 'URL copiada' });
+              }}
+            >
+              Copiar
+            </Button>
           </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          {!connected ? (
-            <Button onClick={handleConnect} disabled={isWorking || !configured} className="font-bold">
-              <span className="material-symbols-outlined text-sm mr-2">login</span>
-              Conectar com Meta
-            </Button>
-          ) : (
-            <Button onClick={handleDisconnect} disabled={isWorking} variant="outline" className="font-bold">
-              <span className="material-symbols-outlined text-sm mr-2">link_off</span>
-              Desconectar Meta
-            </Button>
-          )}
-          <Button onClick={loadStatus} disabled={isWorking} variant="outline" className="font-bold">
-            <span className="material-symbols-outlined text-sm mr-2">refresh</span>
-            Atualizar
-          </Button>
         </div>
 
-        <div className="border-t pt-4">
-          <Button type="button" variant="ghost" size="sm" onClick={() => setAdvancedOpen(!advancedOpen)} className="px-0 text-xs font-bold">
-            <span className="material-symbols-outlined text-sm mr-1">{advancedOpen ? 'expand_less' : 'expand_more'}</span>
-            Configuracao avancada manual
-          </Button>
-
-          {advancedOpen && (
-            <div className="mt-3 space-y-3 rounded-2xl border bg-slate-50 p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Phone Number ID</Label>
-                  <Input value={manual.metaPhoneNumberId} onChange={e => setManual({ ...manual, metaPhoneNumberId: e.target.value })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>WABA ID</Label>
-                  <Input value={manual.metaWabaId} onChange={e => setManual({ ...manual, metaWabaId: e.target.value })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Business ID</Label>
-                  <Input value={manual.metaBusinessId} onChange={e => setManual({ ...manual, metaBusinessId: e.target.value })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Numero exibido</Label>
-                  <Input value={manual.metaPhoneDisplayNumber} onChange={e => setManual({ ...manual, metaPhoneDisplayNumber: e.target.value })} />
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label>Access Token permanente</Label>
-                  <Input type="password" value={manual.metaToken} onChange={e => setManual({ ...manual, metaToken: e.target.value })} placeholder="EAA..." />
-                </div>
-              </div>
-              <Button onClick={handleManualSave} disabled={isWorking || !manual.metaPhoneNumberId || !manual.metaToken} size="sm">
-                Salvar manualmente
-              </Button>
+        <div className="space-y-3 rounded-2xl border bg-slate-50 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Phone Number ID</Label>
+              <Input value={manual.phoneNumberId} onChange={e => setManual({ ...manual, phoneNumberId: e.target.value })} placeholder="100234567890123" />
             </div>
-          )}
+            <div className="space-y-1.5">
+              <Label>WhatsApp Business Account ID</Label>
+              <Input value={manual.wabaId} onChange={e => setManual({ ...manual, wabaId: e.target.value })} placeholder="100234567890456" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Business ID</Label>
+              <Input value={manual.businessId} onChange={e => setManual({ ...manual, businessId: e.target.value })} placeholder="Opcional" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Numero exibido</Label>
+              <Input value={manual.displayPhoneNumber} onChange={e => setManual({ ...manual, displayPhoneNumber: e.target.value })} placeholder="+55 11 99999-9999" />
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
+              <Label>Permanent Access Token</Label>
+              <div className="relative">
+                <Input
+                  type={showToken ? 'text' : 'password'}
+                  value={manual.accessToken}
+                  onChange={e => setManual({ ...manual, accessToken: e.target.value })}
+                  placeholder={status?.hasAccessToken ? 'Token salvo. Preencha apenas se quiser trocar.' : 'EAA...'}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  onClick={() => setShowToken(!showToken)}
+                >
+                  <span className="material-symbols-outlined text-base">{showToken ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Webhook Verify Token</Label>
+              <Input value={manual.webhookVerifyToken} onChange={e => setManual({ ...manual, webhookVerifyToken: e.target.value })} placeholder="Crie uma chave sua" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Two-step PIN</Label>
+              <Input value={manual.twoStepPin} onChange={e => setManual({ ...manual, twoStepPin: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="Opcional" inputMode="numeric" />
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={handleManualSave} disabled={isWorking || !manual.phoneNumberId || !manual.wabaId || !manual.webhookVerifyToken || (!manual.accessToken && !status?.hasAccessToken)} className="font-bold">
+              {isWorking ? 'Salvando...' : 'Salvar WhatsApp Oficial'}
+            </Button>
+            <Button onClick={loadStatus} disabled={isWorking} variant="outline" className="font-bold">
+              Atualizar
+            </Button>
+            {connected && (
+              <Button onClick={handleDisconnect} disabled={isWorking} variant="outline" className="font-bold text-red-600 hover:text-red-700">
+                Desconectar Meta
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -3095,44 +3099,17 @@ const MetaWhatsAppManager = () => {
 };
 
 const WhatsAppView = () => {
-  const [provider, setProvider] = useState<'meta' | 'evolution'>('evolution');
-
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl text-sm border border-emerald-200/50 dark:border-emerald-800/50 flex items-start gap-3 shadow-sm">
         <span className="material-symbols-outlined flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400">chat</span>
         <div className="leading-relaxed">
           <strong className="block mb-0.5 text-emerald-900 dark:text-emerald-100 font-bold">WhatsApp integrado ao SellClin</strong>
-          Configure a Evolution API da clinica para capturar mensagens e criar leads automaticamente.
+          Configure a API Oficial Meta da clinica para capturar mensagens e criar leads automaticamente.
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button
-          type="button"
-          onClick={() => setProvider('meta')}
-          className={`text-left p-4 border rounded-2xl transition-all ${provider === 'meta' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500 shadow-sm' : 'bg-background hover:border-emerald-300'}`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-emerald-700">API Oficial Meta</p>
-              <p className="text-xs text-muted-foreground mt-1">Recomendado. Suporta Cloud API oficial e coexistencia quando a Meta liberar para o numero.</p>
-            </div>
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">Oficial</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setProvider('evolution')}
-          className={`text-left p-4 border rounded-2xl transition-all ${provider === 'evolution' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500 shadow-sm' : 'bg-background hover:border-emerald-300'}`}
-        >
-          <p className="text-sm font-bold text-emerald-700">Evolution API</p>
-          <p className="text-xs text-muted-foreground mt-1">Use URL, API key e instancia da Evolution propria do cliente.</p>
-        </button>
-      </div>
-
-      {provider === 'meta' ? <MetaWhatsAppManager /> : <WhatsAppStatusManager />}
+      <MetaWhatsAppManager />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
@@ -3154,7 +3131,6 @@ const WhatsAppView = () => {
 type IntegrationKey =
   | 'googleCalendar'
   | 'metaWhatsapp'
-  | 'evolutionWhatsapp'
   | 'instagram'
   | 'email'
   | 'messenger'
@@ -3200,7 +3176,7 @@ const integrationCards: Array<{
     key: 'metaWhatsapp',
     name: 'WhatsApp Oficial Meta',
     eyebrow: 'Business Messaging',
-    description: 'API oficial da Meta para Cloud API, webhooks e coexistencia quando liberada.',
+    description: 'API oficial da Meta com credenciais da propria clinica, webhooks e captura de leads.',
     status: 'Recomendado',
     category: 'messaging',
     available: true,
@@ -3211,20 +3187,6 @@ const integrationCards: Array<{
     logoAlt: 'WhatsApp',
     secondaryLogo: '/integrations/meta-logo.png',
     secondaryLogoAlt: 'Meta',
-  },
-  {
-    key: 'evolutionWhatsapp',
-    name: 'Evolution API',
-    eyebrow: 'WhatsApp alternativo',
-    description: 'Use a Evolution propria da clinica com URL, API key, instancia e webhook.',
-    status: 'Ativo para disparos',
-    category: 'messaging',
-    available: true,
-    actionLabel: 'Configurar',
-    bannerClassName: 'from-emerald-100 via-white to-lime-100 border-emerald-200',
-    badgeClassName: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-    logo: '/integrations/evolution-logo.png',
-    logoAlt: 'Evolution API',
   },
   {
     key: 'instagram',
@@ -3349,14 +3311,6 @@ export const IntegrationsView = () => {
       return (
         <div className="space-y-6">
           <MetaWhatsAppManager />
-          <WhatsAppBenefits />
-        </div>
-      );
-    }
-    if (activeIntegration === 'evolutionWhatsapp') {
-      return (
-        <div className="space-y-6">
-          <WhatsAppStatusManager />
           <WhatsAppBenefits />
         </div>
       );

@@ -367,31 +367,33 @@ model Contract {
 }
 
 model Empresa {
-  id                     Int       @id @default(autoincrement())
-  ownerId                Int?      @map("owner_id")
-  name                   String
-  logoUrl                String?   @map("logo_url")
-  domain                 String?
-  whatsapp               String?
-  whatsappProvider       String?   @default("evolution") @map("whatsapp_provider")
-  apiKey                 String?   @map("api_key")
-  evolutionApiUrl        String?   @map("evolution_api_url")
-  evolutionInstance      String?   @map("evolution_instance")
-  evolutionMode          String?   @map("evolution_mode")
-  metaToken              String?   @map("meta_token")
-  metaPhoneNumberId      String?   @map("meta_phone_number_id")
-  metaWabaId             String?   @map("meta_waba_id")
-  metaBusinessId         String?   @map("meta_business_id")
-  metaPhoneDisplayNumber String?   @map("meta_phone_display_number")
-  metaConnectedAt        DateTime? @map("meta_connected_at")
-  metaConnectionStatus   String?   @map("meta_connection_status")
-  webhookToken           String?   @unique @default(uuid()) @map("webhook_token")
-  plan                   String?
-  openHour               String    @default("08:00") @map("open_hour")
-  closeHour              String    @default("20:00") @map("close_hour")
-  isActive               Boolean   @default(true) @map("is_active")
-  createdAt              DateTime  @default(now()) @map("created_at")
-  updatedAt              DateTime  @updatedAt @map("updated_at")
+  id                       Int       @id @default(autoincrement())
+  ownerId                  Int?      @map("owner_id")
+  name                     String
+  logoUrl                  String?   @map("logo_url")
+  domain                   String?
+  whatsapp                 String?
+  whatsappProvider         String?   @default("evolution") @map("whatsapp_provider")
+  apiKey                   String?   @map("api_key")
+  evolutionApiUrl          String?   @map("evolution_api_url")
+  evolutionInstance        String?   @map("evolution_instance")
+  evolutionMode            String?   @map("evolution_mode")
+  metaToken                String?   @map("meta_token")
+  metaPhoneNumberId        String?   @map("meta_phone_number_id")
+  metaWabaId               String?   @map("meta_waba_id")
+  metaBusinessId           String?   @map("meta_business_id")
+  metaPhoneDisplayNumber   String?   @map("meta_phone_display_number")
+  metaWebhookVerifyToken   String?   @map("meta_webhook_verify_token")
+  metaTwoStepPin           String?   @map("meta_two_step_pin")
+  metaConnectedAt          DateTime? @map("meta_connected_at")
+  metaConnectionStatus     String?   @map("meta_connection_status")
+  webhookToken             String?   @unique @default(uuid()) @map("webhook_token")
+  plan                     String?
+  openHour                 String    @default("08:00") @map("open_hour")
+  closeHour                String    @default("20:00") @map("close_hour")
+  isActive                 Boolean   @default(true) @map("is_active")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
 
   owner                    Professional?             @relation("CompanyOwner", fields: [ownerId], references: [id])
   professionals            Professional[]            @relation("CompanyProfessionals")

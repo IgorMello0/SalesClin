@@ -483,7 +483,7 @@ router.put('/:id', auth(), async (req, res) => {
       name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour,
       // Campos de integração WhatsApp
       whatsappProvider, evolutionMode, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId,
-      metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaConnectionStatus
+      metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaWebhookVerifyToken, metaTwoStepPin, metaConnectionStatus
     } = req.body
 
     const data: any = {}
@@ -504,6 +504,8 @@ router.put('/:id', auth(), async (req, res) => {
     if (metaWabaId !== undefined) data.metaWabaId = metaWabaId
     if (metaBusinessId !== undefined) data.metaBusinessId = metaBusinessId
     if (metaPhoneDisplayNumber !== undefined) data.metaPhoneDisplayNumber = metaPhoneDisplayNumber
+    if (metaWebhookVerifyToken !== undefined) data.metaWebhookVerifyToken = metaWebhookVerifyToken
+    if (metaTwoStepPin !== undefined) data.metaTwoStepPin = metaTwoStepPin
     if (metaConnectionStatus !== undefined) {
       data.metaConnectionStatus = metaConnectionStatus
       data.metaConnectedAt = metaConnectionStatus === 'connected' ? new Date() : null

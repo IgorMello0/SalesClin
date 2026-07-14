@@ -7,6 +7,7 @@ import {
   connectMetaWhatsappFromCode,
   disconnectMetaWhatsapp,
   getMetaWhatsappStatus,
+  saveManualMetaWhatsappConfig,
 } from '../services/meta-whatsapp.js'
 
 export const router = Router()
@@ -82,6 +83,28 @@ router.get('/status', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[WhatsApp Meta Status] Erro:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar status da Meta', 500))
+  }
+})
+
+router.post('/configure', auth(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const result = await saveManualMetaWhatsappConfig(companyId, {
+      phoneNumberId: req.body?.phoneNumberId,
+      wabaId: req.body?.wabaId,
+      businessId: req.body?.businessId,
+      accessToken: req.body?.accessToken,
+      webhookVerifyToken: req.body?.webhookVerifyToken,
+      twoStepPin: req.body?.twoStepPin,
+      displayPhoneNumber: req.body?.displayPhoneNumber,
+    })
+
+    return res.json(createSuccessResponse(result))
+  } catch (error: any) {
+    console.error('[WhatsApp Meta Configure] Erro:', error)
+    return res.status(400).json(createErrorResponse(error.message || 'Erro ao salvar configuracao Meta', 400))
   }
 })
 
