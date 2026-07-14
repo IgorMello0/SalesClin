@@ -874,7 +874,6 @@ export const whatsappMetaApi = {
   configure: async (data: {
     phoneNumberId: string
     wabaId: string
-    businessId?: string
     accessToken?: string
     webhookVerifyToken: string
     twoStepPin?: string

@@ -2897,7 +2897,6 @@ const MetaWhatsAppManager = () => {
   const [manual, setManual] = useState({
     phoneNumberId: '',
     wabaId: '',
-    businessId: '',
     accessToken: '',
     webhookVerifyToken: '',
     twoStepPin: '',
@@ -2913,7 +2912,6 @@ const MetaWhatsAppManager = () => {
       setManual({
         phoneNumberId: res.data?.phoneNumberId || '',
         wabaId: res.data?.wabaId || '',
-        businessId: res.data?.businessId || '',
         accessToken: '',
         webhookVerifyToken: res.data?.webhookVerifyToken || '',
         twoStepPin: '',
@@ -2960,7 +2958,6 @@ const MetaWhatsAppManager = () => {
       const res = await whatsappMetaApi.configure({
         phoneNumberId: manual.phoneNumberId,
         wabaId: manual.wabaId,
-        businessId: manual.businessId,
         accessToken: manual.accessToken,
         webhookVerifyToken: manual.webhookVerifyToken,
         twoStepPin: manual.twoStepPin,
@@ -2989,7 +2986,7 @@ const MetaWhatsAppManager = () => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base">API Oficial Meta</CardTitle>
-            <CardDescription>Configure Phone Number ID, WABA ID, token permanente e webhook da propria clinica.</CardDescription>
+            <CardDescription>Configure Phone Number ID, WhatsApp Business Account ID, token permanente e webhook da propria clinica.</CardDescription>
           </div>
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
             {connected ? 'Conectado' : 'Pendente'}
@@ -3042,10 +3039,6 @@ const MetaWhatsAppManager = () => {
             <div className="space-y-1.5">
               <Label>WhatsApp Business Account ID</Label>
               <Input value={manual.wabaId} onChange={e => setManual({ ...manual, wabaId: e.target.value })} placeholder="100234567890456" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Business ID</Label>
-              <Input value={manual.businessId} onChange={e => setManual({ ...manual, businessId: e.target.value })} placeholder="Opcional" />
             </div>
             <div className="space-y-1.5">
               <Label>Numero exibido</Label>
