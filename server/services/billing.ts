@@ -303,6 +303,16 @@ function assertPlanProductIsUnique(planCode: PlanCode, billingCycle: BillingCycl
   }
 
   if (duplicates.length > 0) {
+    if (process.env.ABACATEPAY_ALLOW_SHARED_PRODUCT_IDS === 'true') {
+      console.warn('[Billing] Produto compartilhado permitido para teste', {
+        planCode,
+        billingCycle,
+        productId,
+        sharedWith: duplicates,
+      })
+      return
+    }
+
     const envNames = getPlanProductEnvNames(planCode, billingCycle)
     throw new Error(
       `Produto repetido na configuracao da Abacate Pay: ${planCode} ${billingCycle} usa o mesmo ID de ${duplicates.join(', ')}. Defina um produto exclusivo em ${envNames.primary}.`
