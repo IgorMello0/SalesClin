@@ -79,7 +79,7 @@ const logoClass = 'h-7 w-7 object-contain';
 const integrationOptions: IntegrationOption[] = [
   {
     id: 'whatsappOfficial',
-    title: 'WhatsApp Oficial Meta',
+    title: 'WhatsApp Oficial',
     eyebrow: 'Cloud API',
     description: 'Use Phone Number ID, WABA ID e token permanente da propria clinica.',
     status: 'Disponivel',
@@ -93,8 +93,8 @@ const integrationOptions: IntegrationOption[] = [
   },
   {
     id: 'whatsappUazapi',
-    title: 'WhatsApp por QR Code',
-    eyebrow: 'Conexao simplificada',
+    title: 'WhatsApp Não Oficial',
+    eyebrow: 'WhatsApp',
     description: 'Conecte por QR Code ou codigo de pareamento, sem preencher credenciais tecnicas.',
     status: 'Disponivel',
     available: true,

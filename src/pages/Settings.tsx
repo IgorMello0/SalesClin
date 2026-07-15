@@ -3167,7 +3167,7 @@ const integrationCards: Array<{
   },
   {
     key: 'metaWhatsapp',
-    name: 'WhatsApp Oficial Meta',
+    name: 'WhatsApp Oficial',
     eyebrow: 'Business Messaging',
     description: 'API oficial da Meta com credenciais da propria clinica, webhooks e captura de leads.',
     status: 'Recomendado',
