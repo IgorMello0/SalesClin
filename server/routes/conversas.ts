@@ -130,7 +130,7 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
     if (provider === 'uazapi') {
       const baseUrl = process.env.UAZAPI_API_URL || process.env.UAZAPI_BASE_URL
       if (!baseUrl || !conversation.company.uazapiToken) {
-        return res.status(409).json(createErrorResponse('UAZAPI nao conectada nesta clinica', 409))
+        return res.status(409).json(createErrorResponse('WhatsApp nao conectado nesta clinica', 409))
       }
 
       const result = await sendUazapiRequest({
@@ -143,10 +143,10 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
       })
       if (!result.response.ok) {
         const message = result.data?.message || result.data?.error || result.text || `HTTP ${result.response.status}`
-        return res.status(502).json(createErrorResponse(`UAZAPI: ${message}`, 502))
+        return res.status(502).json(createErrorResponse(`Falha ao enviar pelo WhatsApp: ${String(message).replace(/UAZAPI/gi, 'servico')}`, 502))
       }
       providerMessageId = result.data?.messageid || result.data?.messageId || result.data?.id || null
-      origin = 'WhatsApp UAZAPI'
+      origin = 'WhatsApp'
     } else if (provider === 'meta') {
       if (!conversation.company.metaToken || !conversation.company.metaPhoneNumberId) {
         return res.status(409).json(createErrorResponse('WhatsApp Oficial nao conectado nesta clinica', 409))

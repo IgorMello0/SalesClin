@@ -11,7 +11,6 @@ import {
   MessageCircle,
   QrCode,
   RefreshCcw,
-  ShieldCheck,
   Unplug,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -94,15 +93,15 @@ const integrationOptions: IntegrationOption[] = [
   },
   {
     id: 'whatsappUazapi',
-    title: 'WhatsApp via UAZAPI',
-    eyebrow: 'WhatsApp alternativo',
+    title: 'WhatsApp por QR Code',
+    eyebrow: 'Conexao simplificada',
     description: 'Conecte por QR Code ou codigo de pareamento, sem preencher credenciais tecnicas.',
     status: 'Disponivel',
     available: true,
     logo: (
       <span className="relative flex h-8 w-8 items-center justify-center">
         <img src="/integrations/whatsapp.webp" alt="WhatsApp" className="h-7 w-7 object-contain" />
-        <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-950 px-1 text-[8px] font-black text-white shadow-sm">U</span>
+        <QrCode className="absolute -bottom-1 -right-1 h-4 w-4 rounded bg-white p-0.5 text-slate-700 shadow-sm" />
       </span>
     ),
   },
@@ -183,7 +182,7 @@ const Integrations = () => {
   const loadUazapiStatus = async () => {
     const response = await whatsappUazapiApi.status();
     if (!response.success) {
-      throw new Error(response.error?.message || 'Nao foi possivel consultar a UAZAPI.');
+      throw new Error(response.error?.message || 'Nao foi possivel consultar a conexao do WhatsApp.');
     }
     setUazapiStatus((current) => ({ ...current, ...(response.data || {}) }));
   };
@@ -283,7 +282,7 @@ const Integrations = () => {
     setWorkingKey(usePairingCode ? 'uazapi-pair' : 'uazapi-qr');
     try {
       const response = await whatsappUazapiApi.connect(usePairingCode ? uazapiPhone : undefined);
-      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel conectar pela UAZAPI.');
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel conectar o WhatsApp.');
       const data = response.data || {};
       setUazapiStatus(data);
       setUazapiPolling(!data.connected && !data.qrcode && !data.pairingCode);
@@ -293,21 +292,21 @@ const Integrations = () => {
       });
     } catch (error: any) {
       setUazapiPolling(false);
-      toast({ title: 'Erro na UAZAPI', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao conectar WhatsApp', description: String(error.message || '').replace(/UAZAPI/gi, 'servico de conexao'), variant: 'destructive' });
     } finally {
       setWorkingKey(null);
     }
   };
 
   const disconnectUazapi = async () => {
-    if (!confirm('Remover a instancia UAZAPI desta clinica?')) return;
+    if (!confirm('Remover esta conexao do WhatsApp?')) return;
     setWorkingKey('uazapi-disconnect');
     try {
       const response = await whatsappUazapiApi.disconnect();
       if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel desconectar.');
       setUazapiStatus(null);
       await loadUazapiStatus();
-      toast({ title: 'UAZAPI desconectada' });
+      toast({ title: 'WhatsApp desconectado' });
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     } finally {
@@ -440,27 +439,9 @@ const Integrations = () => {
             {selectedIntegration === 'whatsappOfficial' && (
               <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
                 <div className="space-y-5">
-                  <div className={`rounded-2xl border p-4 text-sm ${
-                    metaStatus?.connected
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                      : 'border-amber-200 bg-amber-50 text-amber-800'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      <ShieldCheck className="mt-0.5 h-5 w-5" />
-                      <div>
-                        <p className="font-black">
-                          {metaStatus?.connected ? 'WhatsApp Oficial configurado' : 'Configure a Cloud API da clinica'}
-                        </p>
-                        <p className="mt-1 leading-relaxed">
-                          O servidor usa apenas `META_APP_SECRET` para validar a assinatura dos webhooks. Os IDs e o token permanente ficam nesta clinica.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   {!metaStatus?.serverSecretConfigured && (
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-                      Defina `META_APP_SECRET` na VPS para validar os webhooks recebidos da Meta.
+                      A integracao oficial ainda nao esta disponivel. Entre em contato com o suporte do SellClin.
                     </div>
                   )}
 
@@ -592,27 +573,9 @@ const Integrations = () => {
             {selectedIntegration === 'whatsappUazapi' && (
               <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
                 <div className="space-y-5">
-                  <div className={`rounded-2xl border p-4 text-sm ${
-                    uazapiStatus?.connected
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                      : 'border-blue-200 bg-blue-50 text-blue-900'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      <MessageCircle className="mt-0.5 h-5 w-5" />
-                      <div>
-                        <p className="font-black">
-                          {uazapiStatus?.connected ? 'WhatsApp conectado pela UAZAPI' : 'Conexao simples gerenciada pelo SellClin'}
-                        </p>
-                        <p className="mt-1 leading-relaxed">
-                          O SellClin cria uma instancia exclusiva para esta clinica, configura o webhook e captura novos leads automaticamente.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   {uazapiStatus?.serverConfigured === false && (
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-                      Defina `UAZAPI_API_URL` e `UAZAPI_ADMIN_TOKEN` na VPS para liberar a conexao.
+                      A conexao por QR Code esta temporariamente indisponivel. Entre em contato com o suporte do SellClin.
                     </div>
                   )}
 
@@ -689,11 +652,6 @@ const Integrations = () => {
                     </div>
                   )}
 
-                  {uazapiStatus?.message && (
-                    <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600">
-                      {uazapiStatus.message}
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-3">

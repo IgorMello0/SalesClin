@@ -1159,7 +1159,7 @@ async function sendUazapiMessage(config: WhatsAppConfig, formattedPhone: string,
     return { success: true }
   } catch (error: any) {
     console.error(`[whatsapp-uazapi] send failed for ${formattedPhone}:`, error)
-    return { success: false, error: error.message || 'Falha no envio pela UAZAPI' }
+    return { success: false, error: String(error.message || 'Falha no envio pelo WhatsApp').replace(/UAZAPI/gi, 'servico de conexao') }
   }
 }
 

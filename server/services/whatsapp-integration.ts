@@ -1277,7 +1277,7 @@ export async function handleUazapiPayload(body: any, empresa: { id: number; owne
     pushName,
     messageText,
     rawPayload: body,
-    origin: 'WhatsApp UAZAPI',
+    origin: 'WhatsApp',
     providerMessageId,
   })
 

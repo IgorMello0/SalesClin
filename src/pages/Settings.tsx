@@ -2999,14 +2999,14 @@ const MetaWhatsAppManager = () => {
             <span className="material-symbols-outlined text-xl">{connected ? 'verified' : configured ? 'add_link' : 'settings_alert'}</span>
             <div className="space-y-1">
               <p className="font-bold">
-                {connected ? 'WhatsApp Oficial configurado' : configured ? 'Servidor pronto para receber webhook' : 'META_APP_SECRET pendente na VPS'}
+                {connected ? 'WhatsApp Oficial configurado' : configured ? 'Pronto para receber mensagens' : 'Integracao indisponivel'}
               </p>
               <p className="text-xs leading-relaxed">
                 {connected
                   ? `Numero: ${status.displayPhoneNumber || status.phoneNumberId || 'Meta WhatsApp'}. Mensagens e campanhas usam a Cloud API oficial.`
                   : configured
                     ? 'Preencha as credenciais da clinica e configure o callback no painel da Meta.'
-                    : 'Defina META_APP_SECRET no ambiente da VPS para validar a assinatura dos webhooks.'}
+                    : 'Entre em contato com o suporte do SellClin para liberar a integracao oficial.'}
               </p>
             </div>
           </div>

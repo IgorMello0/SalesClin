@@ -510,14 +510,29 @@ async function apiRequest<T>(
   }
 
   try {
-    console.log('[API] Request:', { url, method: options.method || 'GET', body: options.body })
-    
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    })
+    if (import.meta.env.DEV) console.log('[API] Request:', { url, method: options.method || 'GET', body: options.body })
 
-    console.log('[API] Response:', { status: response.status, statusText: response.statusText, url })
+    const method = String(options.method || 'GET').toUpperCase()
+    const maxAttempts = method === 'GET' ? 2 : 1
+    let response: Response | null = null
+    let lastError: unknown
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        response = await fetch(url, { ...options, headers })
+        if (attempt < maxAttempts && [502, 503, 504].includes(response.status)) {
+          await new Promise(resolve => setTimeout(resolve, 350))
+          continue
+        }
+        break
+      } catch (error) {
+        lastError = error
+        if (attempt >= maxAttempts) throw error
+        await new Promise(resolve => setTimeout(resolve, 350))
+      }
+    }
+    if (!response) throw lastError || new Error('Falha de conexao')
+
+    if (import.meta.env.DEV) console.log('[API] Response:', { status: response.status, statusText: response.statusText, url })
 
     let data
     const contentType = response.headers.get('content-type')
@@ -529,7 +544,7 @@ async function apiRequest<T>(
       data = text ? { message: text } : { message: 'Erro na requisição' }
     }
     
-    console.log('[API] Response data:', data)
+    if (import.meta.env.DEV) console.log('[API] Response data:', data)
     
     if (!response.ok) {
       // Se for erro de autenticação (401), limpar token e redirecionar para login

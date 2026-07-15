@@ -274,7 +274,7 @@ export async function getUazapiStatus(companyId: number) {
       configured: false,
       status: 'NOT_CONFIGURED',
       webhookUrl,
-      message: 'Defina UAZAPI_API_URL e UAZAPI_ADMIN_TOKEN na VPS.',
+      message: 'Conexao por QR Code indisponivel.',
     }
   }
 
@@ -307,7 +307,7 @@ export async function getUazapiStatus(companyId: number) {
       instanceName: company.uazapiInstanceName,
       webhookUrl,
       ...normalized,
-      message: normalized.connected ? 'WhatsApp conectado pela UAZAPI.' : 'Instancia criada. Conecte pelo QR Code ou codigo de pareamento.',
+      message: normalized.connected ? 'WhatsApp conectado.' : 'Conexao criada. Use o QR Code ou codigo de pareamento.',
     }
   } catch (error: any) {
     return {
@@ -318,7 +318,7 @@ export async function getUazapiStatus(companyId: number) {
       webhookUrl,
       status: 'ERROR',
       connected: false,
-      message: error.message || 'Nao foi possivel consultar a UAZAPI.',
+      message: 'Nao foi possivel consultar a conexao do WhatsApp.',
     }
   }
 }
@@ -358,12 +358,12 @@ export async function connectUazapi(companyId: number, phone?: string) {
     webhookUrl,
     ...normalized,
     message: normalized.connected
-      ? 'WhatsApp conectado pela UAZAPI.'
+      ? 'WhatsApp conectado.'
       : normalized.pairingCode
         ? 'Use o codigo de pareamento no WhatsApp.'
         : normalized.qrcode
           ? 'Escaneie o QR Code com o WhatsApp.'
-          : 'A UAZAPI iniciou a conexao, mas ainda nao retornou QR ou codigo.',
+          : 'A conexao foi iniciada, mas ainda nao retornou QR Code ou codigo.',
   }
 }
 
