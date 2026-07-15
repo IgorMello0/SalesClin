@@ -156,6 +156,7 @@ const Integrations = () => {
   const [metaForm, setMetaForm] = useState<MetaForm>(emptyMetaForm);
   const [uazapiStatus, setUazapiStatus] = useState<UazapiStatus | null>(null);
   const [uazapiPhone, setUazapiPhone] = useState('');
+  const [uazapiPolling, setUazapiPolling] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const selectedOption = integrationOptions.find((option) => option.id === selectedIntegration);
 
@@ -197,6 +198,34 @@ const Integrations = () => {
       }
     });
   }, [canManageIntegrations]);
+
+  useEffect(() => {
+    if (!uazapiPolling) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const response = await whatsappUazapiApi.status();
+        if (cancelled || !response.success) return;
+        const data = response.data || {};
+        setUazapiStatus((current) => ({ ...current, ...data }));
+        if (data.connected || data.qrcode || data.pairingCode || attempts >= 30) {
+          setUazapiPolling(false);
+        }
+      } catch {
+        if (attempts >= 30) setUazapiPolling(false);
+      }
+    };
+
+    const timer = window.setInterval(poll, 2000);
+    void poll();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [uazapiPolling]);
 
   const copyText = async (value?: string | null, label = 'Texto') => {
     if (!value) return;
@@ -255,12 +284,15 @@ const Integrations = () => {
     try {
       const response = await whatsappUazapiApi.connect(usePairingCode ? uazapiPhone : undefined);
       if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel conectar pela UAZAPI.');
-      setUazapiStatus(response.data || {});
+      const data = response.data || {};
+      setUazapiStatus(data);
+      setUazapiPolling(!data.connected && !data.qrcode && !data.pairingCode);
       toast({
         title: usePairingCode ? 'Codigo solicitado' : 'QR Code solicitado',
         description: response.data?.message || 'Conexao iniciada.',
       });
     } catch (error: any) {
+      setUazapiPolling(false);
       toast({ title: 'Erro na UAZAPI', description: error.message, variant: 'destructive' });
     } finally {
       setWorkingKey(null);
@@ -616,11 +648,11 @@ const Integrations = () => {
                     {!uazapiStatus?.connected && (
                       <Button
                         onClick={() => connectUazapi(false)}
-                        disabled={!!workingKey || uazapiStatus?.serverConfigured === false}
+                        disabled={!!workingKey || uazapiPolling || uazapiStatus?.serverConfigured === false}
                         className="mt-4 w-full bg-emerald-600 font-bold hover:bg-emerald-700"
                       >
-                        {workingKey === 'uazapi-qr' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <QrCode size={16} className="mr-2" />}
-                        Gerar QR Code
+                        {workingKey === 'uazapi-qr' || uazapiPolling ? <Loader2 size={16} className="mr-2 animate-spin" /> : <QrCode size={16} className="mr-2" />}
+                        {uazapiPolling ? 'Aguardando QR Code...' : 'Gerar QR Code'}
                       </Button>
                     )}
                   </div>
@@ -641,7 +673,7 @@ const Integrations = () => {
                         <Button
                           variant="outline"
                           onClick={() => connectUazapi(true)}
-                          disabled={!!workingKey || uazapiStatus?.serverConfigured === false}
+                          disabled={!!workingKey || uazapiPolling || uazapiStatus?.serverConfigured === false}
                           className="font-bold"
                         >
                           {workingKey === 'uazapi-pair' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <RefreshCcw size={16} className="mr-2" />}

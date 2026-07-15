@@ -17,6 +17,8 @@ type UazapiResponse = {
   text: string
 }
 
+type NormalizedConnection = ReturnType<typeof normalizeConnectionPayload>
+
 function trimTrailingSlash(value: string) {
   return value.trim().replace(/\/+$/, '')
 }
@@ -98,7 +100,7 @@ async function requestUazapi(params: {
   const result = await parseResponse(response)
   if (!response.ok) {
     const message = result.data?.message || result.data?.error || result.text || `HTTP ${response.status}`
-    throw new Error(`UAZAPI: ${message}`)
+    throw new Error(`UAZAPI ${params.path} (HTTP ${response.status}): ${message}`)
   }
 
   return result.data
@@ -123,26 +125,77 @@ async function getCompany(companyId: number): Promise<UazapiCompany> {
   return company
 }
 
+function extractText(value: any, keys: string[]): string | null {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (!value || typeof value !== 'object') return null
+
+  for (const key of keys) {
+    const nested = value[key]
+    if (typeof nested === 'string' && nested.trim()) return nested.trim()
+  }
+
+  return null
+}
+
 function normalizeConnectionPayload(payload: any) {
   const instance = payload?.instance || payload?.data?.instance || payload?.data || {}
   const status = payload?.status || payload?.data?.status || {}
-  const state = String(instance?.status || payload?.state || '').toLowerCase()
+  const state = String(
+    instance?.status ||
+    payload?.state ||
+    (typeof payload?.status === 'string' ? payload.status : '')
+  ).toLowerCase()
   const connected = status?.connected === true || payload?.connected === true || state === 'connected'
   const loggedIn = status?.loggedIn === true || payload?.loggedIn === true || connected
-  const qrcode = instance?.qrcode || payload?.qrcode || payload?.qrCode || payload?.base64 || null
-  const pairingCode = instance?.paircode || payload?.paircode || payload?.pairingCode || null
+  const qrcode =
+    extractText(instance?.qrcode, ['base64', 'qrcode', 'qrCode', 'code']) ||
+    extractText(instance?.qrCode, ['base64', 'qrcode', 'qrCode', 'code']) ||
+    extractText(instance?.base64, ['base64']) ||
+    extractText(payload?.qrcode, ['base64', 'qrcode', 'qrCode', 'code']) ||
+    extractText(payload?.qrCode, ['base64', 'qrcode', 'qrCode', 'code']) ||
+    extractText(payload?.base64, ['base64'])
+  const pairingCode =
+    extractText(instance?.paircode, ['paircode', 'pairingCode', 'code']) ||
+    extractText(instance?.pairingCode, ['paircode', 'pairingCode', 'code']) ||
+    extractText(payload?.paircode, ['paircode', 'pairingCode', 'code']) ||
+    extractText(payload?.pairingCode, ['paircode', 'pairingCode', 'code'])
 
   return {
     connected,
     loggedIn,
     status: connected ? 'CONNECTED' : state === 'connecting' ? 'CONNECTING' : 'DISCONNECTED',
     providerStatus: state || (connected ? 'connected' : 'disconnected'),
-    qrcode: typeof qrcode === 'string' && qrcode.trim() ? qrcode.trim() : null,
-    pairingCode: typeof pairingCode === 'string' && pairingCode.trim() ? pairingCode.trim() : null,
+    qrcode,
+    pairingCode,
     profileName: instance?.profileName || null,
     profilePicUrl: instance?.profilePicUrl || null,
     owner: instance?.owner || status?.jid?.user || null,
   }
+}
+
+function hasConnectionArtifact(connection: NormalizedConnection) {
+  return connection.connected || Boolean(connection.qrcode || connection.pairingCode)
+}
+
+async function waitForConnectionArtifact(
+  company: UazapiCompany,
+  initialPayload: any,
+  maxAttempts = 10
+) {
+  let normalized = normalizeConnectionPayload(initialPayload)
+  if (hasConnectionArtifact(normalized)) return normalized
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const statusPayload = await requestUazapi({
+      path: '/instance/status',
+      token: company.uazapiToken || undefined,
+    })
+    normalized = normalizeConnectionPayload(statusPayload)
+    if (hasConnectionArtifact(normalized)) return normalized
+  }
+
+  return normalized
 }
 
 async function createInstance(company: UazapiCompany) {
@@ -286,7 +339,7 @@ export async function connectUazapi(companyId: number, phone?: string) {
     token: company.uazapiToken || undefined,
     body: normalizedPhone ? { phone: normalizedPhone, browser: 'auto' } : { browser: 'auto' },
   })
-  const normalized = normalizeConnectionPayload(data)
+  const normalized = await waitForConnectionArtifact(company, data)
 
   await prisma.empresa.update({
     where: { id: company.id },
