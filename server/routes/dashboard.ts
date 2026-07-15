@@ -7,7 +7,7 @@ export const router = Router()
 
 router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res) => {
   try {
-    const { filter } = req.query;
+    const { filter, sdrId, closerId } = req.query;
     
     // 1. Isolamento Multi-Tenant (SaaS)
     const companyId = req.user?.companyId;
@@ -76,6 +76,85 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     };
     if (companyId) appointmentWhere.companyId = companyId;
 
+    // 2.5 Lógica de Filtros por SDR e Closer
+    const leadExtraFilters: any = {};
+    const paymentExtraFilters: any = {};
+
+    if (sdrId && sdrId !== 'all') {
+      const parsedSdrId = parseInt(sdrId as string);
+      // O SDR está atrelado via Agendamento (Avaliação) ou via Proposta
+      leadExtraFilters.OR = [
+        { appointments: { some: { sdrId: parsedSdrId } } },
+        { proposals: { some: { sdrId: parsedSdrId } } }
+      ];
+      appointmentWhere.sdrId = parsedSdrId;
+      paymentExtraFilters.appointment = { sdrId: parsedSdrId };
+    }
+
+    if (closerId && closerId !== 'all') {
+      const parsedCloserId = parseInt(closerId as string);
+      const closerCondition = { proposals: { some: { salespersonId: parsedCloserId } } };
+      
+      if (leadExtraFilters.OR) {
+        // Se ambos foram passados, a lógica (por segurança no dashboard) é AND
+        leadExtraFilters.AND = [{ OR: leadExtraFilters.OR }, closerCondition];
+        delete leadExtraFilters.OR;
+      } else {
+        Object.assign(leadExtraFilters, closerCondition);
+      }
+      
+      // Filtro para pagamentos baseados no closer
+      if (paymentExtraFilters.appointment) {
+        paymentExtraFilters.appointment.lead = closerCondition;
+      } else {
+        paymentExtraFilters.appointment = { lead: closerCondition };
+      }
+      
+      // Filtro para appointments baseados no closer
+      appointmentWhere.lead = closerCondition;
+    }
+
+    // Mesclando filtros extras ao baseWhere
+    Object.assign(baseWhere, leadExtraFilters);
+
+    // Função utilitária para montar os where das demais consultas de lead
+    const buildLeadWhere = (statusIn: string[], useUpdatedAt = false) => {
+      const where: any = {
+        professionalId: { in: professionalIds },
+        ...leadExtraFilters
+      };
+      if (companyId) where.companyId = companyId;
+      if (useUpdatedAt) {
+        where.updatedAt = { gte: startDate, lte: endDate };
+      }
+      if (statusIn.length > 0) {
+        where.status = { in: statusIn };
+      }
+      return where;
+    };
+
+
+    // Busca os funis configurados para pegar os estágios dinâmicos
+    const funnels = await prisma.funnelConfig.findMany({
+      where: companyId ? { companyId } : {},
+      include: { stages: { where: { isActive: true }, orderBy: { order: 'asc' } } }
+    });
+
+    const prospectStages = funnels.find(f => f.code === 'prospecting')?.stages.map(s => s.code) || [];
+    const commercialStages = funnels.find(f => f.code === 'commercial')?.stages.map(s => s.code) || [];
+
+    // Fallbacks
+    const finalProspectStages = prospectStages.length > 0 ? prospectStages : ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended'];
+    const finalCommercialStages = commercialStages.length > 0 ? commercialStages : ['comercial_proposal', 'comercial_follow', 'comercial_closed'];
+
+    // Attended: último do prospect + todos do commercial
+    const lastProspectStage = finalProspectStages[finalProspectStages.length - 1];
+    const attendedStages = lastProspectStage ? [lastProspectStage, ...finalCommercialStages] : finalCommercialStages;
+
+    // Closed: último do commercial + hardcodes históricos
+    const lastCommercialStage = finalCommercialStages[finalCommercialStages.length - 1] || 'comercial_closed';
+    const closedStages = Array.from(new Set([lastCommercialStage, 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post']));
+
     // 3. Consultas em Paralelo para Performance
     const [
       leadsCount,
@@ -86,7 +165,8 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       leadsFechados,
       faturamentoPorMetodo,
       funilStatus,
-      origemData
+      origemData,
+      faturamentoFechadoAgg
     ] = await Promise.all([
       // 1. Total de Novos Leads (Criados no período)
       prisma.lead.count({ where: baseWhere }),
@@ -99,42 +179,23 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       // 3. Avaliações Comparecidas (Leads que estão em status de comparecimento ou superior)
       // Nota: Filtramos por updatedAt para pegar quem mudou para esse status no período
       prisma.lead.count({ 
-        where: { 
-          professionalId: { in: professionalIds },
-          ...(companyId && { companyId }),
-          updatedAt: { gte: startDate, lte: endDate },
-          status: { in: ['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
-        } 
+        where: buildLeadWhere(attendedStages, true) 
       }),
       
       // 4. Oportunidades (Leads em Proposta ou superior no período)
       prisma.lead.count({ 
-        where: { 
-          professionalId: { in: professionalIds },
-          ...(companyId && { companyId }),
-          updatedAt: { gte: startDate, lte: endDate },
-          status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
-        } 
+        where: buildLeadWhere(finalCommercialStages, true) 
       }),
       
       // 5. Faturamento Total (Tudo que foi orçado - Leads em Proposta ou superior - Total histórico ou período)
       prisma.lead.aggregate({
         _sum: { value: true },
-        where: { 
-          professionalId: { in: professionalIds },
-          ...(companyId && { companyId }),
-          status: { in: ['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] }
-        }
+        where: buildLeadWhere(finalCommercialStages, false)
       }),
 
       // 6. Total de Vendas Fechadas (Mudaram para status de fechamento no período)
       prisma.lead.count({
-        where: { 
-          professionalId: { in: professionalIds },
-          ...(companyId && { companyId }),
-          updatedAt: { gte: startDate, lte: endDate },
-          status: { in: ['comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'] } 
-        }
+        where: buildLeadWhere(closedStages, true)
       }),
 
       // 7. Faturamento por Método (Baseado na tabela de Pagamentos - O MAIS PRECISO)
@@ -144,7 +205,8 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
         where: { 
           professionalId: { in: professionalIds }, 
           ...(companyId && { companyId }),
-          date: { gte: startDate, lte: endDate }
+          date: { gte: startDate, lte: endDate },
+          ...paymentExtraFilters
         }
       }),
 
@@ -152,45 +214,38 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       prisma.lead.groupBy({
         by: ['status'],
         _count: { id: true },
-        where: { 
-          professionalId: { in: professionalIds },
-          ...(companyId && { companyId })
-        }
+        where: buildLeadWhere([], false)
       }),
 
       // 9. Leads por Origem (Total Histórico)
       prisma.lead.groupBy({
         by: ['origin'],
         _count: { id: true },
-        where: { 
-          professionalId: { in: professionalIds },
-          ...(companyId && { companyId })
-        }
+        where: buildLeadWhere([], false)
+      }),
+
+      // 11. Faturamento Fechado (Valor dos leads que viraram fechamento no periodo)
+      prisma.lead.aggregate({
+        _sum: { value: true },
+        where: buildLeadWhere(closedStages, true)
       })
     ]);
 
     // Cálculo da Receita Real
     // Regra: Boleto (transferencia) no entra na Receita Total nem no Faturamento Total. Carto, Pix e Dinheiro entram sempre (pago ou pendente).
-    const receitaTotalPeriodo = faturamentoPorMetodo
-      .filter(m => {
-        if (m.method === 'transferencia') return false; // Boletos isolados
-        return ['pago', 'pendente'].includes(m.status);
-      })
-      .reduce((acc, curr) => acc + (Number(curr._sum.amount) || 0), 0);
-
-    let faturamento = Number(faturamentoTotalAgg._sum.value) || 0;
-    let receita = receitaTotalPeriodo;
+    let faturamentoOrcado = Number(faturamentoTotalAgg._sum.value) || 0;
+    let faturamentoFechado = Number(faturamentoFechadoAgg._sum.value) || 0;
     
     // 4. KPIs de Eficiência Matemáticos
     
     // Ticket Orçado: Faturamento (Valor de Proposta) / Oportunidades (Número de Propostas)
     let ticketOrcado = oportunidades > 0 
-      ? (faturamento / oportunidades) 
+      ? (faturamentoOrcado / oportunidades) 
       : 0; 
       
     // Ticket Fechado: Receita (Valor Fechado) / Vendas Fechadas (Número de Contratos)
     let ticketFechado = leadsFechados > 0 
-      ? (receita / leadsFechados) 
+      ? (faturamentoFechado / leadsFechados) 
       : 0;
       
     // Taxa de Conversão de Leads: Vendas Fechadas / Total de Leads
@@ -203,9 +258,9 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       ? ((leadsFechados / oportunidades) * 100)
       : 0;
 
-    // Taxa de Conversão Financeira: Receita Efetiva / Faturamento Orçado
-    let conversaoFinanceira = faturamento > 0 
-      ? ((receita / faturamento) * 100) 
+    // Taxa de Conversao Financeira: Faturamento Fechado / Faturamento Orcado
+    let conversaoFinanceira = faturamentoOrcado > 0 
+      ? ((faturamentoFechado / faturamentoOrcado) * 100) 
       : 0;
 
     // Validação de Permissão de Faturamento para Usuários
@@ -236,8 +291,8 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     }
 
     if (!hasBillingPermission) {
-      faturamento = 0;
-      receita = 0;
+      faturamentoOrcado = 0;
+      faturamentoFechado = 0;
       ticketOrcado = 0;
       ticketFechado = 0;
       conversaoFinanceira = 0;
@@ -311,8 +366,9 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
       comparada: avaliacoesComparecidas,
       oportunidades: oportunidades,
       contratos: leadsFechados,
-      faturamento: faturamento,
-      receita: receita,
+      faturamento: faturamentoOrcado,
+      faturamentoFechado: faturamentoFechado,
+      totalDiscount: 0,
       ticketOrcado: ticketOrcado,
       ticketFechado: ticketFechado,
       conversao: conversaoLeads.toFixed(1),

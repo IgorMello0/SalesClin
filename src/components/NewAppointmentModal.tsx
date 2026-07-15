@@ -144,7 +144,7 @@ export function NewAppointmentModal({
           const role = (u.role?.name || u.role || '').toLowerCase();
           return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
         });
-        const sdrUsers = usrRes.data.filter((u: any) => u.role && !u.role.isSpecialist);
+        const sdrUsers = usrRes.data.filter((u: any) => u.role?.isSDR);
         setSdrs(sdrUsers);
         const existingIds = new Set(allProfs.map(p => p.id.toString()));
         medics.forEach((m: any) => {

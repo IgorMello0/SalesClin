@@ -8,6 +8,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { goalsApi } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const Goals = () => {
   const [revenueTarget, setRevenueTarget] = useState(150000);
@@ -20,6 +23,9 @@ const Goals = () => {
   const [savedPlans, setSavedPlans] = useState<any[]>([]);
   const { toast } = useToast();
   const { professional } = useAuth();
+  
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [planName, setPlanName] = useState("");
 
   // Tour de primeira visita
   const { tourActive, tourStep, tourSteps, tourHandleNext, tourHandlePrev, tourHandleClose } =
@@ -62,7 +68,7 @@ const Goals = () => {
     try {
       const newPlan = {
         professionalId: Number(professional.id),
-        name: `Plano ${format(new Date(), 'dd/MM/yy HH:mm')}`,
+        name: planName || `Plano ${format(new Date(), 'dd/MM/yy HH:mm')}`,
         revenueTarget,
         avgTicket,
         schedulingRate,
@@ -74,7 +80,9 @@ const Goals = () => {
       console.log('Resposta do backend:', response);
       if (response.success) {
         setSavedPlans([response.data, ...savedPlans]);
-        toast({ title: "Plano salvo no backend!" });
+        toast({ title: "Plano salvo com sucesso!" });
+        setIsSaveModalOpen(false);
+        setPlanName("");
       } else {
         toast({ title: "Erro: " + response.message, variant: "destructive" });
       }
@@ -103,14 +111,6 @@ const Goals = () => {
     } catch (error) {
       toast({ title: "Erro ao excluir plano", variant: "destructive" });
     }
-  };
-
-  const applyFacebookPreset = () => {
-    setRevenueTarget(150000); setAvgTicket(5000); setSchedulingRate(60); setShowupRate(60); setClosingRate(45);
-  };
-
-  const applyIndicationsPreset = () => {
-    setRevenueTarget(45000); setAvgTicket(1200); setSchedulingRate(30); setShowupRate(60); setClosingRate(60);
   };
 
   const formatCurrency = (val: number) =>
@@ -163,25 +163,6 @@ const Goals = () => {
         <div>
           <h2 className="text-xl sm:text-3xl font-extrabold text-primary font-headline tracking-tight">Engenharia de Metas</h2>
           <p className="text-on-surface-variant text-xs sm:text-sm mt-1">Calcule o volume de leads necessário para atingir seu faturamento.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={applyFacebookPreset}
-            variant="outline"
-            className="text-xs sm:text-sm font-semibold"
-          >
-            <span className="material-symbols-outlined text-base mr-1">campaign</span>
-            Config. Facebook
-          </Button>
-          <Button
-            onClick={applyIndicationsPreset}
-            variant="secondary"
-            size="sm"
-            className="text-xs sm:text-sm font-semibold shadow-lg shadow-secondary/20"
-          >
-            <span className="material-symbols-outlined text-base mr-1">share</span>
-            Config. Indicações
-          </Button>
         </div>
       </div>
 
@@ -340,8 +321,11 @@ const Goals = () => {
 
               <Button
                 id="goals-save"
-                className="bg-[#F97316] hover:bg-[#EA580C] text-white font-bold shadow-lg shadow-orange-500/20 border-none transition-colors px-6 py-3 h-auto text-base rounded-xl flex items-center gap-2"
-                onClick={handleSavePlan}
+                onClick={() => {
+                  setPlanName(`Plano ${format(new Date(), 'dd/MM/yy HH:mm')}`);
+                  setIsSaveModalOpen(true);
+                }}
+                className="bg-[#FF6B00] hover:bg-[#E66000] text-white shadow-lg shadow-[#FF6B00]/30 px-4 sm:px-6 py-2 h-auto text-sm sm:text-base font-bold transition-all hover:scale-105 active:scale-95"
               >
                 <span className="material-symbols-outlined text-lg">save</span>
                 Salvar Plano
@@ -400,6 +384,33 @@ const Goals = () => {
 
         </div>
       </div>
+
+      <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Salvar Meta</DialogTitle>
+            <DialogDescription>
+              Dê um nome para esta meta para encontrá-la facilmente depois.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nome da Meta</Label>
+              <Input
+                id="name"
+                value={planName}
+                onChange={(e) => setPlanName(e.target.value)}
+                placeholder="Ex: Meta do Facebook Campanha X"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSaveModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSavePlan} className="bg-primary text-white">Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

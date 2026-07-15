@@ -27,6 +27,10 @@ const PopoverContent = ({ className, align = "center", sideOffset = 4, children,
   React.useEffect(() => {
     if (!open) return
     const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      // Prevent popover from closing when clicking inside a portaled select dropdown
+      if (target?.closest?.('.select-content')) return;
+
       if (contentRef.current && !contentRef.current.contains(e.target as Node)) setOpen(false)
     }
     const t = setTimeout(() => document.addEventListener("mousedown", handleClick), 0)

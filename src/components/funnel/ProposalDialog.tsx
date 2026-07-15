@@ -32,11 +32,14 @@ export function ProposalDialog({
   lead,
   professional,
   services,
-  onSuccess
+  onSuccess,
+  targetType = 'lead'
 }: ProposalDialogProps) {
   const { toast } = useToast();
   const [allProfessionals, setAllProfessionals] = useState<any[]>([]);
   const [specialists, setSpecialists] = useState<any[]>([]);
+  const [closers, setClosers] = useState<any[]>([]);
+  const [sdrs, setSdrs] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [proposals, setProposals] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,12 +56,9 @@ export function ProposalDialog({
           const usrRes = await usuariosApi.getAll();
           if (usrRes.success && usrRes.data) {
             setAllUsers(usrRes.data);
-            const medics = usrRes.data.filter((u: any) => {
-              if (u.role?.isSpecialist) return true;
-              const role = (u.role?.name || u.role || '').toLowerCase();
-              return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
-            });
-            setSpecialists(medics);
+            setSpecialists(usrRes.data.filter((u: any) => u.role?.isSpecialist));
+            setClosers(usrRes.data.filter((u: any) => u.role?.isCloser));
+            setSdrs(usrRes.data.filter((u: any) => u.role?.isSDR));
           }
         } catch (e) {
           console.error('[ProposalDialog] Erro ao carregar dados:', e);
@@ -137,14 +137,42 @@ export function ProposalDialog({
   const handleSaveProposal = async () => {
     if (!lead || isSaving) return;
 
-    // Validar justificativas se o valor for menor
+    // Validar campos obrigatórios dinamicamente (só cobra se existem pessoas com a flag)
     for (let i = 0; i < proposals.length; i++) {
       const proposal = proposals[i];
       const newValue = parseCurrency(proposal.value);
+      
       if (newValue < lead.value && !proposal.justification) {
         toast({ 
-          title: `Justificativa Obrigatória (Proposta #${i + 1})`, 
+          title: `Erro ao salvar proposta #${i + 1}`, 
           description: "O valor é menor que o atual do Lead. Por favor, informe o motivo.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      if (specialists.length > 0 && !proposal.specialist) {
+        toast({ 
+          title: `Erro ao salvar proposta #${i + 1}`, 
+          description: "Selecione o Especialista responsável.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      if (closers.length > 0 && !proposal.salesperson) {
+        toast({ 
+          title: `Erro ao salvar proposta #${i + 1}`, 
+          description: "Selecione o Vendedor / Closer responsável.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      if (sdrs.length > 0 && !proposal.sdr) {
+        toast({ 
+          title: `Erro ao salvar proposta #${i + 1}`, 
+          description: "Selecione o SDR responsável.", 
           variant: "destructive" 
         });
         return;
@@ -294,9 +322,11 @@ export function ProposalDialog({
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="bg-white">
-                            {allUsers.map(u => (
+                            {closers.length > 0 ? closers.map(u => (
                               <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
-                            ))}
+                            )) : (
+                              <SelectItem value="none" disabled>Nenhum Closer cadastrado</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -312,9 +342,11 @@ export function ProposalDialog({
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="bg-white">
-                            {allUsers.map(u => (
+                            {sdrs.length > 0 ? sdrs.map(u => (
                               <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
-                            ))}
+                            )) : (
+                              <SelectItem value="none" disabled>Nenhum SDR cadastrado</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>

@@ -191,13 +191,16 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
     }
   };
 
-  const handleUpdateActivity = async (id) => {
+  const handleUpdateActivity = async (activityId) => {
+    if (!lead || !tempActivityContent.trim()) return;
     try {
-      const res = await leadsApi.updateActivity(id, { content: tempActivityContent });
+      const res = await leadsApi.updateActivity(Number(lead.id), Number(activityId), { content: tempActivityContent });
       if (res.success) {
         toast({ title: "Atividade atualizada!" });
         setEditingActivityId(null);
         onUpdate();
+      } else {
+        toast({ title: "Erro ao atualizar atividade", description: res.error?.message, variant: "destructive" });
       }
     } catch (e) {
       toast({ title: "Erro ao atualizar atividade", variant: "destructive" });

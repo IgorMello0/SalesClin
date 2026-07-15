@@ -111,7 +111,7 @@ const SelectContent = ({ className, children, position = "popper", ref, ...props
         else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node
       }}
       className={cn(
-        "fixed z-[9999] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
+        "select-content fixed z-[9999] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95",
         className
       )}
       style={{ top: coords.top, left: coords.left, width: coords.width, maxHeight: coords.maxHeight, transform: coords.transform }}

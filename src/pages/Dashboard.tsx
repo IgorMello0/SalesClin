@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { dashboardApi } from '@/lib/api';
+import { dashboardApi, usuariosApi } from '@/lib/api';
 import { Card } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -17,6 +19,10 @@ const Dashboard = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [conversionMode, setConversionMode] = useState<'percent' | 'reais'>('percent');
   const [bottomActiveTab, setBottomActiveTab] = useState<'finance' | 'sales'>('finance');
+  const [selectedSdrId, setSelectedSdrId] = useState<string>('all');
+  const [selectedCloserId, setSelectedCloserId] = useState<string>('all');
+  const [sdrs, setSdrs] = useState<any[]>([]);
+  const [closers, setClosers] = useState<any[]>([]);
   const [counters, setCounters] = useState({
     leads: 0,
     agendamentos: 0,
@@ -24,7 +30,7 @@ const Dashboard = () => {
     oportunidades: 0,
     contratos: 0,
     faturamento: 0,
-    receita: 0,
+    faturamentoFechado: 0,
     totalDiscount: 0,
     ticketOrcado: 0,
     ticketFechado: 0,
@@ -40,9 +46,9 @@ const Dashboard = () => {
     origem: [] as { origin: string, count: number }[]
   });
 
-  const fetchTargetData = useCallback(async (currentFilter: string, start?: string, end?: string) => {
+  const fetchTargetData = useCallback(async (currentFilter: string, start?: string, end?: string, sdrId?: string, closerId?: string) => {
     try {
-      const response = await dashboardApi.getMetrics(currentFilter, start, end);
+      const response = await dashboardApi.getMetrics(currentFilter, start, end, sdrId, closerId);
       if (response.success && response.data) {
         return response.data;
       }
@@ -51,7 +57,7 @@ const Dashboard = () => {
     }
     return { 
       leads: 0, agendamentos: 0, comparada: 0, oportunidades: 0, contratos: 0,
-      faturamento: 0, receita: 0, totalDiscount: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
+      faturamento: 0, faturamentoFechado: 0, totalDiscount: 0, ticketOrcado: 0, ticketFechado: 0, conversao: 0,
       conversaoPropostas: 0, conversaoFinanceira: 0, parcelamentoMedioBoleto: 0,
       metodos: { boleto: { gerados: 0 }, cartao: 0, pix: 0, dinheiro: 0 },
       funil: { novos: 0, contatados: 0, agendamentos: 0, fechados: 0 },
@@ -78,7 +84,7 @@ const Dashboard = () => {
         oportunidades: Math.floor(currentValues.oportunidades + ease * (targets.oportunidades - currentValues.oportunidades)),
         contratos: Math.floor(currentValues.contratos + ease * ((targets.contratos || 0) - currentValues.contratos)),
         faturamento: Math.floor(currentValues.faturamento + ease * (targets.faturamento - currentValues.faturamento)),
-        receita: Math.floor(currentValues.receita + ease * (targets.receita - currentValues.receita)),
+        faturamentoFechado: Math.floor(currentValues.faturamentoFechado + ease * ((targets.faturamentoFechado || 0) - currentValues.faturamentoFechado)),
         totalDiscount: Math.floor(currentValues.totalDiscount + ease * ((targets.totalDiscount || 0) - currentValues.totalDiscount)),
         ticketOrcado: Math.floor(currentValues.ticketOrcado + ease * (targets.ticketOrcado - currentValues.ticketOrcado)),
         ticketFechado: Math.floor(currentValues.ticketFechado + ease * (targets.ticketFechado - currentValues.ticketFechado)),
@@ -115,8 +121,25 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    const loadTeam = async () => {
+      try {
+        const res = await usuariosApi.getAll();
+        if (res.success && res.data) {
+          const sdrList = res.data.filter((u: any) => u.role?.isSDR);
+          const closerList = res.data.filter((u: any) => u.role?.isCloser);
+          setSdrs(sdrList);
+          setClosers(closerList);
+        }
+      } catch (e) {
+        console.error('Failed to load team for dashboard filters', e);
+      }
+    };
+    loadTeam();
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
-    fetchTargetData('30days').then(targets => {
+    fetchTargetData('30days', undefined, undefined, selectedSdrId, selectedCloserId).then(targets => {
       if (!mounted) return;
       const duration = 1000;
       const startTime = performance.now();
@@ -131,7 +154,7 @@ const Dashboard = () => {
           oportunidades: Math.floor(ease * targets.oportunidades),
           contratos: Math.floor(ease * (targets.contratos || 0)),
           faturamento: Math.floor(ease * targets.faturamento),
-          receita: Math.floor(ease * targets.receita),
+          faturamentoFechado: Math.floor(ease * (targets.faturamentoFechado || 0)),
           totalDiscount: Math.floor(ease * (targets.totalDiscount || 0)),
           ticketOrcado: Math.floor(ease * targets.ticketOrcado),
           ticketFechado: Math.floor(ease * targets.ticketFechado),
@@ -156,10 +179,12 @@ const Dashboard = () => {
     return () => { mounted = false; };
   }, [fetchTargetData]);
 
-  const handleFilterChange = async (newFilter: 'today' | '7days' | '30days' | 'this_month' | 'custom', start?: string, end?: string) => {
-    if (newFilter === filter && newFilter !== 'custom') return;
+  const handleFilterChange = async (newFilter: 'today' | '7days' | '30days' | 'this_month' | 'custom', start?: string, end?: string, sdrId = selectedSdrId, closerId = selectedCloserId) => {
+    if (newFilter === filter && newFilter !== 'custom' && sdrId === selectedSdrId && closerId === selectedCloserId) return;
     setFilter(newFilter);
-    const targets = await fetchTargetData(newFilter, start, end);
+    setSelectedSdrId(sdrId);
+    setSelectedCloserId(closerId);
+    const targets = await fetchTargetData(newFilter, start, end, sdrId, closerId);
     
     // Anima os contadores suavemente
     animationRef(targets);
@@ -219,7 +244,8 @@ const Dashboard = () => {
           </p>
         </div>
         
-        <Card className="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5 w-fit relative overflow-visible">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+          <Card className="flex flex-wrap items-center gap-2 sm:gap-3 p-1.5 w-fit relative overflow-visible">
           <button 
             onClick={() => {
               handleFilterChange('today');
@@ -304,7 +330,90 @@ const Dashboard = () => {
               </div>
             )}
           </div>
+
+          {(sdrs.length > 0 || closers.length > 0) && (
+            <Popover>
+              <div className="relative">
+                <PopoverTrigger asChild>
+                  <button 
+                    className={cn(
+                      "px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 cursor-pointer rounded-lg transition-all select-none",
+                      (selectedSdrId !== 'all' || selectedCloserId !== 'all')
+                        ? "bg-primary/10 text-primary" 
+                        : "text-on-surface-variant hover:bg-muted"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-sm">filter_list</span>
+                    <span>Filtros</span>
+                    {(selectedSdrId !== 'all' || selectedCloserId !== 'all') && (
+                      <span className="flex items-center justify-center w-4 h-4 bg-primary text-primary-foreground rounded-full text-[9px] ml-0.5">
+                        {(selectedSdrId !== 'all' ? 1 : 0) + (selectedCloserId !== 'all' ? 1 : 0)}
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="absolute top-full right-0 mt-2 w-72 p-4 rounded-2xl border border-slate-200/50 shadow-2xl bg-white/95 backdrop-blur-md z-[150]" align="end">
+                  <div className="space-y-4">
+                    <div className="font-bold text-sm text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-slate-400">group</span>
+                      Filtros de Equipe
+                    </div>
+                    
+                    {sdrs.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">SDR Responsável</label>
+                        <Select value={selectedSdrId} onValueChange={(val) => handleFilterChange(filter, filter === 'custom' ? customStartDate : undefined, filter === 'custom' ? customEndDate : undefined, val, selectedCloserId)}>
+                          <SelectTrigger className="w-full bg-slate-50/50 border-slate-200 focus:ring-secondary">
+                            <SelectValue placeholder="SDR (Todos)">
+                              {selectedSdrId === 'all' ? 'Todos os SDRs' : (sdrs.find(s => s.id.toString() === selectedSdrId)?.name || 'Todos os SDRs')}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos os SDRs</SelectItem>
+                            {sdrs.map(sdr => (
+                              <SelectItem key={sdr.id} value={sdr.id.toString()}>{sdr.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {closers.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Closer (Vendedor)</label>
+                        <Select value={selectedCloserId} onValueChange={(val) => handleFilterChange(filter, filter === 'custom' ? customStartDate : undefined, filter === 'custom' ? customEndDate : undefined, selectedSdrId, val)}>
+                          <SelectTrigger className="w-full bg-slate-50/50 border-slate-200 focus:ring-secondary">
+                            <SelectValue placeholder="Closer (Todos)">
+                              {selectedCloserId === 'all' ? 'Todos os Closers' : (closers.find(c => c.id.toString() === selectedCloserId)?.name || 'Todos os Closers')}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos os Closers</SelectItem>
+                            {closers.map(closer => (
+                              <SelectItem key={closer.id} value={closer.id.toString()}>{closer.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    
+                    {(selectedSdrId !== 'all' || selectedCloserId !== 'all') && (
+                      <div className="pt-2">
+                        <button 
+                          onClick={() => handleFilterChange(filter, filter === 'custom' ? customStartDate : undefined, filter === 'custom' ? customEndDate : undefined, 'all', 'all')}
+                          className="w-full text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors py-2"
+                        >
+                          Limpar Filtros
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </div>
+            </Popover>
+          )}
         </Card>
+      </div>
       </div>
 
       {/* Primary Stats Grid */}
@@ -392,7 +501,7 @@ const Dashboard = () => {
               </div>
               <div className="space-y-1">
                 <p className="text-on-surface-variant text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug min-h-[34px]">Faturamento Realizado</p>
-                <h4 className="stats-value text-2xl font-black text-emerald-600">{formatCurrency(counters.receita)}</h4>
+                <h4 className="stats-value text-2xl font-black text-emerald-600">{formatCurrency(counters.faturamentoFechado)}</h4>
                 <p className="text-slate-400 text-xs font-bold mt-1">
                   {counters.contratos} {counters.contratos === 1 ? 'contrato fechado' : 'contratos fechados'}
                 </p>
@@ -498,35 +607,28 @@ const Dashboard = () => {
         </Card>
       </div>
 
-
-      {/* Revenue Detail Section */}
+      {/* Payment Methods Section */}
       {showBilling && (
         <section className="space-y-6 relative z-10 animate-in fade-in">
           <div className="flex items-center gap-3">
-            <h3 className="text-xl font-bold text-primary font-headline">Detalhamento de Receita</h3>
+            <h3 className="text-xl font-bold text-primary font-headline">Meios de Pagamento Utilizados</h3>
             <div className="flex-1 h-px bg-border"></div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6">
-            <div className="sm:col-span-2 md:col-span-1 bg-primary/95 backdrop-blur-lg p-4 sm:p-6 rounded-2xl text-white shadow-lg flex flex-col justify-center hover-card">
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Receita Total</p>
-              <h4 className="text-2xl font-extrabold font-headline">{formatCurrency(counters.receita)}</h4>
-            </div>
-            <div className="sm:col-span-2 md:col-span-4 grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6">
-              {[
-                { label: 'Boletos Gerados', value: extraData.metodos.boleto?.gerados || 0 },
-                { label: 'Cartão', value: extraData.metodos.cartao },
-                { label: 'Pix / Débito', value: extraData.metodos.pix },
-                { label: 'Dinheiro', value: extraData.metodos.dinheiro },
-              ].map((item) => (
-                <Card key={item.label} className="p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                    <span className="text-primary text-[10px] font-bold uppercase tracking-tight">{item.label}</span>
-                  </div>
-                  <h5 className="text-lg font-bold text-primary">{formatCurrency(item.value)}</h5>
-                </Card>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {[
+              { label: 'Boletos Gerados', value: extraData.metodos.boleto?.gerados || 0 },
+              { label: 'Cartão', value: extraData.metodos.cartao },
+              { label: 'Pix / Débito', value: extraData.metodos.pix },
+              { label: 'Dinheiro', value: extraData.metodos.dinheiro },
+            ].map((item) => (
+              <Card key={item.label} className="p-6 flex flex-col justify-between hover-card">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                  <span className="text-primary text-[10px] sm:text-xs font-bold uppercase tracking-tight">{item.label}</span>
+                </div>
+                <h5 className="text-lg sm:text-2xl font-bold text-primary font-headline">{formatCurrency(item.value)}</h5>
+              </Card>
+            ))}
           </div>
         </section>
       )}

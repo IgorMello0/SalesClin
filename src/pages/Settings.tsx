@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import InfoNegocioView from './settings/InfoNegocioView';
 import FunnelsSettingsView from './settings/FunnelsSettingsView';
 import LeadStatusesSettingsView from './settings/LeadStatusesSettingsView';
+import { BillingSettingsView } from './settings/BillingSettingsView';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, modulesApi, billingApi, type BillingStatus, type BillingUsage } from '@/lib/api';
@@ -208,12 +209,25 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [buyingUserExtra, setBuyingUserExtra] = useState(false);
   const [resendingInviteId, setResendingInviteId] = useState<number | null>(null);
+  
+  const isOwner = professional?.type === 'profissional' || professional?.role === 'profissional' || professional?.role === 'admin';
+  const [selectedClinicFilter, setSelectedClinicFilter] = useState<string>(professional?.companyId ? String(professional.companyId) : 'all');
 
   const validRoles = roles.filter((role) => role?.id !== undefined && role?.id !== null && (isSpecialistMode ? role.isSpecialist : !role.isSpecialist));
   
   const filteredTeam = team.filter((user) => {
     const isSpec = user.role?.isSpecialist || false;
-    return isSpecialistMode ? isSpec : !isSpec;
+    const matchesMode = isSpecialistMode ? isSpec : !isSpec;
+    if (!matchesMode) return false;
+    
+    if (selectedClinicFilter !== 'all') {
+      const filterId = Number(selectedClinicFilter);
+      const belongsDirectly = user.companyId === filterId;
+      const belongsViaAccess = user.companyAccess?.some((ca: any) => ca.companyId === filterId);
+      return belongsDirectly || belongsViaAccess;
+    }
+    
+    return true;
   });
   const getUserDisplayName = (user: any) => String(user?.name || user?.email || 'Usuario');
   const getUserEmail = (user: any) => String(user?.email || 'E-mail nao informado');
@@ -487,13 +501,28 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
   };
 
   const getRoleBadge = (roleName?: string) => {
+    const roleKey = roleName?.toLowerCase() || '';
     const colors: Record<string, string> = {
       admin: 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900',
       comercial: 'bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900',
+      closer: 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900',
+      sdr: 'bg-indigo-100 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900',
+      dentista: 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900',
+      especialista: 'bg-teal-100 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-900',
     };
     
+    // Also try to match substring if it's "sdr (abordagem)"
+    let matchedColor = colors[roleKey];
+    if (!matchedColor) {
+      if (roleKey.includes('closer')) matchedColor = colors.closer;
+      else if (roleKey.includes('sdr')) matchedColor = colors.sdr;
+      else if (roleKey.includes('dentista')) matchedColor = colors.dentista;
+      else if (roleKey.includes('especialista')) matchedColor = colors.especialista;
+      else matchedColor = 'bg-primary/10 text-primary border-primary/20';
+    }
+    
     return (
-      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${colors[roleName?.toLowerCase() || ''] || 'bg-primary/10 text-primary border-primary/20'}`}>
+      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${matchedColor}`}>
         {roleName || 'Sem Cargo'}
       </span>
     );
@@ -509,24 +538,46 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
         </div>
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h3 className="font-medium text-sm">{isSpecialistMode ? 'Especialistas' : 'Membros da Equipe'} ({filteredTeam.length})</h3>
+          <h3 className="font-medium text-sm">
+            {isSpecialistMode ? 'Especialistas' : 'Membros da Equipe'} ({filteredTeam.length})
+          </h3>
           {billingUsage && (
             <p className="text-xs text-muted-foreground mt-1">
               {billingUsage.users.used} / {billingUsage.users.limit ?? 'ilimitado'} usuários nesta clínica
             </p>
           )}
         </div>
-        {billingUsage && !billingUsage.users.canCreate ? (
-          <Button size="sm" onClick={handleBuyUserExtra} disabled={buyingUserExtra}>
-            <Plus className="w-4 h-4 mr-2" /> {buyingUserExtra ? 'Abrindo...' : 'Comprar usuário extra'}
-          </Button>
-        ) : (
-          <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
-            <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : (isSpecialistMode ? 'Novo Especialista' : 'Novo Membro')}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isOwner && clinicas.length > 1 && (
+            <Select value={selectedClinicFilter} onValueChange={setSelectedClinicFilter}>
+              <SelectTrigger className="h-8 text-xs w-[180px]">
+                <SelectValue placeholder="Filtrar por clínica...">
+                  {selectedClinicFilter === 'all' 
+                    ? 'Todas as Clínicas' 
+                    : clinicas.find(c => String(c.id) === selectedClinicFilter)?.name || 'Carregando...'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Clínicas</SelectItem>
+                {clinicas.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
+          {billingUsage && !billingUsage.users.canCreate ? (
+            <Button size="sm" onClick={handleBuyUserExtra} disabled={buyingUserExtra}>
+              <Plus className="w-4 h-4 mr-2" /> {buyingUserExtra ? 'Abrindo...' : 'Comprar extra'}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+              <Plus className="w-4 h-4 mr-2" /> {isAdding ? 'Cancelar' : (isSpecialistMode ? 'Novo Especialista' : 'Novo Membro')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {isAdding && (
@@ -968,6 +1019,9 @@ const CargosView = () => {
   const [rolePermissions, setRolePermissions] = useState<any[]>([]);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [isSpecialistRole, setIsSpecialistRole] = useState(false);
+  const [isAdminRole, setIsAdminRole] = useState(false);
+  const [isSDRRole, setIsSDRRole] = useState(false);
+  const [isCloserRole, setIsCloserRole] = useState(false);
 
   const loadModules = async () => {
     try {
@@ -1014,12 +1068,18 @@ const CargosView = () => {
         name: trimmed, 
         value,
         permissions: modules.map(m => ({ moduleId: m.id, hasAccess: true })),
-        isSpecialist: isSpecialistRole
+        isSpecialist: isSpecialistRole,
+        isAdmin: isAdminRole,
+        isSDR: isSDRRole,
+        isCloser: isCloserRole
       });
       if (res.success) {
         toast({ title: 'Cargo criado!', description: `"${trimmed}" agora está salvo no banco de dados.` });
         setNewRoleName('');
         setIsSpecialistRole(false);
+        setIsAdminRole(false);
+        setIsSDRRole(false);
+        setIsCloserRole(false);
         setIsAdding(false);
         
         // Selecionar e expandir automaticamente as permissões do novo cargo
@@ -1051,6 +1111,10 @@ const CargosView = () => {
       return;
     }
     setSelectedRoleId(role.id);
+    setIsSpecialistRole(!!role.isSpecialist);
+    setIsAdminRole(!!role.isAdmin);
+    setIsSDRRole(!!role.isSDR);
+    setIsCloserRole(!!role.isCloser);
     
     const currentPermissions = modules.map(m => {
       const existing = role.permissions?.find((p: any) => p.moduleId === m.id);
@@ -1090,6 +1154,10 @@ const CargosView = () => {
       const role = roles.find(r => r.id === selectedRoleId);
       const res = await rolesApi.update(selectedRoleId, {
         name: role.name,
+        isSpecialist: isSpecialistRole,
+        isAdmin: isAdminRole,
+        isSDR: isSDRRole,
+        isCloser: isCloserRole,
         permissions: rolePermissions.map(p => ({ 
           moduleId: p.moduleId, 
           hasAccess: p.hasAccess,
@@ -1163,6 +1231,45 @@ const CargosView = () => {
                 Este cargo representa um Especialista (ex: Médico, Dentista)?
               </label>
             </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isSDR" 
+                checked={isSDRRole}
+                onCheckedChange={(checked) => setIsSDRRole(checked as boolean)}
+              />
+              <label 
+                htmlFor="isSDR" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Este cargo tem função de SDR (Abordagem / Pré-venda)?
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isCloser" 
+                checked={isCloserRole}
+                onCheckedChange={(checked) => setIsCloserRole(checked as boolean)}
+              />
+              <label 
+                htmlFor="isCloser" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Este cargo tem função de Closer (Fechamento de vendas)?
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isAdmin" 
+                checked={isAdminRole}
+                onCheckedChange={(checked) => setIsAdminRole(checked as boolean)}
+              />
+              <label 
+                htmlFor="isAdmin" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Este cargo é Administrador?
+              </label>
+            </div>
           </div>
         </div>
       )}
@@ -1219,8 +1326,66 @@ const CargosView = () => {
                     disabled={savingPermissions}
                     className="h-7 text-xs px-4"
                   >
-                    {savingPermissions ? 'Salvando...' : 'Salvar Permissões'}
+                    {savingPermissions ? 'Salvando...' : 'Salvar Configurações'}
                   </Button>
+                </div>
+
+                <div className="space-y-4 p-4 border rounded-xl bg-muted/20">
+                  <h4 className="text-sm font-semibold">Configurações de Funções (Flags)</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`edit-isSpecialist-${role.id}`}
+                        checked={isSpecialistRole}
+                        onCheckedChange={(checked) => setIsSpecialistRole(checked as boolean)}
+                      />
+                      <label 
+                        htmlFor={`edit-isSpecialist-${role.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        É um Especialista?
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`edit-isSDR-${role.id}`}
+                        checked={isSDRRole}
+                        onCheckedChange={(checked) => setIsSDRRole(checked as boolean)}
+                      />
+                      <label 
+                        htmlFor={`edit-isSDR-${role.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Função de SDR?
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`edit-isCloser-${role.id}`}
+                        checked={isCloserRole}
+                        onCheckedChange={(checked) => setIsCloserRole(checked as boolean)}
+                      />
+                      <label 
+                        htmlFor={`edit-isCloser-${role.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Função de Closer?
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`edit-isAdmin-${role.id}`}
+                        checked={isAdminRole}
+                        onCheckedChange={(checked) => setIsAdminRole(checked as boolean)}
+                      />
+                      <label 
+                        htmlFor={`edit-isAdmin-${role.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        É Administrador?
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
@@ -1799,6 +1964,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   appearance: AparenciaView,
   funnels: FunnelsSettingsView,
   lead_statuses: LeadStatusesSettingsView,
+  billing: BillingSettingsView,
 };
 
 const Settings = () => {
@@ -1817,6 +1983,7 @@ const Settings = () => {
       title: 'Conta',
       items: [
         { key: 'profile', name: 'Perfil', description: 'Dados pessoais e foto do usuario', icon: 'person' },
+        { key: 'billing', name: 'Planos e Cobrança', description: 'Gerencie sua assinatura e pagamentos', icon: 'credit_card', ownerOnly: true },
         { key: 'security', name: 'Seguranca', description: 'Senha e acesso da conta', icon: 'lock' },
         { key: 'notifications', name: 'Notificacoes', description: 'Alertas e preferencias', icon: 'notifications' },
       ],

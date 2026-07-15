@@ -750,6 +750,9 @@ model Role {
   updatedAt         DateTime            @updatedAt @map("updated_at")
   professionalId    Int                 @map("professional_id")
   isSpecialist      Boolean             @default(false) @map("is_specialist")
+  isAdmin           Boolean             @default(false) @map("is_admin")
+  isSDR             Boolean             @default(false) @map("is_sdr")
+  isCloser          Boolean             @default(false) @map("is_closer")
   permissions       RolePermission[]
   company           Empresa             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   professional      Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)

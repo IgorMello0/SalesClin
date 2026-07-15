@@ -170,6 +170,24 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
     }
   };
 
+  const handleDeleteLead = async () => {
+    if (!selectedLead) return;
+    if (!window.confirm("Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.")) return;
+    
+    try {
+      const res = await leadsApi.delete(Number(selectedLead.id));
+      if (res.success) {
+        toast({ title: "Lead excluído com sucesso!" });
+        if (onUpdate) onUpdate();
+        onOpenChange(false);
+      } else {
+        toast({ title: "Erro ao excluir", description: res.error?.message, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Erro de conexão", variant: "destructive" });
+    }
+  };
+
   const handleDeleteActivity = async (activityId: string) => {
     if (!selectedLead) return;
     try {
@@ -484,6 +502,15 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor do Lead</p>
                         <p className="text-sm font-bold text-secondary">{selectedLead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                       </div>
+
+                      <Button 
+                        variant="ghost" 
+                        onClick={handleDeleteLead}
+                        className="w-full mt-4 text-red-500 hover:text-red-600 hover:bg-red-50 font-bold border border-red-100 h-12 rounded-xl"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Excluir Lead
+                      </Button>
                     </div>
                   </div>
                 </div>
