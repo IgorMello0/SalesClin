@@ -462,22 +462,6 @@ const Integrations = () => {
                         placeholder="100234567890456"
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Business ID</Label>
-                      <Input
-                        value={metaForm.businessId}
-                        onChange={(event) => setMetaForm({ ...metaForm, businessId: event.target.value })}
-                        placeholder="Opcional"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Numero exibido</Label>
-                      <Input
-                        value={metaForm.displayPhoneNumber}
-                        onChange={(event) => setMetaForm({ ...metaForm, displayPhoneNumber: event.target.value })}
-                        placeholder="+55 11 99999-9999"
-                      />
-                    </div>
                     <div className="space-y-1.5 md:col-span-2">
                       <Label>Permanent Access Token</Label>
                       <div className="relative">

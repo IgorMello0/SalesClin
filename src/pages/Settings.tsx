@@ -3040,10 +3040,6 @@ const MetaWhatsAppManager = () => {
               <Label>WhatsApp Business Account ID</Label>
               <Input value={manual.wabaId} onChange={e => setManual({ ...manual, wabaId: e.target.value })} placeholder="100234567890456" />
             </div>
-            <div className="space-y-1.5">
-              <Label>Numero exibido</Label>
-              <Input value={manual.displayPhoneNumber} onChange={e => setManual({ ...manual, displayPhoneNumber: e.target.value })} placeholder="+55 11 99999-9999" />
-            </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label>Permanent Access Token</Label>
               <div className="relative">
