@@ -290,6 +290,26 @@ export function getProductIdForPlan(planCode: PlanCode, billingCycle: BillingCyc
   return process.env[envNames.primary] || (envNames.legacy ? process.env[envNames.legacy] : undefined)
 }
 
+function assertPlanProductIsUnique(planCode: PlanCode, billingCycle: BillingCycle, productId: string) {
+  const duplicates: string[] = []
+
+  for (const candidatePlan of PLAN_CODES) {
+    for (const candidateCycle of BILLING_CYCLES) {
+      if (candidatePlan === planCode && candidateCycle === billingCycle) continue
+      if (getProductIdForPlan(candidatePlan, candidateCycle) === productId) {
+        duplicates.push(`${candidatePlan} ${candidateCycle}`)
+      }
+    }
+  }
+
+  if (duplicates.length > 0) {
+    const envNames = getPlanProductEnvNames(planCode, billingCycle)
+    throw new Error(
+      `Produto repetido na configuracao da Abacate Pay: ${planCode} ${billingCycle} usa o mesmo ID de ${duplicates.join(', ')}. Defina um produto exclusivo em ${envNames.primary}.`
+    )
+  }
+}
+
 function assertPlanCheckoutConfig(
   context: 'criar checkout' | 'alterar plano',
   planCode: PlanCode,
@@ -311,6 +331,8 @@ function assertPlanCheckoutConfig(
       `Configuracao da Abacate Pay incompleta para ${context} do plano ${planCode} ${billingCycle}: defina ${expectedEnv} no ambiente da VPS.`
     )
   }
+
+  assertPlanProductIsUnique(planCode, billingCycle, productId)
 
   return { apiKey, productId }
 }
@@ -656,6 +678,13 @@ export async function createAbacateSubscriptionCheckout(
     },
   }
 
+  console.info('[Billing] Criando checkout de assinatura', {
+    companyId,
+    planCode,
+    billingCycle,
+    productId: abacateConfig.productId,
+  })
+
   const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, abacateConfig.apiKey)
 
   await prisma.companySubscription.update({
@@ -681,6 +710,9 @@ export async function createAbacateSubscriptionCheckout(
   return {
     checkoutId,
     checkoutUrl,
+    planCode,
+    billingCycle,
+    productId: abacateConfig.productId,
   }
 }
 
@@ -839,6 +871,13 @@ export async function createPendingSignupCheckout(input: {
     },
   }
 
+  console.info('[Billing] Criando checkout de cadastro', {
+    pendingSignupId: pending.id,
+    planCode: input.planCode,
+    billingCycle: input.billingCycle,
+    productId: abacateConfig.productId,
+  })
+
   const { checkoutId, checkoutUrl } = await createAbacateSubscriptionBilling(payload, abacateConfig.apiKey)
 
   await prisma.pendingSignup.update({
@@ -853,6 +892,9 @@ export async function createPendingSignupCheckout(input: {
     pendingSignupId: pending.id,
     checkoutId,
     checkoutUrl,
+    planCode: input.planCode,
+    billingCycle: input.billingCycle,
+    productId: abacateConfig.productId,
   }
 }
 
