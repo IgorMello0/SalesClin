@@ -81,6 +81,7 @@ async function requestUazapi(params: {
   token?: string
   admin?: boolean
   body?: any
+  acceptedStatuses?: number[]
 }) {
   const baseUrl = getUazapiBaseUrl()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -98,7 +99,7 @@ async function requestUazapi(params: {
   })
 
   const result = await parseResponse(response)
-  if (!response.ok) {
+  if (!response.ok && !params.acceptedStatuses?.includes(response.status)) {
     const message = result.data?.message || result.data?.error || result.text || `HTTP ${response.status}`
     throw new Error(`UAZAPI ${params.path} (HTTP ${response.status}): ${message}`)
   }
@@ -377,7 +378,37 @@ export async function setupUazapiWebhook(companyId: number) {
 export async function disconnectUazapi(companyId: number) {
   const company = await getCompany(companyId)
   if (company.uazapiToken) {
-    await requestUazapi({ path: '/instance', method: 'DELETE', token: company.uazapiToken })
+    // The provider may reject deletion while a connection attempt is still active.
+    // Closing the session first also makes removal reliable for pending QR codes.
+    try {
+      await requestUazapi({
+        path: '/instance/disconnect',
+        method: 'POST',
+        token: company.uazapiToken,
+      })
+    } catch (error) {
+      console.warn('[WhatsApp Disconnect] Session was already closed or unavailable:', error)
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    try {
+      await requestUazapi({
+        path: '/instance',
+        method: 'DELETE',
+        token: company.uazapiToken,
+        acceptedStatuses: [404, 410],
+      })
+    } catch (error) {
+      // Some provider nodes need a moment to release the session after disconnect.
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await requestUazapi({
+        path: '/instance',
+        method: 'DELETE',
+        token: company.uazapiToken,
+        acceptedStatuses: [404, 410],
+      })
+    }
   }
 
   await prisma.empresa.update({
