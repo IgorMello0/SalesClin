@@ -895,10 +895,20 @@ export const whatsappUazapiApi = {
 export const conversationsApi = {
   list: async () => apiRequest<any[]>('/conversas?page=1&pageSize=100'),
   getById: async (id: number) => apiRequest<any>(`/conversas/${id}`),
-  sendMessage: async (id: number, content: string) => apiRequest<any>(`/conversas/${id}/messages`, {
+  sendMessage: async (id: number, content: string, media?: { url: string; type: 'image' | 'video' | 'audio' }) => apiRequest<any>(`/conversas/${id}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, mediaUrl: media?.url, mediaType: media?.type }),
   }),
+  update: async (id: number, data: { agentId?: number | null }) => apiRequest<any>(`/conversas/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+}
+
+export const aiAgentsApi = {
+  list: async () => apiRequest<any[]>('/agentes-ia?page=1&pageSize=100'),
+  create: async (data: { name: string; basePrompt: string; temperature?: number; mode?: string }) =>
+    apiRequest<any>('/agentes-ia', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // Configuração de Funis

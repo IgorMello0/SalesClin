@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 
 export const router = Router()
 
-router.get('/', auth(), async (req, res) => {
+router.get('/', auth(), requireModule('conversas'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
   
   let companyId = req.user?.companyId;
@@ -24,7 +24,7 @@ router.get('/', auth(), async (req, res) => {
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
 
-router.get('/:id', auth(), async (req, res) => {
+router.get('/:id', auth(), requireModule('conversas'), async (req, res) => {
   const id = Number(req.params.id)
   
   let companyId = req.user?.companyId;
@@ -43,7 +43,7 @@ router.get('/:id', auth(), async (req, res) => {
   res.json(createSuccessResponse(item))
 })
 
-router.post('/', auth(), async (req, res) => {
+router.post('/', auth(), requireModule('conversas'), async (req, res) => {
   const { name, basePrompt, temperature, mode, isActive } = req.body
   
   let companyId = req.user?.companyId;
@@ -60,7 +60,7 @@ router.post('/', auth(), async (req, res) => {
   res.status(201).json(createSuccessResponse(created))
 })
 
-router.put('/:id', auth(), async (req, res) => {
+router.put('/:id', auth(), requireModule('conversas'), async (req, res) => {
   const id = Number(req.params.id)
   const { name, basePrompt, temperature, mode, isActive } = req.body
 
@@ -81,7 +81,7 @@ router.put('/:id', auth(), async (req, res) => {
   res.json(createSuccessResponse(updated))
 })
 
-router.delete('/:id', auth(), async (req, res) => {
+router.delete('/:id', auth(), requireModule('conversas'), async (req, res) => {
   const id = Number(req.params.id)
 
   let companyId = req.user?.companyId;
@@ -100,5 +100,4 @@ router.delete('/:id', auth(), async (req, res) => {
   await prisma.agenteIa.delete({ where: { id } })
   res.json(createSuccessResponse({ id }))
 })
-
 
