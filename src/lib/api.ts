@@ -892,6 +892,15 @@ export const whatsappUazapiApi = {
   disconnect: async () => apiRequest<any>('/whatsapp/uazapi/disconnect', { method: 'POST' }),
 }
 
+export const conversationsApi = {
+  list: async () => apiRequest<any[]>('/conversas?page=1&pageSize=100'),
+  getById: async (id: number) => apiRequest<any>(`/conversas/${id}`),
+  sendMessage: async (id: number, content: string) => apiRequest<any>(`/conversas/${id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  }),
+}
+
 // Configuração de Funis
 export const funnelConfigApi = {
   getAll: async () => apiRequest<Array<any>>('/funnel-config'),

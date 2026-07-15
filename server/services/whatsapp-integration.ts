@@ -1164,6 +1164,11 @@ export async function processIncomingMessage(opts: {
     },
   })
 
+  await prisma.conversa.update({
+    where: { id: conversa.id },
+    data: { updatedAt: new Date() },
+  })
+
   await prisma.leadActivity.create({
     data: {
       leadId: lead.id,
