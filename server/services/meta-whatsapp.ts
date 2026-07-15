@@ -82,6 +82,32 @@ async function graphGet<T = any>(path: string, accessToken: string, params: Reco
   return body
 }
 
+async function graphPost<T = any>(path: string, accessToken: string, body?: Record<string, unknown>): Promise<T> {
+  const url = new URL(path.startsWith('http') ? path : `${GRAPH_BASE_URL}${path}`)
+  url.searchParams.set('access_token', accessToken)
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || payload?.success === false) {
+    throw new Error(payload?.error?.message || `Meta Graph API HTTP ${response.status}`)
+  }
+  return payload
+}
+
+async function subscribeWhatsappApp(wabaId: string, accessToken: string) {
+  try {
+    await graphPost(`/${wabaId}/subscribed_apps`, accessToken)
+  } catch (error: any) {
+    throw new Error(
+      `Nao foi possivel habilitar o recebimento de mensagens na Meta: ${error.message || 'verifique as permissoes do token.'}`
+    )
+  }
+}
+
 async function exchangeCodeForToken(code: string) {
   const { appId, appSecret, redirectUri } = requireMetaEnv()
   const url = new URL(`${GRAPH_BASE_URL}/oauth/access_token`)
@@ -168,6 +194,7 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
   const payload = verifyMetaState(state)
   const accessToken = await exchangeCodeForToken(code)
   const account = await resolveMetaWhatsappAccount(accessToken)
+  await subscribeWhatsappApp(account.wabaId, accessToken)
 
   return prisma.empresa.update({
     where: { id: payload.companyId },
@@ -257,6 +284,13 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
   if (!accessToken && !current.metaToken) {
     throw new Error('Permanent Access Token e obrigatorio na primeira configuracao.')
   }
+
+  const effectiveAccessToken = accessToken || current.metaToken
+  if (!effectiveAccessToken) {
+    throw new Error('Permanent Access Token e obrigatorio para habilitar o recebimento de mensagens.')
+  }
+
+  await subscribeWhatsappApp(wabaId, effectiveAccessToken)
 
   const data: any = {
     whatsappProvider: 'meta',
