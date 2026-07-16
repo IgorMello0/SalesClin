@@ -95,7 +95,7 @@ export function BillingBanner() {
           {isBlocked && (
             <button
               type="button"
-              onClick={handleCheckout}
+              onClick={() => navigate('/select-plan')}
               disabled={isBusy}
               className="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-orange-700 disabled:opacity-60"
             >
