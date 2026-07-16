@@ -675,6 +675,8 @@ export async function createAbacateSubscriptionCheckout(
   const externalId = `sellclin-${companyId}-${subscription.id}`
 
   const payload = {
+    productId: abacateConfig.productId,
+    quantity: 1,
     items: [{ id: abacateConfig.productId, quantity: 1 }],
     externalId,
     returnUrl: `${appUrl}/dashboard?billing=return`,
@@ -868,6 +870,8 @@ export async function createPendingSignupCheckout(input: {
   const externalId = `sellclin-signup-${pending.id}-${Date.now()}`
 
   const payload = {
+    productId: abacateConfig.productId,
+    quantity: 1,
     items: [{ id: abacateConfig.productId, quantity: 1 }],
     externalId,
     returnUrl: `${appUrl}/login?signup=return`,
