@@ -620,6 +620,8 @@ export const authApi = {
     apiRequest<{ sent: boolean }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: async (token: string, password: string) =>
     apiRequest<{ reset: boolean }>('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  changePassword: async (currentPassword: string, newPassword: string) =>
+    apiRequest<{ updated: boolean }>('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
 }
 
 // Profissionais
@@ -948,6 +950,16 @@ export const funnelConfigApi = {
 }
 
 // Configuração de Status de Leads
+export const leadOriginsApi = {
+  getAll: async () => apiRequest<Array<any>>('/lead-origins'),
+  create: async (data: { label: string }) =>
+    apiRequest<any>('/lead-origins', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id: number, data: { label?: string }) =>
+    apiRequest<any>(`/lead-origins/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id: number) =>
+    apiRequest<any>(`/lead-origins/${id}`, { method: 'DELETE' }),
+}
+
 export const leadStatusesApi = {
   getAll: async () => apiRequest<Array<any>>('/lead-statuses'),
   create: async (data: { label: string; color: string }) =>

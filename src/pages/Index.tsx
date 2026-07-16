@@ -22,7 +22,11 @@ import {
   LineChart,
   Users,
   Activity,
-  Star
+  Star,
+  Send,
+  Filter,
+  FileSpreadsheet,
+  Radio
 } from 'lucide-react';
 import { SiteNavbar } from '@/components/SiteNavbar';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -353,6 +357,287 @@ const Index = () => {
                   Gerar Engenharia de Metas
                 </button>
               </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Gradient transition from Metas (#0F172A) to Campanhas (#0A0E1A) */}
+      <div className="h-32 sm:h-48 bg-gradient-to-b from-[#0F172A] to-[#0A0E1A] relative">
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-[#F97316]/5 blur-[100px] rounded-full" />
+      </div>
+
+      {/* 5.5. DISPAROS / CAMPANHAS — IMMERSIVE DARK SECTION */}
+      <section className="pb-32 sm:pb-40 pt-8 sm:pt-12 bg-[#0A0E1A] relative overflow-hidden">
+        {/* Animated gradient mesh background */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-[#F97316]/8 rounded-full blur-[150px] animate-pulse" style={{ animationDuration: '8s' }} />
+          <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-blue-600/6 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '12s' }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-purple-600/4 rounded-full blur-[180px]" />
+        </div>
+        {/* Grid overlay */}
+        <div className="absolute inset-0 z-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 relative z-10">
+          {/* Section Header — Centered */}
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3, margin: "-100px" }}
+            transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+            className="text-center mb-20 sm:mb-24"
+          >
+            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-2 mb-8 backdrop-blur-sm">
+              <Send size={12} className="text-[#F97316]" />
+              <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em]">Campanhas & Disparos</span>
+            </div>
+            <h2 className="text-4xl sm:text-5xl md:text-7xl font-headline font-black text-white mb-6 tracking-tighter leading-[1.05]">
+              Dispare para milhares.<br />
+              <span className="bg-gradient-to-r from-[#F97316] via-orange-400 to-amber-400 bg-clip-text text-transparent">Em segundos.</span>
+            </h2>
+            <p className="text-base sm:text-lg text-slate-400 font-medium leading-relaxed max-w-2xl mx-auto">
+              Envie campanhas personalizadas via WhatsApp para toda sua base. Segmente por funil, tags ou importe uma planilha — e acompanhe tudo ao vivo.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+            
+            {/* Left: Immersive Phone Mockup with floating chat bubbles */}
+            <motion.div 
+              initial={{ opacity: 0, y: 80, scale: 0.9 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true, amount: 0.2, margin: "-100px" }}
+              transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
+              className="lg:col-span-7 relative"
+            >
+              {/* Glow behind the card */}
+              <div className="absolute -inset-10 bg-gradient-to-tr from-[#F97316]/15 via-transparent to-blue-500/10 blur-[80px] rounded-full" />
+              
+              <div className="relative bg-white p-2 sm:p-3 rounded-[2rem] sm:rounded-[2.5rem] border border-[#F97316]/20 shadow-[0_0_40px_rgba(249,115,22,0.08)]">
+                <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border border-slate-100 shadow-sm">
+                  
+                  {/* Top Bar — Campaign Info */}
+                  <div className="px-5 sm:px-7 pt-5 sm:pt-7 pb-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#F97316] to-orange-600 flex items-center justify-center shadow-md shadow-orange-500/20 relative">
+                        <Send size={18} className="text-white" />
+                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-[#0F172A]">Promoção Julho</h4>
+                        <p className="text-[10px] text-slate-500 font-medium">WhatsApp • 1.247 contatos</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Ao Vivo</span>
+                    </div>
+                  </div>
+
+                  <div className="px-5 sm:px-7 pb-5 sm:pb-7 pt-4 space-y-5">
+                    {/* Audience Chips — Compact Pills */}
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2.5">Audiência selecionada</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: "Todos os Leads", active: true },
+                          { label: "Por Etapa", active: false },
+                          { label: "Por Tags", active: false },
+                          { label: "CSV", active: false },
+                        ].map((chip, i) => (
+                          <div key={i} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all cursor-pointer border ${
+                            chip.active 
+                              ? 'bg-[#F97316]/10 text-[#F97316] border-[#F97316]/30' 
+                              : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
+                          }`}>
+                            {chip.label}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* WhatsApp Chat Mockup - Light Theme */}
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2.5">Preview da mensagem</span>
+                      <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                        {/* WhatsApp Header Bar */}
+                        <div className="bg-[#008069] px-4 py-2.5 flex items-center gap-3">
+                          <svg className="w-4 h-4 text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+                          <div className="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center overflow-hidden">
+                            <span className="text-[10px] font-black text-slate-600">ML</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-[11px] font-bold text-white">Maria Lima</div>
+                            <div className="text-[9px] text-white/80">online</div>
+                          </div>
+                          <div className="flex items-center gap-3 text-white/90">
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
+                          </div>
+                        </div>
+                        
+                        {/* Chat Area with WhatsApp light wallpaper */}
+                        <div className="bg-[#EFEAE2] px-4 py-4 min-h-[140px] relative" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'200\' height=\'200\' viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M50 20c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zm100 0c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zm-50 50c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zm-80 30c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zm160 0c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zm-80 50c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3z\' fill=\'%23000000\' fill-opacity=\'0.03\'/%3E%3C/svg%3E")' }}>
+                          {/* Outgoing bubble */}
+                          <div className="flex justify-end mb-1">
+                            <div className="bg-[#D9FDD3] rounded-xl rounded-tr-sm px-3 py-2 max-w-[80%] shadow-sm relative">
+                              <p className="text-[12px] text-[#111B21] leading-[1.5]">
+                                Olá <span className="bg-white/60 text-[#F97316] px-1 py-0.5 rounded text-[10px] font-bold border border-[#F97316]/20">{'{{primeiro_nome}}'}</span>, tudo bem? 😊
+                              </p>
+                              <p className="text-[12px] text-[#111B21] leading-[1.5] mt-1">
+                                Estamos com <strong>condições especiais</strong> essa semana! 🔥
+                              </p>
+                              <p className="text-[12px] text-[#111B21] leading-[1.5] mt-1">
+                                Agende sua avaliação gratuita 📅
+                              </p>
+                              <div className="flex items-center justify-end gap-1 mt-0.5">
+                                <span className="text-[9px] text-[#667781]">14:32</span>
+                                <svg className="w-4 h-3 text-[#53BDEB]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.071.653a.457.457 0 00-.304-.102.493.493 0 00-.381.178l-6.19 7.636-2.405-2.272a.463.463 0 00-.336-.136.475.475 0 00-.343.153.499.499 0 00.009.697l2.746 2.594a.467.467 0 00.678-.034L11.2 1.4a.503.503 0 00-.129-.747z"/><path d="M14.757.653a.457.457 0 00-.305-.102.493.493 0 00-.38.178l-6.19 7.636-1.167-1.102a.183.183 0 00-.254.003.162.162 0 00.003.232l1.505 1.422a.467.467 0 00.679-.034L14.886 1.4a.503.503 0 00-.129-.747z"/></svg>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress Section */}
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Progresso do envio</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500 font-medium">1.198 / 1.247</span>
+                          <span className="text-[11px] font-black text-[#F97316] bg-[#F97316]/10 px-2 py-0.5 rounded-full">96%</span>
+                        </div>
+                      </div>
+                      <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-[#F97316] via-orange-400 to-amber-400 rounded-full relative" style={{ width: '96%' }}>
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent" style={{ backgroundSize: '200% 100%', animation: 'shimmer 2s linear infinite' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { label: "Contatos", val: "1.247", color: "text-blue-600", bg: "bg-blue-50", iconPath: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2M9 7a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
+                        { label: "Enviadas", val: "1.198", color: "text-emerald-600", bg: "bg-emerald-50", iconPath: "M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3" },
+                        { label: "Entregues", val: "1.180", color: "text-cyan-600", bg: "bg-cyan-50", iconPath: "M22 12h-4l-3 9L9 3l-3 9H2" },
+                        { label: "Taxa", val: "96%", color: "text-[#F97316]", bg: "bg-orange-50", iconPath: "M13 17l5-5-5-5M6 17l5-5-5-5" },
+                      ].map((s, i) => (
+                        <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all group">
+                          <div className={`w-6 h-6 rounded-lg ${s.bg} flex items-center justify-center mx-auto mb-2`}>
+                            <svg className={`w-3.5 h-3.5 ${s.color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d={s.iconPath}/></svg>
+                          </div>
+                          <div className="text-base sm:text-lg font-black text-[#0F172A] tabular-nums">{s.val}</div>
+                          <div className="text-[7px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating notification badges */}
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.8, duration: 0.8 }}
+                className="absolute -right-4 sm:-right-8 top-16 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-xl shadow-emerald-500/30 flex items-center gap-2"
+              >
+                <CheckCircle2 size={16} />
+                <div>
+                  <div className="text-[10px] font-black">+47 entregas</div>
+                  <div className="text-[8px] text-emerald-200">agora mesmo</div>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 1.2, duration: 0.8 }}
+                className="absolute -left-4 sm:-left-8 bottom-24 bg-gradient-to-r from-[#F97316] to-orange-500 text-white px-4 py-2.5 rounded-2xl rounded-bl-sm shadow-xl shadow-orange-500/30 flex items-center gap-2"
+              >
+                <MessageCircle size={16} />
+                <div>
+                  <div className="text-[10px] font-black">12 respostas</div>
+                  <div className="text-[8px] text-orange-200">nos últimos 5min</div>
+                </div>
+              </motion.div>
+            </motion.div>
+
+            {/* Right: Features */}
+            <motion.div 
+              initial={{ opacity: 0, y: 60 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3, margin: "-100px" }}
+              transition={{ duration: 1.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="lg:col-span-5"
+            >
+              <div className="space-y-6 sm:space-y-8">
+                {[
+                  { 
+                    icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+                    t: "Disparo em Massa via WhatsApp", 
+                    d: "Envie mensagens personalizadas para milhares de contatos em poucos cliques. O sistema gerencia a fila e garante entrega.",
+                    color: "from-emerald-500 to-emerald-600"
+                  },
+                  { 
+                    icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>,
+                    t: "Variáveis Dinâmicas", 
+                    d: "Use {{nome}}, {{data}}, {{especialista}} e mais. Cada mensagem é única e personalizada automaticamente.",
+                    color: "from-[#F97316] to-orange-600"
+                  },
+                  { 
+                    icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+                    t: "Segmentação Inteligente", 
+                    d: "Filtre por leads, clientes, etapa do funil ou tags. Envie a mensagem certa para a pessoa certa.",
+                    color: "from-blue-500 to-blue-600"
+                  },
+                  { 
+                    icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+                    t: "Importação por Planilha", 
+                    d: "Importe até 5.000 contatos via CSV com nome, telefone e dados customizados. Dispare para públicos externos.",
+                    color: "from-purple-500 to-purple-600"
+                  },
+                  { 
+                    icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+                    t: "Métricas em Tempo Real", 
+                    d: "Acompanhe envios, entregas e taxa de sucesso ao vivo enquanto a campanha roda.",
+                    color: "from-cyan-500 to-cyan-600"
+                  }
+                ].map((item, i) => (
+                  <motion.div 
+                    key={i}
+                    initial={{ opacity: 0, x: 30 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.1 * i, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex gap-4 group cursor-default"
+                  >
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white shadow-lg shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+                      {item.icon}
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-white mb-1 group-hover:text-[#F97316] transition-colors">{item.t}</div>
+                      <div className="text-xs text-slate-500 font-medium leading-relaxed">{item.d}</div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.6, duration: 0.8 }}
+                className="mt-12"
+              >
+                <Link to="/signup" className="inline-flex items-center gap-3 bg-gradient-to-r from-[#F97316] to-orange-500 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-orange-500/25 hover:scale-105 hover:shadow-orange-500/40 transition-all duration-300 group">
+                  Criar Minha Primeira Campanha <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </motion.div>
             </motion.div>
           </div>
         </div>

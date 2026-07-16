@@ -28,10 +28,17 @@ router.get('/', auth(false), async (req, res) => {
     const where: any = { companyId: companyId };
 
     if (search) {
+      const searchStr = String(search);
+      const numericSearch = searchStr.replace(/\D/g, '');
+      
       where.OR = [
-        { name: { contains: String(search), mode: 'insensitive' } },
-        { phone: { contains: String(search), mode: 'insensitive' } }
+        { name: { contains: searchStr, mode: 'insensitive' } },
+        { phone: { contains: searchStr, mode: 'insensitive' } }
       ]
+      
+      if (numericSearch.length > 0) {
+        where.OR.push({ phone: { contains: numericSearch } });
+      }
     }
     if (status) {
       where.status = status
@@ -90,10 +97,14 @@ router.get('/:id', auth(false), async (req, res) => {
 // Criar novo lead
 router.post('/', auth(), async (req, res) => {
   try {
-    const { name, value, origin, status, avatar, phone, email, notes, responsible, tags } = req.body
+    let { name, value, origin, status, avatar, phone, email, notes, responsible, tags } = req.body
     
     if (!name) {
       return res.status(400).json(createErrorResponse('O nome é obrigatório', 400))
+    }
+
+    if (phone) {
+      phone = String(phone).replace(/\D/g, '');
     }
 
     let professionalId: number;
@@ -386,6 +397,9 @@ router.put('/:id', auth(), async (req, res) => {
     if (data.professional_id) {
       prismaData.professionalId = Number(data.professional_id)
       delete prismaData.professional_id
+    }
+    if (prismaData.phone) {
+      prismaData.phone = String(prismaData.phone).replace(/\D/g, '');
     }
     if (data.is_scheduled !== undefined) {
       prismaData.isScheduled = Boolean(data.is_scheduled)

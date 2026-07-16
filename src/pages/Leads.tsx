@@ -20,6 +20,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -87,6 +97,8 @@ const Leads = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchDebounce, setSearchDebounce] = useState('');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState<number | null>(null);
 
   // Proposal State
   const [leadProposals, setLeadProposals] = useState<any[]>([]);
@@ -138,11 +150,26 @@ const Leads = () => {
     }
   };
 
+  const [origins, setOrigins] = useState<any[]>([]);
+
   useEffect(() => {
     loadLeads();
     loadServices();
     loadFunnelConfigs();
+    loadOrigins();
   }, [professional]);
+
+  const loadOrigins = async () => {
+    try {
+      const { leadOriginsApi } = await import('@/lib/api');
+      const res = await leadOriginsApi.getAll();
+      if (res.success && res.data) {
+        setOrigins(res.data);
+      }
+    } catch (e) {
+      console.error("Error loading origins:", e);
+    }
+  };
 
   const allAvailableStages = useMemo(() => {
     const stagesList: {id: string, label: string}[] = [];
@@ -209,9 +236,7 @@ const Leads = () => {
   };
 
   useEffect(() => {
-    if (!isLoading) {
-      loadLeads();
-    }
+    loadLeads();
   }, [searchQuery]);
 
   const handleOpenProposals = async (lead: Lead) => {
@@ -316,10 +341,15 @@ const Leads = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja remover este lead?')) return;
+  const confirmDelete = (id: number) => {
+    setLeadToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!leadToDelete) return;
     try {
-      const response = await leadsApi.delete(id);
+      const response = await leadsApi.delete(leadToDelete);
       if (response.success) {
         toast({
           title: "Lead removido",
@@ -333,6 +363,9 @@ const Leads = () => {
         description: "Erro ao remover lead",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setLeadToDelete(null);
     }
   };
 
@@ -451,12 +484,21 @@ const Leads = () => {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Origem</Label>
-                      <Input
-                        value={formData.origin}
-                        onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                        placeholder="Ex: Instagram, Google..."
-                        className="h-11 rounded-xl bg-muted border-border"
-                      />
+                      <Select 
+                        value={formData.origin} 
+                        onValueChange={(val) => setFormData({ ...formData, origin: val })}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
+                          <SelectValue placeholder="Selecione a origem">
+                            {origins.find(opt => opt.value === formData.origin)?.label || formData.origin}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
+                          {origins.map(opt => (
+                            <SelectItem key={opt.id} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     
                     <div className="space-y-2">
@@ -722,11 +764,11 @@ const Leads = () => {
                         >
                           <span className="material-symbols-outlined text-[18px]">edit</span>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(lead.id)}
-                          className="h-9 w-9 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          onClick={() => confirmDelete(lead.id)}
                         >
                           <span className="material-symbols-outlined text-[18px]">delete</span>
                         </Button>
@@ -753,7 +795,14 @@ const Leads = () => {
         lead={selectedDetailsLead}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
-        onUpdate={() => fetchLeads()}
+        onUpdate={(updatedLead) => {
+          if (updatedLead) {
+            setLeads(prev => prev.map(l => 
+              l.id === updatedLead.id ? { ...l, ...updatedLead } : l
+            ));
+          }
+          fetchLeads();
+        }}
         funnels={funnelList}
         allStages={editStages}
       />
@@ -815,6 +864,31 @@ const Leads = () => {
           phone: "(11) 99999-9999"
         }}
       />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-3xl border-0 shadow-2xl max-w-[400px]">
+          <AlertDialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4 mx-auto">
+              <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
+            </div>
+            <AlertDialogTitle className="text-center font-headline text-xl">Remover Lead</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-slate-500">
+              Tem certeza que deseja remover este lead permanentemente? Esta ação não poderá ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center flex-row gap-3 mt-4">
+            <AlertDialogCancel className="w-full sm:w-auto h-11 px-6 rounded-xl font-bold border-slate-200 hover:bg-slate-50 mt-0">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={executeDelete}
+              className="w-full sm:w-auto h-11 px-6 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white"
+            >
+              Sim, Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

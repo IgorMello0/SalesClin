@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Edit2, Check, X, History, FileText, CheckSquare, Trash2, Calendar, Eye, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -33,6 +43,22 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   const [tempOrigin, setTempOrigin] = useState("");
   const [isEditingValue, setIsEditingValue] = useState(false);
   const [tempValue, setTempValue] = useState(0);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const handleDeleteLead = async () => {
+    if (!selectedLead?.id) return;
+    try {
+      const response = await leadsApi.delete(selectedLead.id);
+      if (response.success) {
+        toast({ title: "Lead removido", description: "O lead foi removido com sucesso." });
+        setIsDeleteDialogOpen(false);
+        onClose();
+        if (onUpdate) onUpdate();
+      }
+    } catch (error) {
+      toast({ title: "Erro", description: "Erro ao remover lead", variant: "destructive" });
+    }
+  };
 
   const [activeDetailsTab, setActiveDetailsTab] = useState('activities');
   const [noteText, setNoteText] = useState("");
@@ -52,8 +78,15 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   const [newTaskPriority, setNewTaskPriority] = useState("media");
   const [newTaskDate, setNewTaskDate] = useState("");
   const [isSavingTask, setIsSavingTask] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState("");
+  const [editTaskDescription, setEditTaskDescription] = useState("");
+  const [editTaskPriority, setEditTaskPriority] = useState("media");
+  const [editTaskDate, setEditTaskDate] = useState("");
+  const [taskToDeleteId, setTaskToDeleteId] = useState<number | null>(null);
 
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
+  const [viewingProposal, setViewingProposal] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
 
   useEffect(() => {
@@ -70,6 +103,23 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
     loadServices();
   }, [professional]);
 
+  const [origins, setOrigins] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadOrigins = async () => {
+      try {
+        const { leadOriginsApi } = await import('@/lib/api');
+        const res = await leadOriginsApi.getAll();
+        if (res.success && res.data) {
+          setOrigins(res.data);
+        }
+      } catch (e) {
+        console.error("Error loading origins:", e);
+      }
+    };
+    loadOrigins();
+  }, []);
+
   
   useEffect(() => {
     if (lead) {
@@ -79,20 +129,31 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
       setTempEmail(lead.email || "");
       setTempOrigin(lead.origin || "");
       setTempValue(lead.value || 0);
-      setStageValue(lead.status || "");
+      setStageValue(String(lead.status || ""));
       
       // Auto-detect funnel based on the lead's status
-      const funnel = funnels.find(f => f.stages?.some(s => (s.id || s.code) === lead.status));
+      const funnel = funnels.find(f => f.stages?.some(s => String(s.code || s.id) === String(lead.status)));
       if (funnel) {
-        setSelectedFunnelForEdit(funnel.code || funnel.id);
+        setSelectedFunnelForEdit(String(funnel.code || funnel.id));
       }
       
       setLeadProposals(lead.proposals || []);
-      setLeadTasks(lead.tasks || []);
+      
+      const loadTasks = async () => {
+        try {
+          const res = await tasksApi.getAll({ leadId: Number(lead.id) });
+          if (res.success) {
+            setLeadTasks(res.data || []);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar tarefas do lead:", error);
+        }
+      };
+      loadTasks();
     }
   }, [lead, funnels]);
 
-  const editStages = funnels?.find(f => (f.code || f.id) === selectedFunnelForEdit)?.stages || [];
+  const editStages = funnels?.find(f => String(f.code || f.id) === selectedFunnelForEdit)?.stages || [];
 
   const handleUpdate = (field, value) => {
     setSelectedLead(prev => ({ ...prev, [field]: value }));
@@ -208,10 +269,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   };
 
   const handleViewProposal = (proposal) => {
-    // Or we could have a parent handler: onOpenProposalViewer(proposal)
-    // For now, we will just pass it out to the parent or ignore if not available in modal
-    // It seems there's a ProposalViewer? No, let's just log or notify for now.
-    toast({ title: "Visualização de proposta indisponível aqui." });
+    setViewingProposal(proposal);
   };
 
   const handleSaveTask = async () => {
@@ -224,19 +282,80 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
         priority: newTaskPriority,
         dueDate: newTaskDate ? new Date(newTaskDate).toISOString() : undefined,
         leadId: Number(selectedLead.id),
-        professionalId: Number(professional?.id)
+        assignedToId: Number(professional?.id),
+        assigneeType: professional?.type === 'usuario' ? 'user' : 'profissional'
       });
       if (res.success) {
         toast({ title: "Tarefa adicionada!" });
         setNewTaskTitle("");
         setNewTaskDescription("");
         setNewTaskDate("");
+        
+        // Add the task locally so it appears immediately without needing a full modal reload
+        setLeadTasks(prev => [...prev, res.data]);
+        
         onUpdate();
       }
     } catch(e) {
       toast({ title: "Erro ao salvar tarefa", variant: "destructive" });
     } finally {
       setIsSavingTask(false);
+    }
+  };
+
+  const handleToggleTaskStatus = async (task: any) => {
+    try {
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      const res = await tasksApi.update(Number(task.id), { status: newStatus });
+      if (res.success) {
+        setLeadTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+        toast({ title: newStatus === 'completed' ? "Tarefa concluída!" : "Tarefa reaberta!" });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar tarefa", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!taskToDeleteId) return;
+    try {
+      const res = await tasksApi.delete(taskToDeleteId);
+      if (res.success) {
+        setLeadTasks(prev => prev.filter(t => t.id !== taskToDeleteId));
+        toast({ title: "Tarefa excluída!" });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao excluir tarefa", variant: "destructive" });
+    } finally {
+      setTaskToDeleteId(null);
+    }
+  };
+
+  const handleStartEditTask = (task: any) => {
+    setEditingTaskId(task.id);
+    setEditTaskTitle(task.title || "");
+    setEditTaskDescription(task.description || "");
+    setEditTaskPriority(task.priority || "media");
+    setEditTaskDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : "");
+  };
+
+  const handleSaveEditTask = async () => {
+    if (!editingTaskId || !editTaskTitle) return;
+    try {
+      const payload = {
+        title: editTaskTitle,
+        description: editTaskDescription,
+        priority: editTaskPriority,
+        dueDate: editTaskDate ? new Date(editTaskDate).toISOString() : undefined,
+      };
+      const res = await tasksApi.update(Number(editingTaskId), payload);
+      if (res.success) {
+        setLeadTasks(prev => prev.map(t => t.id === editingTaskId ? { ...t, ...payload } : t));
+        setEditingTaskId(null);
+        toast({ title: "Tarefa atualizada!" });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar tarefa", variant: "destructive" });
     }
   };
 
@@ -274,7 +393,17 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
             <>
               {/* Left Sidebar */}
               <div className="w-full lg:w-[400px] shrink-0 h-auto lg:h-full overflow-y-auto custom-scrollbar bg-white lg:border-r border-b lg:border-b-0 border-slate-100 flex flex-col p-6 sm:p-8 z-20 relative">
-                <div className="flex flex-col gap-6 items-center w-full">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="absolute top-4 left-4 text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors h-10 w-10 rounded-full"
+                  title="Apagar Lead"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+                
+                <div className="flex flex-col gap-6 items-center w-full mt-4">
                   <div className="w-24 h-24 rounded-[1.75rem] bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-4xl font-extrabold text-white shadow-xl shadow-primary/20 ring-4 ring-slate-50 shrink-0">
                     {selectedLead.avatar}
                   </div>
@@ -345,12 +474,12 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             >
                               <SelectTrigger className="h-7 py-0 px-2 text-xs font-semibold border-slate-200 focus:ring-secondary/20 bg-white w-[130px] rounded-lg">
                                 <SelectValue placeholder="Selecione o Funil">
-                                  {funnels.find(f => (f.code || f.id) === selectedFunnelForEdit)?.label}
+                                  {funnels.find(f => String(f.code || f.id) === selectedFunnelForEdit)?.label}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent className="z-[300]">
                                 {funnels.map((f: any) => (
-                                  <SelectItem key={f.code || f.id} value={f.code || f.id} className="text-xs rounded-lg pl-8">
+                                  <SelectItem key={String(f.code || f.id)} value={String(f.code || f.id)} className="text-xs rounded-lg pl-8">
                                     {f.label}
                                   </SelectItem>
                                 ))}
@@ -360,26 +489,37 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             <Select
                               value={stageValue}
                               onValueChange={async (newStatus) => {
+                                const statusStr = String(newStatus);
+                                let apiSuccess = false;
                                 try {
-                                  const res = await leadsApi.update(Number(selectedLead.id), { status: newStatus });
+                                  const res = await leadsApi.update(Number(selectedLead.id), { status: statusStr });
                                   if (res.success) {
-                                    toast({ title: "Estágio do lead atualizado!" });
-                                    setSelectedLead({ ...selectedLead, status: newStatus });
-                                    loadLeads();
+                                    apiSuccess = true;
+                                  } else {
+                                    toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
                                   }
                                 } catch (e) {
+                                  console.error("[LeadDetailsModal] Erro na API ao atualizar estágio:", e);
                                   toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
+                                }
+                                
+                                if (apiSuccess) {
+                                  toast({ title: "Estágio do lead atualizado!" });
+                                  setStageValue(statusStr);
+                                  const updatedLead = { ...selectedLead, status: statusStr };
+                                  setSelectedLead(updatedLead);
+                                  try { onUpdate(updatedLead); } catch(err) { console.error("[LeadDetailsModal] Erro no onUpdate:", err); }
                                 }
                               }}
                             >
                               <SelectTrigger className="h-7 py-0 px-2 text-xs font-bold border-secondary focus:ring-secondary/20 bg-white min-w-[130px] max-w-[200px] rounded-lg">
                                 <SelectValue placeholder="Selecione a Etapa">
-                                  {editStages.find(s => (s.id || s.code) === stageValue)?.label || "Selecione a Etapa"}
+                                  {editStages.find(s => String(s.code || s.id) === stageValue)?.label || "Selecione a Etapa"}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent className="z-[300]">
                                 {editStages.map((s: any) => (
-                                  <SelectItem key={s.id || s.code} value={s.id || s.code} className="text-xs rounded-lg pl-8">
+                                  <SelectItem key={String(s.code || s.id)} value={String(s.code || s.id)} className="text-xs rounded-lg pl-8">
                                     {s.label}
                                   </SelectItem>
                                 ))}
@@ -500,12 +640,12 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                               <SelectTrigger className="h-8 py-0 px-2 text-xs font-bold border-secondary focus:ring-secondary/20 w-44 bg-white">
                                 <SelectValue placeholder="Selecione o canal" />
                               </SelectTrigger>
-                              <SelectContent>
-                                {ORIGIN_OPTIONS.map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
+                              <SelectContent className="z-[9999]">
+                                <div className="max-h-[300px] overflow-y-auto">
+                                  {origins.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                  ))}
+                                </div>
                               </SelectContent>
                             </Select>
                             <button onClick={handleUpdateOrigin} className="text-emerald-500 hover:text-emerald-600 transition-colors">
@@ -525,7 +665,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                               }}
                               title={selectedLead.origin}
                             >
-                              {ORIGIN_OPTIONS.find(o => o.value === selectedLead.origin)?.label || selectedLead.origin || "Não informada"}
+                              {origins.find(o => o.value === selectedLead.origin)?.label || selectedLead.origin || "Não informada"}
                             </p>
                             <button 
                               onClick={() => {
@@ -547,6 +687,32 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                     </div>
                   </div>
                 </div>
+
+                {/* AlertDialog for deleting lead */}
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                  <AlertDialogContent className="rounded-3xl border-0 shadow-2xl max-w-[400px]">
+                    <AlertDialogHeader>
+                      <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4 mx-auto">
+                        <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
+                      </div>
+                      <AlertDialogTitle className="text-center font-headline text-xl">Remover Lead</AlertDialogTitle>
+                      <AlertDialogDescription className="text-center text-slate-500">
+                        Tem certeza que deseja remover este lead permanentemente? Esta ação não poderá ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="sm:justify-center flex-row gap-3 mt-4">
+                      <AlertDialogCancel className="w-full sm:w-auto h-11 px-6 rounded-xl font-bold border-slate-200 hover:bg-slate-50 mt-0">
+                        Cancelar
+                      </AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDeleteLead}
+                        className="w-full sm:w-auto h-11 px-6 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white"
+                      >
+                        Sim, Remover
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
 
                 {/* Right Side: Main Area (Tabs + Timeline) */}
@@ -867,32 +1033,85 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             ) : (
                               <div className="grid grid-cols-1 gap-3">
                                 {leadTasks.map(task => (
-                                  <div key={task.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-start gap-3 shadow-sm hover:border-secondary/20 transition-colors">
-                                    <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${task.status === 'completed' ? 'bg-secondary border-secondary text-white' : 'border-slate-300'}`}>
-                                      {task.status === 'completed' && <Check className="w-3 h-3" />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className={`text-sm font-bold ${task.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</p>
-                                      {task.description && (
-                                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{task.description}</p>
-                                      )}
-                                      <div className="flex flex-wrap items-center gap-3 mt-3">
-                                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${
-                                            task.priority === 'urgent' ? 'bg-red-500' :
-                                            task.priority === 'high' ? 'bg-orange-500' :
-                                            task.priority === 'medium' ? 'bg-blue-500' : 'bg-slate-400'
-                                          }`}></span>
-                                          {getPriorityLabel(task.priority)}
+                                  <div key={task.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col gap-3 shadow-sm hover:border-secondary/20 transition-colors group">
+                                    {editingTaskId === task.id ? (
+                                      <div className="space-y-3 w-full">
+                                        <Input 
+                                          value={editTaskTitle}
+                                          onChange={(e) => setEditTaskTitle(e.target.value)}
+                                          className="h-9 text-xs rounded-lg"
+                                          placeholder="Título"
+                                        />
+                                        <Textarea 
+                                          value={editTaskDescription}
+                                          onChange={(e) => setEditTaskDescription(e.target.value)}
+                                          className="text-xs rounded-lg min-h-[50px]"
+                                          placeholder="Descrição"
+                                        />
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <Select value={editTaskPriority} onValueChange={(val: any) => setEditTaskPriority(val)}>
+                                            <SelectTrigger className="h-9 text-xs rounded-lg">
+                                              <SelectValue>{getPriorityLabel(editTaskPriority)}</SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="low">Baixa</SelectItem>
+                                              <SelectItem value="medium">Média</SelectItem>
+                                              <SelectItem value="high">Alta</SelectItem>
+                                              <SelectItem value="urgent">Urgente</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <Input 
+                                            type="datetime-local" 
+                                            value={editTaskDate}
+                                            onChange={(e) => setEditTaskDate(e.target.value)}
+                                            className="h-9 text-xs rounded-lg font-headline"
+                                          />
                                         </div>
-                                        {task.dueDate && (
-                                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">
-                                            <Calendar className="w-3 h-3" />
-                                            {safeFormatDate(task.dueDate)}
-                                          </div>
-                                        )}
+                                        <div className="flex gap-2 justify-end">
+                                          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setEditingTaskId(null)}>Cancelar</Button>
+                                          <Button size="sm" className="h-8 text-xs bg-secondary hover:bg-secondary/90" onClick={handleSaveEditTask}>Salvar</Button>
+                                        </div>
                                       </div>
-                                    </div>
+                                    ) : (
+                                      <div className="flex items-start gap-3 w-full">
+                                        <div 
+                                          onClick={() => handleToggleTaskStatus(task)}
+                                          className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${task.status === 'completed' ? 'bg-secondary border-secondary text-white' : 'border-slate-300 hover:border-secondary/50'}`}
+                                        >
+                                          {task.status === 'completed' && <Check className="w-3.5 h-3.5" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className={`text-sm font-bold ${task.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</p>
+                                          {task.description && (
+                                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{task.description}</p>
+                                          )}
+                                          <div className="flex flex-wrap items-center gap-3 mt-3">
+                                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">
+                                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                                task.priority === 'urgent' ? 'bg-red-500' :
+                                                task.priority === 'high' ? 'bg-orange-500' :
+                                                task.priority === 'medium' ? 'bg-blue-500' : 'bg-slate-400'
+                                              }`}></span>
+                                              {getPriorityLabel(task.priority)}
+                                            </div>
+                                            {task.dueDate && (
+                                              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">
+                                                <Calendar className="w-3 h-3" />
+                                                {safeFormatDate(task.dueDate)}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-secondary hover:bg-secondary/10" onClick={() => handleStartEditTask(task)}>
+                                            <Edit2 className="w-4 h-4" />
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => setTaskToDeleteId(task.id)}>
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -907,6 +1126,33 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!taskToDeleteId} onOpenChange={() => setTaskToDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A tarefa será permanentemente removida do lead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTask} className="bg-red-500 hover:bg-red-600">
+              Sim, excluir tarefa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Visualizador de Propostas */}
+      {viewingProposal && (
+        <ProposalViewer
+          open={!!viewingProposal}
+          onOpenChange={(open) => !open && setViewingProposal(null)}
+          proposal={viewingProposal}
+          lead={selectedLead}
+        />
+      )}
 
       {/* Proposal Dialog */}
       <ProposalDialog 

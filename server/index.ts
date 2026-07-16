@@ -78,12 +78,14 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/tasks', tasksRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/auth', authRouter)
+import { leadOriginsRouter } from './routes/lead-origins.js'
+
 app.use('/api/billing', billingRouter)
 app.use('/api/google-calendar', googleCalendarRouter)
 app.use('/api/whatsapp/meta', whatsappMetaRouter)
 app.use('/api/whatsapp/uazapi', whatsappUazapiRouter)
 app.use('/api/lead-statuses', leadStatusesRouter)
-
+app.use('/api/lead-origins', leadOriginsRouter)
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
 
@@ -99,9 +101,9 @@ const port = process.env.PORT || 4000
 async function startServer() {
   await bootstrapSystemDefaults(prisma)
 
-  app.listen(port, () => {
+  app.listen(Number(port), '0.0.0.0', () => {
     // eslint-disable-next-line no-console
-    console.log(`[server] listening on http://localhost:${port}`)
+    console.log(`[server] listening on http://0.0.0.0:${port}`)
   })
 }
 // No Vercel (serverless), o app é exportado sem listen.

@@ -13,6 +13,7 @@ import {
   sendPasswordResetEmail,
   sendVerificationEmail,
 } from '../services/email-verification.js'
+import { auth } from '../middleware/auth.js'
 
 export const router = Router()
 

@@ -25,7 +25,12 @@ import {
   LayoutDashboard,
   DollarSign,
   Layers,
-  Share2
+  Share2,
+  Receipt,
+  Tag,
+  Percent,
+  Rocket,
+  Handshake
 } from 'lucide-react';
 
 interface MockAppointment {
@@ -290,7 +295,7 @@ export const InteractiveAppBrowser = () => {
                       { label: "Total de Leads", val: 187, icon: <User size={16} />, bg: "bg-blue-50 text-blue-600 border-blue-100" },
                       { label: "Avaliação Agendada", val: 112, icon: <Calendar size={16} />, bg: "bg-orange-50 text-[#F97316] border-orange-100" },
                       { label: "Avaliação Comparecida", val: 67, icon: <CheckCircle2 size={16} />, bg: "bg-blue-50 text-blue-600 border-blue-100" },
-                      { label: "Propostas/Vendas", val: 30, icon: <Award size={16} />, bg: "bg-orange-50 text-[#F97316] border-orange-100" },
+                      { label: "Propostas Geradas", val: 30, icon: <Rocket size={16} />, bg: "bg-blue-50 text-blue-600 border-blue-100" },
                     ].map((card, i) => (
                       <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
                         <div className="flex items-center justify-between mb-2">
@@ -302,20 +307,22 @@ export const InteractiveAppBrowser = () => {
                     ))}
                   </div>
 
-                  {/* Financial Stats Grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Secondary Stats Grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                     {[
-                      { label: "Faturamento Total", val: "R$ 150.000", icon: <DollarSign size={16} />, bg: "bg-emerald-50 text-emerald-600 border-emerald-100" },
-                      { label: "Ticket (Orçado)", val: "R$ 5.000", icon: <Sliders size={16} />, bg: "bg-slate-50 text-slate-600 border-slate-200/60" },
-                      { label: "Ticket (Fechado)", val: "R$ 4.500", icon: <Check size={16} />, bg: "bg-slate-50 text-slate-600 border-slate-200/60" },
-                      { label: "Conversão de Leads", val: "16.0%", icon: <Activity size={16} />, bg: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+                      { label: "Faturamento Real.", val: "R$ 150k", icon: <Handshake size={14} />, bg: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+                      { label: "Ticket (Orçado)", val: "R$ 5k", icon: <Sliders size={14} />, bg: "bg-slate-50 text-slate-600 border-slate-200/60" },
+                      { label: "Ticket (Fechado)", val: "R$ 4.5k", icon: <Check size={14} />, bg: "bg-slate-50 text-slate-600 border-slate-200/60" },
+                      { label: "Parc. Médio Boleto", val: "4.5x", icon: <Receipt size={14} />, bg: "bg-blue-50 text-blue-600 border-blue-100" },
+                      { label: "Desc. Concedido", val: "R$ 2.5k", icon: <Tag size={14} />, bg: "bg-red-50 text-red-500 border-red-100" },
+                      { label: "Conversão (Qtd.)", val: "16%", icon: <Percent size={14} />, bg: "bg-blue-50 text-blue-600 border-blue-100" },
                     ].map((card, i) => (
-                      <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                      <div key={i} className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{card.label}</span>
-                          <div className={`p-1.5 rounded-lg border ${card.bg}`}>{card.icon}</div>
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider truncate mr-1">{card.label}</span>
+                          <div className={`p-1 rounded-lg border ${card.bg}`}>{card.icon}</div>
                         </div>
-                        <div className="text-xl font-black text-slate-800">{card.val}</div>
+                        <div className="text-lg font-black text-slate-800">{card.val}</div>
                       </div>
                     ))}
                   </div>

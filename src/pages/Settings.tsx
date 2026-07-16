@@ -30,7 +30,9 @@ import { useToast } from '@/hooks/use-toast';
 import InfoNegocioView from './settings/InfoNegocioView';
 import FunnelsSettingsView from './settings/FunnelsSettingsView';
 import LeadStatusesSettingsView from './settings/LeadStatusesSettingsView';
+import LeadOriginsSettingsView from './settings/LeadOriginsSettingsView';
 import { BillingSettingsView } from './settings/BillingSettingsView';
+import { SecuritySettingsView } from './settings/SecuritySettingsView';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, modulesApi, billingApi, type BillingStatus, type BillingUsage } from '@/lib/api';
@@ -147,24 +149,16 @@ const ServicosView = () => {
               </div>
               <div className="space-y-1 sm:col-span-2">
                 <Label className="text-xs">Duração Média (minutos)</Label>
-                <Input 
-                  type="number" 
-                  value={newService.durationMinutes} 
-                  onChange={e => setNewService({...newService, durationMinutes: e.target.value})} 
-                  placeholder="Ex: 45" 
-                  className="h-8 text-sm" 
-                  min="5"
-                />
+                <Input value={newService.durationMinutes} onChange={e => setNewService({...newService, durationMinutes: e.target.value})} className="h-8 text-sm" type="number" />
               </div>
             </div>
-            <Button size="sm" className="w-full mt-2" onClick={handleSave}>Salvar Serviço</Button>
+            <div className="flex justify-end pt-2">
+              <Button size="sm" onClick={handleSave}>Salvar Serviço</Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {loading ? (
-        <div className="text-sm text-muted-foreground text-center py-4">Carregando serviços...</div>
-      ) : (
         <div className="space-y-3">
           {services.map((s, i) => (
             <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50 hover:border-primary/30 transition-colors">
@@ -186,7 +180,6 @@ const ServicosView = () => {
             </div>
           )}
         </div>
-      )}
     </div>
   );
 };
@@ -1894,33 +1887,6 @@ const ClinicasView = () => {
   );
 };
 
-const AparenciaView = () => {
-  return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="p-4 bg-orange-500/10 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 rounded-2xl text-sm border border-orange-200/50 dark:border-orange-800/50 flex items-start gap-3 shadow-sm">
-        <Monitor className="w-5 h-5 flex-shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" />
-        <div className="leading-relaxed">
-          <strong className="block mb-0.5 text-orange-900 dark:text-orange-100 font-bold">Interface do CRM</strong>
-          O SellClin agora usa menu lateral como navegacao padrao para manter o sistema mais consistente.
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-white">
-            <span className="material-symbols-outlined text-[20px]">dock_to_left</span>
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Menu lateral ativo</h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              A opcao de alternar para menu superior foi removida por enquanto. O menu lateral continua podendo ser recolhido para ganhar espaco.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 
 // Map of components per setting
@@ -1953,7 +1919,7 @@ const EspecialistasView = () => <EquipeView isSpecialistMode={true} />;
 
 const ViewsMap: Record<string, React.FC<any>> = {
   profile: ProfileSettingsView,
-  security: () => <PlaceholderSettingsView title="Seguranca" description="A troca de senha e controles de acesso ficam concentrados aqui em uma proxima etapa." icon="lock" />,
+  security: SecuritySettingsView,
   notifications: () => <PlaceholderSettingsView title="Notificacoes" description="Preferencias de alertas, lembretes e avisos serao organizadas nesta area." icon="notifications" />,
   services: ServicosView,
   team: EquipeView,
@@ -1961,9 +1927,9 @@ const ViewsMap: Record<string, React.FC<any>> = {
   roles: CargosView,
   clinics: ClinicasView,
   business: InfoNegocioView,
-  appearance: AparenciaView,
   funnels: FunnelsSettingsView,
   lead_statuses: LeadStatusesSettingsView,
+  lead_origins: LeadOriginsSettingsView,
   billing: BillingSettingsView,
 };
 
@@ -2004,12 +1970,7 @@ const Settings = () => {
       items: [
         { key: 'funnels', name: 'Funis de Vendas', description: 'Pipelines e etapas do comercial', icon: 'view_kanban', ownerOnly: true },
         { key: 'lead_statuses', name: 'Status', description: 'Status rápidos dos negócios', icon: 'label', ownerOnly: true },
-      ],
-    },
-    {
-      title: 'Sistema',
-      items: [
-        { key: 'appearance', name: 'Interface', description: 'Menu lateral e experiencia visual', icon: 'palette' },
+        { key: 'lead_origins', name: 'Origens', description: 'Fontes de captação de leads', icon: 'share', ownerOnly: true },
       ],
     },
   ];

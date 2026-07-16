@@ -242,7 +242,8 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
         priority: newTaskPriority,
         dueDate: newTaskDate || new Date().toISOString(),
         leadId: selectedLead.id,
-        assignedToId: professional?.id
+        assignedToId: Number(professional?.id),
+        assigneeType: professional?.type === 'usuario' ? 'user' : 'profissional'
       };
       const res = await tasksApi.create(payload);
       if (res.success) {

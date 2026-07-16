@@ -18,6 +18,11 @@ const produtoLinks = [
     label: 'Engenharia de Metas',
     desc: 'Cálculo reverso para previsibilidade de lucro.',
   },
+  {
+    to: '/funcionalidades/campanhas',
+    label: 'Campanhas & Disparos',
+    desc: 'Envios em massa via WhatsApp.',
+  },
 ];
 
 export const SiteNavbar = () => {
@@ -28,7 +33,7 @@ export const SiteNavbar = () => {
   const location = useLocation();
 
   // Páginas com fundo escuro no hero — logo e links ficam brancos no topo
-  const darkHeroPages = ['/funcionalidades/funil', '/funcionalidades/metas'];
+  const darkHeroPages = ['/funcionalidades/funil', '/funcionalidades/metas', '/funcionalidades/campanhas'];
   const isDarkHero = darkHeroPages.includes(location.pathname);
 
   useEffect(() => {

@@ -293,7 +293,8 @@ const SalesFunnel = () => {
   }, [leads]);
 
   const getOriginLabel = (origin: string) => {
-    return ORIGIN_OPTIONS.find(o => o.value === origin.toLowerCase())?.label || origin;
+    if (!origin) return origin;
+    return origins.find(o => o.value === origin.toLowerCase())?.label || origin;
   };
 
   const getStageLabel = (status: string) => {
@@ -531,12 +532,27 @@ const SalesFunnel = () => {
     }
   };
 
+  const [origins, setOrigins] = useState<any[]>([]);
+
+  const loadOrigins = async () => {
+    try {
+      const { leadOriginsApi } = await import('@/lib/api');
+      const res = await leadOriginsApi.getAll();
+      if (res.success && res.data) {
+        setOrigins(res.data);
+      }
+    } catch (e) {
+      console.error("Error loading origins:", e);
+    }
+  };
+
   useEffect(() => {
     if (professional?.id) {
       loadLeads();
       loadServices();
       loadFunnelConfigs();
       loadStatuses();
+      loadOrigins();
     }
   }, [professional, activeFunnel]);
 
@@ -1308,7 +1324,7 @@ const SalesFunnel = () => {
                           <span className="truncate font-bold">Todos</span>
                           {filterOrigin === 'todos' && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
                         </button>
-                        {ORIGIN_OPTIONS
+                        {origins
                           .filter(opt => opt.label.toLowerCase().includes(filterSearchQuery.toLowerCase()))
                           .map((opt) => (
                             <button
@@ -1612,11 +1628,11 @@ const SalesFunnel = () => {
                 <Select value={newLeadData.origin} onValueChange={(val) => setNewLeadData({...newLeadData, origin: val})}>
                   <SelectTrigger id="origin" className="rounded-xl border-slate-200 h-12 bg-white">
                     <SelectValue placeholder="Selecione...">
-                      {ORIGIN_OPTIONS.find(opt => opt.value === newLeadData.origin)?.label}
+                      {origins.find(opt => opt.value === newLeadData.origin)?.label}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
-                    {ORIGIN_OPTIONS.map(opt => (
+                    {origins.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1737,8 +1753,14 @@ const SalesFunnel = () => {
         onUpdate={(updatedLead) => {
           if (updatedLead) {
              setSelectedLead(updatedLead);
+             // Atualizar localmente para refletir imediatamente no kanban
+             setLeads(prev => prev.map(l => 
+               l.id === String(updatedLead.id) || l.id === updatedLead.id 
+                 ? { ...l, ...updatedLead, id: String(updatedLead.id) } 
+                 : l
+             ));
           }
-          loadLeads(); // Reload leads to reflect new state
+          loadLeads(); // Reload leads to sync with server
         }}
         funnels={funnelList}
         allStages={editStages}

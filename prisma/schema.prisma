@@ -105,6 +105,23 @@ model LeadStatus {
   @@map("lead_statuses")
 }
 
+model LeadOriginConfig {
+  id        Int      @id @default(autoincrement())
+  companyId Int      @map("company_id")
+  value     String
+  label     String
+  order     Int      @default(0)
+  isDefault Boolean  @default(false) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Empresa @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, value])
+  @@map("lead_origins")
+}
+
 model Lead {
   id                   Int            @id @default(autoincrement())
   professionalId       Int            @map("professional_id")
@@ -410,6 +427,7 @@ model Empresa {
   clients                  Client[]
   leads                    Lead[]
   leadStatuses             LeadStatus[]
+  leadOrigins              LeadOriginConfig[]
   appointments             Appointment[]
   payments                 Payment[]
   funnelConfigs            FunnelConfig[]

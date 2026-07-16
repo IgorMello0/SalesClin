@@ -13,6 +13,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,6 +44,7 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
   const [data, setData] = useState<any>(null);
   const [tempStatus, setTempStatus] = useState<string>('');
   const [tempNotes, setTempNotes] = useState<string>('');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -57,6 +68,26 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
       onClose();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!appointmentId) return;
+    setSaving(true);
+    try {
+      const response = await appointmentsApi.delete(appointmentId);
+      if (response.success) {
+        toast({ title: 'Agendamento apagado com sucesso.' });
+        setIsDeleteDialogOpen(false);
+        onUpdate();
+        onClose();
+      } else {
+        toast({ title: 'Erro ao apagar', description: response.error?.message, variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Erro ao apagar', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -294,6 +325,15 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
               Fechar
             </Button>
             
+            <Button
+              onClick={() => setIsDeleteDialogOpen(true)}
+              variant="ghost"
+              disabled={saving}
+              className="h-9 px-3 text-[11px] font-bold text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg"
+            >
+              Apagar
+            </Button>
+
             <Button 
               onClick={() => {
                 setTempStatus('cancelado');
@@ -318,36 +358,57 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
               </Button>
             ) : (
               <Button 
-                onClick={() => { onClose(); navigate('/clients'); }}
+                onClick={() => { onClose(); navigate('/patients'); }}
                 variant="outline"
                 className="flex-1 h-9 rounded-lg font-bold border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-2 text-[11px] shadow-sm"
               >
                 <span className="material-symbols-outlined text-[14px] mr-1">person</span>
-                Paciente
+                No Paciente
               </Button>
             )}
           </div>
-
           <Button 
-            onClick={handleSave}
-            disabled={saving || loading}
-            className="w-full bg-primary hover:bg-primary/90 text-white rounded-lg font-bold h-10 text-[13px] shadow-sm"
+            onClick={handleSave} 
+            disabled={saving} 
+            className="w-full h-10 rounded-lg font-bold shadow-md shadow-primary/20 gap-2 bg-[#111827] hover:bg-[#1f2937]"
           >
             {saving ? (
-              <span className="flex items-center gap-1.5">
-                <span className="animate-spin material-symbols-outlined text-[16px]">progress_activity</span>
-                Salvando...
-              </span>
+              <span className="material-symbols-outlined animate-spin text-[18px]">refresh</span>
             ) : (
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px]">save</span>
-                Salvar Alterações
-              </span>
+              <span className="material-symbols-outlined text-[18px]">save</span>
             )}
+            Salvar Alterações
           </Button>
         </div>
-
       </DialogContent>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="sm:max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mb-3">
+              <span className="material-symbols-outlined text-red-500 text-[24px]">delete</span>
+            </div>
+            <AlertDialogTitle className="text-center text-xl font-bold text-slate-800">
+              Apagar Agendamento
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-slate-500 mt-2">
+              Você está prestes a excluir este agendamento permanentemente. Esta ação não poderá ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-3 mt-4 sm:justify-center w-full">
+            <AlertDialogCancel className="flex-1 mt-0 bg-white border-slate-200 hover:bg-slate-50 text-slate-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white border-0"
+            >
+              {saving ? <span className="material-symbols-outlined animate-spin text-[18px] mr-2">refresh</span> : null}
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

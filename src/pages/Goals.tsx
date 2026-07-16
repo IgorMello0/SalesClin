@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useAuth } from '@/contexts/AuthContext';
-import { goalsApi } from '@/lib/api';
+import { goalsApi, dashboardApi } from '@/lib/api';
 import { useSectionTour } from '@/hooks/useSectionTour';
 import { TourPopover } from '@/components/onboarding/TourPopover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ const Goals = () => {
 
   const [results, setResults] = useState({ sales: 0, showups: 0, appointments: 0, leads: 0 });
   const [savedPlans, setSavedPlans] = useState<any[]>([]);
+  const [actualMetrics, setActualMetrics] = useState({ sales: 0, revenue: 0 });
   const { toast } = useToast();
   const { professional } = useAuth();
   
@@ -43,6 +44,20 @@ const Goals = () => {
     const leadsNeeded = schedulingRate > 0 ? Math.ceil(appointmentsNeeded / (schedulingRate / 100)) : 0;
     setResults({ sales: salesNeeded, showups: showupsNeeded, appointments: appointmentsNeeded, leads: leadsNeeded });
   }, [revenueTarget, avgTicket, schedulingRate, showupRate, closingRate]);
+
+  useEffect(() => {
+    const fetchActuals = async () => {
+      try {
+        const res = await dashboardApi.getMetrics('this_month');
+        if (res.success && res.data) {
+          setActualMetrics({ sales: res.data.contratos || 0, revenue: res.data.faturamentoFechado || 0 });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar métricas reais:', error);
+      }
+    };
+    fetchActuals();
+  }, []);
 
   useEffect(() => {
     fetchPlans();
@@ -380,6 +395,74 @@ const Goals = () => {
                 ))
               )}
             </div>
+          </div>
+
+          {/* Tracking Real vs Projetado */}
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">monitoring</span>
+              <h3 className="text-base font-bold text-primary">Termômetro do Mês (Real vs Projetado)</h3>
+            </div>
+            
+            <Card className="p-6 border-slate-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* Vendas Progresso */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">Vendas Fechadas</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-extrabold text-primary">{actualMetrics.sales}</span>
+                        <span className="text-xs font-semibold text-slate-400">/ {results.sales} vendas da meta</span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">
+                      {results.sales > 0 ? Math.min(100, Math.round((actualMetrics.sales / results.sales) * 100)) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-secondary transition-all duration-1000"
+                      style={{ width: `${results.sales > 0 ? Math.min(100, (actualMetrics.sales / results.sales) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {results.sales > actualMetrics.sales 
+                      ? `Faltam ${results.sales - actualMetrics.sales} vendas para atingir o plano projetado.`
+                      : 'Meta de vendas atingida! 🎉'}
+                  </p>
+                </div>
+
+                {/* Faturamento Progresso */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">Faturamento Realizado</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-extrabold text-emerald-600">{formatCurrency(actualMetrics.revenue)}</span>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-400">/ {formatCurrency(revenueTarget)} da meta</p>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+                      {revenueTarget > 0 ? Math.min(100, Math.round((actualMetrics.revenue / revenueTarget) * 100)) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 transition-all duration-1000"
+                      style={{ width: `${revenueTarget > 0 ? Math.min(100, (actualMetrics.revenue / revenueTarget) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {revenueTarget > actualMetrics.revenue 
+                      ? `Falta ${formatCurrency(revenueTarget - actualMetrics.revenue)} para bater a meta.`
+                      : 'Meta financeira batida! 🎉'}
+                  </p>
+                </div>
+
+              </div>
+            </Card>
           </div>
 
         </div>

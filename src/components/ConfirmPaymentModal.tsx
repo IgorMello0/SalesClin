@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { leadsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Trash2, Plus } from 'lucide-react';
+import { Loader2, Trash2, Plus, Minus } from 'lucide-react';
 import { format, addMonths } from 'date-fns';
 
 interface Proposal {
@@ -59,9 +59,11 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
       const res = await leadsApi.getProposals(Number(leadId));
       if (res.success && res.data) {
         setProposals(res.data);
-        const pending = res.data.filter((p: Proposal) => p.status === 'pending');
-        if (pending.length === 1) {
-          setSelectedProposalId(pending[0].id.toString());
+        const validProposals = res.data.filter((p: Proposal) => p.status !== 'rejected' && p.status !== 'lost');
+        if (validProposals.length === 1) {
+          setSelectedProposalId(validProposals[0].id.toString());
+        } else if (res.data.length === 1) {
+          setSelectedProposalId(res.data[0].id.toString());
         }
       }
     } catch (e) {
@@ -144,6 +146,26 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
   const handleInstallmentChange = (index: number, field: string, value: any) => {
     const updated = [...installments];
     updated[index] = { ...updated[index], [field]: value };
+    
+    // Cascading date changes
+    if (field === 'date') {
+      const changedInstallment = updated[index];
+      const dateParts = String(value).split('-');
+      if (dateParts.length === 3) {
+        const newDay = dateParts[2];
+        for (let i = index + 1; i < updated.length; i++) {
+          if (updated[i].blockId === changedInstallment.blockId && updated[i].method === 'transferencia') {
+            const currentParts = updated[i].date?.split('-');
+            if (currentParts && currentParts.length === 3) {
+              // Note: date-fns addMonths handles month overflow, but we just want to update the day of the month here
+              // However, if a month doesn't have that day (e.g. Feb 30), it will render an invalid date in native input, but browser corrects it or rejects.
+              updated[i] = { ...updated[i], date: `${currentParts[0]}-${currentParts[1]}-${newDay}` };
+            }
+          }
+        }
+      }
+    }
+
     setInstallments(updated);
   };
 
@@ -261,7 +283,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhuma proposta (usar valor do lead)</SelectItem>
-                    {proposals.filter(p => p.status === 'pending').map(p => (
+                    {proposals.filter(p => p.status !== 'rejected' && p.status !== 'lost').map(p => (
                       <SelectItem key={p.id} value={p.id.toString()}>
                         <div className="flex items-center gap-2">
                           <span className={`inline-block w-2 h-2 rounded-full bg-orange-400`} />
@@ -330,6 +352,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                         <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200">
                           <SelectValue>
                             {block.method === 'cartao' ? 'Cartão de Crédito' : 
+                             block.method === 'debito' ? 'Cartão de Débito' : 
                              block.method === 'pix' ? 'PIX' : 
                              block.method === 'dinheiro' ? 'Dinheiro' : 
                              block.method === 'transferencia' ? 'Boleto' : block.method}
@@ -337,6 +360,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="cartao">Cartão de Crédito</SelectItem>
+                          <SelectItem value="debito">Cartão de Débito</SelectItem>
                           <SelectItem value="pix">PIX</SelectItem>
                           <SelectItem value="dinheiro">Dinheiro</SelectItem>
                           <SelectItem value="transferencia">Boleto</SelectItem>
@@ -346,20 +370,39 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
 
                     {(block.method === 'cartao' || block.method === 'transferencia') && (
                       <div className="sm:col-span-3 space-y-1.5">
-                        <Label className="text-[10px] uppercase text-slate-500 font-bold">Parcelas</Label>
-                        <Select 
-                          value={block.installmentsCount.toString()} 
-                          onValueChange={(val) => handleBlockChange(block.id, 'installmentsCount', Number(val))}
-                        >
-                          <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200">
-                            <SelectValue>{block.installmentsCount}x</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
-                              <SelectItem key={n} value={n.toString()}>{n}x</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label className="text-[10px] uppercase text-slate-500 font-bold flex items-center justify-between gap-1 w-full">
+                          <span>Parcelas</span>
+                          <span className="lowercase font-bold text-[9px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                            {block.method === 'transferencia' ? 36 : 12}x
+                          </span>
+                        </Label>
+                        <div className="relative">
+                          <input 
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={block.installmentsCount || ''}
+                            onChange={(e) => {
+                              if (e.target.value === '') {
+                                // Allow clearing the input temporarily
+                                handleBlockChange(block.id, 'installmentsCount', '');
+                                return;
+                              }
+                              let val = parseInt(e.target.value.replace(/\D/g, ''));
+                              if (isNaN(val)) val = 1;
+                              const max = block.method === 'transferencia' ? 36 : 12;
+                              if (val > max) val = max;
+                              handleBlockChange(block.id, 'installmentsCount', val);
+                            }}
+                            onBlur={(e) => {
+                              if (!block.installmentsCount || block.installmentsCount < 1) {
+                                handleBlockChange(block.id, 'installmentsCount', 1);
+                              }
+                            }}
+                            className="w-full h-10 rounded-xl bg-slate-50 border border-slate-200 text-center font-bold text-slate-700 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none pr-4"
+                          />
+                          <span className="text-slate-400 font-bold text-xs absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">x</span>
+                        </div>
                       </div>
                     )}
 
@@ -407,7 +450,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                     
                     <div className="flex-1 w-full flex items-center gap-2">
                        <div className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded w-16 text-center shrink-0">
-                          {inst.method === 'cartao' ? cartaoText : inst.method === 'transferencia' ? 'BOLETO' : inst.method.toUpperCase()}
+                          {inst.method === 'cartao' ? cartaoText : inst.method === 'debito' ? 'DÉBITO' : inst.method === 'transferencia' ? 'BOLETO' : inst.method.toUpperCase()}
                        </div>
                       {inst.method === 'transferencia' ? (
                         <Input 

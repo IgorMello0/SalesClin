@@ -42,6 +42,7 @@ import MetasPage from "./pages/MetasPage";
 import PrecosPage from "./pages/PrecosPage";
 import ClientesPage from "./pages/ClientesPage";
 import SobrePage from "./pages/SobrePage";
+import CampanhasPage from "./pages/CampanhasPage";
 import Campaigns from "./pages/Campaigns";
 import LegalPage from "./pages/LegalPage";
 
@@ -70,6 +71,7 @@ const App = () => (
                 <Route path="/funcionalidades/funil" element={<FunilPage />} />
                 <Route path="/funcionalidades/agenda" element={<AgendaPage />} />
                 <Route path="/funcionalidades/metas" element={<MetasPage />} />
+                <Route path="/funcionalidades/campanhas" element={<CampanhasPage />} />
                 <Route path="/precos" element={<PrecosPage />} />
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/sobre" element={<SobrePage />} />

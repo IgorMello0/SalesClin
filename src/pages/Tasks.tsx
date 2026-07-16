@@ -12,6 +12,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -107,6 +117,7 @@ export default function Tasks() {
   // Tasks & Filtering State
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [taskToDeleteId, setTaskToDeleteId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isTeamMode, setIsTeamMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -348,10 +359,10 @@ export default function Tasks() {
   };
 
   // Delete a Task
-  const handleDeleteTask = async (id: number) => {
-    if (!confirm('Tem certeza que deseja remover esta tarefa?')) return;
+  const handleDeleteTask = async () => {
+    if (!taskToDeleteId) return;
     try {
-      const res = await tasksApi.delete(id);
+      const res = await tasksApi.delete(taskToDeleteId);
       if (res.success) {
         toast({
           title: 'Tarefa removida',
@@ -368,9 +379,11 @@ export default function Tasks() {
     } catch (err) {
       toast({
         title: 'Erro',
-        description: 'Erro de processamento.',
+        description: 'Erro de conexão ao excluir a tarefa.',
         variant: 'destructive',
       });
+    } finally {
+      setTaskToDeleteId(null);
     }
   };
 
@@ -599,7 +612,7 @@ export default function Tasks() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteTask(task.id)}
+                      onClick={() => setTaskToDeleteId(task.id)}
                       className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg cursor-pointer"
                       title="Remover"
                     >
@@ -1071,7 +1084,7 @@ export default function Tasks() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteTask(task.id)}
+                            onClick={() => setTaskToDeleteId(task.id)}
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg cursor-pointer"
                             title="Excluir"
                           >
@@ -1318,6 +1331,23 @@ export default function Tasks() {
 
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!taskToDeleteId} onOpenChange={() => setTaskToDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja remover esta tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A tarefa será permanentemente removida.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTask} className="bg-red-500 hover:bg-red-600">
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
