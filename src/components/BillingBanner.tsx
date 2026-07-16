@@ -84,14 +84,6 @@ export function BillingBanner() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/select-plan')}
-            className="rounded-md border border-orange-200 bg-white px-3 py-1.5 text-xs font-bold text-orange-900 transition hover:bg-orange-100"
-          >
-            Ver plano
-          </button>
-
           {isBlocked && (
             <button
               type="button"
