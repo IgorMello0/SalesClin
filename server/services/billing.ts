@@ -672,7 +672,7 @@ export async function createAbacateSubscriptionCheckout(
 
   const subscription = company.subscription || await ensureCompanySubscription(prisma, companyId, planCode)
   const appUrl = getPublicAppUrl()
-  const externalId = `sellclin-${companyId}-${subscription.id}`
+  const externalId = `sellclin-${companyId}-${subscription.id}-${planCode}-${billingCycle}-${Date.now()}`
 
   const payload = {
     productId: abacateConfig.productId,
