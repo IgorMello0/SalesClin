@@ -1,12 +1,20 @@
 import jwt from 'jsonwebtoken'
 import { prisma } from '../prisma.js'
+import {
+  clearMetaConnection,
+  getWhatsAppConnection,
+  isCoexistenceEnabled,
+  upsertMetaConnection,
+  type WhatsAppOfficialMode,
+} from './whatsapp-connections.js'
 
-const GRAPH_VERSION = 'v19.0'
+const GRAPH_VERSION = String(process.env.META_GRAPH_VERSION || 'v19.0').replace(/^v?/, 'v')
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`
 
 type MetaStatePayload = {
   companyId: number
   userId?: number | null
+  officialMode: WhatsAppOfficialMode
 }
 
 type ManualMetaWhatsappInput = {
@@ -44,13 +52,28 @@ function getJwtSecret() {
   return secret
 }
 
-function requireMetaEnv() {
+function requireMetaCredentials() {
   const appId = process.env.META_APP_ID
   const appSecret = process.env.META_APP_SECRET
-  const configId = process.env.META_WHATSAPP_CONFIG_ID
 
-  if (!appId || !appSecret || !configId) {
-    throw new Error('Meta WhatsApp nao configurado. Defina META_APP_ID, META_APP_SECRET e META_WHATSAPP_CONFIG_ID.')
+  if (!appId || !appSecret) {
+    throw new Error('Meta WhatsApp nao configurado. Defina META_APP_ID e META_APP_SECRET.')
+  }
+
+  return { appId, appSecret }
+}
+
+function requireMetaEnv(officialMode: WhatsAppOfficialMode = 'cloud_api') {
+  const { appId, appSecret } = requireMetaCredentials()
+  const configId = officialMode === 'coexistence'
+    ? process.env.META_WHATSAPP_COEXISTENCE_CONFIG_ID
+    : process.env.META_WHATSAPP_CONFIG_ID
+
+  if (!configId) {
+    const variable = officialMode === 'coexistence'
+      ? 'META_WHATSAPP_COEXISTENCE_CONFIG_ID'
+      : 'META_WHATSAPP_CONFIG_ID'
+    throw new Error(`Meta WhatsApp nao configurado para este modo. Defina ${variable}.`)
   }
 
   return { appId, appSecret, configId, redirectUri: getRedirectUri() }
@@ -109,7 +132,8 @@ async function subscribeWhatsappApp(wabaId: string, accessToken: string) {
 }
 
 async function exchangeCodeForToken(code: string) {
-  const { appId, appSecret, redirectUri } = requireMetaEnv()
+  const { appId, appSecret } = requireMetaCredentials()
+  const redirectUri = getRedirectUri()
   const url = new URL(`${GRAPH_BASE_URL}/oauth/access_token`)
   url.searchParams.set('client_id', appId)
   url.searchParams.set('client_secret', appSecret)
@@ -126,7 +150,7 @@ async function exchangeCodeForToken(code: string) {
 }
 
 async function tryExchangeLongLivedToken(accessToken: string) {
-  const { appId, appSecret } = requireMetaEnv()
+  const { appId, appSecret } = requireMetaCredentials()
   const url = new URL(`${GRAPH_BASE_URL}/oauth/access_token`)
   url.searchParams.set('grant_type', 'fb_exchange_token')
   url.searchParams.set('client_id', appId)
@@ -173,9 +197,17 @@ async function resolveMetaWhatsappAccount(accessToken: string) {
   throw new Error('Nenhum numero de WhatsApp Business foi retornado pela Meta para esta autorizacao.')
 }
 
-export function buildMetaConnectUrl(companyId: number, userId?: number | null) {
-  const { appId, configId, redirectUri } = requireMetaEnv()
-  const state = jwt.sign({ companyId, userId } satisfies MetaStatePayload, getJwtSecret(), { expiresIn: '20m' })
+export function buildMetaConnectUrl(
+  companyId: number,
+  userId?: number | null,
+  officialMode: WhatsAppOfficialMode = 'cloud_api',
+) {
+  const { appId, configId, redirectUri } = requireMetaEnv(officialMode)
+  const state = jwt.sign(
+    { companyId, userId, officialMode } satisfies MetaStatePayload,
+    getJwtSecret(),
+    { expiresIn: '20m' },
+  )
   const url = new URL(`https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`)
   url.searchParams.set('client_id', appId)
   url.searchParams.set('redirect_uri', redirectUri)
@@ -187,7 +219,12 @@ export function buildMetaConnectUrl(companyId: number, userId?: number | null) {
 }
 
 export function verifyMetaState(state: string): MetaStatePayload {
-  return jwt.verify(state, getJwtSecret()) as MetaStatePayload
+  const payload = jwt.verify(state, getJwtSecret()) as Partial<MetaStatePayload> & Pick<MetaStatePayload, 'companyId'>
+  return {
+    companyId: payload.companyId,
+    userId: payload.userId,
+    officialMode: payload.officialMode === 'coexistence' ? 'coexistence' : 'cloud_api',
+  }
 }
 
 export async function connectMetaWhatsappFromCode(code: string, state: string) {
@@ -196,7 +233,7 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
   const account = await resolveMetaWhatsappAccount(accessToken)
   await subscribeWhatsappApp(account.wabaId, accessToken)
 
-  return prisma.empresa.update({
+  const updated = await prisma.empresa.update({
     where: { id: payload.companyId },
     data: {
       whatsappProvider: 'meta',
@@ -219,9 +256,25 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
       metaConnectionStatus: true,
     },
   })
+
+  await upsertMetaConnection({
+    companyId: payload.companyId,
+    officialMode: payload.officialMode,
+    status: 'connected',
+    phoneNumberId: account.phoneNumberId,
+    wabaId: account.wabaId,
+    businessId: account.businessId,
+    displayPhoneNumber: account.displayPhoneNumber,
+    accessToken,
+    connectedAt: updated.metaConnectedAt,
+    metadata: { onboarding: 'embedded_signup' },
+  })
+
+  return { ...updated, officialMode: payload.officialMode }
 }
 
 export async function getMetaWhatsappStatus(companyId: number) {
+  const connection = await getWhatsAppConnection(companyId)
   const company = await prisma.empresa.findUnique({
     where: { id: companyId },
     select: {
@@ -261,6 +314,10 @@ export async function getMetaWhatsappStatus(companyId: number) {
     hasTwoStepPin: Boolean(company.metaTwoStepPin),
     webhookUrl: buildMetaWebhookUrl(company.webhookToken),
     connectedAt: company.metaConnectedAt,
+    officialMode: connection?.provider === 'meta' ? (connection.officialMode || 'cloud_api') : 'cloud_api',
+    coexistenceEnabled: isCoexistenceEnabled(),
+    coexistenceConfigured: Boolean(process.env.META_WHATSAPP_COEXISTENCE_CONFIG_ID),
+    graphVersion: GRAPH_VERSION,
   }
 }
 
@@ -325,6 +382,20 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
     },
   })
 
+  await upsertMetaConnection({
+    companyId,
+    officialMode: 'cloud_api',
+    status: 'connected',
+    phoneNumberId,
+    wabaId,
+    businessId: cleanOptional(input.businessId),
+    displayPhoneNumber: cleanOptional(input.displayPhoneNumber),
+    accessToken: effectiveAccessToken,
+    webhookVerifyToken,
+    connectedAt: updated.metaConnectedAt,
+    metadata: { onboarding: 'manual' },
+  })
+
   return {
     ...updated,
     webhookUrl: buildMetaWebhookUrl(updated.webhookToken),
@@ -333,7 +404,7 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
 }
 
 export async function disconnectMetaWhatsapp(companyId: number) {
-  return prisma.empresa.update({
+  const updated = await prisma.empresa.update({
     where: { id: companyId },
     data: {
       whatsappProvider: 'meta',
@@ -349,4 +420,7 @@ export async function disconnectMetaWhatsapp(companyId: number) {
     },
     select: { id: true, whatsappProvider: true, metaConnectionStatus: true },
   })
+
+  await clearMetaConnection(companyId)
+  return updated
 }

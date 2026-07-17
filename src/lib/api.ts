@@ -887,16 +887,24 @@ export const googleCalendarApi = {
 
 export const whatsappMetaApi = {
   status: async () => apiRequest<any>('/whatsapp/meta/status'),
-  connect: async () => apiRequest<{ url: string }>('/whatsapp/meta/connect'),
+  connect: async (mode: 'cloud_api' | 'coexistence' = 'cloud_api') =>
+    apiRequest<{ url: string }>(`/whatsapp/meta/connect?mode=${mode}`),
   configure: async (data: {
     phoneNumberId: string
     wabaId: string
+    businessId?: string
     accessToken?: string
     webhookVerifyToken: string
     twoStepPin?: string
     displayPhoneNumber?: string
   }) => apiRequest<any>('/whatsapp/meta/configure', { method: 'POST', body: JSON.stringify(data) }),
   disconnect: async () => apiRequest<any>('/whatsapp/meta/disconnect', { method: 'POST' }),
+}
+
+export const whatsappTemplatesApi = {
+  list: async (status?: string) =>
+    apiRequest<any[]>(`/whatsapp/templates${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  sync: async () => apiRequest<any[]>('/whatsapp/templates/sync', { method: 'POST' }),
 }
 
 export const whatsappUazapiApi = {
@@ -916,6 +924,8 @@ export const conversationsApi = {
     method: 'POST',
     body: JSON.stringify({ content, mediaUrl: media?.url, mediaType: media?.type }),
   }),
+  sendTemplate: async (id: number, data: { templateId: number; parameterValues?: string[]; headerMediaUrl?: string }) =>
+    apiRequest<any>(`/conversas/${id}/templates`, { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: { agentId?: number | null }) => apiRequest<any>(`/conversas/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -1059,6 +1069,7 @@ export const campaignsApi = {
     maxDelay?: number
     randomize?: boolean
     variations?: string[] | null
+    templateId?: number | null
   }) =>
     apiRequest<any>('/campaigns', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: number, data: any) =>

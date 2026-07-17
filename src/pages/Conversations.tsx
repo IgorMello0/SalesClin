@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { aiAgentsApi, campaignsApi, conversationsApi } from '@/lib/api';
+import { aiAgentsApi, campaignsApi, conversationsApi, whatsappTemplatesApi } from '@/lib/api';
+import type { WhatsAppTemplate } from '@/components/whatsapp/TemplateCatalog';
 
 type Message = {
   id: number;
@@ -21,6 +22,8 @@ type Message = {
   origin?: string | null;
   rawJson?: { mediaUrl?: string; mediaType?: 'image' | 'video' | 'audio' } | null;
   createdAt: string;
+  deliveryStatus?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null;
+  errorMessage?: string | null;
 };
 
 type Conversation = {
@@ -79,6 +82,11 @@ const Conversations = () => {
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [showAgentDialog, setShowAgentDialog] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateParameters, setTemplateParameters] = useState<string[]>([]);
+  const [sendingTemplate, setSendingTemplate] = useState(false);
   const [creatingAgent, setCreatingAgent] = useState(false);
   const [agentName, setAgentName] = useState('');
   const [agentPrompt, setAgentPrompt] = useState('');
@@ -117,6 +125,9 @@ const Conversations = () => {
     void loadConversations();
     void aiAgentsApi.list().then((response) => {
       if (response.success) setAgents((response.data || []).filter((agent: AiAgent) => agent.isActive));
+    });
+    void whatsappTemplatesApi.list('APPROVED').then((response) => {
+      if (response.success) setTemplates(response.data || []);
     });
     const refreshTimer = window.setInterval(() => void loadConversations(true), 5000);
     const clockTimer = window.setInterval(() => setClock(Date.now()), 1000);
@@ -255,6 +266,42 @@ const Conversations = () => {
   const windowRemaining = getWindowRemaining(selected);
   const officialWindowClosed = windowRemaining !== null && windowRemaining <= 0;
 
+  const selectedTemplate = templates.find((template) => String(template.id) === selectedTemplateId);
+  const templateParameterCount = useMemo(() => {
+    if (!selectedTemplate) return 0;
+    return (selectedTemplate.components || []).reduce((total, component) => {
+      if (String(component.type || '').toUpperCase() !== 'BODY') return total;
+      return total + (String(component.text || '').match(/\{\{[^}]+\}\}/g) || []).length;
+    }, 0);
+  }, [selectedTemplate]);
+
+  useEffect(() => {
+    setTemplateParameters((current) => Array.from({ length: templateParameterCount }, (_, index) => current[index] || ''));
+  }, [templateParameterCount]);
+
+  const sendTemplate = async () => {
+    if (!selected || !selectedTemplate || sendingTemplate) return;
+    if (templateParameters.some((value) => !value.trim())) {
+      toast({ title: 'Preencha as variaveis', description: 'Todas as variaveis do template precisam de um valor.', variant: 'destructive' });
+      return;
+    }
+    setSendingTemplate(true);
+    try {
+      const response = await conversationsApi.sendTemplate(selected.id, {
+        templateId: selectedTemplate.id,
+        parameterValues: templateParameters,
+      });
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel enviar o template.');
+      setShowTemplateDialog(false);
+      await loadConversations(true);
+      toast({ title: 'Template enviado', description: 'A conversa foi reaberta pela API Oficial.' });
+    } catch (error: any) {
+      toast({ title: 'Template nao enviado', description: error.message, variant: 'destructive' });
+    } finally {
+      setSendingTemplate(false);
+    }
+  };
+
   return (
     <div className="flex h-screen flex-col bg-white">
       <header className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
@@ -300,7 +347,7 @@ const Conversations = () => {
               <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-xs font-black text-white">{initials(contactName(selected))}</div><div><p className="text-sm font-black text-slate-950">{contactName(selected)}</p><p className="flex items-center gap-1 text-xs text-slate-500"><Phone className="h-3 w-3" />{contactPhone(selected)}</p></div></div>
               <div className="flex items-center gap-2">
                 {selected.serviceWindow?.isOfficial && <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${!officialWindowClosed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}><Clock3 className="h-3.5 w-3.5" />{formatWindowRemaining(windowRemaining || 0)}</span>}
-                <Select value={selected.agentId ? String(selected.agentId) : 'manual'} onValueChange={assignAgent} disabled={assigningAgent}><SelectTrigger className="h-9 w-[190px] bg-white text-xs font-bold"><div className="flex items-center gap-1.5">{selected.agentId ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}<SelectValue /></div></SelectTrigger><SelectContent><SelectItem value="manual">Atendimento manual</SelectItem>{agents.map((agent) => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}<SelectItem value="new"><span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" />Novo agente</span></SelectItem></SelectContent></Select>
+                <Select value={selected.agentId ? String(selected.agentId) : 'manual'} onValueChange={assignAgent}><SelectTrigger disabled={assigningAgent} className="h-9 w-[190px] bg-white text-xs font-bold"><div className="flex items-center gap-1.5">{selected.agentId ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}<SelectValue /></div></SelectTrigger><SelectContent><SelectItem value="manual">Atendimento manual</SelectItem>{agents.map((agent) => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}<SelectItem value="new"><span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" />Novo agente</span></SelectItem></SelectContent></Select>
               </div>
             </div>
 
@@ -317,7 +364,7 @@ const Conversations = () => {
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'video' && <video src={message.rawJson.mediaUrl} controls className="max-h-72 w-full" />}
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'audio' && <audio src={message.rawJson.mediaUrl} controls className="m-2 max-w-[260px]" />}
                       {message.content && !/^\[(image|video|audio)\]$/.test(message.content) && <p className="px-4 py-2.5">{message.content}</p>}
-                    </div><p className={`mt-1 text-[10px] text-slate-400 ${incoming ? 'text-left' : 'text-right'}`}>{!incoming && <span className="mr-1 font-bold text-sky-600">{message.sender === 'bot' ? 'IA' : 'Voce'}</span>}{format(messageDate(message), 'HH:mm')}</p></div></div>
+                    </div><p className={`mt-1 text-[10px] text-slate-400 ${incoming ? 'text-left' : 'text-right'}`}>{!incoming && <span className={`mr-1 font-bold ${message.deliveryStatus === 'failed' ? 'text-red-600' : 'text-sky-600'}`}>{message.sender === 'bot' ? 'IA' : 'Voce'}{message.deliveryStatus ? ` · ${message.deliveryStatus === 'read' ? 'lida' : message.deliveryStatus === 'delivered' ? 'entregue' : message.deliveryStatus === 'failed' ? 'falhou' : 'enviada'}` : ''}</span>}{format(messageDate(message), 'HH:mm')}</p></div></div>
                   </div>
                 );
               })}
@@ -326,7 +373,7 @@ const Conversations = () => {
 
             <div className="flex-shrink-0 border-t border-slate-200 bg-white p-4">
               {pendingMedia && <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2">{pendingMedia.type === 'image' ? <img src={pendingMedia.previewUrl} alt="Previa" className="h-14 w-14 rounded object-cover" /> : <ImageIcon className="h-8 w-8 text-slate-500" />}<div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{pendingMedia.file.name}</p><p className="text-[10px] text-slate-500">{pendingMedia.type}</p></div><Button variant="ghost" size="icon" onClick={clearPendingMedia} aria-label="Remover anexo"><X className="h-4 w-4" /></Button></div>}
-              {officialWindowClosed && <div className="mx-auto mb-2 max-w-5xl rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">A janela de atendimento da Meta terminou. Para retomar, envie um template aprovado ao contato.</div>}
+              {officialWindowClosed && <div className="mx-auto mb-2 flex max-w-5xl items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"><span>A janela de atendimento da Meta terminou. Para retomar, envie um template aprovado.</span><Button size="sm" onClick={() => setShowTemplateDialog(true)} disabled={templates.length === 0}>Usar template</Button></div>}
               <div className="relative mx-auto flex max-w-5xl items-center gap-2">
                 <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={(event) => { selectMedia(event.target.files?.[0]); event.currentTarget.value = ''; }} />
                 <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={sending || officialWindowClosed} aria-label="Anexar midia"><Paperclip className="h-4 w-4" /></Button>
@@ -352,6 +399,35 @@ const Conversations = () => {
             <div className="space-y-2"><Label htmlFor="agent-prompt">Orientacoes do agente</Label><Textarea id="agent-prompt" value={agentPrompt} onChange={(event) => setAgentPrompt(event.target.value)} placeholder="Descreva o tom, objetivo e regras do atendimento." rows={7} /></div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setShowAgentDialog(false)}>Cancelar</Button><Button onClick={() => void createAgent()} disabled={creatingAgent || !agentName.trim() || !agentPrompt.trim()}>{creatingAgent && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Criar e atribuir</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enviar template aprovado</DialogTitle>
+            <DialogDescription>Use um template da Meta para iniciar ou retomar a conversa fora da janela de 24 horas.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Template</Label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger><SelectValue placeholder="Selecione um template" /></SelectTrigger>
+                <SelectContent>{templates.map((template) => <SelectItem key={template.id} value={String(template.id)}>{template.name} · {template.language}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {templateParameters.map((value, index) => (
+              <div key={index} className="space-y-2">
+                <Label>Variavel {index + 1}</Label>
+                <Input value={value} onChange={(event) => setTemplateParameters((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Valor de {{${index + 1}}}`} />
+              </div>
+            ))}
+            {selectedTemplate && templateParameterCount === 0 && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">Este template nao exige variaveis.</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>Cancelar</Button>
+            <Button onClick={() => void sendTemplate()} disabled={!selectedTemplate || sendingTemplate || templateParameters.some((value) => !value.trim())}>{sendingTemplate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enviar template</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

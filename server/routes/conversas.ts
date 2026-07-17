@@ -3,6 +3,7 @@ import { prisma } from '../prisma.js'
 import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import { sendUazapiRequest } from '../services/uazapi-whatsapp.js'
+import { sendMetaTemplateMessage } from '../services/whatsapp-messages.js'
 
 export const router = Router()
 
@@ -198,6 +199,8 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
           content: content || `[${mediaType}]`,
           providerMessageId,
           origin,
+          deliveryStatus: 'sent',
+          sentAt: new Date(),
           rawJson: mediaUrl ? { mediaUrl, mediaType } : undefined,
         },
       })
@@ -209,6 +212,61 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
   } catch (error: any) {
     console.error('[Conversas] Erro ao enviar mensagem:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao enviar mensagem', 500))
+  }
+})
+
+router.post('/:id/templates', auth(), requireModule('conversas'), async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const companyId = getCompanyId(req)
+    const templateId = Number(req.body?.templateId)
+    const parameterValues = Array.isArray(req.body?.parameterValues)
+      ? req.body.parameterValues.map((value: unknown) => String(value || ''))
+      : []
+    if (!companyId) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))
+    if (!templateId) return res.status(400).json(createErrorResponse('Selecione um template aprovado', 400))
+
+    const conversation = await prisma.conversa.findFirst({
+      where: { id, companyId },
+      include: {
+        lead: { select: { name: true, phone: true } },
+        client: { select: { name: true, phone: true } },
+      },
+    })
+    if (!conversation) return res.status(404).json(createErrorResponse('Conversa nao encontrada', 404))
+
+    const phone = normalizePhone(conversation.phone || conversation.lead?.phone || conversation.client?.phone)
+    const name = conversation.client?.name || conversation.lead?.name || phone
+    const sent = await sendMetaTemplateMessage({
+      companyId,
+      phone,
+      templateId,
+      parameterValues,
+      variables: { nome: name, name, telefone: phone, phone },
+      headerMediaUrl: String(req.body?.headerMediaUrl || '').trim() || undefined,
+    })
+
+    const message = await prisma.$transaction(async (tx) => {
+      const created = await tx.mensagem.create({
+        data: {
+          conversationId: conversation.id,
+          sender: 'profissional',
+          content: `[Template: ${sent.template.name}]`,
+          providerMessageId: sent.providerMessageId,
+          origin: 'WhatsApp Meta Template',
+          deliveryStatus: 'sent',
+          sentAt: new Date(),
+          rawJson: { templateId, templateName: sent.template.name, parameterValues },
+        },
+      })
+      await tx.conversa.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
+      return created
+    })
+
+    return res.status(201).json(createSuccessResponse(message))
+  } catch (error: any) {
+    console.error('[Conversas] Erro ao enviar template:', error)
+    return res.status(502).json(createErrorResponse(error.message || 'Erro ao enviar template', 502))
   }
 })
 

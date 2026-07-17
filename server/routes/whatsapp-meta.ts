@@ -9,6 +9,7 @@ import {
   getMetaWhatsappStatus,
   saveManualMetaWhatsappConfig,
 } from '../services/meta-whatsapp.js'
+import { isCoexistenceAllowed, type WhatsAppOfficialMode } from '../services/whatsapp-connections.js'
 
 export const router = Router()
 
@@ -22,6 +23,8 @@ function getPublicAppUrl() {
 }
 
 async function getRequestCompanyId(req: any) {
+  if (req.user?.companyId) return Number(req.user.companyId)
+
   if (req.user?.type === 'profissional') {
     const prof = await prisma.professional.findUnique({
       where: { id: req.user.id },
@@ -37,12 +40,40 @@ async function getRequestCompanyId(req: any) {
   return undefined
 }
 
+async function getRequestEmail(req: any) {
+  if (req.user?.type === 'profissional') {
+    const professional = await prisma.professional.findUnique({
+      where: { id: req.user.id },
+      select: { email: true },
+    })
+    return professional?.email || null
+  }
+
+  if (req.user?.type === 'usuario') {
+    const user = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+      select: { email: true },
+    })
+    return user?.email || null
+  }
+
+  return null
+}
+
 router.get('/connect', auth(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
 
-    const url = buildMetaConnectUrl(companyId, req.user?.id || null)
+    const officialMode: WhatsAppOfficialMode = req.query.mode === 'coexistence' ? 'coexistence' : 'cloud_api'
+    if (officialMode === 'coexistence') {
+      const email = await getRequestEmail(req)
+      if (!isCoexistenceAllowed(email)) {
+        return res.status(403).json(createErrorResponse('Coexistencia ainda nao liberada para este perfil.', 403))
+      }
+    }
+
+    const url = buildMetaConnectUrl(companyId, req.user?.id || null, officialMode)
     return res.json(createSuccessResponse({ url }))
   } catch (error: any) {
     console.error('[WhatsApp Meta Connect] Erro:', error)
@@ -65,8 +96,8 @@ router.get('/callback', async (req, res) => {
   }
 
   try {
-    await connectMetaWhatsappFromCode(code, state)
-    return res.redirect(`${appUrl}/settings?view=whatsapp&whatsappMeta=connected`)
+    const result = await connectMetaWhatsappFromCode(code, state)
+    return res.redirect(`${appUrl}/integrations?channel=whatsapp-official&whatsappMeta=connected&mode=${result.officialMode}`)
   } catch (err: any) {
     console.error('[WhatsApp Meta Callback] Erro:', err)
     return res.redirect(`${appUrl}/settings?view=whatsapp&whatsappMeta=error`)
@@ -78,8 +109,14 @@ router.get('/status', auth(), async (req, res) => {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
 
-    const status = await getMetaWhatsappStatus(companyId)
-    return res.json(createSuccessResponse(status))
+    const [status, email] = await Promise.all([
+      getMetaWhatsappStatus(companyId),
+      getRequestEmail(req),
+    ])
+    return res.json(createSuccessResponse({
+      ...status,
+      coexistenceAllowed: isCoexistenceAllowed(email),
+    }))
   } catch (error: any) {
     console.error('[WhatsApp Meta Status] Erro:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar status da Meta', 500))

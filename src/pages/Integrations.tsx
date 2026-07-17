@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TemplateCatalog } from '@/components/whatsapp/TemplateCatalog';
 
 type IntegrationKey = 'whatsappOfficial' | 'whatsappUazapi' | 'instagram' | 'messenger' | 'googleCalendar';
 
@@ -35,6 +36,10 @@ type MetaStatus = {
   webhookUrl?: string | null;
   hasAccessToken?: boolean;
   hasTwoStepPin?: boolean;
+  officialMode?: 'cloud_api' | 'coexistence';
+  coexistenceAllowed?: boolean;
+  coexistenceEnabled?: boolean;
+  coexistenceConfigured?: boolean;
 };
 
 type MetaForm = {
@@ -230,6 +235,18 @@ const Integrations = () => {
     if (!value) return;
     await navigator.clipboard.writeText(value);
     toast({ title: `${label} copiado` });
+  };
+
+  const connectMeta = async (mode: 'cloud_api' | 'coexistence') => {
+    setWorkingKey('whatsappOfficial');
+    try {
+      const response = await whatsappMetaApi.connect(mode);
+      if (!response.success || !response.data?.url) throw new Error(response.error?.message || 'Nao foi possivel iniciar a conexao.');
+      window.location.assign(response.data.url);
+    } catch (error: any) {
+      toast({ title: 'Conexao nao iniciada', description: error.message, variant: 'destructive' });
+      setWorkingKey(null);
+    }
   };
 
   const saveMetaConfig = async () => {
@@ -445,6 +462,30 @@ const Integrations = () => {
                     </div>
                   )}
 
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => void connectMeta('cloud_api')}
+                      disabled={workingKey === 'whatsappOfficial'}
+                      className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left transition hover:border-blue-400 disabled:opacity-60"
+                    >
+                      <p className="font-black text-slate-950">Numero exclusivo da Cloud API</p>
+                      <p className="mt-1 text-sm font-medium text-slate-600">Fluxo oficial padrao para um numero dedicado ao SellClin.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void connectMeta('coexistence')}
+                      disabled={!metaStatus?.coexistenceAllowed || !metaStatus?.coexistenceConfigured || workingKey === 'whatsappOfficial'}
+                      className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-black text-slate-950">WhatsApp Business com coexistencia</p>
+                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-emerald-700">Teste controlado</span>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-slate-600">Mantem o app WhatsApp Business no celular e conecta a API Oficial.</p>
+                    </button>
+                  </div>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label>Phone Number ID</Label>
@@ -529,6 +570,8 @@ const Integrations = () => {
                       </Button>
                     )}
                   </div>
+
+                  {metaStatus?.connected && <TemplateCatalog />}
                 </div>
 
                 <div className="space-y-3">
@@ -541,6 +584,8 @@ const Integrations = () => {
                     <p className="mt-2 break-all font-mono text-sm text-slate-900">{metaStatus?.phoneNumberId || '-'}</p>
                     <p className="mt-3 text-xs font-black uppercase tracking-[0.25em] text-slate-400">Token</p>
                     <p className="mt-2 text-sm font-semibold text-slate-700">{metaStatus?.hasAccessToken ? 'Salvo' : 'Nao salvo'}</p>
+                    <p className="mt-3 text-xs font-black uppercase tracking-[0.25em] text-slate-400">Modo oficial</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">{metaStatus?.officialMode === 'coexistence' ? 'Coexistencia' : 'Cloud API'}</p>
                   </div>
 
                   <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">

@@ -26,12 +26,13 @@ import { router as rolesRouter } from './routes/roles.js'
 import { router as funnelConfigRouter } from './routes/funnelConfig.js'
 import { router as notificationsRouter } from './routes/notifications.js'
 import { router as tasksRouter } from './routes/tasks.js'
-import { router as campaignsRouter } from './routes/campaigns.js'
+import { router as campaignsRouter, resumeInterruptedCampaigns } from './routes/campaigns.js'
 import { router as authRouter } from './routes/auth.js'
 import { router as billingRouter } from './routes/billing.js'
 import { router as googleCalendarRouter } from './routes/google-calendar.js'
 import { router as whatsappMetaRouter } from './routes/whatsapp-meta.js'
 import { router as whatsappUazapiRouter } from './routes/whatsapp-uazapi.js'
+import { router as whatsappTemplatesRouter } from './routes/whatsapp-templates.js'
 import leadStatusesRouter from './routes/lead-statuses.js'
 import { createErrorResponse } from './utils/response.js'
 import { prisma } from './prisma.js'
@@ -84,6 +85,7 @@ app.use('/api/billing', billingRouter)
 app.use('/api/google-calendar', googleCalendarRouter)
 app.use('/api/whatsapp/meta', whatsappMetaRouter)
 app.use('/api/whatsapp/uazapi', whatsappUazapiRouter)
+app.use('/api/whatsapp/templates', whatsappTemplatesRouter)
 app.use('/api/lead-statuses', leadStatusesRouter)
 app.use('/api/lead-origins', leadOriginsRouter)
 // Servir arquivos estáticos da pasta uploads
@@ -100,6 +102,13 @@ const port = process.env.PORT || 4000
 
 async function startServer() {
   await bootstrapSystemDefaults(prisma)
+
+  await resumeInterruptedCampaigns().catch((error) => {
+    console.error('[campaigns] initial resume failed:', error)
+  })
+  setInterval(() => {
+    void resumeInterruptedCampaigns().catch((error) => console.error('[campaigns] scheduled resume failed:', error))
+  }, 60_000).unref()
 
   app.listen(Number(port), '0.0.0.0', () => {
     // eslint-disable-next-line no-console

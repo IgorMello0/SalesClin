@@ -135,7 +135,7 @@ router.get('/:id', auth(false), async (req, res) => {
 router.post('/', auth(false), async (req, res) => {
   try {
     const { professionalId, companyId } = resolveIds(req)
-    const { name, message, audienceType, audienceFilter, mediaUrl, mediaType, minDelay, maxDelay, randomize, variations } = req.body
+    const { name, message, audienceType, audienceFilter, mediaUrl, mediaType, minDelay, maxDelay, randomize, variations, templateId } = req.body
 
     if (!name || !message || !audienceType) {
       return res.status(400).json(createErrorResponse('Nome, mensagem e tipo de audiência são obrigatórios'))
@@ -153,6 +153,13 @@ router.post('/', auth(false), async (req, res) => {
 
     if (!profId || !companyId) {
       return res.status(400).json(createErrorResponse('Não foi possível identificar o profissional ou empresa'))
+    }
+
+    const selectedTemplate = templateId
+      ? await prisma.whatsAppTemplate.findFirst({ where: { id: Number(templateId), companyId } })
+      : null
+    if (templateId && (!selectedTemplate || selectedTemplate.status.toUpperCase() !== 'APPROVED')) {
+      return res.status(400).json(createErrorResponse('Selecione um template aprovado desta clinica'))
     }
 
     // Buscar destinatários com base no tipo de audiência
@@ -216,6 +223,13 @@ router.post('/', auth(false), async (req, res) => {
       data: {
         companyId,
         professionalId: profId,
+        templateId: selectedTemplate?.id || null,
+        templateSnapshot: selectedTemplate ? {
+          id: selectedTemplate.id,
+          name: selectedTemplate.name,
+          language: selectedTemplate.language,
+          components: selectedTemplate.components,
+        } : undefined,
         name,
         message,
         audienceType,
@@ -269,7 +283,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
 
     const campaign = await prisma.messageCampaign.findFirst({
       where: { id, companyId: companyId || undefined },
-      include: { recipients: { where: { status: 'pending' } } }
+      include: { recipients: { where: { status: { in: ['pending', 'processing'] } } }, template: true }
     })
 
     if (!campaign) {
@@ -373,7 +387,12 @@ router.post('/:id/send', auth(false), async (req, res) => {
       uazapiToken: empresa!.uazapiToken!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
-      metaTemplate: getMetaTemplateFromAudienceFilter(campaign.audienceFilter),
+      metaTemplate: campaign.template ? {
+        enabled: true,
+        name: campaign.template.name,
+        languageCode: campaign.template.language,
+        parameters: getMetaTemplateFromAudienceFilter(campaign.audienceFilter)?.parameters || [],
+      } : getMetaTemplateFromAudienceFilter(campaign.audienceFilter),
       mediaUrl: absoluteMediaUrl,
       mediaType: campaign.mediaType,
       minDelay: campaign.minDelay,
@@ -1223,7 +1242,8 @@ async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, m
     console.error(`[whatsapp-meta] send failed for ${formattedPhone}:`, errorData)
     return { success: false, error: formatMetaApiError(response.status, errorData) }
   }
-  return { success: true }
+  const body = await response.json().catch(() => ({}))
+  return { success: true, providerMessageId: body?.messages?.[0]?.id || null }
 }
 
 async function sendWhatsAppMessage(
@@ -1231,7 +1251,7 @@ async function sendWhatsAppMessage(
   phone: string,
   message: string,
   recipient: any
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; providerMessageId?: string | null }> {
   const formattedPhone = formatPhoneForWhatsApp(phone, config.provider)
 
   try {
@@ -1247,11 +1267,24 @@ async function sendWhatsAppMessage(
   }
 }
 
-async function processCampaignSend(campaignId: number, recipients: any[], config: WhatsAppConfig) {
-  let sentCount = 0
-  let failedCount = 0
+export async function processCampaignSend(campaignId: number, recipients: any[], config: WhatsAppConfig) {
+  let sentCount = await prisma.campaignRecipient.count({
+    where: { campaignId, status: { in: ['sent', 'delivered', 'read'] } },
+  })
+  let failedCount = await prisma.campaignRecipient.count({ where: { campaignId, status: 'failed' } })
 
-  for (const recipient of recipients) {
+  for (const [recipientIndex, recipient] of recipients.entries()) {
+    const claimed = await prisma.campaignRecipient.updateMany({
+      where: {
+        id: recipient.id,
+        status: { in: ['pending', 'processing'] },
+        attempts: { lt: 4 },
+      },
+      data: { status: 'processing', processingAt: new Date(), attempts: { increment: 1 } },
+    })
+    if (claimed.count === 0) continue
+
+    await prisma.messageCampaign.update({ where: { id: campaignId }, data: { workerHeartbeatAt: new Date() } })
     // Escolhe aleatoriamente uma variação se a randomização estiver ativa
     let messageToSend = recipient.renderedMessage || recipient.name
     if (config.randomize && config.variations && Array.isArray(config.variations) && config.variations.length > 0) {
@@ -1299,20 +1332,20 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
       if (result.success) {
         await prisma.campaignRecipient.update({
           where: { id: recipient.id },
-          data: { status: 'sent', sentAt: new Date() }
+          data: { status: 'sent', sentAt: new Date(), providerMessageId: result.providerMessageId || null, processingAt: null }
         })
         sentCount++
       } else {
         await prisma.campaignRecipient.update({
           where: { id: recipient.id },
-          data: { status: 'failed', errorMessage: result.error || 'Falha no envio' }
+          data: { status: 'failed', failedAt: new Date(), processingAt: null, errorMessage: result.error || 'Falha no envio' }
         })
         failedCount++
       }
     } catch (err: any) {
       await prisma.campaignRecipient.update({
         where: { id: recipient.id },
-        data: { status: 'failed', errorMessage: err.message || 'Erro desconhecido' }
+        data: { status: 'failed', failedAt: new Date(), processingAt: null, errorMessage: err.message || 'Erro desconhecido' }
       })
       failedCount++
     }
@@ -1327,18 +1360,101 @@ async function processCampaignSend(campaignId: number, recipients: any[], config
     const minD = config.minDelay ?? 180
     const maxD = config.maxDelay ?? 200
     const delaySeconds = minD === maxD ? minD : Math.floor(Math.random() * (maxD - minD + 1)) + minD
+    if (recipientIndex === recipients.length - 1) continue
     
-    await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000))
+    let remainingDelay = delaySeconds * 1000
+    while (remainingDelay > 0) {
+      const slice = Math.min(remainingDelay, 30_000)
+      await new Promise(resolve => setTimeout(resolve, slice))
+      remainingDelay -= slice
+      if (remainingDelay > 0) {
+        await prisma.messageCampaign.update({ where: { id: campaignId }, data: { workerHeartbeatAt: new Date() } })
+      }
+    }
   }
 
   // Finaliza a campanha
   await prisma.messageCampaign.update({
     where: { id: campaignId },
     data: {
-      status: failedCount === recipients.length ? 'failed' : 'completed',
+      status: sentCount > 0 ? 'completed' : 'failed',
       completedAt: new Date(),
       sentCount,
       failedCount
     }
   })
+}
+
+export async function resumeInterruptedCampaigns() {
+  const staleBefore = new Date(Date.now() - 2 * 60 * 1000)
+  const campaigns = await prisma.messageCampaign.findMany({
+    where: {
+      status: 'sending',
+      OR: [{ workerHeartbeatAt: null }, { workerHeartbeatAt: { lt: staleBefore } }],
+    },
+    include: {
+      recipients: { where: { status: { in: ['pending', 'processing'] }, attempts: { lt: 4 } } },
+      template: true,
+      company: {
+        select: {
+          whatsappProvider: true,
+          evolutionApiUrl: true,
+          apiKey: true,
+          evolutionInstance: true,
+          uazapiToken: true,
+          metaToken: true,
+          metaPhoneNumberId: true,
+        },
+      },
+    },
+    take: 5,
+  })
+
+  for (const campaign of campaigns) {
+    const claimed = await prisma.messageCampaign.updateMany({
+      where: {
+        id: campaign.id,
+        status: 'sending',
+        OR: [{ workerHeartbeatAt: null }, { workerHeartbeatAt: { lt: staleBefore } }],
+      },
+      data: { workerHeartbeatAt: new Date() },
+    })
+    if (claimed.count === 0) continue
+
+    await prisma.campaignRecipient.updateMany({
+      where: { campaignId: campaign.id, status: 'processing', processingAt: { lt: staleBefore } },
+      data: { status: 'pending', processingAt: null },
+    })
+    const recipients = await prisma.campaignRecipient.findMany({
+      where: { campaignId: campaign.id, status: 'pending', attempts: { lt: 4 } },
+    })
+    const provider = campaign.company.whatsappProvider || 'evolution'
+    const publicUrl = String(process.env.PUBLIC_APP_URL || '').replace(/\/$/, '')
+    const mediaUrl = campaign.mediaUrl?.startsWith('/uploads/') && publicUrl
+      ? `${publicUrl}${campaign.mediaUrl}`
+      : campaign.mediaUrl
+
+    void processCampaignSend(campaign.id, recipients, {
+      provider,
+      evolutionUrl: campaign.company.evolutionApiUrl || '',
+      evolutionKey: campaign.company.apiKey || '',
+      evolutionInstance: campaign.company.evolutionInstance || '',
+      uazapiUrl: process.env.UAZAPI_API_URL || process.env.UAZAPI_BASE_URL || '',
+      uazapiToken: campaign.company.uazapiToken || '',
+      metaToken: campaign.company.metaToken || '',
+      metaPhoneId: campaign.company.metaPhoneNumberId || '',
+      metaTemplate: campaign.template ? {
+        enabled: true,
+        name: campaign.template.name,
+        languageCode: campaign.template.language,
+        parameters: getMetaTemplateFromAudienceFilter(campaign.audienceFilter)?.parameters || [],
+      } : getMetaTemplateFromAudienceFilter(campaign.audienceFilter),
+      mediaUrl,
+      mediaType: campaign.mediaType,
+      minDelay: campaign.minDelay,
+      maxDelay: campaign.maxDelay,
+      randomize: campaign.randomize,
+      variations: Array.isArray(campaign.variations) ? campaign.variations as string[] : undefined,
+    }).catch((error) => console.error('[campaigns] resume failed:', error))
+  }
 }

@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { prisma } from '../prisma.js'
+import { updateWhatsAppMessageStatus } from './whatsapp-messages.js'
 
 type CompanyRef = {
   id: number
@@ -1296,9 +1297,8 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
       const metadata = value.metadata || {}
       const phoneNumberId = metadata.phone_number_id || ''
       const messages = value.messages || []
+      const statuses = value.statuses || []
       const contacts = value.contacts || []
-
-      if (messages.length === 0) continue
 
       let empresa = empresaOverride
       if (!empresa) {
@@ -1307,8 +1307,64 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
         if (!empresa) continue
       }
 
+      for (const statusEvent of statuses) {
+        const providerMessageId = String(statusEvent?.id || '')
+        if (!providerMessageId) continue
+        const status = String(statusEvent?.status || '').toLowerCase()
+        const eventKey = `meta:status:${providerMessageId}:${status}:${statusEvent?.timestamp || ''}`
+        try {
+          await prisma.whatsAppWebhookEvent.create({
+            data: {
+              companyId: empresa.id,
+              provider: 'meta',
+              eventKey,
+              eventType: `message.${status}`,
+              status: 'processing',
+              attempts: 1,
+              payload: statusEvent,
+            },
+          })
+        } catch (error: any) {
+          if (error?.code === 'P2002') continue
+          throw error
+        }
+
+        const errorInfo = statusEvent?.errors?.[0]
+        await updateWhatsAppMessageStatus({
+          providerMessageId,
+          status,
+          errorCode: errorInfo?.code ? String(errorInfo.code) : null,
+          errorMessage: errorInfo?.title || errorInfo?.message || null,
+          occurredAt: statusEvent?.timestamp
+            ? new Date(Number(statusEvent.timestamp) * 1000)
+            : new Date(),
+        })
+        await prisma.whatsAppWebhookEvent.update({
+          where: { eventKey },
+          data: { status: 'processed', processedAt: new Date() },
+        })
+      }
+
       for (const msg of messages) {
         if (msg.type === 'status' || !msg.from) continue
+
+        const eventKey = `meta:message:${msg.id || `${msg.from}:${msg.timestamp || ''}`}`
+        try {
+          await prisma.whatsAppWebhookEvent.create({
+            data: {
+              companyId: empresa.id,
+              provider: 'meta',
+              eventKey,
+              eventType: 'message.received',
+              status: 'processing',
+              attempts: 1,
+              payload: msg,
+            },
+          })
+        } catch (error: any) {
+          if (error?.code === 'P2002') continue
+          throw error
+        }
 
         const phone = normalizePhone(msg.from)
         const contactInfo = contacts.find((contact: any) => contact.wa_id === msg.from)
@@ -1324,6 +1380,10 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
           rawPayload: msg,
           origin: 'WhatsApp Official',
           providerMessageId: msg.id || null,
+        })
+        await prisma.whatsAppWebhookEvent.update({
+          where: { eventKey },
+          data: { status: 'processed', processedAt: new Date() },
         })
       }
     }

@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { campaignsApi, leadsApi, clientsApi } from '@/lib/api';
+import { campaignsApi, leadsApi, clientsApi, whatsappTemplatesApi } from '@/lib/api';
+import type { WhatsAppTemplate } from '@/components/whatsapp/TemplateCatalog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -95,7 +97,7 @@ function splitSpreadsheetLine(line: string, delimiter: string) {
   return result;
 }
 
-function parseSpreadsheetContacts(text: string) {
+function parseSpreadsheetContacts(text: string): { contacts: SpreadsheetContact[]; stats: SpreadsheetStats } {
   const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const emptyStats: SpreadsheetStats = {
     totalImported: Math.max(0, lines.length - 1),
@@ -210,6 +212,8 @@ export default function Campaigns() {
   const [metaTemplateName, setMetaTemplateName] = useState('');
   const [metaTemplateLanguage, setMetaTemplateLanguage] = useState('pt_BR');
   const [metaTemplateParameters, setMetaTemplateParameters] = useState('{{nome}}');
+  const [metaTemplateId, setMetaTemplateId] = useState('');
+  const [approvedTemplates, setApprovedTemplates] = useState<WhatsAppTemplate[]>([]);
 
   // Tags filter states
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -229,6 +233,12 @@ export default function Campaigns() {
   }, []);
 
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
+
+  useEffect(() => {
+    void whatsappTemplatesApi.list('APPROVED').then((response) => {
+      if (response.success) setApprovedTemplates(response.data || []);
+    });
+  }, []);
 
   // Load available tags dynamically
   useEffect(() => {
@@ -307,7 +317,7 @@ export default function Campaigns() {
   const resetForm = () => {
     setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both');
     setMediaUrl(''); setMediaType(''); setMinDelay(180); setMaxDelay(200); setRandomize(false); setVariations([]); setNewVariation('');
-    setUseMetaTemplate(false); setMetaTemplateName(''); setMetaTemplateLanguage('pt_BR'); setMetaTemplateParameters('{{nome}}');
+    setUseMetaTemplate(false); setMetaTemplateId(''); setMetaTemplateName(''); setMetaTemplateLanguage('pt_BR'); setMetaTemplateParameters('{{nome}}');
     setAttachments([]); setSpreadsheetContacts([]); setSpreadsheetFileName(''); setSpreadsheetStats(null);
     setIsCreating(false);
   };
@@ -348,7 +358,7 @@ export default function Campaigns() {
     if (audienceType === 'spreadsheet' && spreadsheetContacts.length === 0) {
       toast({ title: 'Importe uma planilha', description: 'Use CSV ou TSV com colunas nome, telefone, data, hora e especialista.', variant: 'destructive' }); return;
     }
-    if (useMetaTemplate && !metaTemplateName.trim()) {
+    if (useMetaTemplate && !metaTemplateId && !metaTemplateName.trim()) {
       toast({ title: 'Informe o template da Meta', description: 'Use o nome exato do template aprovado no WhatsApp Manager.', variant: 'destructive' }); return;
     }
     setIsSending(true);
@@ -399,7 +409,8 @@ export default function Campaigns() {
         minDelay: Number(minDelay),
         maxDelay: Number(maxDelay),
         randomize,
-        variations: randomize && variations.length > 0 ? variations : null
+        variations: randomize && variations.length > 0 ? variations : null,
+        templateId: useMetaTemplate && metaTemplateId ? Number(metaTemplateId) : null,
       });
       if (res.success) {
         toast({ title: 'Campanha criada!' });
@@ -818,6 +829,22 @@ export default function Campaigns() {
 
                   {useMetaTemplate && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                      {approvedTemplates.length > 0 && (
+                        <div className="md:col-span-2">
+                          <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Template sincronizado</label>
+                          <Select value={metaTemplateId} onValueChange={(value) => {
+                            setMetaTemplateId(value);
+                            const selected = approvedTemplates.find((template) => String(template.id) === value);
+                            if (selected) {
+                              setMetaTemplateName(selected.name);
+                              setMetaTemplateLanguage(selected.language);
+                            }
+                          }}>
+                            <SelectTrigger className="rounded-xl bg-white"><SelectValue placeholder="Selecione um template aprovado" /></SelectTrigger>
+                            <SelectContent>{approvedTemplates.map((template) => <SelectItem key={template.id} value={String(template.id)}>{template.name} · {template.language}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Nome do template</label>
                         <Input
@@ -1397,4 +1424,3 @@ export default function Campaigns() {
     </div>
   );
 }
-

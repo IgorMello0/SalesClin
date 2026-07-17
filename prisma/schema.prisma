@@ -384,38 +384,38 @@ model Contract {
 }
 
 model Empresa {
-  id                       Int       @id @default(autoincrement())
-  ownerId                  Int?      @map("owner_id")
-  name                     String
-  logoUrl                  String?   @map("logo_url")
-  domain                   String?
-  whatsapp                 String?
-  whatsappProvider         String?   @default("evolution") @map("whatsapp_provider")
-  apiKey                   String?   @map("api_key")
-  evolutionApiUrl          String?   @map("evolution_api_url")
-  evolutionInstance        String?   @map("evolution_instance")
-  evolutionMode            String?   @map("evolution_mode")
-  metaToken                String?   @map("meta_token")
-  metaPhoneNumberId        String?   @map("meta_phone_number_id")
-  metaWabaId               String?   @map("meta_waba_id")
-  metaBusinessId           String?   @map("meta_business_id")
-  metaPhoneDisplayNumber   String?   @map("meta_phone_display_number")
-  metaWebhookVerifyToken   String?   @map("meta_webhook_verify_token")
-  metaTwoStepPin           String?   @map("meta_two_step_pin")
-  metaConnectedAt          DateTime? @map("meta_connected_at")
-  metaConnectionStatus     String?   @map("meta_connection_status")
-  uazapiInstanceId         String?   @map("uazapi_instance_id")
-  uazapiInstanceName       String?   @map("uazapi_instance_name")
-  uazapiToken              String?   @map("uazapi_token") @db.Text
-  uazapiConnectionStatus   String?   @map("uazapi_connection_status")
-  uazapiConnectedAt        DateTime? @map("uazapi_connected_at")
-  webhookToken             String?   @unique @default(uuid()) @map("webhook_token")
-  plan                     String?
-  openHour                 String    @default("08:00") @map("open_hour")
-  closeHour                String    @default("20:00") @map("close_hour")
-  isActive                 Boolean   @default(true) @map("is_active")
-  createdAt                DateTime  @default(now()) @map("created_at")
-  updatedAt                DateTime  @updatedAt @map("updated_at")
+  id                     Int       @id @default(autoincrement())
+  ownerId                Int?      @map("owner_id")
+  name                   String
+  logoUrl                String?   @map("logo_url")
+  domain                 String?
+  whatsapp               String?
+  whatsappProvider       String?   @default("evolution") @map("whatsapp_provider")
+  apiKey                 String?   @map("api_key")
+  evolutionApiUrl        String?   @map("evolution_api_url")
+  evolutionInstance      String?   @map("evolution_instance")
+  evolutionMode          String?   @map("evolution_mode")
+  metaToken              String?   @map("meta_token")
+  metaPhoneNumberId      String?   @map("meta_phone_number_id")
+  metaWabaId             String?   @map("meta_waba_id")
+  metaBusinessId         String?   @map("meta_business_id")
+  metaPhoneDisplayNumber String?   @map("meta_phone_display_number")
+  metaWebhookVerifyToken String?   @map("meta_webhook_verify_token")
+  metaTwoStepPin         String?   @map("meta_two_step_pin")
+  metaConnectedAt        DateTime? @map("meta_connected_at")
+  metaConnectionStatus   String?   @map("meta_connection_status")
+  uazapiInstanceId       String?   @map("uazapi_instance_id")
+  uazapiInstanceName     String?   @map("uazapi_instance_name")
+  uazapiToken            String?   @map("uazapi_token") @db.Text
+  uazapiConnectionStatus String?   @map("uazapi_connection_status")
+  uazapiConnectedAt      DateTime? @map("uazapi_connected_at")
+  webhookToken           String?   @unique @default(uuid()) @map("webhook_token")
+  plan                   String?
+  openHour               String    @default("08:00") @map("open_hour")
+  closeHour              String    @default("20:00") @map("close_hour")
+  isActive               Boolean   @default(true) @map("is_active")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
   owner                    Professional?             @relation("CompanyOwner", fields: [ownerId], references: [id])
   professionals            Professional[]            @relation("CompanyProfessionals")
@@ -437,8 +437,87 @@ model Empresa {
   subscription             CompanySubscription?
   billingAddons            BillingAddon[]
   googleCalendarConnection GoogleCalendarConnection?
+  whatsappConnection       WhatsAppConnection?
+  whatsappTemplates        WhatsAppTemplate[]
+  whatsappWebhookEvents    WhatsAppWebhookEvent[]
 
   @@map("empresas")
+}
+
+model WhatsAppConnection {
+  id                   Int       @id @default(autoincrement())
+  companyId            Int       @unique @map("company_id")
+  provider             String
+  officialMode         String?   @map("official_mode")
+  status               String    @default("disconnected")
+  phoneNumberId        String?   @map("phone_number_id")
+  wabaId               String?   @map("waba_id")
+  businessId           String?   @map("business_id")
+  displayPhoneNumber   String?   @map("display_phone_number")
+  accessToken          String?   @map("access_token") @db.Text
+  webhookVerifyToken   String?   @map("webhook_verify_token")
+  externalInstanceId   String?   @map("external_instance_id")
+  externalInstanceName String?   @map("external_instance_name")
+  metadata             Json?
+  connectedAt          DateTime? @map("connected_at")
+  lastSyncedAt         DateTime? @map("last_synced_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  company       Empresa                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  templates     WhatsAppTemplate[]
+  webhookEvents WhatsAppWebhookEvent[]
+
+  @@index([provider, status])
+  @@map("whatsapp_connections")
+}
+
+model WhatsAppTemplate {
+  id              Int       @id @default(autoincrement())
+  companyId       Int       @map("company_id")
+  connectionId    Int?      @map("connection_id")
+  externalId      String?   @map("external_id")
+  name            String
+  language        String
+  category        String
+  status          String
+  qualityScore    String?   @map("quality_score")
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  components      Json
+  parameterFormat String?   @map("parameter_format")
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  company    Empresa             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  connection WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  campaigns  MessageCampaign[]
+
+  @@unique([companyId, name, language])
+  @@index([companyId, status])
+  @@map("whatsapp_templates")
+}
+
+model WhatsAppWebhookEvent {
+  id           Int       @id @default(autoincrement())
+  companyId    Int?      @map("company_id")
+  connectionId Int?      @map("connection_id")
+  provider     String
+  eventKey     String    @unique @map("event_key")
+  eventType    String?   @map("event_type")
+  status       String    @default("pending")
+  attempts     Int       @default(0)
+  payload      Json
+  errorMessage String?   @map("error_message") @db.Text
+  processedAt  DateTime? @map("processed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  company    Empresa?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  connection WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("whatsapp_webhook_events")
 }
 
 model GoogleCalendarConnection {
@@ -572,6 +651,13 @@ model Mensagem {
   providerMessageId String?    @map("provider_message_id")
   rawJson           Json?      @map("raw_json")
   origin            String?
+  deliveryStatus    String?    @map("delivery_status")
+  sentAt            DateTime?  @map("sent_at")
+  deliveredAt       DateTime?  @map("delivered_at")
+  readAt            DateTime?  @map("read_at")
+  failedAt          DateTime?  @map("failed_at")
+  errorCode         String?    @map("error_code")
+  errorMessage      String?    @map("error_message") @db.Text
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
   chatLogs          ChatLog[]
@@ -979,40 +1065,50 @@ enum CampaignStatus {
 }
 
 enum RecipientStatus {
-  pending // Aguardando envio
-  sent // Enviado com sucesso
-  failed // Falha no envio
-  skipped // Ignorado (sem telefone válido)
+  pending
+  processing
+  sent
+  delivered
+  read
+  failed
+  skipped
+  canceled
 }
 
 // Campanhas de mensagens em massa
 model MessageCampaign {
-  id              Int            @id @default(autoincrement())
-  companyId       Int            @map("company_id")
-  professionalId  Int            @map("professional_id")
-  name            String // Nome da campanha
-  message         String         @db.Text // Corpo da mensagem (suporta variáveis como {{nome}})
-  audienceType    String         @map("audience_type") // 'all_leads', 'all_clients', 'leads_by_status', 'manual'
-  audienceFilter  Json?          @map("audience_filter") // Filtros aplicados (status, funil, tags, etc.)
-  status          CampaignStatus @default(draft)
-  totalRecipients Int            @default(0) @map("total_recipients")
-  sentCount       Int            @default(0) @map("sent_count")
-  failedCount     Int            @default(0) @map("failed_count")
-  mediaUrl        String?        @map("media_url") @db.Text
-  mediaType       String?        @map("media_type") // 'image', 'video', 'audio'
-  minDelay        Int            @default(180) @map("min_delay")
-  maxDelay        Int            @default(200) @map("max_delay")
-  randomize       Boolean        @default(false)
-  variations      Json? // Array de strings com as variações de mensagens
-  scheduledAt     DateTime?      @map("scheduled_at") // Data de agendamento (se agendada)
-  startedAt       DateTime?      @map("started_at") // Quando começou a enviar
-  completedAt     DateTime?      @map("completed_at") // Quando finalizou
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  id                Int            @id @default(autoincrement())
+  companyId         Int            @map("company_id")
+  professionalId    Int            @map("professional_id")
+  templateId        Int?           @map("template_id")
+  name              String // Nome da campanha
+  message           String         @db.Text // Corpo da mensagem (suporta variáveis como {{nome}})
+  audienceType      String         @map("audience_type") // 'all_leads', 'all_clients', 'leads_by_status', 'manual'
+  audienceFilter    Json?          @map("audience_filter") // Filtros aplicados (status, funil, tags, etc.)
+  status            CampaignStatus @default(draft)
+  totalRecipients   Int            @default(0) @map("total_recipients")
+  sentCount         Int            @default(0) @map("sent_count")
+  failedCount       Int            @default(0) @map("failed_count")
+  mediaUrl          String?        @map("media_url") @db.Text
+  mediaType         String?        @map("media_type") // 'image', 'video', 'audio'
+  minDelay          Int            @default(180) @map("min_delay")
+  maxDelay          Int            @default(200) @map("max_delay")
+  randomize         Boolean        @default(false)
+  variations        Json? // Array de strings com as variações de mensagens
+  templateSnapshot  Json?          @map("template_snapshot")
+  providerSnapshot  String?        @map("provider_snapshot")
+  connectionMode    String?        @map("connection_mode")
+  workerHeartbeatAt DateTime?      @map("worker_heartbeat_at")
+  scheduledAt       DateTime?      @map("scheduled_at") // Data de agendamento (se agendada)
+  startedAt         DateTime?      @map("started_at") // Quando começou a enviar
+  completedAt       DateTime?      @map("completed_at") // Quando finalizou
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
   // Relacionamentos
   company      Empresa             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  template     WhatsAppTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
   recipients   CampaignRecipient[]
 
   @@map("message_campaigns")
@@ -1027,15 +1123,25 @@ model CampaignRecipient {
   sourceType String @map("source_type") // 'lead', 'client' ou 'spreadsheet'
   sourceId   Int?   @map("source_id") // ID do lead/client; nulo para planilha
 
-  status          RecipientStatus @default(pending)
-  sentAt          DateTime?       @map("sent_at")
-  errorMessage    String?         @map("error_message")
-  renderedMessage String?         @map("rendered_message") @db.Text // Mensagem final renderizada
-  variables       Json? // Dados extras para variaveis de planilha, como data, hora e especialista
-  createdAt       DateTime        @default(now()) @map("created_at")
+  status            RecipientStatus @default(pending)
+  providerMessageId String?         @map("provider_message_id")
+  attempts          Int             @default(0)
+  processingAt      DateTime?       @map("processing_at")
+  nextAttemptAt     DateTime?       @map("next_attempt_at")
+  sentAt            DateTime?       @map("sent_at")
+  deliveredAt       DateTime?       @map("delivered_at")
+  readAt            DateTime?       @map("read_at")
+  failedAt          DateTime?       @map("failed_at")
+  errorCode         String?         @map("error_code")
+  errorMessage      String?         @map("error_message")
+  renderedMessage   String?         @map("rendered_message") @db.Text // Mensagem final renderizada
+  variables         Json? // Dados extras para variaveis de planilha, como data, hora e especialista
+  createdAt         DateTime        @default(now()) @map("created_at")
 
   // Relacionamentos
   campaign MessageCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
+  @@index([status, nextAttemptAt])
+  @@index([providerMessageId])
   @@map("campaign_recipients")
 }
