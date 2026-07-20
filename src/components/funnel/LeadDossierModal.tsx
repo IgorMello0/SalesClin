@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { leadsApi, tasksApi, clientsApi } from '@/lib/api';
+import { leadsApi, tasksApi, clientsApi, usuariosApi } from '@/lib/api';
 import { Edit2, Phone, Mail, FileText, CheckSquare, History, Plus, Loader2, ArrowRight, X, Trash2, Calendar, MapPin, CheckCircle2, Circle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -54,16 +54,30 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
   const [isViewingProposal, setIsViewingProposal] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
+  
+  const [team, setTeam] = useState<any[]>([]);
 
   useEffect(() => {
     if (open && initialLead) {
       setSelectedLead(initialLead);
       setSelectedFunnelForEdit(initialLead.status || "");
       loadLeadDetails(initialLead.id);
+      loadTeam();
     } else {
       setSelectedLead(null);
     }
   }, [open, initialLead]);
+
+  const loadTeam = async () => {
+    try {
+      const res = await usuariosApi.getAll({ pageSize: 50 });
+      if (res.success && res.data) {
+        setTeam(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const loadLeadDetails = async (id: string) => {
     setIsLoading(true);
@@ -135,6 +149,27 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
       }
     } catch (e) {
       toast({ title: "Erro ao atualizar telefone", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateAssignment = async (type: 'sdrId' | 'closerId', value: string | null) => {
+    if (!selectedLead) return;
+    const numericValue = value ? Number(value) : null;
+    
+    try {
+      const res = await leadsApi.updateAssignment(Number(selectedLead.id), {
+        sdrId: type === 'sdrId' ? numericValue : selectedLead.sdrId,
+        closerId: type === 'closerId' ? numericValue : selectedLead.closerId,
+      });
+      if (res.success) {
+        toast({ title: "Atribuição atualizada!" });
+        setSelectedLead(prev => prev ? { ...prev, [type]: numericValue } : null);
+        if (onUpdate) onUpdate();
+      } else {
+        toast({ title: "Erro", description: res.error?.message, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar atribuição", variant: "destructive" });
     }
   };
 
@@ -502,6 +537,48 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor do Lead</p>
                         <p className="text-sm font-bold text-secondary">{selectedLead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                      </div>
+
+                      <hr className="border-slate-100 my-2 w-full" />
+                      <div className="space-y-3 w-full">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SDR Responsável</p>
+                          <Select 
+                            value={selectedLead.sdrId ? String(selectedLead.sdrId) : "unassigned"}
+                            onValueChange={(val) => handleUpdateAssignment('sdrId', val === "unassigned" ? null : val)}
+                          >
+                            <SelectTrigger className="h-8 py-0 px-2 text-xs border-slate-200 focus-visible:ring-secondary/20 bg-white">
+                              <SelectValue placeholder="Sem SDR">
+                                {selectedLead.sdrId ? team.find(u => u.id === selectedLead.sdrId)?.name || 'Desconhecido' : 'Sem SDR'}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="z-[300]">
+                              <SelectItem value="unassigned">Sem SDR</SelectItem>
+                              {team.filter(u => u.role?.isSdr).map(u => (
+                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Closer Responsável</p>
+                          <Select 
+                            value={selectedLead.closerId ? String(selectedLead.closerId) : "unassigned"}
+                            onValueChange={(val) => handleUpdateAssignment('closerId', val === "unassigned" ? null : val)}
+                          >
+                            <SelectTrigger className="h-8 py-0 px-2 text-xs border-slate-200 focus-visible:ring-secondary/20 bg-white">
+                              <SelectValue placeholder="Sem Closer">
+                                {selectedLead.closerId ? team.find(u => u.id === selectedLead.closerId)?.name || 'Desconhecido' : 'Sem Closer'}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="z-[300]">
+                              <SelectItem value="unassigned">Sem Closer</SelectItem>
+                              {team.filter(u => u.role?.isCloser).map(u => (
+                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       <Button 

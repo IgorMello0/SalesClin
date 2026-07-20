@@ -282,7 +282,7 @@ router.post('/', auth(), async (req, res) => {
     })
     const roleId = req.body.roleId || defaultRole?.id || null
 
-    const created = await prisma.usuario.create({ 
+      const created = await prisma.usuario.create({ 
       data: { 
         companyId: primaryCompanyId,
         name, 
@@ -292,6 +292,7 @@ router.post('/', auth(), async (req, res) => {
         isActive: false,
         emailVerified: false,
         emailVerifiedAt: null,
+        leadRoutingWeight: req.body.leadRoutingWeight !== undefined ? Number(req.body.leadRoutingWeight) : 1
       },
       include: { company: true, role: true }
     })
@@ -437,7 +438,7 @@ router.put('/:id', auth(), async (req, res) => {
       return res.status(403).json(createErrorResponse('Você não tem permissão para editar este usuário', 403))
     }
 
-    const { name, email, password, role, isActive, companyIds } = req.body
+    const { name, email, password, role, isActive, companyIds, leadRoutingWeight } = req.body
     
     // Validações
     if (!name || !email) {
@@ -457,6 +458,7 @@ router.put('/:id', auth(), async (req, res) => {
     }
 
     const data: any = { name, email, roleId: req.body.roleId, isActive }
+    if (leadRoutingWeight !== undefined) data.leadRoutingWeight = Number(leadRoutingWeight)
     if (password) data.passwordHash = await bcrypt.hash(password, 10)
     
     // Atualizar Múltiplas Clínicas

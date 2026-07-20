@@ -27,6 +27,25 @@ router.get('/', auth(false), async (req, res) => {
 
     const where: any = { companyId: companyId };
 
+    // Regra de Visibilidade de Leads
+    if (req.user?.type === 'usuario') {
+      const dbUser = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: { role: true }
+      });
+      if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
+        // Se não for Admin nem Gestor Comercial, só vê leads atribuídos a si mesmo (como SDR ou Closer)
+        where.AND = [
+          {
+            OR: [
+              { sdrId: req.user.id },
+              { closerId: req.user.id }
+            ]
+          }
+        ];
+      }
+    }
+
     if (search) {
       const searchStr = String(search);
       const numericSearch = searchStr.replace(/\D/g, '');
@@ -126,10 +145,51 @@ router.post('/', auth(), async (req, res) => {
       return res.status(403).json(createErrorResponse('Acesso negado', 403));
     }
     
+    // Roteamento Automático de SDRs
+    let sdrId: number | undefined = undefined;
+    if (req.user?.companyId) {
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: req.user.companyId },
+        select: { leadRoutingMode: true }
+      });
+
+      if (empresa && empresa.leadRoutingMode !== 'manual') {
+        const sdrs = await prisma.usuario.findMany({
+          where: {
+            companyId: req.user.companyId,
+            isActive: true,
+            role: { isSdr: true }
+          },
+          select: { id: true, leadRoutingWeight: true }
+        });
+
+        if (sdrs.length > 0) {
+          if (empresa.leadRoutingMode === 'automatic_equal') {
+            // Distribuição uniforme (Roleta randomizada)
+            const randomIndex = Math.floor(Math.random() * sdrs.length);
+            sdrId = sdrs[randomIndex].id;
+          } else if (empresa.leadRoutingMode === 'semi_automatic') {
+            // Distribuição ponderada (Pesos customizados)
+            const totalWeight = sdrs.reduce((acc, sdr) => acc + (sdr.leadRoutingWeight || 1), 0);
+            let random = Math.random() * totalWeight;
+            for (const sdr of sdrs) {
+              random -= (sdr.leadRoutingWeight || 1);
+              if (random <= 0) {
+                sdrId = sdr.id;
+                break;
+              }
+            }
+            if (!sdrId) sdrId = sdrs[sdrs.length - 1].id;
+          }
+        }
+      }
+    }
+
     const created = await prisma.lead.create({
       data: { 
         professionalId, 
         companyId: req.user.companyId,
+        sdrId,
         name, 
         value: Number(value) || 0, 
         origin, 
@@ -650,3 +710,32 @@ router.delete('/:id', auth(), async (req, res) => {
     res.status(500).json(createErrorResponse(error.message || 'Erro ao deletar lead', 500))
   }
 })
+
+// Atualizar atribuição de equipe (SDR/Closer)
+router.patch('/:id/assignment', auth(), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sdrId, closerId } = req.body;
+    
+    const lead = await prisma.lead.findUnique({ where: { id: parseInt(id) } });
+    if (!lead) return res.status(404).json(createErrorResponse('Lead não encontrado', 404));
+
+    const updated = await prisma.lead.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...(sdrId !== undefined && { sdrId: sdrId === null ? null : parseInt(sdrId) }),
+        ...(closerId !== undefined && { closerId: closerId === null ? null : parseInt(closerId) })
+      },
+      include: {
+        sdr: { select: { name: true } },
+        closer: { select: { name: true } }
+      }
+    });
+
+    logAudit(req.user!.id, 'ATUALIZAR_EQUIPE_LEAD', 'Lead', updated.id);
+    res.json(createSuccessResponse(updated));
+  } catch (error: any) {
+    console.error('[Leads] Erro ao reatribuir equipe:', error);
+    res.status(500).json(createErrorResponse('Erro ao reatribuir equipe', 500));
+  }
+});

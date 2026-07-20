@@ -31,6 +31,7 @@ import InfoNegocioView from './settings/InfoNegocioView';
 import FunnelsSettingsView from './settings/FunnelsSettingsView';
 import LeadStatusesSettingsView from './settings/LeadStatusesSettingsView';
 import LeadOriginsSettingsView from './settings/LeadOriginsSettingsView';
+import { LeadRoutingSettingsView } from './settings/LeadRoutingSettingsView';
 import { BillingSettingsView } from './settings/BillingSettingsView';
 import { SecuritySettingsView } from './settings/SecuritySettingsView';
 
@@ -191,7 +192,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
   const [clinicas, setClinicas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newMember, setNewMember] = useState({ name: '', email: '', roleId: '', companyIds: [] as number[] });
+  const [newMember, setNewMember] = useState({ name: '', email: '', roleId: '', companyIds: [] as number[], leadRoutingWeight: 1 });
   const [isSavingMember, setIsSavingMember] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
@@ -329,11 +330,12 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
         roleId: newMember.roleId ? Number(newMember.roleId) : null,
         isActive: true,
         companyIds: newMember.companyIds.length > 0 ? newMember.companyIds : undefined,
+        leadRoutingWeight: newMember.leadRoutingWeight
       });
       if (res.success) {
         toast({ title: 'Convite enviado', description: `${newMember.name} receberá um e-mail para definir a senha.` });
         setIsAdding(false);
-        setNewMember({ name: '', email: '', roleId: '', companyIds: [] });
+        setNewMember({ name: '', email: '', roleId: '', companyIds: [], leadRoutingWeight: 1 });
         loadTeam();
         loadBillingUsage();
       } else {
@@ -429,7 +431,8 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
         name: editingMember.name,
         email: editingMember.email,
         roleId: editingMember.roleId ? Number(editingMember.roleId) : null,
-        companyIds: editingMember.companyIds
+        companyIds: editingMember.companyIds,
+        leadRoutingWeight: editingMember.leadRoutingWeight !== undefined ? Number(editingMember.leadRoutingWeight) : undefined
       });
       if (res.success) {
         toast({ title: 'Sucesso', description: 'Perfil atualizado!' });
@@ -600,6 +603,20 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
                 </SelectContent>
               </Select>
             </div>
+            
+            {validRoles.find(r => String(r.id) === newMember.roleId)?.isSdr && (
+              <div className="space-y-2">
+                <Label>Peso no Roteamento (SDR)</Label>
+                <Input 
+                  type="number"
+                  min="1"
+                  value={newMember.leadRoutingWeight} 
+                  onChange={e => setNewMember({...newMember, leadRoutingWeight: parseInt(e.target.value) || 1})}
+                  placeholder="1"
+                />
+              </div>
+            )}
+
             {clinicas.length > 0 && (
               <div className="space-y-2 sm:col-span-2 mt-2">
                 <Label className="mb-2 block">Acesso às Clínicas (Multi-Tenancy)</Label>
@@ -741,6 +758,20 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {validRoles.find(r => String(r.id) === editingMember?.roleId)?.isSdr && (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label className="text-[11px] uppercase text-muted-foreground font-bold">Peso no Roteamento (SDR)</Label>
+                        <Input 
+                          type="number"
+                          min="1"
+                          value={editingMember?.leadRoutingWeight || 1} 
+                          onChange={e => setEditingMember({...editingMember, leadRoutingWeight: parseInt(e.target.value) || 1})}
+                          className="h-9 text-sm"
+                        />
+                        <p className="text-[10px] text-muted-foreground">Utilizado apenas se o roteamento for semi-automático. Um peso maior fará com que este SDR receba mais leads.</p>
+                      </div>
+                    )}
                     {clinicas.length > 0 && (
                       <div className="space-y-2 sm:col-span-2 mt-4">
                         <Label className="text-[11px] uppercase text-muted-foreground font-bold mb-2 block">Acesso às Clínicas (Multi-Tenancy)</Label>
@@ -827,6 +858,7 @@ const InfoNegocioView = () => {
     plan: '',
     openHour: '08:00',
     closeHour: '20:00',
+    leadRoutingMode: 'manual',
   });
 
   useEffect(() => {
@@ -845,6 +877,7 @@ const InfoNegocioView = () => {
           plan: res.data.plan || '',
           openHour: res.data.openHour || '08:00',
           closeHour: res.data.closeHour || '20:00',
+          leadRoutingMode: res.data.leadRoutingMode || 'manual',
         });
       }
     } catch (e) {
@@ -1013,6 +1046,7 @@ const CargosView = () => {
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [isSpecialistRole, setIsSpecialistRole] = useState(false);
   const [isAdminRole, setIsAdminRole] = useState(false);
+  const [isManagerRole, setIsManagerRole] = useState(false);
   const [isSDRRole, setIsSDRRole] = useState(false);
   const [isCloserRole, setIsCloserRole] = useState(false);
 
@@ -1063,6 +1097,7 @@ const CargosView = () => {
         permissions: modules.map(m => ({ moduleId: m.id, hasAccess: true })),
         isSpecialist: isSpecialistRole,
         isAdmin: isAdminRole,
+        isManager: isManagerRole,
         isSDR: isSDRRole,
         isCloser: isCloserRole
       });
@@ -1071,6 +1106,7 @@ const CargosView = () => {
         setNewRoleName('');
         setIsSpecialistRole(false);
         setIsAdminRole(false);
+        setIsManagerRole(false);
         setIsSDRRole(false);
         setIsCloserRole(false);
         setIsAdding(false);
@@ -1106,6 +1142,7 @@ const CargosView = () => {
     setSelectedRoleId(role.id);
     setIsSpecialistRole(!!role.isSpecialist);
     setIsAdminRole(!!role.isAdmin);
+    setIsManagerRole(!!role.isManager);
     setIsSDRRole(!!role.isSDR);
     setIsCloserRole(!!role.isCloser);
     
@@ -1149,6 +1186,7 @@ const CargosView = () => {
         name: role.name,
         isSpecialist: isSpecialistRole,
         isAdmin: isAdminRole,
+        isManager: isManagerRole,
         isSDR: isSDRRole,
         isCloser: isCloserRole,
         permissions: rolePermissions.map(p => ({ 
@@ -1261,6 +1299,19 @@ const CargosView = () => {
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
                 Este cargo é Administrador?
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isManager" 
+                checked={isManagerRole}
+                onCheckedChange={(checked) => setIsManagerRole(checked as boolean)}
+              />
+              <label 
+                htmlFor="isManager" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Permissão de Gestor Comercial (Pode visualizar todos os leads)
               </label>
             </div>
           </div>
@@ -1376,6 +1427,19 @@ const CargosView = () => {
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                       >
                         É Administrador?
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`edit-isManager-${role.id}`}
+                        checked={isManagerRole}
+                        onCheckedChange={(checked) => setIsManagerRole(checked as boolean)}
+                      />
+                      <label 
+                        htmlFor={`edit-isManager-${role.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        É Gestor Comercial? (Visualiza todos os leads)
                       </label>
                     </div>
                   </div>
@@ -1930,6 +1994,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   funnels: FunnelsSettingsView,
   lead_statuses: LeadStatusesSettingsView,
   lead_origins: LeadOriginsSettingsView,
+  lead_routing: LeadRoutingSettingsView,
   billing: BillingSettingsView,
 };
 
@@ -1971,6 +2036,7 @@ const Settings = () => {
         { key: 'funnels', name: 'Funis de Vendas', description: 'Pipelines e etapas do comercial', icon: 'view_kanban', ownerOnly: true },
         { key: 'lead_statuses', name: 'Status', description: 'Status rápidos dos negócios', icon: 'label', ownerOnly: true },
         { key: 'lead_origins', name: 'Origens', description: 'Fontes de captação de leads', icon: 'share', ownerOnly: true },
+        { key: 'lead_routing', name: 'Roteamento', description: 'Distribuição automática de leads', icon: 'route', ownerOnly: true },
       ],
     },
   ];

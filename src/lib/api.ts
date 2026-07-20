@@ -739,6 +739,7 @@ export const leadsApi = {
   getProposals: async (id: number) => apiRequest<Array<any>>(`/leads/${id}/proposals`),
   updateProposal: async (id: number, proposalId: number, data: any) => apiRequest<any>(`/leads/${id}/proposals/${proposalId}`, { method: 'PUT', body: JSON.stringify(data) }),
   confirmPayment: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/confirm-payment`, { method: 'POST', body: JSON.stringify(data) }),
+  updateAssignment: async (id: number, data: { sdrId?: number | null, closerId?: number | null }) => apiRequest<any>(`/leads/${id}/assignment`, { method: 'PATCH', body: JSON.stringify(data) }),
 }
 
 // Catálogos

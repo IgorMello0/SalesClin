@@ -373,7 +373,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                         <Label className="text-[10px] uppercase text-slate-500 font-bold flex items-center justify-between gap-1 w-full">
                           <span>Parcelas</span>
                           <span className="lowercase font-bold text-[9px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
-                            {block.method === 'transferencia' ? 36 : 12}x
+                            {block.method === 'transferencia' ? 36 : 24}x
                           </span>
                         </Label>
                         <div className="relative">
@@ -390,7 +390,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
                               }
                               let val = parseInt(e.target.value.replace(/\D/g, ''));
                               if (isNaN(val)) val = 1;
-                              const max = block.method === 'transferencia' ? 36 : 12;
+                              const max = block.method === 'transferencia' ? 36 : 24;
                               if (val > max) val = max;
                               handleBlockChange(block.id, 'installmentsCount', val);
                             }}

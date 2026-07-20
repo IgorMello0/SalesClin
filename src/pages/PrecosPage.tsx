@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check, ArrowRight, Zap, Star, ShieldCheck } from 'lucide-react';
 import { SiteNavbar } from '@/components/SiteNavbar';
@@ -6,6 +6,8 @@ import { SiteFooter } from '@/components/SiteFooter';
 import { Link } from 'react-router-dom';
 
 const PrecosPage = () => {
+  const [isAnnual, setIsAnnual] = useState(true);
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -13,49 +15,54 @@ const PrecosPage = () => {
   const plans = [
     {
       name: "Start",
-      price: "197",
+      priceMonthly: "197",
+      priceAnnual: "147",
+      savings: "600",
       plan: "start",
-      desc: "Ideal para consultórios individuais e clínicas em início de escala.",
+      desc: "O básico para organizar a casa. Ideal para clínicas estruturando o atendimento.",
       features: [
         "Até 5 Usuários",
-        "Gestão de Leads",
-        "Funil de Vendas Kanban",
+        "Dashboard (Básico)",
         "Agenda Inteligente",
-        "Suporte Individual",
-        "Relatórios Básicos"
+        "Gestão de Clientes e Leads",
+        "Funil Comercial (Kanban)",
+        "Gestão de Tarefas"
       ],
       featured: false,
       cta: "Escolher Start"
     },
     {
       name: "Pro",
-      price: "297",
+      priceMonthly: "297",
+      priceAnnual: "247",
+      savings: "600",
       plan: "pro",
-      desc: "O plano definitivo para clínicas que buscam crescimento agressivo.",
+      desc: "O motor de vendas automatizado. Para clínicas que buscam crescimento agressivo.",
       features: [
-        "Até 10 usuários por clínica",
+        "Até 10 Usuários",
+        "Integrações (WhatsApp Oficial)",
+        "Campanhas & Disparos",
         "Engenharia de Metas",
-        "Integração WhatsApp",
-        "Múltiplos Funis",
-        "Dashboard de Performance",
-        "Treinamento de Equipe",
-        "Relatórios Customizados"
+        "Dashboard de Conversão",
+        "Tudo do plano Start"
       ],
       featured: true,
       cta: "Escolher Pro"
     },
     {
       name: "Enterprise",
-      price: "497",
+      priceMonthly: "497",
+      priceAnnual: "397",
+      savings: "1.200",
       plan: "enterprise",
-      desc: "Soluções personalizadas para redes de clínicas e multiclínicas.",
+      desc: "Escala e controle. Para franquias e redes de clínicas com múltiplas unidades.",
       features: [
-        "Multiclínicas",
+        "Usuários Ilimitados",
+        "Gestão Multiclínicas (Filiais)",
+        "Visão de Rede (Dashboard Unificado)",
         "API Dedicada",
-        "Gestor de Contas Exclusivo",
-        "SLA de Suporte",
-        "Backup em Tempo Real",
-        "White-label Parcial"
+        "Treinamento para a Equipe",
+        "Gestor de Contas Exclusivo"
       ],
       featured: false,
       cta: "Falar com Time"
@@ -82,9 +89,31 @@ const PrecosPage = () => {
               Escala sem <br className="hidden md:block" /> 
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F97316] to-orange-400">complexidade.</span>
             </h1>
-            <p className="text-lg md:text-xl text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto mb-12">
               Engenharia comercial para clínicas de alto nível. Escolha a estrutura perfeita para o seu estágio atual de crescimento.
             </p>
+
+            {/* BILLING TOGGLE */}
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <div className="bg-slate-100 p-1.5 rounded-full inline-flex relative cursor-pointer shadow-inner" onClick={() => setIsAnnual(!isAnnual)}>
+                <div 
+                  className="absolute top-1.5 bottom-1.5 w-[140px] bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-slate-200/50 transition-transform duration-300 ease-out"
+                  style={{ transform: isAnnual ? 'translateX(140px)' : 'translateX(0)' }}
+                />
+                
+                <div className={`relative z-10 w-[140px] py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-colors duration-300 text-center flex items-center justify-center ${!isAnnual ? 'text-[#0F172A]' : 'text-slate-400 hover:text-slate-600'}`}>
+                  Mensal
+                </div>
+                
+                <div className={`relative z-10 w-[140px] py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-colors duration-300 text-center flex items-center justify-center ${isAnnual ? 'text-[#0F172A]' : 'text-slate-400 hover:text-slate-600'}`}>
+                  Anual
+                  <div className={`absolute -top-3 -right-2 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full transition-all duration-300 shadow-sm ${isAnnual ? 'bg-emerald-100 text-emerald-600 scale-100' : 'bg-slate-200 text-slate-400 scale-95 opacity-70'}`}>
+                    2 meses grátis
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </motion.div>
         </div>
       </section>
@@ -125,13 +154,22 @@ const PrecosPage = () => {
                   
                   <div className="mb-10 relative z-10">
                     <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-[#0F172A] mb-6">{p.name}</h3>
-                    <div className="flex items-baseline gap-1 mb-6">
-                      {p.price !== "Custom" && <span className="text-2xl font-bold text-slate-300 mr-1">R$</span>}
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className="text-2xl font-bold text-slate-300 mr-1">R$</span>
                       <span className="text-6xl font-black text-[#0F172A] tabular-nums tracking-tighter">
-                        {p.price}
+                        {isAnnual ? p.priceAnnual : p.priceMonthly}
                       </span>
-                      {p.price !== "Custom" && <span className="text-sm font-bold text-slate-400 ml-1">/mês</span>}
+                      <span className="text-sm font-bold text-slate-400 ml-1">/mês</span>
                     </div>
+                    {isAnnual ? (
+                      <div className="h-6 mb-4">
+                        <span className="inline-block bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
+                          Economia de R$ {p.savings}/ano
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="h-6 mb-4" />
+                    )}
                     <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-[90%]">{p.desc}</p>
                   </div>
 
@@ -181,14 +219,17 @@ const PrecosPage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {[
-                  { feature: "Usuários Simultâneos", start: "5", pro: "10 por clínica", ent: "Ilimitado" },
-                  { feature: "Gestão de Leads (Kanban)", start: true, pro: true, ent: true },
-                  { feature: "Agenda Inteligente Integrada", start: true, pro: true, ent: true },
-                  { feature: "Cálculo de Previsibilidade (Metas)", start: false, pro: true, ent: true },
-                  { feature: "Dashboard de Performance Avançado", start: false, pro: true, ent: true },
-                  { feature: "Integração WhatsApp Nativo", start: false, pro: true, ent: true },
-                  { feature: "Multiclínicas (Gestão de Redes)", start: false, pro: false, ent: true },
-                  { feature: "Nível de Suporte", start: "Horário Comercial", pro: "Prioritário 24/7", ent: "Gerente Dedicado" },
+                  { feature: "Módulo: Dashboard", start: "Básico", pro: "Conversões", ent: "Rede Unificada" },
+                  { feature: "Módulo: Clientes", start: true, pro: true, ent: true },
+                  { feature: "Módulo: Leads", start: true, pro: true, ent: true },
+                  { feature: "Módulo: Agenda", start: true, pro: true, ent: true },
+                  { feature: "Módulo: Comercial (Funil)", start: true, pro: true, ent: true },
+                  { feature: "Módulo: Tarefas", start: true, pro: true, ent: true },
+                  { feature: "Módulo: Metas (Previsibilidade)", start: false, pro: true, ent: true },
+                  { feature: "Módulo: Campanhas (Disparos)", start: false, pro: true, ent: true },
+                  { feature: "Módulo: Integrações", start: false, pro: true, ent: true },
+                  { feature: "Multiclínicas (Filiais)", start: false, pro: false, ent: true },
+                  { feature: "Limite de Usuários", start: "Até 5", pro: "Até 10", ent: "Ilimitado" },
                 ].map((row, i) => (
                   <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-6 pl-8 text-sm font-medium text-slate-700">{row.feature}</td>

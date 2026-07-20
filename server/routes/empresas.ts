@@ -483,7 +483,8 @@ router.put('/:id', auth(), async (req, res) => {
       name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour,
       // Campos de integração WhatsApp
       whatsappProvider, evolutionMode, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId,
-      metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaWebhookVerifyToken, metaTwoStepPin, metaConnectionStatus
+      metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaWebhookVerifyToken, metaTwoStepPin, metaConnectionStatus,
+      leadRoutingMode
     } = req.body
 
     const data: any = {}
@@ -495,6 +496,7 @@ router.put('/:id', auth(), async (req, res) => {
     if (isActive !== undefined) data.isActive = isActive
     if (openHour !== undefined) data.openHour = openHour
     if (closeHour !== undefined) data.closeHour = closeHour
+    if (leadRoutingMode !== undefined) data.leadRoutingMode = leadRoutingMode
     if (whatsappProvider !== undefined) data.whatsappProvider = whatsappProvider
     if (evolutionMode !== undefined) data.evolutionMode = evolutionMode
     if (evolutionApiUrl !== undefined) data.evolutionApiUrl = evolutionApiUrl

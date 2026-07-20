@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { SiteNavbar } from '@/components/SiteNavbar';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -8,6 +9,7 @@ import {
   ArrowRight,
   BarChart,
   Briefcase,
+  Check,
   ChevronRight,
   Eye,
   EyeOff,
@@ -49,6 +51,12 @@ const PLAN_OPTIONS: Array<{
   },
 ];
 
+const TESTIMONIALS = [
+  { text: "O SellClin mudou o jogo da nossa clínica. Centralizamos todos os leads e finalmente temos controle total do que entra e do que converte.", author: "Dr. Ricardo Santos", clinic: "Clínica OrthoDesign", img: "https://i.pravatar.cc/150?u=dr1" },
+  { text: "Finalmente tenho controle total dos meus leads de WhatsApp. Não perdemos mais nenhuma oportunidade de agendamento.", author: "Mariana Costa", clinic: "Aesthetic Center", img: "https://i.pravatar.cc/150?u=dr2" },
+  { text: "A agenda inteligente é fantástica. Reduzimos o no-show em 30% usando as automações e integrações de calendário.", author: "Dr. Paulo Vieira", clinic: "Vision Institute", img: "https://i.pravatar.cc/150?u=dr3" },
+];
+
 const Signup = () => {
   const [searchParams] = useSearchParams();
   const requestedPlan = searchParams.get('plan');
@@ -66,6 +74,14 @@ const Signup = () => {
   const [selectedPlan, setSelectedPlan] = useState<PublicPlanCode>(initialPlan);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(initialBillingCycle);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveTestimonial((prev) => (prev + 1) % TESTIMONIALS.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { toast } = useToast();
 
@@ -166,6 +182,62 @@ const Signup = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="pt-8 mt-8 border-t border-slate-100/60 max-w-md">
+                <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100 relative mb-8 min-h-[160px] overflow-hidden">
+                  <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-[#F97316] text-white flex items-center justify-center shadow-lg shadow-orange-500/20 z-20">
+                     <span className="font-serif text-2xl leading-none pt-2">"</span>
+                  </div>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeTestimonial}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.5, ease: "easeInOut" }}
+                      className="relative z-10"
+                    >
+                      <p className="text-sm text-slate-600 font-medium leading-italic mb-4">
+                        "{TESTIMONIALS[activeTestimonial].text}"
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden">
+                           <img src={TESTIMONIALS[activeTestimonial].img} alt={TESTIMONIALS[activeTestimonial].author} className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-black text-[#0F172A]">{TESTIMONIALS[activeTestimonial].author}</div>
+                          <div className="text-[9px] font-bold text-[#F97316] uppercase tracking-wider">{TESTIMONIALS[activeTestimonial].clinic}</div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+                  
+                  {/* Testimonial Indicators */}
+                  <div className="absolute bottom-4 right-6 flex gap-1.5 z-20">
+                    {TESTIMONIALS.map((_, i) => (
+                      <div 
+                        key={i} 
+                        className={`h-1.5 rounded-full transition-all duration-500 ${i === activeTestimonial ? 'w-4 bg-[#F97316]' : 'w-1.5 bg-slate-300'}`} 
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    "Liberação imediata do sistema após pagamento",
+                    "Acesso completo aos módulos do seu plano",
+                    "Cancele a qualquer momento sem burocracia"
+                  ].map((text, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                        <Check size={12} className="text-emerald-500" strokeWidth={4} />
+                      </div>
+                      <span className="text-xs text-slate-500 font-medium">{text}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

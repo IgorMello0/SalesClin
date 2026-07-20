@@ -77,7 +77,7 @@ router.get('/', auth(), async (req, res) => {
   try {
     const professionalId = req.user!.id
     const companyId = req.user!.companyId
-    const { status, priority, dueDateRange, search, team } = req.query as any
+    const { status, priority, dueDateRange, search, team, leadId } = req.query as any
 
     if (!companyId) {
       return res.status(400).json(createErrorResponse('Clínica não definida', 400))
@@ -85,6 +85,10 @@ router.get('/', auth(), async (req, res) => {
 
     const where: any = {
       companyId
+    }
+
+    if (leadId) {
+      where.leadId = Number(leadId)
     }
 
     // Se não for rota da equipe, restringe às tarefas atribuídas ou criadas pelo usuário

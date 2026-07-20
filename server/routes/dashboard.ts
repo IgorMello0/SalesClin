@@ -80,28 +80,35 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     const leadExtraFilters: any = {};
     const paymentExtraFilters: any = {};
 
+    // Regra de Visibilidade de Leads
+    if (req.user?.type === 'usuario') {
+      const dbUser = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: { role: true }
+      });
+      if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
+        // Se não for Admin nem Gestor Comercial, só vê leads atribuídos a si mesmo (como SDR ou Closer)
+        leadExtraFilters.OR = [
+          { sdrId: req.user.id },
+          { closerId: req.user.id }
+        ];
+      }
+    }
+
     if (sdrId && sdrId !== 'all') {
       const parsedSdrId = parseInt(sdrId as string);
-      // O SDR está atrelado via Agendamento (Avaliação) ou via Proposta
-      leadExtraFilters.OR = [
-        { appointments: { some: { sdrId: parsedSdrId } } },
-        { proposals: { some: { sdrId: parsedSdrId } } }
-      ];
+      // O SDR agora está atrelado diretamente ao Lead
+      leadExtraFilters.sdrId = parsedSdrId;
       appointmentWhere.sdrId = parsedSdrId;
       paymentExtraFilters.appointment = { sdrId: parsedSdrId };
     }
 
     if (closerId && closerId !== 'all') {
       const parsedCloserId = parseInt(closerId as string);
-      const closerCondition = { proposals: { some: { salespersonId: parsedCloserId } } };
+      // O Closer agora está atrelado diretamente ao Lead
+      leadExtraFilters.closerId = parsedCloserId;
       
-      if (leadExtraFilters.OR) {
-        // Se ambos foram passados, a lógica (por segurança no dashboard) é AND
-        leadExtraFilters.AND = [{ OR: leadExtraFilters.OR }, closerCondition];
-        delete leadExtraFilters.OR;
-      } else {
-        Object.assign(leadExtraFilters, closerCondition);
-      }
+      const closerCondition = { closerId: parsedCloserId };
       
       // Filtro para pagamentos baseados no closer
       if (paymentExtraFilters.appointment) {
@@ -308,7 +315,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
           method: 'transferencia',
           professionalId: { in: professionalIds },
           ...(companyId && { companyId }),
-          date: { gte: startDate, lte: endDate }
+          createdAt: { gte: startDate, lte: endDate }
         },
         _count: { id: true }
       });

@@ -146,11 +146,15 @@ model Lead {
   notes                String?
   subStatus            String?        @map("sub_status")
   companyId            Int?           @map("company_id")
+  sdrId                Int?           @map("sdr_id")
+  closerId             Int?           @map("closer_id")
   appointments         Appointment[]
   activities           LeadActivity[]
   company              Empresa?       @relation(fields: [companyId], references: [id])
   convertedToClient    Client?        @relation(fields: [convertedToClientId], references: [id])
   professional         Professional   @relation(fields: [professionalId], references: [id])
+  sdr                  Usuario?       @relation("LeadSdr", fields: [sdrId], references: [id])
+  closer               Usuario?       @relation("LeadCloser", fields: [closerId], references: [id])
   proposals            Proposal[]
   tasks                Task[]
   conversas            Conversa[]
@@ -411,6 +415,7 @@ model Empresa {
   uazapiConnectedAt      DateTime? @map("uazapi_connected_at")
   webhookToken           String?   @unique @default(uuid()) @map("webhook_token")
   plan                   String?
+  leadRoutingMode        String    @default("manual") @map("lead_routing_mode")
   openHour               String    @default("08:00") @map("open_hour")
   closeHour              String    @default("20:00") @map("close_hour")
   isActive               Boolean   @default(true) @map("is_active")
@@ -562,6 +567,7 @@ model Usuario {
   email               String    @unique
   passwordHash        String    @map("password_hash")
   roleId              Int?      @map("role_id")
+  leadRoutingWeight   Int       @default(1) @map("lead_routing_weight")
   isActive            Boolean   @default(true) @map("is_active")
   googleId            String?   @unique @map("google_id")
   authProvider        String?   @default("local") @map("auth_provider")
@@ -578,6 +584,8 @@ model Usuario {
   proposalsAsSalesperson Proposal[]          @relation("SalespersonProposals")
   proposalsAsSpecialist  Proposal[]          @relation("SpecialistProposals")
   proposalsAsSdr         Proposal[]          @relation("SdrProposals")
+  leadsAsSdr             Lead[]              @relation("LeadSdr")
+  leadsAsCloser          Lead[]              @relation("LeadCloser")
   appointmentsAsSDR      Appointment[]       @relation("AppointmentSDR")
   appointmentsAsEspec    Appointment[]       @relation("AppointmentEspecialista")
   assignedTasks          Task[]              @relation("AssignedUserTasks")
@@ -857,6 +865,7 @@ model Role {
   isAdmin           Boolean             @default(false) @map("is_admin")
   isSDR             Boolean             @default(false) @map("is_sdr")
   isCloser          Boolean             @default(false) @map("is_closer")
+  isManager         Boolean             @default(false) @map("is_manager")
   permissions       RolePermission[]
   company           Empresa             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   professional      Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)

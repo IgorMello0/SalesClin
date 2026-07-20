@@ -18,7 +18,7 @@ import {
 import { Edit2, Check, X, History, FileText, CheckSquare, Trash2, Calendar, Eye, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { leadsApi, tasksApi, clientsApi } from '@/lib/api';
+import { leadsApi, tasksApi, clientsApi, usuariosApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -44,6 +44,18 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   const [isEditingValue, setIsEditingValue] = useState(false);
   const [tempValue, setTempValue] = useState(0);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [team, setTeam] = useState<any[]>([]);
+
+  const loadTeam = async () => {
+    try {
+      const res = await usuariosApi.getAll({ pageSize: 50 });
+      if (res.success && res.data) {
+        setTeam(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleDeleteLead = async () => {
     if (!selectedLead?.id) return;
@@ -118,6 +130,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
       }
     };
     loadOrigins();
+    loadTeam();
   }, []);
 
   
@@ -171,6 +184,26 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
       }
     } catch (e) {
       toast({ title: "Erro ao atualizar nome", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateAssignment = async (type: 'sdrId' | 'closerId', value: string | null) => {
+    if (!selectedLead) return;
+    const numericValue = value ? Number(value) : null;
+    
+    try {
+      const res = await leadsApi.updateAssignment(Number(selectedLead.id), {
+        sdrId: type === 'sdrId' ? numericValue : selectedLead.sdrId,
+        closerId: type === 'closerId' ? numericValue : selectedLead.closerId,
+      });
+      if (res.success) {
+        toast({ title: "Atribuição atualizada!" });
+        handleUpdate(type, numericValue);
+      } else {
+        toast({ title: "Erro", description: res.error?.message, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao atualizar atribuição", variant: "destructive" });
     }
   };
 
@@ -684,6 +717,49 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor do Lead</p>
                         <p className="text-sm font-bold text-secondary">{selectedLead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                       </div>
+
+                      <hr className="border-slate-100 my-2 w-full" />
+                      <div className="space-y-3 w-full">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SDR Responsável</p>
+                          <Select 
+                            value={selectedLead.sdrId ? String(selectedLead.sdrId) : "unassigned"}
+                            onValueChange={(val) => handleUpdateAssignment('sdrId', val === "unassigned" ? null : val)}
+                          >
+                            <SelectTrigger className="h-8 py-0 px-2 text-xs border-slate-200 focus-visible:ring-secondary/20 bg-white">
+                              <SelectValue placeholder="Sem SDR">
+                                {selectedLead.sdrId ? team.find(u => u.id === selectedLead.sdrId)?.name || 'Desconhecido' : 'Sem SDR'}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="z-[9999]">
+                              <SelectItem value="unassigned">Sem SDR</SelectItem>
+                              {team.filter(u => u.role?.isSdr).map(u => (
+                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Closer Responsável</p>
+                          <Select 
+                            value={selectedLead.closerId ? String(selectedLead.closerId) : "unassigned"}
+                            onValueChange={(val) => handleUpdateAssignment('closerId', val === "unassigned" ? null : val)}
+                          >
+                            <SelectTrigger className="h-8 py-0 px-2 text-xs border-slate-200 focus-visible:ring-secondary/20 bg-white">
+                              <SelectValue placeholder="Sem Closer">
+                                {selectedLead.closerId ? team.find(u => u.id === selectedLead.closerId)?.name || 'Desconhecido' : 'Sem Closer'}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="z-[9999]">
+                              <SelectItem value="unassigned">Sem Closer</SelectItem>
+                              {team.filter(u => u.role?.isCloser).map(u => (
+                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </div>

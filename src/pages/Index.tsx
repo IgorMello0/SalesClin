@@ -35,6 +35,7 @@ import { InteractiveAppBrowser } from '@/components/landing/InteractiveAppBrowse
 
 const Index = () => {
   const [activeModule, setActiveModule] = useState(0);
+  const [isAnnual, setIsAnnual] = useState(true);
 
   const [revenue, setRevenue] = useState(150000);
   const [ticket, setTicket] = useState(5000);
@@ -654,7 +655,29 @@ const Index = () => {
             className="text-center mb-24"
           >
             <span className="text-[#F97316] font-black text-[10px] uppercase tracking-[0.4em] mb-4 block">Planos</span>
-            <h2 className="text-4xl md:text-6xl font-headline font-black text-[#0F172A] mb-6 tracking-tighter">A estrutura certa para <br/> <span className="text-[#F97316]">cada etapa.</span></h2>
+            <h2 className="text-4xl md:text-6xl font-headline font-black text-[#0F172A] mb-8 tracking-tighter">A estrutura certa para <br/> <span className="text-[#F97316]">cada etapa.</span></h2>
+            
+            {/* BILLING TOGGLE */}
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <div className="bg-slate-100 p-1.5 rounded-full inline-flex relative cursor-pointer shadow-inner" onClick={() => setIsAnnual(!isAnnual)}>
+                <div 
+                  className="absolute top-1.5 bottom-1.5 w-[140px] bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-slate-200/50 transition-transform duration-300 ease-out"
+                  style={{ transform: isAnnual ? 'translateX(140px)' : 'translateX(0)' }}
+                />
+                
+                <div className={`relative z-10 w-[140px] py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-colors duration-300 text-center flex items-center justify-center ${!isAnnual ? 'text-[#0F172A]' : 'text-slate-400 hover:text-slate-600'}`}>
+                  Mensal
+                </div>
+                
+                <div className={`relative z-10 w-[140px] py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-colors duration-300 text-center flex items-center justify-center ${isAnnual ? 'text-[#0F172A]' : 'text-slate-400 hover:text-slate-600'}`}>
+                  Anual
+                  <div className={`absolute -top-3 -right-2 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full transition-all duration-300 shadow-sm ${isAnnual ? 'bg-emerald-100 text-emerald-600 scale-100' : 'bg-slate-200 text-slate-400 scale-95 opacity-70'}`}>
+                    2 meses grátis
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </motion.div>
           <motion.div 
             initial="hidden"
@@ -670,9 +693,33 @@ const Index = () => {
             className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch"
           >
             {[
-              { name: "Start", price: "197", plan: "start", features: ["Até 5 Usuários", "Gestão de Leads", "Funil de Vendas", "Suporte Individual"], featured: false },
-              { name: "Pro", price: "297", plan: "pro", features: ["Até 10 usuários por clínica", "Integração WhatsApp", "Inteligência de Metas", "Relatórios Custom"], featured: true },
-              { name: "Enterprise", price: "497", plan: "enterprise", features: ["Multiclínicas", "API Dedicada", "Treinamento Time", "Gestor de Contas"], featured: false }
+              { 
+                name: "Start", 
+                priceMonthly: "197",
+                priceAnnual: "147",
+                savings: "600",
+                plan: "start", 
+                features: ["Até 5 Usuários", "Dashboard (Básico)", "Agenda Inteligente", "Gestão de Clientes e Leads", "Funil Comercial (Kanban)", "Gestão de Tarefas"], 
+                featured: false 
+              },
+              { 
+                name: "Pro", 
+                priceMonthly: "297",
+                priceAnnual: "247",
+                savings: "600",
+                plan: "pro", 
+                features: ["Até 10 Usuários", "Integrações (WhatsApp Oficial)", "Campanhas & Disparos", "Engenharia de Metas", "Dashboard de Conversão", "Tudo do plano Start"], 
+                featured: true 
+              },
+              { 
+                name: "Enterprise", 
+                priceMonthly: "497",
+                priceAnnual: "397",
+                savings: "1.200",
+                plan: "enterprise", 
+                features: ["Usuários Ilimitados", "Gestão Multiclínicas (Filiais)", "Visão de Rede (Dashboard Unificado)", "API Dedicada", "Treinamento para a Equipe", "Gestor de Contas Exclusivo"], 
+                featured: false 
+              }
             ].map((p, i) => (
               <motion.div 
                 key={i} 
@@ -685,12 +732,22 @@ const Index = () => {
                 <div className={`flex-grow bg-white p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] border transition-all duration-500 flex flex-col ${p.featured ? 'border-[#F97316] shadow-[0_0_40px_rgba(249,115,22,0.15)] md:scale-105 z-10' : 'border-[#F97316]/20 shadow-[0_0_15px_rgba(249,115,22,0.02)] hover:border-[#F97316] hover:shadow-[0_0_25px_rgba(249,115,22,0.1)] hover:-translate-y-1'}`}>
                   <div className="mb-8">
                     <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">{p.name}</h3>
-                    <div className="flex items-baseline gap-1">
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className="text-2xl font-bold text-slate-300 mr-1">R$</span>
                       <span className="text-5xl font-black text-[#0F172A] tabular-nums">
-                        {p.price === "Custom" ? "Custom" : `R$ ${p.price}`}
+                        {isAnnual ? p.priceAnnual : p.priceMonthly}
                       </span>
-                      {p.price !== "Custom" && <span className="text-xs font-bold text-slate-400">/mês</span>}
+                      <span className="text-xs font-bold text-slate-400 ml-1">/mês</span>
                     </div>
+                    {isAnnual ? (
+                      <div className="h-5">
+                        <span className="inline-block bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded">
+                          Economia de R$ {p.savings}/ano
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="h-5" />
+                    )}
                   </div>
                   
                   <div className="space-y-5 mb-12 flex-grow">
