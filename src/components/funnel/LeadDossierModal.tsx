@@ -85,7 +85,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
       const [activitiesRes, proposalsRes, tasksRes] = await Promise.all([
         leadsApi.getActivities(id),
         leadsApi.getProposals(id),
-        tasksApi.list({ leadId: id })
+        tasksApi.getAll({ leadId: Number(id) })
       ]);
       
       if (activitiesRes.success) {

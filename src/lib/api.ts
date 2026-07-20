@@ -1017,13 +1017,14 @@ export const uploadApi = {
 
 // Tarefas (Tasks)
 export const tasksApi = {
-  getAll: async (params?: { status?: string; priority?: string; dueDateRange?: string; search?: string; team?: boolean }) => {
+  getAll: async (params?: { status?: string; priority?: string; dueDateRange?: string; search?: string; team?: boolean; leadId?: number }) => {
     const query = new URLSearchParams()
     if (params?.status) query.append('status', params.status)
     if (params?.priority) query.append('priority', params.priority)
     if (params?.dueDateRange) query.append('dueDateRange', params.dueDateRange)
     if (params?.search) query.append('search', params.search)
     if (params?.team) query.append('team', params.team.toString())
+    if (params?.leadId) query.append('leadId', params.leadId.toString())
     return apiRequest<Array<any>>(`/tasks?${query.toString()}`)
   },
   create: async (data: any) => apiRequest<any>('/tasks', { method: 'POST', body: JSON.stringify(data) }),
