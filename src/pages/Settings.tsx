@@ -604,7 +604,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
               </Select>
             </div>
             
-            {validRoles.find(r => String(r.id) === newMember.roleId)?.isSdr && (
+            {validRoles.find(r => String(r.id) === newMember.roleId)?.isSDR && (
               <div className="space-y-2">
                 <Label>Peso no Roteamento (SDR)</Label>
                 <Input 
@@ -759,7 +759,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
                       </Select>
                     </div>
 
-                    {validRoles.find(r => String(r.id) === editingMember?.roleId)?.isSdr && (
+                    {validRoles.find(r => String(r.id) === editingMember?.roleId)?.isSDR && (
                       <div className="space-y-1.5 sm:col-span-2">
                         <Label className="text-[11px] uppercase text-muted-foreground font-bold">Peso no Roteamento (SDR)</Label>
                         <Input 
