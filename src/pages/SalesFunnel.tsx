@@ -1665,7 +1665,7 @@ const SalesFunnel = () => {
                   onChange={(e) => setNewLeadData({...newLeadData, email: e.target.value})}
                 />
               </div>
-              {!(professional?.role?.isSDR && !professional?.role?.isAdmin && !professional?.role?.isManager) && (
+              {!(professional?.role?.toLowerCase() === 'sdr') && (
                 <div className="space-y-2">
                   <Label htmlFor="sdr" className="text-xs font-bold uppercase tracking-widest text-slate-400">Atribuir a (SDR)</Label>
                   <Select value={newLeadData.sdrId} onValueChange={(val) => setNewLeadData({...newLeadData, sdrId: val})}>

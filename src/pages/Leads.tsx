@@ -516,7 +516,7 @@ const Leads = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      {!(professional?.role?.isSDR && !professional?.role?.isAdmin && !professional?.role?.isManager) && (
+                      {!(professional?.role?.toLowerCase() === 'sdr') && (
                         <div className="space-y-2">
                           <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">SDR</Label>
                           <Select value={formData.sdrId} onValueChange={(val) => setFormData({...formData, sdrId: val})}>
