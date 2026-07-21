@@ -35,11 +35,13 @@ router.get('/', auth(false), async (req, res) => {
       });
       if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
         // Se não for Admin nem Gestor Comercial, só vê leads atribuídos a si mesmo (como SDR ou Closer)
+        // OU leads antigos que ainda não possuem nenhuma atribuição
         where.AND = [
           {
             OR: [
               { sdrId: req.user.id },
-              { closerId: req.user.id }
+              { closerId: req.user.id },
+              { sdrId: null, closerId: null }
             ]
           }
         ];
@@ -217,6 +219,29 @@ router.post('/', auth(), async (req, res) => {
         tags: tags || [] 
       }
     })
+    
+    if (sdrId) {
+      const assignedSdr = await prisma.usuario.findUnique({ where: { id: sdrId }, select: { name: true }});
+      if (assignedSdr) {
+        let actCreator = 'Sistema';
+        if (req.user?.type === 'usuario') {
+          const u = await prisma.usuario.findUnique({ where: { id: req.user.id }, select: { name: true }});
+          if (u) actCreator = u.name;
+        } else if (req.user?.type === 'profissional') {
+          const p = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { name: true }});
+          if (p) actCreator = p.name;
+        }
+        
+        await prisma.leadActivity.create({
+          data: { 
+            leadId: created.id, 
+            type: 'system', 
+            content: `O lead foi atribuído para o SDR ${assignedSdr.name}.`,
+            createdBy: actCreator 
+          }
+        });
+      }
+    }
     
     logAudit(req.user.id, 'CRIAR_LEAD', 'Lead', created.id)
     
@@ -747,12 +772,21 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
       }
     });
 
+    let userName = 'Sistema';
+    if (req.user?.type === 'usuario') {
+      const u = await prisma.usuario.findUnique({ where: { id: req.user.id }, select: { name: true }});
+      if (u) userName = u.name;
+    } else if (req.user?.type === 'profissional') {
+      const p = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { name: true }});
+      if (p) userName = p.name;
+    }
+
     if (sdrId !== undefined) {
       const parsedSdr = sdrId === null ? null : parseInt(sdrId);
       if (lead.sdrId !== parsedSdr) {
         const content = parsedSdr === null ? 'SDR responsável removido.' : `O SDR responsável foi alterado para ${updated.sdr?.name || 'outro usuário'}.`;
         await prisma.leadActivity.create({
-          data: { leadId: updated.id, type: 'system', content, createdBy: req.user!.id.toString() }
+          data: { leadId: updated.id, type: 'system', content, createdBy: userName }
         });
       }
     }
@@ -762,7 +796,7 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
       if (lead.closerId !== parsedCloser) {
         const content = parsedCloser === null ? 'Closer responsável removido.' : `O Closer responsável foi alterado para ${updated.closer?.name || 'outro usuário'}.`;
         await prisma.leadActivity.create({
-          data: { leadId: updated.id, type: 'system', content, createdBy: req.user!.id.toString() }
+          data: { leadId: updated.id, type: 'system', content, createdBy: userName }
         });
       }
     }

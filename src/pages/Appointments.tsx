@@ -420,9 +420,9 @@ const Appointments = () => {
                         return (
                           <div
                             key={apt.id}
-                            className={`absolute left-2 right-4 rounded-xl border px-3 py-2 ${apt.isMasked ? 'cursor-default' : 'cursor-pointer hover:shadow-md'} transition-all overflow-hidden shadow-sm pointer-events-auto flex flex-col justify-center ${st.bg}`}
+                            className={`absolute left-2 right-4 rounded-xl border px-3 py-2 cursor-pointer hover:shadow-md transition-all overflow-hidden shadow-sm pointer-events-auto flex flex-col justify-center ${st.bg}`}
                             style={{ top: `${topOffset}px`, height: `${Math.max(height - 4, 36)}px`, zIndex: 10 }}
-                            onClick={() => { if (!apt.isMasked) setQuickViewAptId(apt.id); }}
+                            onClick={() => setQuickViewAptId(apt.id)}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex flex-col gap-0.5">
@@ -508,9 +508,9 @@ const Appointments = () => {
                               return (
                                 <div 
                                   key={apt.id} 
-                                  className={`absolute left-0.5 right-1 rounded-lg border px-1.5 py-1 ${apt.isMasked ? 'cursor-default' : 'cursor-pointer hover:shadow-md'} transition-all text-[10px] overflow-hidden shadow-sm pointer-events-auto flex flex-col ${st.bg}`}
+                                  className={`absolute left-0.5 right-1 rounded-lg border px-1.5 py-1 cursor-pointer hover:shadow-md transition-all text-[10px] overflow-hidden shadow-sm pointer-events-auto flex flex-col ${st.bg}`}
                                   style={{ top: `${topOffset}px`, height: `${Math.max(height - 2, 24)}px`, zIndex: 10 }}
-                                  onClick={() => { if (!apt.isMasked) setQuickViewAptId(apt.id); }}
+                                  onClick={() => setQuickViewAptId(apt.id)}
                                 >
                                   <div className="flex items-center gap-1">
                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot} shrink-0`} />
@@ -559,8 +559,8 @@ const Appointments = () => {
                               return (
                                 <div 
                                   key={apt.id} 
-                                  className={`text-[10px] px-1.5 py-0.5 rounded border truncate ${apt.isMasked ? 'cursor-default' : 'cursor-pointer hover:opacity-80'} transition-opacity ${st.bg}`}
-                                  onClick={(e) => { e.stopPropagation(); if (!apt.isMasked) setQuickViewAptId(apt.id); }}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded border truncate cursor-pointer hover:opacity-80 transition-opacity ${st.bg}`}
+                                  onClick={(e) => { e.stopPropagation(); setQuickViewAptId(apt.id); }}
                                 >
                                   <span className="font-bold">{apt.time}</span> {apt.clientName} {getGoogleSyncBadge(apt)}
                                 </div>
