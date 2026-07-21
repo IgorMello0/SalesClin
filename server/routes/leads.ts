@@ -145,9 +145,23 @@ router.post('/', auth(), async (req, res) => {
       return res.status(403).json(createErrorResponse('Acesso negado', 403));
     }
     
-    // Roteamento Automático de SDRs
     let sdrId: number | undefined = undefined;
-    if (req.user?.companyId) {
+    let closerId: number | undefined = undefined;
+
+    // Verificar se o criador do lead é SDR ou Closer
+    if (req.user?.type === 'usuario' && req.user?.id) {
+      const criador = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: { role: true }
+      });
+      if (criador?.role) {
+        if (criador.role.isSDR) sdrId = req.user.id;
+        if (criador.role.isCloser) closerId = req.user.id;
+      }
+    }
+    
+    // Roteamento Automático de SDRs (apenas se quem criou NÃO for um SDR)
+    if (!sdrId && req.user?.companyId) {
       const empresa = await prisma.empresa.findUnique({
         where: { id: req.user.companyId },
         select: { leadRoutingMode: true }
@@ -190,6 +204,7 @@ router.post('/', auth(), async (req, res) => {
         professionalId, 
         companyId: req.user.companyId,
         sdrId,
+        closerId,
         name, 
         value: Number(value) || 0, 
         origin, 
