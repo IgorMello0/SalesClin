@@ -604,18 +604,6 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
               </Select>
             </div>
             
-            {validRoles.find(r => String(r.id) === newMember.roleId)?.isSDR && (
-              <div className="space-y-2">
-                <Label>Peso no Roteamento (SDR)</Label>
-                <Input 
-                  type="number"
-                  min="1"
-                  value={newMember.leadRoutingWeight} 
-                  onChange={e => setNewMember({...newMember, leadRoutingWeight: parseInt(e.target.value) || 1})}
-                  placeholder="1"
-                />
-              </div>
-            )}
 
             {clinicas.length > 0 && (
               <div className="space-y-2 sm:col-span-2 mt-2">
@@ -759,19 +747,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
                       </Select>
                     </div>
 
-                    {validRoles.find(r => String(r.id) === editingMember?.roleId)?.isSDR && (
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <Label className="text-[11px] uppercase text-muted-foreground font-bold">Peso no Roteamento (SDR)</Label>
-                        <Input 
-                          type="number"
-                          min="1"
-                          value={editingMember?.leadRoutingWeight || 1} 
-                          onChange={e => setEditingMember({...editingMember, leadRoutingWeight: parseInt(e.target.value) || 1})}
-                          className="h-9 text-sm"
-                        />
-                        <p className="text-[10px] text-muted-foreground">Utilizado apenas se o roteamento for semi-automático. Um peso maior fará com que este SDR receba mais leads.</p>
-                      </div>
-                    )}
+
                     {clinicas.length > 0 && (
                       <div className="space-y-2 sm:col-span-2 mt-4">
                         <Label className="text-[11px] uppercase text-muted-foreground font-bold mb-2 block">Acesso às Clínicas (Multi-Tenancy)</Label>

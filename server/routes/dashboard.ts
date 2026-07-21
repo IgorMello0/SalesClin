@@ -92,11 +92,25 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
           { sdrId: req.user.id },
           { closerId: req.user.id }
         ];
+
+        appointmentWhere.OR = [
+          { sdrId: req.user.id },
+          { lead: { sdrId: req.user.id } },
+          { lead: { closerId: req.user.id } }
+        ];
+
+        paymentExtraFilters.appointment = {
+          OR: [
+            { sdrId: req.user.id },
+            { lead: { sdrId: req.user.id } },
+            { lead: { closerId: req.user.id } }
+          ]
+        };
       }
     }
 
     if (sdrId && sdrId !== 'all') {
-      const parsedSdrId = parseInt(sdrId as string);
+      const parsedSdrId = sdrId === 'none' ? null : parseInt(sdrId as string);
       // O SDR agora está atrelado diretamente ao Lead
       leadExtraFilters.sdrId = parsedSdrId;
       appointmentWhere.sdrId = parsedSdrId;
@@ -104,7 +118,7 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
     }
 
     if (closerId && closerId !== 'all') {
-      const parsedCloserId = parseInt(closerId as string);
+      const parsedCloserId = closerId === 'none' ? null : parseInt(closerId as string);
       // O Closer agora está atrelado diretamente ao Lead
       leadExtraFilters.closerId = parsedCloserId;
       

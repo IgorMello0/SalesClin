@@ -598,10 +598,12 @@ export const clientsApi = {
 
 // Dashboard
 export const dashboardApi = {
-  getMetrics: async (filter: string = 'custom', startDate?: string, endDate?: string) => {
+  getMetrics: async (filter: string = 'custom', startDate?: string, endDate?: string, sdrId?: string, closerId?: string) => {
     const query = new URLSearchParams({ filter })
     if (startDate) query.append('startDate', startDate)
     if (endDate) query.append('endDate', endDate)
+    if (sdrId && sdrId !== 'all') query.append('sdrId', sdrId)
+    if (closerId && closerId !== 'all') query.append('closerId', closerId)
     return apiRequest<any>(`/dashboard/metrics?${query.toString()}`)
   },
 }

@@ -747,6 +747,26 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
       }
     });
 
+    if (sdrId !== undefined) {
+      const parsedSdr = sdrId === null ? null : parseInt(sdrId);
+      if (lead.sdrId !== parsedSdr) {
+        const content = parsedSdr === null ? 'SDR responsável removido.' : `O SDR responsável foi alterado para ${updated.sdr?.name || 'outro usuário'}.`;
+        await prisma.leadActivity.create({
+          data: { leadId: updated.id, type: 'system', content, createdBy: req.user!.id.toString() }
+        });
+      }
+    }
+
+    if (closerId !== undefined) {
+      const parsedCloser = closerId === null ? null : parseInt(closerId);
+      if (lead.closerId !== parsedCloser) {
+        const content = parsedCloser === null ? 'Closer responsável removido.' : `O Closer responsável foi alterado para ${updated.closer?.name || 'outro usuário'}.`;
+        await prisma.leadActivity.create({
+          data: { leadId: updated.id, type: 'system', content, createdBy: req.user!.id.toString() }
+        });
+      }
+    }
+
     logAudit(req.user!.id, 'ATUALIZAR_EQUIPE_LEAD', 'Lead', updated.id);
     res.json(createSuccessResponse(updated));
   } catch (error: any) {

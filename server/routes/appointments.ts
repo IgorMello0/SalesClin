@@ -59,7 +59,34 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
     }),
     prisma.appointment.count({ where })
   ])
-  res.json(createSuccessResponse(items, { page, pageSize, total }))
+
+  let isRestricted = false;
+  if (req.user?.type === 'usuario') {
+    const dbUser = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+      include: { role: true }
+    });
+    if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
+      isRestricted = true;
+    }
+  }
+
+  const maskedItems = items.map(item => {
+    if (isRestricted) {
+      const isMine = item.sdrId === req.user!.id || item.lead?.sdrId === req.user!.id || item.lead?.closerId === req.user!.id;
+      if (!isMine) {
+        return {
+          ...item,
+          client: { ...item.client, name: 'Horário Reservado (Ocupado)', phone: '', email: '' },
+          lead: { ...item.lead, name: 'Horário Reservado', phone: '', email: '' },
+          notes: 'Reservado por outro membro da equipe',
+        };
+      }
+    }
+    return item;
+  });
+
+  res.json(createSuccessResponse(maskedItems, { page, pageSize, total }))
 })
 
 // Check availability (olheiro em tempo real)
@@ -172,6 +199,30 @@ router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) 
     include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
   })
   if (!item) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404))
+  
+  let isRestricted = false;
+  if (req.user?.type === 'usuario') {
+    const dbUser = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+      include: { role: true }
+    });
+    if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
+      isRestricted = true;
+    }
+  }
+
+  if (isRestricted) {
+    const isMine = item.sdrId === req.user!.id || item.lead?.sdrId === req.user!.id || item.lead?.closerId === req.user!.id;
+    if (!isMine) {
+      return res.json(createSuccessResponse({
+        ...item,
+        client: { ...item.client, name: 'Horário Reservado (Ocupado)', phone: '', email: '' },
+        lead: { ...item.lead, name: 'Horário Reservado', phone: '', email: '' },
+        notes: 'Reservado por outro membro da equipe',
+      }));
+    }
+  }
+
   res.json(createSuccessResponse(item))
 })
 

@@ -365,11 +365,12 @@ const Dashboard = () => {
                         <Select value={selectedSdrId} onValueChange={(val) => handleFilterChange(filter, filter === 'custom' ? customStartDate : undefined, filter === 'custom' ? customEndDate : undefined, val, selectedCloserId)}>
                           <SelectTrigger className="w-full bg-slate-50/50 border-slate-200 focus:ring-secondary">
                             <SelectValue placeholder="SDR (Todos)">
-                              {selectedSdrId === 'all' ? 'Todos os SDRs' : (sdrs.find(s => s.id.toString() === selectedSdrId)?.name || 'Todos os SDRs')}
+                              {selectedSdrId === 'all' ? 'Todos (Sem Filtro)' : selectedSdrId === 'none' ? 'Leads sem SDR' : (sdrs.find(s => s.id.toString() === selectedSdrId)?.name || 'Todos (Sem Filtro)')}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">Todos os SDRs</SelectItem>
+                            <SelectItem value="all">Todos (Sem filtro)</SelectItem>
+                            <SelectItem value="none">Leads sem SDR (Vazio)</SelectItem>
                             {sdrs.map(sdr => (
                               <SelectItem key={sdr.id} value={sdr.id.toString()}>{sdr.name}</SelectItem>
                             ))}
@@ -384,11 +385,12 @@ const Dashboard = () => {
                         <Select value={selectedCloserId} onValueChange={(val) => handleFilterChange(filter, filter === 'custom' ? customStartDate : undefined, filter === 'custom' ? customEndDate : undefined, selectedSdrId, val)}>
                           <SelectTrigger className="w-full bg-slate-50/50 border-slate-200 focus:ring-secondary">
                             <SelectValue placeholder="Closer (Todos)">
-                              {selectedCloserId === 'all' ? 'Todos os Closers' : (closers.find(c => c.id.toString() === selectedCloserId)?.name || 'Todos os Closers')}
+                              {selectedCloserId === 'all' ? 'Todos (Sem Filtro)' : selectedCloserId === 'none' ? 'Leads sem Closer' : (closers.find(c => c.id.toString() === selectedCloserId)?.name || 'Todos (Sem Filtro)')}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">Todos os Closers</SelectItem>
+                            <SelectItem value="all">Todos (Sem filtro)</SelectItem>
+                            <SelectItem value="none">Leads sem Closer (Vazio)</SelectItem>
                             {closers.map(closer => (
                               <SelectItem key={closer.id} value={closer.id.toString()}>{closer.name}</SelectItem>
                             ))}
