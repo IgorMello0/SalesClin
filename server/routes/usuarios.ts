@@ -30,8 +30,12 @@ async function getOwnedCompanyIds(professionalId: number) {
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body as { email: string; password: string }
+  const emailAddress = String(email || '').trim().toLowerCase()
+  if (!emailAddress || !password) {
+    return res.status(400).json(createErrorResponse('Email e senha sao obrigatorios', 400))
+  }
   const user = await prisma.usuario.findUnique({ 
-    where: { email },
+    where: { email: emailAddress },
     include: {
       company: { select: { id: true, name: true } },
       role: true,

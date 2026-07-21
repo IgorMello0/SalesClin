@@ -1,31 +1,60 @@
 import { prisma } from '../prisma.js'
+import type { AuthUser } from '../middleware/auth.js'
+
+type AuditActor = number | Pick<AuthUser, 'id' | 'type' | 'companyId'>
+
+async function resolveProfessionalId(actor: AuditActor): Promise<number | null> {
+  if (typeof actor === 'number') {
+    const professional = await prisma.professional.findUnique({
+      where: { id: actor },
+      select: { id: true },
+    })
+    return professional?.id || null
+  }
+
+  if (actor.type === 'profissional') {
+    return actor.id
+  }
+
+  if (actor.type === 'usuario' && actor.companyId) {
+    const company = await prisma.empresa.findUnique({
+      where: { id: actor.companyId },
+      select: { ownerId: true },
+    })
+    return company?.ownerId || null
+  }
+
+  return null
+}
 
 /**
- * Registra uma ação no log de auditoria
- * 
- * @param userId ID do profissional que realizou a ação
- * @param action Descrição da ação (ex: 'CRIAR', 'ATUALIZAR', 'DELETAR')
- * @param targetTable Nome da tabela afetada (ex: 'Appointment', 'Client')
- * @param targetId ID do registro afetado (opcional)
+ * Registra uma acao no log de auditoria sem interromper a operacao principal.
+ * O schema legado relaciona o log a Professional. Acoes de usuarios da equipe
+ * sao associadas ao profissional dono da clinica ativa.
  */
 export async function logAudit(
-  userId: number,
+  actor: AuditActor,
   action: string,
   targetTable: string,
   targetId?: number
 ) {
   try {
-    // Verificação de segurança: não falhar a requisição principal se o log falhar
+    const professionalId = await resolveProfessionalId(actor)
+    if (!professionalId) {
+      console.warn(`[Audit] Registro ignorado: autor sem profissional vinculado (${action} em ${targetTable})`)
+      return
+    }
+
     await prisma.auditLog.create({
       data: {
-        userId,
+        userId: professionalId,
         action,
         targetTable,
         targetId,
-        timestamp: new Date()
-      }
+        timestamp: new Date(),
+      },
     })
-    console.log(`[Audit] Usuário ${userId} executou ${action} em ${targetTable} ${targetId ? `(ID: ${targetId})` : ''}`)
+    console.log(`[Audit] Profissional ${professionalId} executou ${action} em ${targetTable} ${targetId ? `(ID: ${targetId})` : ''}`)
   } catch (error) {
     console.error('[Audit] Erro ao registrar log de auditoria:', error)
   }

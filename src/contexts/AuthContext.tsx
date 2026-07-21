@@ -205,15 +205,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] Attempting login for:', email);
       
       // Tentar login como profissional primeiro
-      let response = await professionalsApi.login(email, password);
-      console.log('[Auth] Professional login response:', response);
+      const professionalResponse = await professionalsApi.login(email.trim().toLowerCase(), password);
+      let response = professionalResponse;
+      console.log('[Auth] Professional login response:', professionalResponse);
       
-      // Se falhar por credencial comum, tentar login como usuario.
-      // Erros 403 indicam conta pendente/bloqueada e preservam a mensagem original.
-      if (!response.success && response.error?.code !== 403) {
+      // Professional e Usuario sao cadastros separados. O mesmo e-mail pode
+      // ter um cadastro profissional pendente e um convite de equipe ativo.
+      if (!professionalResponse.success) {
         console.log('[Auth] Professional login failed, trying user login...');
-        response = await usuariosApi.login(email, password);
-        console.log('[Auth] User login response:', response);
+        const userResponse = await usuariosApi.login(email.trim().toLowerCase(), password);
+        console.log('[Auth] User login response:', userResponse);
+
+        if (userResponse.success) {
+          response = userResponse;
+        } else if (professionalResponse.error?.code === 403 || professionalResponse.error?.code === 500) {
+          response = professionalResponse;
+        } else {
+          response = userResponse;
+        }
       }
       
       if (response.success && response.data) {

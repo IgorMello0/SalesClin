@@ -13,15 +13,16 @@ export const router = Router()
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body as { email: string; password: string }
+    const emailAddress = String(email || '').trim().toLowerCase()
     
-    if (!email || !password) {
+    if (!emailAddress || !password) {
       return res.status(400).json(createErrorResponse('Email e senha são obrigatórios', 400))
     }
     
     console.log('[Login] Tentativa de login:', email)
     
     const professional = await prisma.professional.findUnique({
-      where: { email },
+      where: { email: emailAddress },
       include: {
         company: { select: { id: true, name: true } },
         ownedCompanies: { select: { id: true, name: true } },

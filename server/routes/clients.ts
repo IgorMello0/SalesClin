@@ -149,7 +149,7 @@ router.post('/', auth(), requireModule('clientes'), async (req, res) => {
       data: { professionalId, companyId: req.user.companyId, name, email, phone, dateOfBirth, document, notes }
     })
     
-    logAudit(req.user.id, 'CRIAR_CLIENTE', 'Client', created.id)
+    logAudit(req.user, 'CRIAR_CLIENTE', 'Client', created.id)
     
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {
@@ -463,7 +463,7 @@ router.post('/:id/proposals', auth(false), async (req, res) => {
 
     if (req.user) {
       await logAudit(
-        req.user.id,
+        req.user,
         `Criou proposta ${proposal.id} para o cliente ${client.id}`,
         'proposals',
         proposal.id

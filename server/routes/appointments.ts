@@ -295,7 +295,7 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
 
     const synced = await syncAppointmentToGoogle(created.id)
     
-    logAudit(req.user.id, 'CRIAR_AGENDAMENTO', 'Appointment', created.id)
+    logAudit(req.user, 'CRIAR_AGENDAMENTO', 'Appointment', created.id)
     
     res.status(201).json(createSuccessResponse(synced || created))
   } catch (error: any) {

@@ -258,6 +258,8 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
           if (clinic?.id) merged.set(Number(clinic.id), clinic);
         }
         setClinicas(Array.from(merged.values()));
+      } else {
+        setClinicas(professional?.companies || []);
       }
     } catch (e) {
       console.error('Erro ao carregar clínicas', e);
@@ -1512,6 +1514,8 @@ const ClinicasView = () => {
           if (clinic?.id) merged.set(Number(clinic.id), clinic);
         }
         setClinicas(Array.from(merged.values()));
+      } else {
+        setClinicas(professional?.companies || []);
       }
     } catch (e) {
       toast({ title: 'Erro', description: 'Erro ao carregar clínicas', variant: 'destructive' });

@@ -296,9 +296,17 @@ router.post('/google', async (req, res) => {
       await ensureCompanyDefaults(prisma, professional.companyId, professional.id)
     }
 
-    const availableCompanies = professional.ownedCompanies.length > 0
-      ? professional.ownedCompanies.map(c => ({ id: c.id, name: c.name }))
-      : (professional.company ? [{ id: professional.company.id, name: professional.company.name }] : [])
+    const companiesMap = new Map<number, string>()
+    if (professional.company) {
+      companiesMap.set(professional.company.id, professional.company.name)
+    }
+    for (const company of professional.ownedCompanies) {
+      companiesMap.set(company.id, company.name)
+    }
+    const availableCompanies = Array.from(companiesMap.entries()).map(([id, companyName]) => ({
+      id,
+      name: companyName,
+    }))
 
     const allowedCompanies = availableCompanies.map(c => c.id)
 

@@ -6,6 +6,28 @@ import { logAudit } from '../utils/audit.js'
 
 export const router = Router()
 
+const PAYMENT_METHOD_ALIASES: Record<string, 'pix' | 'cartao' | 'dinheiro' | 'transferencia'> = {
+  pix: 'pix',
+  cartao: 'cartao',
+  credito: 'cartao',
+  debito: 'cartao',
+  dinheiro: 'dinheiro',
+  transferencia: 'transferencia',
+  boleto: 'transferencia',
+}
+
+const PAYMENT_STATUS_ALIASES: Record<string, 'pago' | 'pendente' | 'atrasado' | 'cancelado'> = {
+  pago: 'pago',
+  paid: 'pago',
+  pendente: 'pendente',
+  pending: 'pendente',
+  atrasado: 'atrasado',
+  overdue: 'atrasado',
+  cancelado: 'cancelado',
+  canceled: 'cancelado',
+  cancelled: 'cancelado',
+}
+
 // Listar todos os leads
 router.get('/', auth(false), async (req, res) => {
   try {
@@ -129,9 +151,17 @@ router.post('/', auth(), async (req, res) => {
     }
 
     let professionalId: number;
+    let companyId = req.user?.companyId || null;
 
     if (req.user?.type === 'profissional') {
       professionalId = req.user.id;
+      if (!companyId) {
+        const professional = await prisma.professional.findUnique({
+          where: { id: req.user.id },
+          select: { companyId: true },
+        });
+        companyId = professional?.companyId || null;
+      }
     } else if (req.user?.type === 'usuario') {
       // Buscar o dono da empresa do usuário
       const empresa = await prisma.empresa.findUnique({
@@ -170,16 +200,16 @@ router.post('/', auth(), async (req, res) => {
     }
     
     // Roteamento Automático de SDRs (apenas se quem criou NÃO for um SDR)
-    if (!sdrId && req.user?.companyId) {
+    if (!sdrId && companyId) {
       const empresa = await prisma.empresa.findUnique({
-        where: { id: req.user.companyId },
+        where: { id: companyId },
         select: { leadRoutingMode: true }
       });
 
       if (empresa && empresa.leadRoutingMode !== 'manual') {
         const sdrs = await prisma.usuario.findMany({
           where: {
-            companyId: req.user.companyId,
+            companyId,
             isActive: true,
             role: { isSDR: true }
           },
@@ -208,10 +238,24 @@ router.post('/', auth(), async (req, res) => {
       }
     }
 
+    if (phone) {
+      const existingLead = await prisma.lead.findFirst({
+        where: { phone, companyId },
+        select: { id: true, name: true },
+      });
+
+      if (existingLead) {
+        return res.status(409).json(createErrorResponse(
+          `Este telefone ja pertence ao lead ${existingLead.name} (ID ${existingLead.id}).`,
+          409
+        ));
+      }
+    }
+
     const created = await prisma.lead.create({
       data: { 
         professionalId, 
-        companyId: req.user.companyId,
+        companyId,
         sdrId,
         closerId,
         name, 
@@ -250,7 +294,7 @@ router.post('/', auth(), async (req, res) => {
       }
     }
     
-    logAudit(req.user.id, 'CRIAR_LEAD', 'Lead', created.id)
+    logAudit(req.user, 'CRIAR_LEAD', 'Lead', created.id)
     
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {
@@ -654,6 +698,30 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
 
     const { payments, proposalId } = req.body // Array of { amount, date, method, status } + optional proposalId
 
+    if (!Array.isArray(payments) || payments.length === 0) {
+      return res.status(400).json(createErrorResponse('Informe ao menos um pagamento.', 400))
+    }
+
+    const normalizedPayments = payments.map((payment: any) => ({
+      ...payment,
+      amount: Number(payment.amount),
+      date: new Date(payment.date),
+      method: PAYMENT_METHOD_ALIASES[String(payment.method || '').trim().toLowerCase()],
+      status: PAYMENT_STATUS_ALIASES[String(payment.status || 'pago').trim().toLowerCase()],
+    }))
+
+    const invalidPayment = normalizedPayments.find((payment: any) => (
+      !Number.isFinite(payment.amount)
+      || payment.amount <= 0
+      || !payment.method
+      || !payment.status
+      || Number.isNaN(payment.date.getTime())
+    ))
+
+    if (invalidPayment) {
+      return res.status(400).json(createErrorResponse('Pagamento invalido. Confira valor, data e metodo.', 400))
+    }
+
     const lead = await prisma.lead.findUnique({ where: { id } })
     if (!lead) return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
 
@@ -685,15 +753,15 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
 
     // Criar os pagamentos no banco de dados
     const paymentRecords = []
-    for (const p of payments) {
+    for (const p of normalizedPayments) {
       const payment = await prisma.payment.create({
         data: {
           clientId: clientId,
           professionalId: lead.professionalId,
           companyId: lead.companyId,
           amount: p.amount,
-          date: new Date(p.date),
-          method: p.method, // 'cartao', 'pix', 'transferencia', 'dinheiro'
+          date: p.date,
+          method: p.method,
           status: p.status || 'pago'
         }
       })
@@ -808,7 +876,7 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
       }
     }
 
-    logAudit(req.user!.id, 'ATUALIZAR_EQUIPE_LEAD', 'Lead', updated.id);
+    logAudit(req.user!, 'ATUALIZAR_EQUIPE_LEAD', 'Lead', updated.id);
     res.json(createSuccessResponse(updated));
   } catch (error: any) {
     console.error('[Leads] Erro ao reatribuir equipe:', error);

@@ -49,8 +49,14 @@ app.use(json({
 }))
 app.use(urlencoded({ limit: '20mb', extended: true }))
 
-app.get('/api/health', (_req, res) => {
-  res.json({ success: true, data: { status: 'ok' } })
+app.get('/api/health', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`
+    res.json({ success: true, data: { status: 'ok', database: 'connected' } })
+  } catch (error) {
+    console.error('[health] database unavailable:', error)
+    res.status(503).json(createErrorResponse('Banco de dados indisponivel', 503))
+  }
 })
 
 app.use('/api/profissionais', professionalsRouter)
