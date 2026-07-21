@@ -60,31 +60,37 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
     prisma.appointment.count({ where })
   ])
 
-  let isRestricted = false;
-  if (req.user?.type === 'usuario') {
-    const dbUser = await prisma.usuario.findUnique({
-      where: { id: req.user.id },
-      include: { role: true }
-    });
-    if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
-      isRestricted = true;
-    }
-  }
-
-  const maskedItems = items.map(item => {
-    if (isRestricted) {
-      const isMine = item.sdrId === req.user!.id || item.lead?.sdrId === req.user!.id || item.lead?.closerId === req.user!.id;
-      if (!isMine) {
-        return {
-          ...item,
-          client: { ...item.client, name: 'Horário Reservado (Ocupado)', phone: '', email: '' },
-          lead: { ...item.lead, name: 'Horário Reservado', phone: '', email: '' },
-          notes: 'Reservado por outro membro da equipe',
-        };
+    let restrictedRole: any = null;
+    if (req.user?.type === 'usuario') {
+      const dbUser = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: { role: true }
+      });
+      if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
+        restrictedRole = dbUser.role;
       }
     }
-    return item;
-  });
+
+    const maskedItems = items.map(item => {
+      if (restrictedRole) {
+        let isMine = false;
+        if (restrictedRole.isSDR) {
+          isMine = item.sdrId === req.user!.id;
+        }
+        if (restrictedRole.isCloser) {
+          isMine = isMine || item.lead?.closerId === req.user!.id;
+        }
+        if (!isMine) {
+          return {
+            ...item,
+            client: { ...item.client, name: 'Horário Reservado (Ocupado)', phone: '', email: '' },
+            lead: { ...item.lead, name: 'Horário Reservado', phone: '', email: '' },
+            notes: 'Reservado por outro membro da equipe',
+          };
+        }
+      }
+      return item;
+    });
 
   res.json(createSuccessResponse(maskedItems, { page, pageSize, total }))
 })
@@ -199,29 +205,34 @@ router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) 
     include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
   })
   if (!item) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404))
-  
-  let isRestricted = false;
-  if (req.user?.type === 'usuario') {
-    const dbUser = await prisma.usuario.findUnique({
-      where: { id: req.user.id },
-      include: { role: true }
-    });
-    if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
-      isRestricted = true;
+    let restrictedRole: any = null;
+    if (req.user?.type === 'usuario') {
+      const dbUser = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: { role: true }
+      });
+      if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
+        restrictedRole = dbUser.role;
+      }
     }
-  }
 
-  if (isRestricted) {
-    const isMine = item.sdrId === req.user!.id || item.lead?.sdrId === req.user!.id || item.lead?.closerId === req.user!.id;
-    if (!isMine) {
-      return res.json(createSuccessResponse({
-        ...item,
-        client: { ...item.client, name: 'Horário Reservado (Ocupado)', phone: '', email: '' },
-        lead: { ...item.lead, name: 'Horário Reservado', phone: '', email: '' },
-        notes: 'Reservado por outro membro da equipe',
-      }));
+    if (restrictedRole) {
+      let isMine = false;
+      if (restrictedRole.isSDR) {
+        isMine = item.sdrId === req.user!.id;
+      }
+      if (restrictedRole.isCloser) {
+        isMine = isMine || item.lead?.closerId === req.user!.id;
+      }
+      if (!isMine) {
+        return res.json(createSuccessResponse({
+          ...item,
+          client: { ...item.client, name: 'Horário Reservado (Ocupado)', phone: '', email: '' },
+          lead: { ...item.lead, name: 'Horário Reservado', phone: '', email: '' },
+          notes: 'Reservado por outro membro da equipe',
+        }));
+      }
     }
-  }
 
   res.json(createSuccessResponse(item))
 })
