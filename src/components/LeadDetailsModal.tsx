@@ -733,7 +733,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             </SelectTrigger>
                             <SelectContent className="z-[9999]">
                               <SelectItem value="unassigned">Sem SDR</SelectItem>
-                              {team.filter(u => u.role?.isSdr).map(u => (
+                              {team.filter(u => u.role?.isSDR).map(u => (
                                 <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                               ))}
                             </SelectContent>

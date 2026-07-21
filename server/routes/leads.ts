@@ -158,7 +158,7 @@ router.post('/', auth(), async (req, res) => {
           where: {
             companyId: req.user.companyId,
             isActive: true,
-            role: { isSdr: true }
+            role: { isSDR: true }
           },
           select: { id: true, leadRoutingWeight: true }
         });
