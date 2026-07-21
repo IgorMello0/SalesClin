@@ -194,7 +194,14 @@ router.post('/', auth(), async (req, res) => {
         include: { role: true }
       });
       if (criador?.role) {
-        if (criador.role.isSDR && requestedSdrId === undefined) sdrId = req.user.id;
+        const isSdrPuro = criador.role.isSDR && !criador.role.isAdmin && !criador.role.isManager;
+        
+        if (isSdrPuro) {
+          sdrId = req.user.id; // SDR puro não pode delegar, sempre vai para ele
+        } else if (criador.role.isSDR && requestedSdrId === undefined) {
+          sdrId = req.user.id; // Para quem também é admin, mas não enviou sdrId
+        }
+        
         if (criador.role.isCloser) closerId = req.user.id;
       }
     }

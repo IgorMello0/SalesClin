@@ -516,22 +516,24 @@ const Leads = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">SDR</Label>
-                        <Select value={formData.sdrId} onValueChange={(val) => setFormData({...formData, sdrId: val})}>
-                          <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
-                            <SelectValue placeholder="Selecione...">
-                              {formData.sdrId === 'random' ? 'Aleatório (Roleta)' : sdrs.find(opt => opt.id.toString() === formData.sdrId)?.name}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
-                            <SelectItem value="random" className="font-bold text-primary">Aleatório (Roleta)</SelectItem>
-                            {sdrs.map(opt => (
-                              <SelectItem key={opt.id} value={opt.id.toString()}>{opt.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {!(professional?.role?.isSDR && !professional?.role?.isAdmin && !professional?.role?.isManager) && (
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">SDR</Label>
+                          <Select value={formData.sdrId} onValueChange={(val) => setFormData({...formData, sdrId: val})}>
+                            <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
+                              <SelectValue placeholder="Selecione...">
+                                {formData.sdrId === 'random' ? 'Aleatório (Roleta)' : sdrs.find(opt => opt.id.toString() === formData.sdrId)?.name}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
+                              <SelectItem value="random" className="font-bold text-primary">Aleatório (Roleta)</SelectItem>
+                              {sdrs.map(opt => (
+                                <SelectItem key={opt.id} value={opt.id.toString()}>{opt.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
