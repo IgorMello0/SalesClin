@@ -40,7 +40,10 @@ export function LeadRoutingSettingsView() {
       }
       
       if (usrRes.success && usrRes.data) {
-        const sdrUsers = usrRes.data.filter((u: any) => u.role?.isSDR);
+        const sdrUsers = usrRes.data.filter((u: any) => 
+          u.role?.isSDR && 
+          (u.companyId === professional.companyId || u.companyAccess?.some((ca: any) => ca.companyId === professional.companyId))
+        );
         setSdrs(sdrUsers);
         
         const initialWeights: Record<number, number> = {};
