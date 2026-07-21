@@ -118,7 +118,7 @@ router.get('/:id', auth(false), async (req, res) => {
 // Criar novo lead
 router.post('/', auth(), async (req, res) => {
   try {
-    let { name, value, origin, status, avatar, phone, email, notes, responsible, tags } = req.body
+    let { name, value, origin, status, avatar, phone, email, notes, responsible, tags, sdrId: requestedSdrId } = req.body
     
     if (!name) {
       return res.status(400).json(createErrorResponse('O nome é obrigatório', 400))
@@ -150,14 +150,21 @@ router.post('/', auth(), async (req, res) => {
     let sdrId: number | undefined = undefined;
     let closerId: number | undefined = undefined;
 
-    // Verificar se o criador do lead é SDR ou Closer
+    // Se a interface enviar o SDR (pode ser um ID numérico, null para forçar nenhum, ou undefined/'random')
+    if (requestedSdrId === 'random') {
+      sdrId = undefined; // Força a roleta
+    } else if (requestedSdrId !== undefined) {
+      sdrId = requestedSdrId === null ? undefined : Number(requestedSdrId);
+    }
+
+    // Verificar se o criador do lead é SDR ou Closer e o SDR não foi explicitamente definido no request
     if (req.user?.type === 'usuario' && req.user?.id) {
       const criador = await prisma.usuario.findUnique({
         where: { id: req.user.id },
         include: { role: true }
       });
       if (criador?.role) {
-        if (criador.role.isSDR) sdrId = req.user.id;
+        if (criador.role.isSDR && requestedSdrId === undefined) sdrId = req.user.id;
         if (criador.role.isCloser) closerId = req.user.id;
       }
     }

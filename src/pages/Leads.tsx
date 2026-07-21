@@ -40,7 +40,7 @@ import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
-import { leadsApi, catalogsApi } from '@/lib/api';
+import { leadsApi, catalogsApi, usuariosApi } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { ProposalViewer } from '@/components/ProposalViewer';
 import { LeadDetailsModal } from '@/components/LeadDetailsModal';
@@ -85,6 +85,7 @@ const Leads = () => {
     value: '',
     origin: '',
     status: 'prospect_lead',
+    sdrId: 'random',
     tags: [] as string[]
   });
   const { toast } = useToast();
@@ -94,11 +95,23 @@ const Leads = () => {
   
   const [leads, setLeads] = useState<Lead[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [sdrs, setSdrs] = useState<any[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchDebounce, setSearchDebounce] = useState('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<number | null>(null);
+
+  const loadSdrs = async () => {
+    try {
+      const res = await usuariosApi.getAll({ pageSize: 50 });
+      if (res.success && res.data) {
+        setSdrs(res.data.filter((u: any) => u.isSdr || (u.role && u.role.isSDR) || (u.role && u.role.isSdr)));
+      }
+    } catch (e) {
+      console.error("Error loading SDRs:", e);
+    }
+  };
 
   // Proposal State
   const [leadProposals, setLeadProposals] = useState<any[]>([]);
@@ -157,6 +170,7 @@ const Leads = () => {
     loadServices();
     loadFunnelConfigs();
     loadOrigins();
+    loadSdrs();
   }, [professional]);
 
   const loadOrigins = async () => {
@@ -308,6 +322,7 @@ const Leads = () => {
         value: parseFloat(formData.value) || 0,
         origin: formData.origin || 'Direto',
         status: formData.status,
+        sdrId: formData.sdrId,
         tags: formData.tags
       };
 
@@ -482,23 +497,41 @@ const Leads = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Origem</Label>
-                      <Select 
-                        value={formData.origin} 
-                        onValueChange={(val) => setFormData({ ...formData, origin: val })}
-                      >
-                        <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
-                          <SelectValue placeholder="Selecione a origem">
-                            {origins.find(opt => opt.value === formData.origin)?.label || formData.origin}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
-                          {origins.map(opt => (
-                            <SelectItem key={opt.id} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Origem</Label>
+                        <Select 
+                          value={formData.origin} 
+                          onValueChange={(val) => setFormData({ ...formData, origin: val })}
+                        >
+                          <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
+                            <SelectValue placeholder="Selecione a origem">
+                              {origins.find(opt => opt.value === formData.origin)?.label || formData.origin}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
+                            {origins.map(opt => (
+                              <SelectItem key={opt.id} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">SDR</Label>
+                        <Select value={formData.sdrId} onValueChange={(val) => setFormData({...formData, sdrId: val})}>
+                          <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
+                            <SelectValue placeholder="Selecione...">
+                              {formData.sdrId === 'random' ? 'Aleatório (Roleta)' : sdrs.find(opt => opt.id.toString() === formData.sdrId)?.name}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
+                            <SelectItem value="random" className="font-bold text-primary">Aleatório (Roleta)</SelectItem>
+                            {sdrs.map(opt => (
+                              <SelectItem key={opt.id} value={opt.id.toString()}>{opt.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                     
                     <div className="space-y-2">

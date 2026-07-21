@@ -95,14 +95,12 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
 
         appointmentWhere.OR = [
           { sdrId: req.user.id },
-          { lead: { sdrId: req.user.id } },
           { lead: { closerId: req.user.id } }
         ];
 
         paymentExtraFilters.appointment = {
           OR: [
             { sdrId: req.user.id },
-            { lead: { sdrId: req.user.id } },
             { lead: { closerId: req.user.id } }
           ]
         };
@@ -111,28 +109,44 @@ router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res)
 
     if (sdrId && sdrId !== 'all') {
       const parsedSdrId = sdrId === 'none' ? null : parseInt(sdrId as string);
-      // O SDR agora está atrelado diretamente ao Lead
       leadExtraFilters.sdrId = parsedSdrId;
-      appointmentWhere.sdrId = parsedSdrId;
-      paymentExtraFilters.appointment = { sdrId: parsedSdrId };
+      
+      const sdrCondition = { sdrId: parsedSdrId };
+      
+      if (appointmentWhere.OR) {
+        appointmentWhere.AND = appointmentWhere.AND || [];
+        appointmentWhere.AND.push(sdrCondition);
+      } else {
+        Object.assign(appointmentWhere, sdrCondition);
+      }
+
+      if (paymentExtraFilters.appointment) {
+        paymentExtraFilters.appointment.AND = paymentExtraFilters.appointment.AND || [];
+        paymentExtraFilters.appointment.AND.push(sdrCondition);
+      } else {
+        paymentExtraFilters.appointment = sdrCondition;
+      }
     }
 
     if (closerId && closerId !== 'all') {
       const parsedCloserId = closerId === 'none' ? null : parseInt(closerId as string);
-      // O Closer agora está atrelado diretamente ao Lead
       leadExtraFilters.closerId = parsedCloserId;
       
-      const closerCondition = { closerId: parsedCloserId };
+      const leadCloserCondition = { lead: { closerId: parsedCloserId } };
       
-      // Filtro para pagamentos baseados no closer
-      if (paymentExtraFilters.appointment) {
-        paymentExtraFilters.appointment.lead = closerCondition;
+      if (appointmentWhere.OR) {
+        appointmentWhere.AND = appointmentWhere.AND || [];
+        appointmentWhere.AND.push(leadCloserCondition);
       } else {
-        paymentExtraFilters.appointment = { lead: closerCondition };
+        appointmentWhere.lead = { closerId: parsedCloserId };
       }
-      
-      // Filtro para appointments baseados no closer
-      appointmentWhere.lead = closerCondition;
+
+      if (paymentExtraFilters.appointment) {
+        paymentExtraFilters.appointment.AND = paymentExtraFilters.appointment.AND || [];
+        paymentExtraFilters.appointment.AND.push(leadCloserCondition);
+      } else {
+        paymentExtraFilters.appointment = leadCloserCondition;
+      }
     }
 
     // Mesclando filtros extras ao baseWhere

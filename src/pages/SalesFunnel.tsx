@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { NewAppointmentModal } from '@/components/NewAppointmentModal';
 import { ConfirmPaymentModal } from '@/components/ConfirmPaymentModal';
-import { clientsApi, leadsApi, tasksApi } from '@/lib/api';
+import { clientsApi, leadsApi, tasksApi, usuariosApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from "lucide-react";
 import { useEffect } from 'react';
@@ -117,10 +117,22 @@ const SalesFunnel = () => {
   const [isAddingLead, setIsAddingLead] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [newLeadStage, setNewLeadStage] = useState<string | null>(null);
-  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: '', phone: '', email: '' });
+  const [newLeadData, setNewLeadData] = useState({ name: '', value: '', origin: '', phone: '', email: '', sdrId: 'random' });
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sdrs, setSdrs] = useState<any[]>([]);
+
+  const loadSdrs = async () => {
+    try {
+      const res = await usuariosApi.getAll({ pageSize: 50 });
+      if (res.success && res.data) {
+        setSdrs(res.data.filter((u: any) => u.isSdr || (u.role && u.role.isSDR) || (u.role && u.role.isSdr)));
+      }
+    } catch (e) {
+      console.error("Error loading SDRs:", e);
+    }
+  };
   const [isConfiguringFunnels, setIsConfiguringFunnels] = useState(false);
   const [dynamicFunnels, setDynamicFunnels] = useState<any[]>([]);
   const [isLoadingFunnels, setIsLoadingFunnels] = useState(true);
@@ -553,6 +565,7 @@ const SalesFunnel = () => {
       loadFunnelConfigs();
       loadStatuses();
       loadOrigins();
+      loadSdrs();
     }
   }, [professional, activeFunnel]);
 
@@ -867,6 +880,7 @@ const SalesFunnel = () => {
         value: Number(newLeadData.value.toString().replace(/\./g, "")) || 0,
         origin: newLeadData.origin,
         status: finalStatus,
+        sdrId: newLeadData.sdrId,
         avatar: newLeadData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
       });
 
@@ -876,7 +890,7 @@ const SalesFunnel = () => {
         toast({ title: "Lead Criado!", description: "O lead foi salvo no banco de dados." });
         loadLeads();
         setIsAddingLead(false);
-        setNewLeadData({ name: '', value: '', origin: '', phone: '', email: '' });
+        setNewLeadData({ name: '', value: '', origin: '', phone: '', email: '', sdrId: 'random' });
       } else {
         toast({ 
           title: "Erro ao criar lead", 
@@ -1639,16 +1653,34 @@ const SalesFunnel = () => {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">E-mail</Label>
-              <Input 
-                id="email" 
-                type="email"
-                placeholder="email@exemplo.com" 
-                className="rounded-xl border-slate-200 h-12"
-                value={newLeadData.email}
-                onChange={(e) => setNewLeadData({...newLeadData, email: e.target.value})}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">E-mail</Label>
+                <Input 
+                  id="email" 
+                  type="email"
+                  placeholder="email@exemplo.com" 
+                  className="rounded-xl border-slate-200 h-12"
+                  value={newLeadData.email}
+                  onChange={(e) => setNewLeadData({...newLeadData, email: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sdr" className="text-xs font-bold uppercase tracking-widest text-slate-400">Atribuir a (SDR)</Label>
+                <Select value={newLeadData.sdrId} onValueChange={(val) => setNewLeadData({...newLeadData, sdrId: val})}>
+                  <SelectTrigger id="sdr" className="rounded-xl border-slate-200 h-12 bg-white">
+                    <SelectValue placeholder="Selecione...">
+                      {newLeadData.sdrId === 'random' ? 'Aleatório (Roleta)' : sdrs.find(opt => opt.id.toString() === newLeadData.sdrId)?.name}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
+                    <SelectItem value="random" className="font-bold text-primary">Aleatório (Roleta)</SelectItem>
+                    {sdrs.map(opt => (
+                      <SelectItem key={opt.id} value={opt.id.toString()}>{opt.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
