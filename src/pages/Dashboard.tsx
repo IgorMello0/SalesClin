@@ -125,8 +125,14 @@ const Dashboard = () => {
       try {
         const res = await usuariosApi.getAll();
         if (res.success && res.data) {
-          const sdrList = res.data.filter((u: any) => u.role?.isSDR);
-          const closerList = res.data.filter((u: any) => u.role?.isCloser);
+          const sdrList = res.data.filter((u: any) => 
+            u.role?.isSDR && 
+            (u.companyId === professional?.companyId || u.companyAccess?.some((ca: any) => ca.companyId === professional?.companyId))
+          );
+          const closerList = res.data.filter((u: any) => 
+            u.role?.isCloser && 
+            (u.companyId === professional?.companyId || u.companyAccess?.some((ca: any) => ca.companyId === professional?.companyId))
+          );
           setSdrs(sdrList);
           setClosers(closerList);
         }
