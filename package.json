@@ -8,6 +8,7 @@
     "build": "prisma generate && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "test:whatsapp": "tsx --test server/services/whatsapp-integration.test.ts",
     "preview": "vite preview",
     "server:dev": "nodemon --watch server --ext ts --exec \"tsx server/index.ts\"",
     "prisma:studio": "prisma studio",
