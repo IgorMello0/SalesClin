@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyOwner, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import {
   buildMetaConnectUrl,
@@ -12,6 +12,7 @@ import {
 import { isCoexistenceAllowed, type WhatsAppOfficialMode } from '../services/whatsapp-connections.js'
 
 export const router = Router()
+const ownerOnly = [auth(), requireModule('conversas'), requireCompanyOwner()]
 
 function getPublicAppUrl() {
   return (
@@ -60,7 +61,7 @@ async function getRequestEmail(req: any) {
   return null
 }
 
-router.get('/connect', auth(), async (req, res) => {
+router.get('/connect', ...ownerOnly, async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -104,7 +105,7 @@ router.get('/callback', async (req, res) => {
   }
 })
 
-router.get('/status', auth(), async (req, res) => {
+router.get('/status', auth(), requireModule('conversas'), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -123,7 +124,7 @@ router.get('/status', auth(), async (req, res) => {
   }
 })
 
-router.post('/configure', auth(), async (req, res) => {
+router.post('/configure', ...ownerOnly, async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -145,7 +146,7 @@ router.post('/configure', auth(), async (req, res) => {
   }
 })
 
-router.post('/disconnect', auth(), async (req, res) => {
+router.post('/disconnect', ...ownerOnly, async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))

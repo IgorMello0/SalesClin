@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyOwner, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import {
   createGoogleCalendarAuthUrl,
@@ -10,7 +10,7 @@ import {
 
 export const router = Router()
 
-router.get('/status', auth(), async (req, res) => {
+router.get('/status', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
     const companyId = req.user?.companyId
     if (!companyId) return res.status(400).json(createErrorResponse('Empresa nao definida', 400))
@@ -52,7 +52,7 @@ router.get('/status', auth(), async (req, res) => {
   }
 })
 
-router.get('/connect', auth(), async (req, res) => {
+router.get('/connect', auth(), requireModule('agendamentos'), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user?.companyId
     if (!companyId || !req.user) return res.status(400).json(createErrorResponse('Empresa nao definida', 400))
@@ -85,7 +85,7 @@ router.get('/callback', async (req, res) => {
   }
 })
 
-router.post('/disconnect', auth(), async (req, res) => {
+router.post('/disconnect', auth(), requireModule('agendamentos'), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user?.companyId
     if (!companyId) return res.status(400).json(createErrorResponse('Empresa nao definida', 400))
@@ -107,7 +107,7 @@ router.post('/disconnect', auth(), async (req, res) => {
   }
 })
 
-router.post('/resync', auth(), async (req, res) => {
+router.post('/resync', auth(), requireModule('agendamentos'), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user?.companyId
     if (!companyId) return res.status(400).json(createErrorResponse('Empresa nao definida', 400))

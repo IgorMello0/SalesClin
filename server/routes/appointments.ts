@@ -2,12 +2,17 @@ import { Router } from 'express'
 import { prisma } from '../prisma.js'
 import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
+import {
+  assertClientBelongsToCompany,
+  assertUserBelongsToCompany,
+  getCompanyOwnerProfessionalId,
+} from '../services/tenant.js'
 import { logAudit } from '../utils/audit.js'
 import { deleteAppointmentFromGoogle, syncAppointmentToGoogle } from '../services/google-calendar.js'
 
 export const router = Router()
 
-router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => {
+router.get('/', auth(), requireModule('agendamentos'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
   const { professionalId, clientId, status } = req.query as any
   let profId: number | undefined;
@@ -96,7 +101,7 @@ router.get('/', auth(false), requireModule('agendamentos'), async (req, res) => 
 })
 
 // Check availability (olheiro em tempo real)
-router.get('/check-availability', auth(false), async (req, res) => {
+router.get('/check-availability', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
     const { professionalId, startTime, endTime } = req.query as any
     if (!professionalId || !startTime || !endTime) {
@@ -124,7 +129,7 @@ router.get('/check-availability', auth(false), async (req, res) => {
 })
 
 // Horários disponíveis para um dia específico
-router.get('/available-slots', auth(false), async (req, res) => {
+router.get('/available-slots', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
     const { professionalId, date, durationMinutes } = req.query as any
     if (!professionalId || !date) {
@@ -137,7 +142,7 @@ router.get('/available-slots', auth(false), async (req, res) => {
     // 1. Busca os horários da empresa
     const prof = await prisma.professional.findUnique({
       where: { id: Number(professionalId) },
-      include: { company: true }
+      include: { company: { select: { openHour: true, closeHour: true } } }
     })
     
     const openHourStr = prof?.company?.openHour || "08:00"
@@ -198,11 +203,18 @@ router.get('/available-slots', auth(false), async (req, res) => {
   }
 })
 
-router.get('/:id', auth(false), requireModule('agendamentos'), async (req, res) => {
+router.get('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
-  const item = await prisma.appointment.findUnique({
-    where: { id },
-    include: { professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true }
+  const item = await prisma.appointment.findFirst({
+    where: { id, companyId: req.user!.companyId },
+    include: {
+      professional: { select: { id: true, name: true, specialization: true } },
+      client: true,
+      lead: true,
+      service: true,
+      appointmentLogs: true,
+      payments: true,
+    }
   })
   if (!item) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404))
     let restrictedRole: any = null;
@@ -241,22 +253,25 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
     const { clientId, leadId, tags, serviceId, startTime, endTime, status, notes, sdrId, especialistaId } = req.body
     
-    let professionalId: number;
+    const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
 
-    if (req.user?.type === 'profissional') {
-      professionalId = req.user.id;
-    } else if (req.user?.type === 'usuario') {
-      const empresa = await prisma.empresa.findUnique({
-        where: { id: req.user.companyId! },
-        select: { ownerId: true }
-      });
-      if (!empresa || !empresa.ownerId) {
-        return res.status(400).json(createErrorResponse('Empresa ou Profissional responsável não encontrado', 400));
-      }
-      professionalId = empresa.ownerId;
-    } else {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
+    if (clientId) await assertClientBelongsToCompany(Number(clientId), req.user?.companyId)
+    if (leadId) {
+      const lead = await prisma.lead.findFirst({
+        where: { id: Number(leadId), companyId: req.user!.companyId },
+        select: { id: true },
+      })
+      if (!lead) return res.status(400).json(createErrorResponse('Lead inválido para esta clínica', 400))
     }
+    if (serviceId) {
+      const service = await prisma.catalogItem.findFirst({
+        where: { id: Number(serviceId), professionalId },
+        select: { id: true },
+      })
+      if (!service) return res.status(400).json(createErrorResponse('Serviço inválido para esta clínica', 400))
+    }
+    if (sdrId) await assertUserBelongsToCompany(Number(sdrId), req.user?.companyId)
+    if (especialistaId) await assertUserBelongsToCompany(Number(especialistaId), req.user?.companyId)
 
     // Overbooking Validation
     const conflicting = await prisma.appointment.findFirst({
@@ -298,7 +313,7 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
         especialistaId: especialistaId ? Number(especialistaId) : null
       },
       include: { 
-        professional: true, client: true, lead: true, service: true, appointmentLogs: true, payments: true,
+        professional: { select: { id: true, name: true, specialization: true } }, client: true, lead: true, service: true, appointmentLogs: true, payments: true,
         sdr: { select: { id: true, name: true,  } },
         especialista: { select: { id: true, name: true,  } }
       }
@@ -320,8 +335,20 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     const id = Number(req.params.id)
     const { clientId, serviceId, startTime, endTime, status, notes, sdrId, especialistaId } = req.body
 
-    const current = await prisma.appointment.findUnique({ where: { id } });
+    const current = await prisma.appointment.findFirst({ where: { id, companyId: req.user!.companyId } });
     if (!current) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404));
+
+    const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
+    if (clientId) await assertClientBelongsToCompany(Number(clientId), req.user?.companyId)
+    if (serviceId) {
+      const service = await prisma.catalogItem.findFirst({
+        where: { id: Number(serviceId), professionalId },
+        select: { id: true },
+      })
+      if (!service) return res.status(400).json(createErrorResponse('Serviço inválido para esta clínica', 400))
+    }
+    if (sdrId) await assertUserBelongsToCompany(Number(sdrId), req.user?.companyId)
+    if (especialistaId) await assertUserBelongsToCompany(Number(especialistaId), req.user?.companyId)
 
     // Verificar se o usuário tem permissão sobre este profissional
     let canEdit = false;
@@ -366,7 +393,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
         especialistaId: especialistaId !== undefined ? (especialistaId ? Number(especialistaId) : null) : undefined
       },
       include: { 
-        lead: true, professional: true, client: true, service: true, appointmentLogs: true, payments: true,
+        lead: true, professional: { select: { id: true, name: true, specialization: true } }, client: true, service: true, appointmentLogs: true, payments: true,
         sdr: { select: { id: true, name: true,  } },
         especialista: { select: { id: true, name: true,  } }
       }
@@ -403,7 +430,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
 router.delete('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
 
-  const current = await prisma.appointment.findUnique({ where: { id } });
+  const current = await prisma.appointment.findFirst({ where: { id, companyId: req.user!.companyId } });
   if (!current) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404));
 
   let canEdit = false;
@@ -429,5 +456,3 @@ router.delete('/:id', auth(), requireModule('agendamentos'), async (req, res) =>
   
   res.json(createSuccessResponse({ id }))
 })
-
-

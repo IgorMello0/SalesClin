@@ -1,16 +1,17 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
+import { assertClientBelongsToCompany, getCompanyOwnerProfessionalId } from '../services/tenant.js'
 
 export const router = Router()
+router.use(auth(), requireModule('clientes'))
 
-router.get('/', auth(false), async (req, res) => {
+router.get('/', auth(), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
-  const { clientId, professionalId, type } = req.query as any
-  const where: any = {}
+  const { clientId, type } = req.query as any
+  const where: any = { client: { companyId: req.user!.companyId } }
   if (clientId) where.clientId = Number(clientId)
-  if (professionalId) where.professionalId = Number(professionalId)
   if (type) where.type = type
 
   const [items, total] = await Promise.all([
@@ -19,40 +20,67 @@ router.get('/', auth(false), async (req, res) => {
       skip,
       take,
       orderBy: { id: 'desc' },
-      include: { client: true, professional: true, template: true }
+      include: {
+        client: true,
+        professional: { select: { id: true, name: true, specialization: true } },
+        template: true,
+      }
     }),
     prisma.ficha.count({ where })
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
 
-router.get('/:id', auth(false), async (req, res) => {
+router.get('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
-  const item = await prisma.ficha.findUnique({
-    where: { id },
-    include: { client: true, professional: true, template: true }
+  const item = await prisma.ficha.findFirst({
+    where: { id, client: { companyId: req.user!.companyId } },
+    include: {
+      client: true,
+      professional: { select: { id: true, name: true, specialization: true } },
+      template: true,
+    }
   })
   if (!item) return res.status(404).json(createErrorResponse('Ficha não encontrada', 404))
   res.json(createSuccessResponse(item))
 })
 
 router.post('/', auth(), async (req, res) => {
-  const { clientId, professionalId, type, templateId, content } = req.body
-  const created = await prisma.ficha.create({ data: { clientId, professionalId, type, templateId, content } })
+  const { clientId, type, templateId, content } = req.body
+  await assertClientBelongsToCompany(Number(clientId), req.user?.companyId)
+  const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
+  if (templateId) {
+    const template = await prisma.fichaTemplate.findFirst({
+      where: { id: Number(templateId), createdBy: professionalId },
+      select: { id: true },
+    })
+    if (!template) return res.status(400).json(createErrorResponse('Template inválido para esta clínica', 400))
+  }
+  const created = await prisma.ficha.create({
+    data: { clientId: Number(clientId), professionalId, type, templateId, content },
+  })
   res.status(201).json(createSuccessResponse(created))
 })
 
 router.put('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
   const { type, templateId, content } = req.body
-  const updated = await prisma.ficha.update({ where: { id }, data: { type, templateId, content } })
+  const current = await prisma.ficha.findFirst({
+    where: { id, client: { companyId: req.user!.companyId } },
+    select: { id: true },
+  })
+  if (!current) return res.status(404).json(createErrorResponse('Ficha não encontrada', 404))
+  const updated = await prisma.ficha.update({ where: { id: current.id }, data: { type, templateId, content } })
   res.json(createSuccessResponse(updated))
 })
 
 router.delete('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
-  await prisma.ficha.delete({ where: { id } })
+  const current = await prisma.ficha.findFirst({
+    where: { id, client: { companyId: req.user!.companyId } },
+    select: { id: true },
+  })
+  if (!current) return res.status(404).json(createErrorResponse('Ficha não encontrada', 404))
+  await prisma.ficha.delete({ where: { id: current.id } })
   res.json(createSuccessResponse({ id }))
 })
-
-

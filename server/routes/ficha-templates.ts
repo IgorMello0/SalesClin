@@ -1,36 +1,43 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
+import { getCompanyOwnerProfessionalId } from '../services/tenant.js'
 
 export const router = Router()
+router.use(auth(), requireModule('clientes'))
 
-router.get('/', auth(false), async (req, res) => {
+router.get('/', auth(), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
+  const createdBy = await getCompanyOwnerProfessionalId(req.user?.companyId)
+  const where = { createdBy }
   const [items, total] = await Promise.all([
     prisma.fichaTemplate.findMany({
+      where,
       skip,
       take,
       orderBy: { id: 'desc' },
-      include: { creator: true, fichas: true }
+      include: { creator: { select: { id: true, name: true } }, fichas: true }
     }),
-    prisma.fichaTemplate.count()
+    prisma.fichaTemplate.count({ where })
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
 
-router.get('/:id', auth(false), async (req, res) => {
+router.get('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
-  const item = await prisma.fichaTemplate.findUnique({
-    where: { id },
-    include: { creator: true, fichas: true }
+  const createdBy = await getCompanyOwnerProfessionalId(req.user?.companyId)
+  const item = await prisma.fichaTemplate.findFirst({
+    where: { id, createdBy },
+    include: { creator: { select: { id: true, name: true } }, fichas: true }
   })
   if (!item) return res.status(404).json(createErrorResponse('Template não encontrado', 404))
   res.json(createSuccessResponse(item))
 })
 
 router.post('/', auth(), async (req, res) => {
-  const { name, description, category, fields, createdBy } = req.body
+  const { name, description, category, fields } = req.body
+  const createdBy = await getCompanyOwnerProfessionalId(req.user?.companyId)
   const created = await prisma.fichaTemplate.create({ data: { name, description, category, fields, createdBy } })
   res.status(201).json(createSuccessResponse(created))
 })
@@ -38,14 +45,18 @@ router.post('/', auth(), async (req, res) => {
 router.put('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
   const { name, description, category, fields } = req.body
-  const updated = await prisma.fichaTemplate.update({ where: { id }, data: { name, description, category, fields } })
+  const createdBy = await getCompanyOwnerProfessionalId(req.user?.companyId)
+  const current = await prisma.fichaTemplate.findFirst({ where: { id, createdBy }, select: { id: true } })
+  if (!current) return res.status(404).json(createErrorResponse('Template não encontrado', 404))
+  const updated = await prisma.fichaTemplate.update({ where: { id: current.id }, data: { name, description, category, fields } })
   res.json(createSuccessResponse(updated))
 })
 
 router.delete('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
-  await prisma.fichaTemplate.delete({ where: { id } })
+  const createdBy = await getCompanyOwnerProfessionalId(req.user?.companyId)
+  const current = await prisma.fichaTemplate.findFirst({ where: { id, createdBy }, select: { id: true } })
+  if (!current) return res.status(404).json(createErrorResponse('Template não encontrado', 404))
+  await prisma.fichaTemplate.delete({ where: { id: current.id } })
   res.json(createSuccessResponse({ id }))
 })
-
-

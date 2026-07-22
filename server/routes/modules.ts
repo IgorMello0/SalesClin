@@ -38,81 +38,14 @@ router.get('/:code', auth(), async (req, res) => {
   }
 })
 
-// Criar novo módulo (apenas admin)
-router.post('/', auth(), async (req, res) => {
-  try {
-    // Verificar se é admin
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403))
-    }
+router.post('/', auth(), (_req, res) => res.status(405).json(
+  createErrorResponse('Modulos globais sao gerenciados somente pelo bootstrap do sistema', 405)
+))
 
-    const { code, name, description, icon } = req.body
-    
-    if (!code || !name) {
-      return res.status(400).json(createErrorResponse('Código e nome são obrigatórios', 400))
-    }
+router.put('/:id', auth(), (_req, res) => res.status(405).json(
+  createErrorResponse('Modulos globais sao gerenciados somente pelo bootstrap do sistema', 405)
+))
 
-    const exists = await prisma.module.findUnique({ where: { code } })
-    if (exists) {
-      return res.status(400).json(createErrorResponse('Módulo com este código já existe', 400))
-    }
-
-    const module = await prisma.module.create({
-      data: { code, name, description, icon },
-    })
-    
-    res.status(201).json(createSuccessResponse(module))
-  } catch (error: any) {
-    console.error('[Modules] Erro ao criar módulo:', error)
-    res.status(500).json(createErrorResponse(error.message || 'Erro ao criar módulo', 500))
-  }
-})
-
-// Atualizar módulo (apenas admin)
-router.put('/:id', auth(), async (req, res) => {
-  try {
-    // Verificar se é admin
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403))
-    }
-
-    const id = Number(req.params.id)
-    const { code, name, description, icon, isActive } = req.body
-    
-    const module = await prisma.module.update({
-      where: { id },
-      data: { code, name, description, icon, isActive },
-    })
-    
-    res.json(createSuccessResponse(module))
-  } catch (error: any) {
-    console.error('[Modules] Erro ao atualizar módulo:', error)
-    if (error.code === 'P2025') {
-      return res.status(404).json(createErrorResponse('Módulo não encontrado', 404))
-    }
-    res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar módulo', 500))
-  }
-})
-
-// Deletar módulo (apenas admin)
-router.delete('/:id', auth(), async (req, res) => {
-  try {
-    // Verificar se é admin
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403))
-    }
-
-    const id = Number(req.params.id)
-    
-    await prisma.module.delete({ where: { id } })
-    
-    res.json(createSuccessResponse({ id }))
-  } catch (error: any) {
-    console.error('[Modules] Erro ao deletar módulo:', error)
-    if (error.code === 'P2025') {
-      return res.status(404).json(createErrorResponse('Módulo não encontrado', 404))
-    }
-    res.status(500).json(createErrorResponse(error.message || 'Erro ao deletar módulo', 500))
-  }
-})
-
+router.delete('/:id', auth(), (_req, res) => res.status(405).json(
+  createErrorResponse('Modulos globais sao gerenciados somente pelo bootstrap do sistema', 405)
+))

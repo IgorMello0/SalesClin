@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import { OAuth2Client } from 'google-auth-library'
 import { prisma } from '../prisma.js'
+import { getJwtSecret } from '../config/security.js'
 
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
 const EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
@@ -29,10 +30,6 @@ function getOAuthClient() {
   }
 
   return new OAuth2Client(clientId, clientSecret, getRedirectUri())
-}
-
-function getJwtSecret() {
-  return process.env.JWT_SECRET || 'dev-secret'
 }
 
 export function createGoogleCalendarAuthUrl(companyId: number, userId: number, userType: string) {

@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import { json, urlencoded } from 'express'
+import { assertProductionSecurityConfig } from './config/security.js'
 import { router as professionalsRouter } from './routes/professionals.js'
 import { router as clientsRouter } from './routes/clients.js'
 import { router as categoriesRouter } from './routes/categories.js'
@@ -37,7 +38,10 @@ import leadStatusesRouter from './routes/lead-statuses.js'
 import { createErrorResponse } from './utils/response.js'
 import { prisma } from './prisma.js'
 import { bootstrapSystemDefaults } from './bootstrap/defaults.js'
+import { expirePastDueBillingRecords } from './services/billing.js'
 import path from 'path'
+
+assertProductionSecurityConfig()
 
 const app = express()
 app.use(cors())
@@ -108,6 +112,15 @@ const port = process.env.PORT || 4000
 
 async function startServer() {
   await bootstrapSystemDefaults(prisma)
+
+  await expirePastDueBillingRecords().catch((error) => {
+    console.error('[billing] initial expiration reconciliation failed:', error)
+  })
+  setInterval(() => {
+    void expirePastDueBillingRecords().catch((error) => {
+      console.error('[billing] scheduled expiration reconciliation failed:', error)
+    })
+  }, 15 * 60_000).unref()
 
   await resumeInterruptedCampaigns().catch((error) => {
     console.error('[campaigns] initial resume failed:', error)

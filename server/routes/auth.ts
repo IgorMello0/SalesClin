@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../prisma.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
+import { getJwtSecret } from '../config/security.js'
 import {
   consumeEmailToken,
   EMAIL_TOKEN_TYPES,
@@ -315,7 +316,7 @@ router.post('/google', async (req, res) => {
       companyId: professional.companyId,
       type: 'profissional',
       allowedCompanies,
-    }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+    }, getJwtSecret(), { expiresIn: '12h' })
 
     console.log('[Auth Google] Login bem-sucedido:', email)
 

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyOwner, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import {
   connectUazapi,
@@ -9,12 +9,13 @@ import {
 } from '../services/uazapi-whatsapp.js'
 
 export const router = Router()
+const ownerOnly = [auth(), requireModule('conversas'), requireCompanyOwner()]
 
 function getCompanyId(req: any) {
   return Number(req.user?.companyId) || undefined
 }
 
-router.get('/status', auth(), async (req, res) => {
+router.get('/status', auth(), requireModule('conversas'), async (req, res) => {
   try {
     const companyId = getCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))
@@ -25,7 +26,7 @@ router.get('/status', auth(), async (req, res) => {
   }
 })
 
-router.post('/connect', auth(), async (req, res) => {
+router.post('/connect', ...ownerOnly, async (req, res) => {
   try {
     const companyId = getCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))
@@ -36,7 +37,7 @@ router.post('/connect', auth(), async (req, res) => {
   }
 })
 
-router.post('/webhook/setup', auth(), async (req, res) => {
+router.post('/webhook/setup', ...ownerOnly, async (req, res) => {
   try {
     const companyId = getCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))
@@ -47,7 +48,7 @@ router.post('/webhook/setup', auth(), async (req, res) => {
   }
 })
 
-router.post('/disconnect', auth(), async (req, res) => {
+router.post('/disconnect', ...ownerOnly, async (req, res) => {
   try {
     const companyId = getCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))

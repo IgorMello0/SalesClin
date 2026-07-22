@@ -1,11 +1,10 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyOwner } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
-import { sendVerificationEmail } from '../services/email-verification.js'
+import { getJwtSecret } from '../config/security.js'
 
 export const router = Router()
 
@@ -59,7 +58,7 @@ router.post('/login', async (req, res) => {
       companyId: professional.companyId, 
       type: 'profissional',
       allowedCompanies 
-    }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+    }, getJwtSecret(), { expiresIn: '12h' })
     
     console.log('[Login] Login bem-sucedido:', email)
 
@@ -123,7 +122,7 @@ router.get('/me', auth(), async (req, res) => {
       companyId: activeCompanyId, 
       type: 'profissional',
       allowedCompanies 
-    }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '12h' })
+    }, getJwtSecret(), { expiresIn: '12h' })
 
     res.json(createSuccessResponse({
       ...professional,
@@ -192,7 +191,7 @@ router.put('/me', auth(), async (req, res) => {
         bio,
         crm
       },
-      include: { company: true }
+      include: { company: { select: { id: true, name: true, isActive: true } } }
     })
 
     res.json(createSuccessResponse(updated))
@@ -203,14 +202,10 @@ router.put('/me', auth(), async (req, res) => {
 })
 
 // Listar profissionais
-router.get('/', auth(false), async (req, res) => {
+router.get('/', auth(), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
   
-  const where: any = {}
-  
-  if (req.user?.companyId) {
-    where.companyId = req.user.companyId
-  }
+  const where: any = { companyId: req.user!.companyId }
 
   const [items, total] = await Promise.all([
     prisma.professional.findMany({
@@ -233,205 +228,95 @@ router.get('/', auth(false), async (req, res) => {
 })
 
 // Obter por id
-router.get('/:id', auth(false), async (req, res) => {
+router.get('/:id', auth(), async (req, res) => {
   const id = Number(req.params.id)
-  const item = await prisma.professional.findUnique({
-    where: { id },
-    include: {
-      categories: true,
-      catalogItems: true,
-      appointments: true,
-      payments: true,
-      fichaTemplates: true,
-      fichas: true,
-      chatHistories: true,
-      settingsProfile: true,
-      auditLogs: true,
-      contracts: true,
-      conversas: true
-    }
+  const item = await prisma.professional.findFirst({
+    where: { id, companyId: req.user!.companyId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      specialization: true,
+      companyId: true,
+      companyName: true,
+      logoUrl: true,
+      contractType: true,
+      bio: true,
+      crm: true,
+      photoUrl: true,
+      onboardingCompleted: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   })
   if (!item) return res.status(404).json(createErrorResponse('Profissional não encontrado', 404))
   res.json(createSuccessResponse(item))
 })
 
-// Criar (signup público - cria nova empresa)
-router.post('/', async (req, res) => {
-  try {
-    return res.status(403).json(createErrorResponse('Cadastro publico exige checkout. Use /api/billing/signup-checkout.', 403))
-
-    const { name, email, password, phone, specialization, companyName, logoUrl, contractType } = req.body
-    
-    if (!name || !email || !password) {
-      return res.status(400).json(createErrorResponse('Nome, email e senha são obrigatórios', 400))
-    }
-    
-    if (password.length < 6) {
-      return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
-    }
-    
-    console.log('[Signup] Tentativa de cadastro:', email)
-    
-    const existing = await prisma.professional.findUnique({ where: { email } })
-    if (existing) {
-      console.log('[Signup] Email já cadastrado:', email)
-      return res.status(400).json(createErrorResponse('Email já cadastrado', 400))
-    }
-    
-    const passwordHash = await bcrypt.hash(password, 10)
-    
-    // Criar empresa primeiro
-    const empresaNome = companyName || `Empresa de ${name}`
-    console.log('[Signup] Criando empresa:', empresaNome)
-    
-    const empresa = await prisma.empresa.create({
-      data: {
-        name: empresaNome,
-        isActive: true
-      }
-    })
-    
-    console.log('[Signup] Empresa criada com ID:', empresa.id)
-    
-    // Criar profissional associado à empresa
-    const created = await prisma.professional.create({
-      data: { 
-        name, 
-        email, 
-        passwordHash, 
-        phone, 
-        specialization, 
-        companyId: empresa.id,
-        companyName, 
-        logoUrl, 
-        contractType,
-        emailVerified: false,
-        emailVerifiedAt: null,
-      },
-      include: {
-        company: true
-      }
-    })
-
-    // Set the professional as the owner of the company
-    await prisma.empresa.update({
-      where: { id: empresa.id },
-      data: { ownerId: created.id }
-    })
-    await ensureCompanyDefaults(prisma, empresa.id, created.id)
-
-    await sendVerificationEmail({
-      email: created.email,
-      name: created.name,
-      professionalId: created.id,
-    })
-
-    console.log('[Signup] Cadastro bem-sucedido:', email)
-    
-    res.status(201).json(createSuccessResponse({ 
-      requiresEmailVerification: true,
-      email: created.email,
-      professional: { 
-        id: created.id.toString(), 
-        name: created.name, 
-        email: created.email, 
-        phone: created.phone || '', 
-        specialization: created.specialization || '',
-        photoUrl: created.photoUrl || '',
-        onboardingCompleted: created.onboardingCompleted,
-        company: created.company ? {
-          id: created.company.id,
-          name: created.company.name
-        } : null
-      } 
-    }))
-  } catch (error) {
-    console.error('[Signup] Erro:', error)
-    res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
-  }
-})
+// O cadastro publico cria apenas uma intencao de compra em /api/billing/signup-checkout.
+router.post('/', (_req, res) => res.status(403).json(
+  createErrorResponse('Cadastro publico exige checkout. Use /api/billing/signup-checkout.', 403),
+))
 
 // Adicionar profissional à mesma equipe (logado)
-router.post('/equipe', auth(), async (req, res) => {
-  try {
-    const { name, email, password, phone, specialization, role } = req.body
-    
-    if (!name || !email || !password) {
-      return res.status(400).json(createErrorResponse('Nome, email e senha são obrigatórios', 400))
-    }
-    
-    if (password.length < 6) {
-      return res.status(400).json(createErrorResponse('A senha deve ter pelo menos 6 caracteres', 400))
-    }
-    
-    const existing = await prisma.professional.findUnique({ where: { email } })
-    if (existing) {
-      return res.status(400).json(createErrorResponse('Email já cadastrado', 400))
-    }
-
-    const currentProf = await prisma.professional.findUnique({ where: { id: req.user!.id } })
-    if (!currentProf || !currentProf.companyId) {
-      return res.status(400).json(createErrorResponse('Empresa não encontrada', 400))
-    }
-    
-    const passwordHash = await bcrypt.hash(password, 10)
-    
-    const created = await prisma.professional.create({
-      data: { 
-        name, 
-        email, 
-        passwordHash, 
-        phone, 
-        specialization: specialization || role, 
-        companyId: currentProf.companyId,
-        companyName: currentProf.companyName, 
-      }
-    })
-    
-    res.status(201).json(createSuccessResponse({ 
-      id: created.id.toString(), 
-      name: created.name, 
-      email: created.email, 
-      phone: created.phone || '', 
-      specialization: created.specialization || ''
-    }))
-  } catch (error) {
-    console.error('[AddEquipe] Erro:', error)
-    res.status(500).json(createErrorResponse('Erro interno do servidor', 500))
-  }
+router.post('/equipe', auth(), requireCompanyOwner(), async (req, res) => {
+  return res.status(410).json(createErrorResponse(
+    'Esta rota foi desativada. Cadastre membros da equipe em /api/usuarios para aplicar limites e permissoes.',
+    410
+  ))
 })
 
 // Atualizar
-router.put('/:id', auth(), async (req, res) => {
+router.put('/:id', auth(), requireCompanyOwner(), async (req, res) => {
   const id = Number(req.params.id)
-  const { name, email, passwordHash, phone, specialization, companyName, logoUrl, contractType } = req.body
+  const { name, email, phone, specialization, companyName, logoUrl, contractType } = req.body
+  const target = await prisma.professional.findFirst({
+    where: { id, companyId: req.user!.companyId },
+    select: { id: true },
+  })
+  if (!target) return res.status(404).json(createErrorResponse('Profissional nao encontrado', 404))
   const updated = await prisma.professional.update({
-    where: { id },
-    data: { name, email, passwordHash, phone, specialization, companyName, logoUrl, contractType }
+    where: { id: target.id },
+    data: { name, email, phone, specialization, companyName, logoUrl, contractType },
+    select: { id: true, name: true, email: true, phone: true, specialization: true, companyId: true },
   })
   res.json(createSuccessResponse(updated))
 })
 
 // Deletar
-router.delete('/:id', auth(), async (req, res) => {
+router.delete('/:id', auth(), requireCompanyOwner(), async (req, res) => {
   const id = Number(req.params.id)
-  await prisma.professional.delete({ where: { id } })
+  if (id === req.user!.id) {
+    return res.status(400).json(createErrorResponse('O proprietario nao pode excluir a propria conta por esta rota', 400))
+  }
+  const target = await prisma.professional.findFirst({
+    where: { id, companyId: req.user!.companyId },
+    select: { id: true },
+  })
+  if (!target) return res.status(404).json(createErrorResponse('Profissional nao encontrado', 404))
+  await prisma.professional.delete({ where: { id: target.id } })
   res.json(createSuccessResponse({ id }))
 })
 
 // Listar clientes de um profissional
-router.get('/:id/clientes', auth(false), async (req, res) => {
+router.get('/:id/clientes', auth(), async (req, res) => {
   const professionalId = Number(req.params.id)
+  const professional = await prisma.professional.findFirst({
+    where: { id: professionalId, companyId: req.user!.companyId },
+    select: { id: true },
+  })
+  if (!professional) return res.status(404).json(createErrorResponse('Profissional nao encontrado', 404))
   const { skip, take, page, pageSize } = parsePagination(req.query)
   const [items, total] = await Promise.all([
     prisma.client.findMany({
-      where: { professionalId },
+      where: { professionalId, companyId: req.user!.companyId },
       skip,
       take,
       include: { appointments: true, payments: true, fichas: true, chatHistories: true, conversas: true },
       orderBy: { id: 'desc' }
     }),
-    prisma.client.count({ where: { professionalId } })
+    prisma.client.count({ where: { professionalId, companyId: req.user!.companyId } })
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })

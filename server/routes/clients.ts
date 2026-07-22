@@ -6,7 +6,7 @@ import { logAudit } from '../utils/audit.js'
 
 export const router = Router()
 
-router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
+router.get('/', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     let companyId = req.user?.companyId;
@@ -74,7 +74,7 @@ router.get('/', auth(false), requireModule('clientes'), async (req, res) => {
   }
 })
 
-router.get('/:id', auth(false), async (req, res) => {
+router.get('/:id', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const id = Number(req.params.id)
     
@@ -229,7 +229,7 @@ router.delete('/:id', auth(), requireModule('clientes'), async (req, res) => {
   }
 })
 
-router.get('/:id/dossier', auth(false), async (req, res) => {
+router.get('/:id/dossier', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const id = Number(req.params.id)
     
@@ -405,7 +405,7 @@ router.get('/:id/dossier', auth(false), async (req, res) => {
   }
 })
 
-router.post('/:id/proposals', auth(false), async (req, res) => {
+router.post('/:id/proposals', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const clientId = Number(req.params.id)
 
@@ -478,7 +478,7 @@ router.post('/:id/proposals', auth(false), async (req, res) => {
 })
 
 
-router.post('/:id/send-to-funnel', auth(false), async (req, res) => {
+router.post('/:id/send-to-funnel', auth(), requireModule('clientes'), async (req, res) => {
   try {
     const clientId = Number(req.params.id);
     let companyId = req.user?.companyId;

@@ -1,12 +1,30 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import { sendUazapiRequest } from '../services/uazapi-whatsapp.js'
+import crypto from 'node:crypto'
+import { getJwtSecret } from '../config/security.js'
 
 export const router = Router()
 
 const SPREADSHEET_CONTACT_LIMIT = 5000
+
+function getCampaignMediaSignature(campaignId: number, index: string) {
+  return crypto.createHmac('sha256', getJwtSecret()).update(`${campaignId}:${index}`).digest('hex')
+}
+
+function hasValidCampaignMediaSignature(campaignId: number, index: string, signature: unknown) {
+  if (typeof signature !== 'string') return false
+  const expected = Buffer.from(getCampaignMediaSignature(campaignId, index))
+  const actual = Buffer.from(signature)
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual)
+}
+
+function getCampaignMediaPath(campaignId: number, index: string) {
+  const signature = getCampaignMediaSignature(campaignId, index)
+  return `/api/campaigns/media/${campaignId}/${index}?signature=${encodeURIComponent(signature)}`
+}
 
 // ─── Helper: Resolve companyId & professionalId from JWT ───
 function resolveIds(req: any) {
@@ -28,6 +46,10 @@ router.get('/media/:campaignId/:index', async (req, res) => {
   try {
     const campaignId = parseInt(req.params.campaignId)
     const indexStr = req.params.index
+
+    if (!hasValidCampaignMediaSignature(campaignId, indexStr, req.query.signature)) {
+      return res.status(401).send('Assinatura de midia invalida')
+    }
 
     const campaign = await prisma.messageCampaign.findUnique({
       where: { id: campaignId },
@@ -74,7 +96,9 @@ router.get('/media/:campaignId/:index', async (req, res) => {
 })
 
 // ─── Listar campanhas ───
-router.get('/', auth(false), async (req, res) => {
+router.use(auth(), requireModule('campanhas'))
+
+router.get('/', auth(), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     const { companyId } = resolveIds(req)
@@ -106,7 +130,7 @@ router.get('/', auth(false), async (req, res) => {
 })
 
 // ─── Obter campanha por ID com destinatários ───
-router.get('/:id', auth(false), async (req, res) => {
+router.get('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { companyId } = resolveIds(req)
@@ -132,7 +156,7 @@ router.get('/:id', auth(false), async (req, res) => {
 })
 
 // ─── Criar campanha (rascunho) ───
-router.post('/', auth(false), async (req, res) => {
+router.post('/', auth(), async (req, res) => {
   try {
     const { professionalId, companyId } = resolveIds(req)
     const { name, message, audienceType, audienceFilter, mediaUrl, mediaType, minDelay, maxDelay, randomize, variations, templateId } = req.body
@@ -276,7 +300,7 @@ router.post('/', auth(false), async (req, res) => {
 })
 
 // ─── Disparar campanha ───
-router.post('/:id/send', auth(false), async (req, res) => {
+router.post('/:id/send', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { companyId } = resolveIds(req)
@@ -343,7 +367,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
               if (item.url.startsWith('data:')) {
                 return {
                   ...item,
-                  url: `${protocol}://${requestHost}/api/campaigns/media/${id}/${idx}`
+                  url: `${protocol}://${requestHost}${getCampaignMediaPath(id, String(idx))}`
                 }
               } else if (item.url.startsWith('/uploads/')) {
                 return {
@@ -358,7 +382,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
         } else if (absoluteMediaUrl.startsWith('data:')) {
           const requestHost = req.get('host')
           const protocol = req.protocol
-          absoluteMediaUrl = `${protocol}://${requestHost}/api/campaigns/media/${id}/single`
+          absoluteMediaUrl = `${protocol}://${requestHost}${getCampaignMediaPath(id, 'single')}`
         } else if (absoluteMediaUrl.startsWith('/uploads/')) {
           const requestHost = req.get('host')
           const protocol = req.protocol
@@ -368,7 +392,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
         if (absoluteMediaUrl.startsWith('data:')) {
           const requestHost = req.get('host')
           const protocol = req.protocol
-          absoluteMediaUrl = `${protocol}://${requestHost}/api/campaigns/media/${id}/single`
+          absoluteMediaUrl = `${protocol}://${requestHost}${getCampaignMediaPath(id, 'single')}`
         } else if (absoluteMediaUrl.startsWith('/uploads/')) {
           const requestHost = req.get('host')
           const protocol = req.protocol
@@ -410,7 +434,7 @@ router.post('/:id/send', auth(false), async (req, res) => {
 })
 
 // ─── Atualizar campanha (apenas rascunhos) ───
-router.put('/:id', auth(false), async (req, res) => {
+router.put('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { companyId } = resolveIds(req)
@@ -449,7 +473,7 @@ router.put('/:id', auth(false), async (req, res) => {
 })
 
 // ─── Deletar campanha ───
-router.delete('/:id', auth(false), async (req, res) => {
+router.delete('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { companyId } = resolveIds(req)
@@ -475,7 +499,7 @@ router.delete('/:id', auth(false), async (req, res) => {
 })
 
 // ─── Obter status de progresso da campanha ───
-router.get('/:id/progress', auth(false), async (req, res) => {
+router.get('/:id/progress', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
 

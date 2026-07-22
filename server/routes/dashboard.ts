@@ -5,7 +5,7 @@ import { createErrorResponse, createSuccessResponse } from '../utils/response.js
 
 export const router = Router()
 
-router.get('/metrics', auth(false), requireModule('dashboard'), async (req, res) => {
+router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
   try {
     const { filter, sdrId, closerId } = req.query;
     

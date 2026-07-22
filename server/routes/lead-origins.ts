@@ -1,9 +1,9 @@
 import { Router } from 'express'
-import { auth } from '../middleware/auth.js'
-import { PrismaClient } from '@prisma/client'
+import { auth, requireModule } from '../middleware/auth.js'
+import { prisma } from '../prisma.js'
 
 const router = Router()
-const prisma = new PrismaClient()
+router.use(auth(), requireModule('funnel'))
 
 const DEFAULT_ORIGINS = [
   { value: 'instagram', label: 'Instagram' },

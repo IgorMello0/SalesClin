@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import { createErrorResponse } from '../utils/response.js'
 import { prisma } from '../prisma.js'
 import { canCompanyAccessModule } from '../services/billing.js'
+import { getJwtSecret } from '../config/security.js'
 
 export type AuthUser = {
   id: number
@@ -29,52 +30,60 @@ export function auth(required = true) {
     }
 
     try {
-      const secret = process.env.JWT_SECRET || 'dev-secret'
-      const payload = jwt.verify(token, secret) as AuthUser & { allowedCompanies?: number[] }
+      const payload = jwt.verify(token, getJwtSecret()) as AuthUser & { allowedCompanies?: number[] }
 
-      if (!payload.companyId || !payload.allowedCompanies?.length) {
-        if (payload.type === 'profissional') {
-          const professional = await prisma.professional.findUnique({
-            where: { id: payload.id },
-            select: {
-              companyId: true,
-              ownedCompanies: { select: { id: true } },
+      // Always rebuild tenant access from the database. JWT claims are only identity hints.
+      if (payload.type === 'profissional') {
+        const professional = await prisma.professional.findUnique({
+          where: { id: payload.id },
+          select: {
+            companyId: true,
+            company: { select: { id: true, isActive: true } },
+            ownedCompanies: {
+              where: { isActive: true },
+              select: { id: true },
             },
-          })
+          },
+        })
 
-          const allowedCompanies = [
-            ...(professional?.companyId ? [professional.companyId] : []),
-            ...(professional?.ownedCompanies.map(company => company.id) || []),
-          ]
-
-          payload.allowedCompanies = Array.from(new Set([
-            ...(payload.allowedCompanies || []),
-            ...allowedCompanies,
-          ]))
-          payload.companyId = payload.companyId || professional?.companyId || payload.allowedCompanies[0] || null
-        } else if (payload.type === 'usuario') {
-          const user = await prisma.usuario.findUnique({
-            where: { id: payload.id },
-            select: {
-              companyId: true,
-              companyAccess: {
-                where: { isActive: true },
-                select: { companyId: true },
-              },
-            },
-          })
-
-          const allowedCompanies = [
-            ...(user?.companyId ? [user.companyId] : []),
-            ...(user?.companyAccess.map(access => access.companyId) || []),
-          ]
-
-          payload.allowedCompanies = Array.from(new Set([
-            ...(payload.allowedCompanies || []),
-            ...allowedCompanies,
-          ]))
-          payload.companyId = payload.companyId || user?.companyId || payload.allowedCompanies[0] || null
+        if (!professional) {
+          return res.status(401).json(createErrorResponse('Conta nao encontrada', 401))
         }
+
+        payload.allowedCompanies = Array.from(new Set([
+          ...(professional.company?.isActive ? [professional.company.id] : []),
+          ...professional.ownedCompanies.map(company => company.id),
+        ]))
+      } else if (payload.type === 'usuario') {
+        const user = await prisma.usuario.findUnique({
+          where: { id: payload.id },
+          select: {
+            companyId: true,
+            isActive: true,
+            company: { select: { id: true, isActive: true } },
+            companyAccess: {
+              where: { isActive: true, company: { isActive: true } },
+              select: { companyId: true },
+            },
+          },
+        })
+
+        if (!user?.isActive) {
+          return res.status(401).json(createErrorResponse('Conta inativa ou nao encontrada', 401))
+        }
+
+        payload.allowedCompanies = Array.from(new Set([
+          ...(user.company?.isActive ? [user.company.id] : []),
+          ...user.companyAccess.map(access => access.companyId),
+        ]))
+      }
+
+      if (payload.type !== 'cliente' && !payload.allowedCompanies?.length) {
+        return res.status(403).json(createErrorResponse('Nenhuma clinica ativa disponivel para esta conta', 403))
+      }
+
+      if (payload.companyId && !payload.allowedCompanies?.includes(payload.companyId)) {
+        payload.companyId = payload.allowedCompanies?.[0] || null
       }
       
       // Se o frontend solicitar troca de contexto (clínica)
@@ -91,6 +100,32 @@ export function auth(required = true) {
           payload.companyId = id
         }
       }
+
+      // Role claims can become stale after an owner changes a team member's role.
+      // Resolve the role for the active company on every authenticated request.
+      if (payload.type === 'usuario' && payload.companyId) {
+        const [companyAccess, user] = await Promise.all([
+          prisma.userCompanyAccess.findUnique({
+            where: {
+              userId_companyId: {
+                userId: payload.id,
+                companyId: payload.companyId,
+              },
+            },
+            select: { isActive: true, role: { select: { value: true } } },
+          }),
+          prisma.usuario.findUnique({
+            where: { id: payload.id },
+            select: { role: { select: { value: true } } },
+          }),
+        ])
+
+        if (companyAccess && !companyAccess.isActive) {
+          return res.status(403).json(createErrorResponse('Acesso inativo nesta clinica', 403))
+        }
+
+        payload.role = companyAccess?.role?.value || user?.role?.value || null
+      }
       
       req.user = payload
       return next()
@@ -103,6 +138,51 @@ export function auth(required = true) {
 export function requireCompany(req: Request, res: Response, next: NextFunction) {
   if (!req.user?.companyId) return res.status(400).json(createErrorResponse('Empresa não definida', 400))
   return next()
+}
+
+export function requireCompanyAccess(paramName?: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const companyId = paramName ? Number(req.params[paramName]) : req.user?.companyId
+
+    if (!companyId || !Number.isInteger(companyId)) {
+      return res.status(400).json(createErrorResponse('Empresa nao definida', 400))
+    }
+
+    if (!req.user?.allowedCompanies?.includes(companyId)) {
+      return res.status(403).json(createErrorResponse('Acesso negado a esta clinica', 403))
+    }
+
+    return next()
+  }
+}
+
+export function requireCompanyOwner(paramName?: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.user?.type !== 'profissional') {
+        return res.status(403).json(createErrorResponse('Apenas o proprietario pode realizar esta acao', 403))
+      }
+
+      const companyId = paramName ? Number(req.params[paramName]) : req.user.companyId
+      if (!companyId || !Number.isInteger(companyId)) {
+        return res.status(400).json(createErrorResponse('Empresa nao definida', 400))
+      }
+
+      const company = await prisma.empresa.findFirst({
+        where: { id: companyId, ownerId: req.user.id },
+        select: { id: true },
+      })
+
+      if (!company) {
+        return res.status(403).json(createErrorResponse('Apenas o proprietario pode realizar esta acao', 403))
+      }
+
+      return next()
+    } catch (error) {
+      console.error('[Auth] Erro ao validar proprietario:', error)
+      return res.status(500).json(createErrorResponse('Erro ao validar acesso', 500))
+    }
+  }
 }
 
 export function requireRoles(roles: Array<string>) {
@@ -130,8 +210,7 @@ export function requireModule(moduleCode: string) {
       })
 
       if (!module) {
-        console.warn(`[Auth] Módulo "${moduleCode}" não encontrado no banco. Liberando acesso por padrão.`)
-        return next()
+        return res.status(503).json(createErrorResponse('Modulo nao configurado', 503))
       }
 
       const planAccess = await canCompanyAccessModule(req.user.companyId, moduleCode)
@@ -207,14 +286,17 @@ export function requireModule(moduleCode: string) {
         const rolePermission = activeRole?.permissions[0]
 
         // Buscar permissão individual (override)
-        const individualPermission = await prisma.userPermission.findUnique({
-          where: {
-            userId_moduleId: {
-              userId: req.user.id,
-              moduleId: module.id,
-            },
-          },
-        })
+        const individualPermission = req.user.companyId
+          ? await prisma.userCompanyPermission.findUnique({
+              where: {
+                userId_companyId_moduleId: {
+                  userId: req.user.id,
+                  companyId: req.user.companyId,
+                  moduleId: module.id,
+                },
+              },
+            })
+          : null
 
         // Segue a mesma hierarquia de prioridade do frontend/permissions API:
         // 1. Permissão Individual (se existir)
@@ -254,8 +336,7 @@ export function requirePermission(moduleCode: string, permissionKey: string) {
       })
 
       if (!module) {
-        console.warn(`[Auth] Módulo "${moduleCode}" não encontrado no banco. Liberando acesso por padrão.`)
-        return next()
+        return res.status(503).json(createErrorResponse('Modulo nao configurado', 503))
       }
 
       const planAccess = await canCompanyAccessModule(req.user.companyId, moduleCode)
@@ -335,14 +416,17 @@ export function requirePermission(moduleCode: string, permissionKey: string) {
         const rolePermission = activeRole?.permissions[0]
 
         // Buscar permissão individual (override)
-        const individualPermission = await prisma.userPermission.findUnique({
-          where: {
-            userId_moduleId: {
-              userId: req.user.id,
-              moduleId: module.id,
-            },
-          },
-        })
+        const individualPermission = req.user.companyId
+          ? await prisma.userCompanyPermission.findUnique({
+              where: {
+                userId_companyId_moduleId: {
+                  userId: req.user.id,
+                  companyId: req.user.companyId,
+                  moduleId: module.id,
+                },
+              },
+            })
+          : null
 
         const hasAccess = individualPermission?.hasAccess ?? rolePermission?.hasAccess ?? true
 
@@ -368,5 +452,3 @@ export function requirePermission(moduleCode: string, permissionKey: string) {
     }
   }
 }
-
-

@@ -1,9 +1,16 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createSuccessResponse, createErrorResponse } from '../utils/response.js'
+import {
+  assertClientBelongsToCompany,
+  assertLeadBelongsToCompany,
+  assertProfessionalBelongsToCompany,
+  assertUserBelongsToCompany,
+} from '../services/tenant.js'
 
 export const router = Router()
+router.use(auth(), requireModule('tarefas'))
 
 // Helper para calcular a próxima data com base na regra de recorrência
 function getNextDueDate(currentDate: Date, rule: string): Date {
@@ -22,6 +29,30 @@ function getNextDueDate(currentDate: Date, rule: string): Date {
       nextDate.setDate(nextDate.getDate() + 1)
   }
   return nextDate
+}
+
+function safeTaskParty(party: any, isUser = false) {
+  if (!party) return null
+  const { passwordHash: _passwordHash, ...safeParty } = party
+  return isUser ? { ...safeParty, isUser: true } : safeParty
+}
+
+function mapTaskResponse(task: any) {
+  const {
+    assignedTo: assignedProfessional,
+    assignedToUser,
+    createdBy: creatorProfessional,
+    createdByUser,
+    company,
+    ...safeTask
+  } = task
+
+  return {
+    ...safeTask,
+    company: company ? { id: company.id, name: company.name } : company,
+    assignedTo: safeTaskParty(assignedProfessional) || safeTaskParty(assignedToUser, true),
+    createdBy: safeTaskParty(creatorProfessional) || safeTaskParty(createdByUser, true),
+  }
 }
 
 // Helper para disparar alertas urgentes (WhatsApp/E-mail)
@@ -186,15 +217,7 @@ router.get('/', auth(), async (req, res) => {
     })
 
     // Normalizar a resposta das tarefas para unificar assignedTo e createdBy
-    const mappedTasks = tasks.map(t => {
-      const assigned = t.assignedTo || (t.assignedToUser ? { ...t.assignedToUser, isUser: true } : null);
-      const creator = t.createdBy || (t.createdByUser ? { ...t.createdByUser, isUser: true } : null);
-      return {
-        ...t,
-        assignedTo: assigned,
-        createdBy: creator
-      };
-    });
+    const mappedTasks = tasks.map(mapTaskResponse)
 
     res.json(createSuccessResponse(mappedTasks))
   } catch (error: any) {
@@ -220,6 +243,14 @@ router.post('/', auth(), async (req, res) => {
 
     const isAssigneeUser = assigneeType === 'user';
     const isCreatorUser = req.user!.type === 'usuario';
+
+    if (clientId) await assertClientBelongsToCompany(Number(clientId), companyId)
+    if (leadId) await assertLeadBelongsToCompany(Number(leadId), companyId)
+    if (isAssigneeUser) {
+      await assertUserBelongsToCompany(Number(assignedToId), companyId)
+    } else {
+      await assertProfessionalBelongsToCompany(Number(assignedToId), companyId)
+    }
 
     const data: any = {
       title,
@@ -292,13 +323,7 @@ router.post('/', auth(), async (req, res) => {
       }
     }
 
-    const mappedTask = {
-      ...task,
-      assignedTo: task.assignedTo || (task.assignedToUser ? { ...task.assignedToUser, isUser: true } : null),
-      createdBy: task.createdBy || (task.createdByUser ? { ...task.createdByUser, isUser: true } : null)
-    };
-
-    res.status(201).json(createSuccessResponse(mappedTask))
+    res.status(201).json(createSuccessResponse(mapTaskResponse(task)))
   } catch (error: any) {
     console.error('[Tasks] Erro ao criar tarefa:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar tarefa', 500))
@@ -312,8 +337,8 @@ router.put('/:id', auth(), async (req, res) => {
     const companyId = req.user!.companyId
     const { title, description, status, priority, dueDate, assignedToId, assigneeType, clientId, leadId, isRecurring, recurrenceRule } = req.body
 
-    const existingTask = await prisma.task.findUnique({
-      where: { id },
+    const existingTask = await prisma.task.findFirst({
+      where: { id, companyId },
       include: { assignedTo: true, assignedToUser: true, createdBy: true, createdByUser: true, company: true }
     })
 
@@ -325,6 +350,16 @@ router.put('/:id', auth(), async (req, res) => {
     const isNowCompleted = status === 'completed' && existingTask.status !== 'completed'
 
     const isAssigneeUser = assigneeType === 'user' || req.body.assignedToUserId !== undefined;
+
+    if (clientId) await assertClientBelongsToCompany(Number(clientId), companyId)
+    if (leadId) await assertLeadBelongsToCompany(Number(leadId), companyId)
+    if (assignedToId !== undefined) {
+      if (isAssigneeUser) {
+        await assertUserBelongsToCompany(Number(assignedToId), companyId)
+      } else {
+        await assertProfessionalBelongsToCompany(Number(assignedToId), companyId)
+      }
+    }
 
     const data: any = {
       title,
@@ -455,13 +490,7 @@ router.put('/:id', auth(), async (req, res) => {
       }
     }
 
-    const mappedUpdated = {
-      ...updated,
-      assignedTo: updated.assignedTo || (updated.assignedToUser ? { ...updated.assignedToUser, isUser: true } : null),
-      createdBy: updated.createdBy || (updated.createdByUser ? { ...updated.createdByUser, isUser: true } : null)
-    };
-
-    res.json(createSuccessResponse(mappedUpdated))
+    res.json(createSuccessResponse(mapTaskResponse(updated)))
   } catch (error: any) {
     console.error('[Tasks] Erro ao atualizar tarefa:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar tarefa', 500))
@@ -472,9 +501,10 @@ router.put('/:id', auth(), async (req, res) => {
 router.delete('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
+    const companyId = req.user!.companyId
 
-    const existingTask = await prisma.task.findUnique({
-      where: { id }
+    const existingTask = await prisma.task.findFirst({
+      where: { id, companyId }
     })
 
     if (!existingTask) {

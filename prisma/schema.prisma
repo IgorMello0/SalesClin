@@ -426,6 +426,7 @@ model Empresa {
   professionals            Professional[]            @relation("CompanyProfessionals")
   usuarios                 Usuario[]
   userCompanyAccess        UserCompanyAccess[]
+  userCompanyPermissions   UserCompanyPermission[]
   agentesIa                AgenteIa[]
   conversas                Conversa[]
   roles                    Role[]
@@ -581,6 +582,7 @@ model Usuario {
   companyAccess          UserCompanyAccess[]
   role                   Role?               @relation(fields: [roleId], references: [id])
   permissions            UserPermission[]
+  companyPermissions     UserCompanyPermission[]
   proposalsAsSalesperson Proposal[]          @relation("SalespersonProposals")
   proposalsAsSpecialist  Proposal[]          @relation("SpecialistProposals")
   proposalsAsSdr         Proposal[]          @relation("SdrProposals")
@@ -698,6 +700,7 @@ model Module {
   professionalPermissions ProfessionalPermission[]
   rolePermissions         RolePermission[]
   userPermissions         UserPermission[]
+  userCompanyPermissions  UserCompanyPermission[]
   planModules             PlanModule[]
 
   @@map("modules")
@@ -735,8 +738,10 @@ model CompanySubscription {
   planCode              String    @map("plan_code")
   billingCycle          String    @default("monthly") @map("billing_cycle")
   status                String    @default("trialing")
+  accessSource          String    @default("trial") @map("access_source")
   trialEndsAt           DateTime  @map("trial_ends_at")
   currentPeriodEndsAt   DateTime? @map("current_period_ends_at")
+  manualAccessEndsAt    DateTime? @map("manual_access_ends_at")
   abacateSubscriptionId String?   @unique @map("abacate_subscription_id")
   abacateCheckoutId     String?   @map("abacate_checkout_id")
   checkoutUrl           String?   @map("checkout_url")
@@ -835,6 +840,21 @@ model UserPermission {
 
   @@unique([userId, moduleId])
   @@map("user_permissions")
+}
+
+model UserCompanyPermission {
+  userId    Int      @map("user_id")
+  companyId Int      @map("company_id")
+  moduleId  Int      @map("module_id")
+  hasAccess Boolean  @default(true) @map("has_access")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  company   Empresa  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  user      Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, companyId, moduleId])
+  @@map("user_company_permissions")
 }
 
 model Goal {

@@ -9,6 +9,7 @@ export const TRIAL_DAYS = 15
 export const PLAN_CODES = ['start', 'pro', 'enterprise'] as const
 export const BILLING_CYCLES = ['monthly', 'yearly'] as const
 export const ADDON_CODES = ['extra_clinic', 'extra_user'] as const
+const ABACATEPAY_DEFAULT_PUBLIC_KEY = 't9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9'
 export type PlanCode = typeof PLAN_CODES[number]
 export type BillingCycle = typeof BILLING_CYCLES[number]
 export type AddonCode = typeof ADDON_CODES[number]
@@ -59,10 +60,32 @@ export function addDays(date: Date, days: number) {
 
 export function getEffectiveSubscriptionStatus(subscription: {
   status: string
+  accessSource?: string | null
   trialEndsAt: Date
+  currentPeriodEndsAt?: Date | null
+  manualAccessEndsAt?: Date | null
+  abacateSubscriptionId?: string | null
 }) {
   if (subscription.status === 'trialing' && subscription.trialEndsAt.getTime() < Date.now()) {
     return 'expired'
+  }
+
+  if (subscription.status === 'active') {
+    if (subscription.accessSource === 'manual') {
+      return subscription.manualAccessEndsAt && subscription.manualAccessEndsAt.getTime() >= Date.now()
+        ? 'active'
+        : 'expired'
+    }
+
+    if (subscription.accessSource === 'abacatepay') {
+      return subscription.abacateSubscriptionId
+        && subscription.currentPeriodEndsAt
+        && subscription.currentPeriodEndsAt.getTime() >= Date.now()
+        ? 'active'
+        : 'payment_pending'
+    }
+
+    return 'payment_pending'
   }
 
   return subscription.status
@@ -101,6 +124,7 @@ export async function ensureCompanySubscription(
         planCode,
         billingCycle,
         status: 'trialing',
+        accessSource: 'trial',
         trialEndsAt,
       },
   })
@@ -141,8 +165,16 @@ export async function getCompanyBillingStatus(companyId: number) {
     status: effectiveStatus,
     trialEndsAt: subscription.trialEndsAt,
     currentPeriodEndsAt: subscription.currentPeriodEndsAt,
+    accessSource: subscription.accessSource,
+    manualAccessEndsAt: subscription.manualAccessEndsAt,
     billingCycle: isBillingCycle(subscription.billingCycle) ? subscription.billingCycle : 'monthly',
-    daysRemaining: getDaysRemaining(subscription.trialEndsAt),
+    daysRemaining: getDaysRemaining(
+      effectiveStatus === 'active' && subscription.accessSource === 'manual' && subscription.manualAccessEndsAt
+        ? subscription.manualAccessEndsAt
+        : effectiveStatus === 'active' && subscription.currentPeriodEndsAt
+          ? subscription.currentPeriodEndsAt
+          : subscription.trialEndsAt
+    ),
     modules,
     abacateSubscriptionId: subscription.abacateSubscriptionId,
     abacateCheckoutId: subscription.abacateCheckoutId,
@@ -157,7 +189,7 @@ export async function getCompanyModuleEntitlements(companyId?: number | null) {
   if (!companyId) {
     return {
       planCode: 'start',
-      subscriptionStatus: 'active',
+      subscriptionStatus: 'missing_company',
       moduleCodes: new Set<string>(),
       hasKnownCompany: false,
     }
@@ -175,13 +207,22 @@ export async function getCompanyModuleEntitlements(companyId?: number | null) {
 }
 
 export async function canCompanyAccessModule(companyId: number | null | undefined, moduleCode: string) {
+  if (!companyId) {
+    return {
+      hasAccess: false,
+      blockedByPlan: true,
+      planCode: 'start',
+      subscriptionStatus: 'missing_company',
+    }
+  }
+
   if (ALWAYS_ALLOWED_MODULES.has(moduleCode)) {
-    const status = companyId ? await getCompanyBillingStatus(companyId) : undefined
+    const status = await getCompanyBillingStatus(companyId)
     return {
       hasAccess: true,
       blockedByPlan: false,
-      planCode: status?.planCode || 'start',
-      subscriptionStatus: status?.status || 'active',
+      planCode: status.planCode,
+      subscriptionStatus: status.status,
     }
   }
 
@@ -303,7 +344,10 @@ function assertPlanProductIsUnique(planCode: PlanCode, billingCycle: BillingCycl
   }
 
   if (duplicates.length > 0) {
-    if (process.env.ABACATEPAY_ALLOW_SHARED_PRODUCT_IDS === 'true') {
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.ABACATEPAY_ALLOW_SHARED_PRODUCT_IDS === 'true'
+    ) {
       console.warn('[Billing] Produto compartilhado permitido para teste', {
         planCode,
         billingCycle,
@@ -435,13 +479,77 @@ async function sumActiveAddons(input: {
     where: {
       ownerProfessionalId: input.ownerProfessionalId,
       addonCode: input.addonCode,
-      status: { in: Array.from(OPERATIONAL_SUBSCRIPTION_STATUSES) },
+      status: 'active',
+      abacateSubscriptionId: { not: null },
+      currentPeriodEndsAt: { gte: new Date() },
       targetCompanyId: input.targetCompanyId ?? null,
     },
     _sum: { quantity: true },
   })
 
   return result._sum.quantity || 0
+}
+
+export async function expirePastDueBillingRecords() {
+  const now = new Date()
+  const legacySubscriptions = await prisma.companySubscription.findMany({
+    where: {
+      status: 'active',
+      accessSource: 'trial',
+    },
+    select: {
+      id: true,
+      abacateSubscriptionId: true,
+      currentPeriodEndsAt: true,
+      trialEndsAt: true,
+    },
+  })
+
+  if (legacySubscriptions.length > 0) {
+    await prisma.$transaction(
+      legacySubscriptions.map((subscription) => prisma.companySubscription.update({
+        where: { id: subscription.id },
+        data: subscription.abacateSubscriptionId
+          ? { accessSource: 'abacatepay' }
+          : {
+              accessSource: 'manual',
+              manualAccessEndsAt: subscription.currentPeriodEndsAt || subscription.trialEndsAt,
+            },
+      })),
+    )
+  }
+
+  const [paidSubscriptions, manualSubscriptions, addons] = await prisma.$transaction([
+    prisma.companySubscription.updateMany({
+      where: {
+        status: 'active',
+        accessSource: 'abacatepay',
+        currentPeriodEndsAt: { lt: now },
+      },
+      data: { status: 'expired' },
+    }),
+    prisma.companySubscription.updateMany({
+      where: {
+        status: 'active',
+        accessSource: 'manual',
+        manualAccessEndsAt: { lt: now },
+      },
+      data: { status: 'expired' },
+    }),
+    prisma.billingAddon.updateMany({
+      where: {
+        status: { in: ['trialing', 'active'] },
+        currentPeriodEndsAt: { lt: now },
+      },
+      data: { status: 'expired' },
+    }),
+  ])
+
+  return {
+    subscriptionsExpired: paidSubscriptions.count + manualSubscriptions.count,
+    addonsExpired: addons.count,
+    legacySubscriptionsReconciled: legacySubscriptions.length,
+  }
 }
 
 export async function getBillingUsage(ownerProfessionalId: number, activeCompanyId?: number | null) {
@@ -462,9 +570,7 @@ export async function getBillingUsage(ownerProfessionalId: number, activeCompany
     countActiveUsersForCompany(targetCompanyId),
   ])
 
-  const clinicLimit = billingStatus.status === 'trialing'
-    ? null
-    : (baseLimits.clinicLimit === null ? null : baseLimits.clinicLimit + clinicExtraQuantity)
+  const clinicLimit = baseLimits.clinicLimit === null ? null : baseLimits.clinicLimit + clinicExtraQuantity
   const usersPerClinicLimit = baseLimits.usersPerClinicLimit === null ? null : baseLimits.usersPerClinicLimit + userExtraQuantity
 
   return {
@@ -491,6 +597,15 @@ export async function getBillingUsage(ownerProfessionalId: number, activeCompany
 
 export async function assertCanCreateClinic(ownerProfessionalId: number) {
   const usage = await getBillingUsage(ownerProfessionalId)
+  if (!OPERATIONAL_SUBSCRIPTION_STATUSES.has(usage.subscriptionStatus)) {
+    throw new BillingLimitError({
+      message: 'Assinatura inativa. Ative um plano para criar clinicas.',
+      limitType: 'clinics',
+      addonCode: 'extra_clinic',
+      used: usage.clinics.used,
+      limit: usage.clinics.limit,
+    })
+  }
   if (!usage.clinics.canCreate) {
     throw new BillingLimitError({
       message: 'Limite de clinicas do plano atingido.',
@@ -515,6 +630,15 @@ export async function assertCanAddUserToCompany(
   }
 
   const usage = await getBillingUsage(ownerProfessionalId, companyId)
+  if (!OPERATIONAL_SUBSCRIPTION_STATUSES.has(usage.subscriptionStatus)) {
+    throw new BillingLimitError({
+      message: 'Assinatura inativa. Ative um plano para adicionar usuarios.',
+      limitType: 'users',
+      addonCode: 'extra_user',
+      used: usage.users.used,
+      limit: usage.users.limit,
+    })
+  }
   const used = await countActiveUsersForCompany(companyId, excludeUserId)
   const limit = usage.users.limit
   if (limit !== null && used >= limit) {
@@ -553,10 +677,22 @@ export async function createAddonCheckout(input: {
   }
 
   const usage = await getBillingUsage(input.ownerProfessionalId, activeCompanyId)
-  const billingCycle = input.billingCycle || (isBillingCycle(usage.billingCycle) ? usage.billingCycle : 'monthly')
+  if (!OPERATIONAL_SUBSCRIPTION_STATUSES.has(usage.subscriptionStatus)) {
+    throw new Error('Ative um plano antes de contratar adicionais.')
+  }
+
+  const planBillingCycle = isBillingCycle(usage.billingCycle) ? usage.billingCycle : 'monthly'
+  if (input.billingCycle && input.billingCycle !== planBillingCycle) {
+    throw new Error('O adicional deve usar o mesmo ciclo de cobranca do plano ativo.')
+  }
+  const billingCycle = planBillingCycle
   const productId = getProductIdForAddon(input.addonCode, billingCycle)
   const apiKey = process.env.ABACATEPAY_API_KEY
-  const quantity = Math.max(1, Math.min(Number(input.quantity || 1), 50))
+  const requestedQuantity = Number(input.quantity || 1)
+  if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1 || requestedQuantity > 50) {
+    throw new Error('Quantidade de adicional invalida.')
+  }
+  const quantity = requestedQuantity
 
   if (!apiKey || !productId) {
     throw new Error('Configuracao da Abacate Pay incompleta para criar checkout de extra.')
@@ -626,6 +762,9 @@ export async function activateBillingAddon(input: {
   }
 
   const isOperational = OPERATIONAL_SUBSCRIPTION_STATUSES.has(input.normalizedStatus)
+  if (isOperational && !input.subscriptionId) {
+    throw new Error('Evento operacional de adicional sem assinatura recorrente.')
+  }
   const data = {
     status: input.normalizedStatus,
     ...(input.subscriptionId ? { abacateSubscriptionId: input.subscriptionId } : {}),
@@ -702,21 +841,14 @@ export async function createAbacateSubscriptionCheckout(
   await prisma.companySubscription.update({
     where: { companyId },
     data: {
-      planCode,
-      billingCycle,
       status: getEffectiveSubscriptionStatus(subscription) === 'expired' ? 'payment_pending' : subscription.status,
       abacateCheckoutId: checkoutId,
       checkoutUrl,
-      pendingPlanCode: null,
-      pendingBillingCycle: null,
+      pendingPlanCode: planCode,
+      pendingBillingCycle: billingCycle,
       abacatePlanChangeId: null,
       planChangeStatus: null,
     },
-  })
-
-  await prisma.empresa.update({
-    where: { id: companyId },
-    data: { plan: planCode },
   })
 
   return {
@@ -916,9 +1048,10 @@ export function verifyAbacateWebhookSignature(rawBody: string, signature: string
   const hmacKey =
     process.env.ABACATEPAY_WEBHOOK_PUBLIC_KEY ||
     process.env.ABACATEPAY_PUBLIC_KEY ||
-    process.env.ABACATEPAY_HMAC_KEY
+    process.env.ABACATEPAY_HMAC_KEY ||
+    ABACATEPAY_DEFAULT_PUBLIC_KEY
 
-  if (!hmacKey) return true
+  if (!hmacKey) return false
   if (!signature) return false
 
   const expected = crypto

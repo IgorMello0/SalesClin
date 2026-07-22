@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import multer from 'multer'
 import path from 'path'
@@ -93,7 +93,7 @@ async function uploadToCatbox(buffer: Buffer, originalName: string): Promise<str
   return fileUrl.trim()
 }
 
-router.post('/campaign-media', auth(), campaignUpload.single('file'), async (req, res) => {
+router.post('/campaign-media', auth(), requireModule('campanhas'), campaignUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json(createErrorResponse('Nenhum arquivo enviado', 400))
@@ -125,4 +125,3 @@ router.post('/campaign-media', auth(), campaignUpload.single('file'), async (req
     ))
   }
 })
-

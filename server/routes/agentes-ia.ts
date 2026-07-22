@@ -14,11 +14,17 @@ router.get('/', auth(), requireModule('conversas'), async (req, res) => {
     companyId = prof?.companyId || undefined;
   }
 
-  const where: any = {}
-  if (companyId) where.companyId = Number(companyId)
+  if (!companyId) return res.status(400).json(createErrorResponse('Clinica nao definida', 400))
+  const where = { companyId: Number(companyId) }
 
   const [items, total] = await Promise.all([
-    prisma.agenteIa.findMany({ skip, take, where, orderBy: { id: 'desc' }, include: { company: true, conversas: true } }),
+    prisma.agenteIa.findMany({
+      skip,
+      take,
+      where,
+      orderBy: { id: 'desc' },
+      include: { company: { select: { id: true, name: true } }, conversas: true },
+    }),
     prisma.agenteIa.count({ where })
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
@@ -33,13 +39,14 @@ router.get('/:id', auth(), requireModule('conversas'), async (req, res) => {
     companyId = prof?.companyId || undefined;
   }
 
-  const item = await prisma.agenteIa.findUnique({ where: { id }, include: { company: true, conversas: true } })
+  if (!companyId) return res.status(400).json(createErrorResponse('Clinica nao definida', 400))
+
+  const item = await prisma.agenteIa.findFirst({
+    where: { id, companyId: Number(companyId) },
+    include: { company: { select: { id: true, name: true } }, conversas: true },
+  })
   if (!item) return res.status(404).json(createErrorResponse('Agente IA não encontrado', 404))
   
-  if (companyId && item.companyId !== companyId) {
-    return res.status(403).json(createErrorResponse('Acesso negado', 403))
-  }
-
   res.json(createSuccessResponse(item))
 })
 
@@ -100,4 +107,3 @@ router.delete('/:id', auth(), requireModule('conversas'), async (req, res) => {
   await prisma.agenteIa.delete({ where: { id } })
   res.json(createSuccessResponse({ id }))
 })
-

@@ -1,18 +1,19 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
+import { getCompanyOwnerProfessionalId } from '../services/tenant.js'
 
 export const router = Router()
+router.use(auth(), requireModule('metas'))
 
 // Listar metas do profissional
-router.get('/', auth(false), async (req, res) => {
+router.get('/', auth(), async (req, res) => {
   try {
-    const professionalId = req.query.professionalId || req.user?.id
-    if (!professionalId) return res.status(400).json(createErrorResponse('professionalId é obrigatório', 400))
+    const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
 
     const items = await prisma.goal.findMany({
-      where: { professionalId: Number(professionalId) },
+      where: { professionalId },
       orderBy: { createdAt: 'desc' }
     })
     
@@ -33,15 +34,17 @@ router.get('/', auth(false), async (req, res) => {
 // Salvar nova meta
 router.post('/', auth(), async (req, res) => {
   try {
-    const { professionalId, name, revenueTarget, avgTicket, schedulingRate, showupRate, closingRate } = req.body
+    const { name, revenueTarget, avgTicket, schedulingRate, showupRate, closingRate } = req.body
     
-    if (!professionalId || !name) {
+    if (!name) {
       return res.status(400).json(createErrorResponse('Dados incompletos', 400))
     }
+
+    const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
     
     const created = await prisma.goal.create({
       data: { 
-        professionalId: Number(professionalId), 
+        professionalId,
         name, 
         revenueTarget: Number(revenueTarget), 
         avgTicket: Number(avgTicket), 
@@ -62,7 +65,10 @@ router.post('/', auth(), async (req, res) => {
 router.delete('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
-    await prisma.goal.delete({ where: { id } })
+    const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
+    const goal = await prisma.goal.findFirst({ where: { id, professionalId }, select: { id: true } })
+    if (!goal) return res.status(404).json(createErrorResponse('Meta não encontrada', 404))
+    await prisma.goal.delete({ where: { id: goal.id } })
     res.json(createSuccessResponse({ id }))
   } catch (error: any) {
     console.error('[Metas] Erro ao excluir meta:', error)

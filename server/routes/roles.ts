@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyOwner } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 
 export const router = Router()
@@ -8,17 +8,7 @@ export const router = Router()
 // Listar cargos da empresa do usuário logado
 router.get('/', auth(), async (req, res) => {
   try {
-    let companyId: number | undefined
-
-    if (req.user?.type === 'profissional') {
-      const prof = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-        select: { companyId: true }
-      })
-      companyId = prof?.companyId || undefined
-    } else if (req.user?.type === 'usuario') {
-      companyId = req.user.companyId || undefined
-    }
+    const companyId = req.user?.companyId || undefined
 
     if (!companyId) {
       return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
@@ -45,8 +35,8 @@ router.get('/', auth(), async (req, res) => {
 router.get('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
-    const role = await prisma.role.findUnique({
-      where: { id },
+    const role = await prisma.role.findFirst({
+      where: { id, companyId: req.user?.companyId || -1 },
       include: {
         permissions: true
       }
@@ -61,22 +51,11 @@ router.get('/:id', auth(), async (req, res) => {
 })
 
 // Criar novo cargo
-router.post('/', auth(), async (req, res) => {
+router.post('/', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     const { name, value, permissions, isSpecialist, isAdmin, isSDR, isCloser, isManager } = req.body // permissions: Array<{ moduleId: number, hasAccess: boolean }>
-    let companyId: number | undefined
-    let professionalId: number | undefined
-
-    if (req.user?.type !== 'profissional') {
-      return res.status(403).json(createErrorResponse('Somente o profissional pode criar cargos', 403))
-    }
-
-    const prof = await prisma.professional.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, companyId: true }
-    })
-    companyId = prof?.companyId || undefined
-    professionalId = prof?.id || undefined
+    const companyId = req.user?.companyId || undefined
+    const professionalId = req.user?.id
 
     if (!companyId || !professionalId) {
       return res.status(404).json(createErrorResponse('Empresa ou Profissional responsável não encontrado', 404))
@@ -129,13 +108,16 @@ router.post('/', auth(), async (req, res) => {
 })
 
 // Atualizar cargo e permissões
-router.put('/:id', auth(), async (req, res) => {
+router.put('/:id', auth(), requireCompanyOwner(), async (req, res) => {
   try {
-    if (req.user?.type !== 'profissional') {
-      return res.status(403).json(createErrorResponse('Somente o profissional pode editar cargos', 403))
-    }
     const id = Number(req.params.id)
     const { name, permissions, isSpecialist, isAdmin, isSDR, isCloser, isManager } = req.body
+
+    const existing = await prisma.role.findFirst({
+      where: { id, companyId: req.user?.companyId || -1 },
+      select: { id: true },
+    })
+    if (!existing) return res.status(404).json(createErrorResponse('Cargo nao encontrado', 404))
 
     const updated = await prisma.$transaction(async (tx) => {
       // Atualizar nome do cargo
@@ -178,15 +160,25 @@ router.put('/:id', auth(), async (req, res) => {
 })
 
 // Deletar cargo
-router.delete('/:id', auth(), async (req, res) => {
+router.delete('/:id', auth(), requireCompanyOwner(), async (req, res) => {
   try {
-    if (req.user?.type !== 'profissional') {
-      return res.status(403).json(createErrorResponse('Somente o profissional pode excluir cargos', 403))
-    }
     const id = Number(req.params.id)
+
+    const role = await prisma.role.findFirst({
+      where: { id, companyId: req.user?.companyId || -1 },
+      select: { id: true },
+    })
+    if (!role) return res.status(404).json(createErrorResponse('Cargo nao encontrado', 404))
     
     // Verificar se há usuários vinculados
-    const usersCount = await prisma.usuario.count({ where: { roleId: id } })
+    const usersCount = await prisma.usuario.count({
+      where: {
+        OR: [
+          { roleId: id },
+          { companyAccess: { some: { roleId: id } } },
+        ],
+      },
+    })
     if (usersCount > 0) {
       return res.status(400).json(createErrorResponse('Não é possível excluir um cargo que possui usuários vinculados', 400))
     }

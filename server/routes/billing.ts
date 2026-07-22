@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { auth, requireCompany } from '../middleware/auth.js'
+import { auth, requireCompany, requireCompanyOwner } from '../middleware/auth.js'
 import { prisma } from '../prisma.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import {
@@ -69,7 +69,7 @@ router.get('/status', auth(), requireCompany, async (req, res) => {
   }
 })
 
-router.get('/usage', auth(), requireCompany, async (req, res) => {
+router.get('/usage', auth(), requireCompany, requireCompanyOwner(), async (req, res) => {
   try {
     if (req.user?.type !== 'profissional') {
       return res.status(403).json(createErrorResponse('Apenas profissionais podem consultar limites da conta', 403))
@@ -83,7 +83,7 @@ router.get('/usage', auth(), requireCompany, async (req, res) => {
   }
 })
 
-router.post('/checkout', auth(), requireCompany, async (req, res) => {
+router.post('/checkout', auth(), requireCompany, requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user!.companyId!
     const requestedPlanCode = req.body?.planCode
@@ -108,7 +108,7 @@ router.post('/checkout', auth(), requireCompany, async (req, res) => {
   }
 })
 
-router.post('/change-plan', auth(), requireCompany, async (req, res) => {
+router.post('/change-plan', auth(), requireCompany, requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user!.companyId!
     const requestedPlanCode = req.body?.planCode
@@ -131,7 +131,7 @@ router.post('/change-plan', auth(), requireCompany, async (req, res) => {
   }
 })
 
-router.post('/cancel-subscription', auth(), requireCompany, async (req, res) => {
+router.post('/cancel-subscription', auth(), requireCompany, requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user!.companyId!
     const result = await cancelCompanyAbacateSubscription(companyId)
@@ -143,7 +143,7 @@ router.post('/cancel-subscription', auth(), requireCompany, async (req, res) => 
   }
 })
 
-router.post('/addon-checkout', auth(), requireCompany, async (req, res) => {
+router.post('/addon-checkout', auth(), requireCompany, requireCompanyOwner(), async (req, res) => {
   try {
     if (req.user?.type !== 'profissional') {
       return res.status(403).json(createErrorResponse('Apenas profissionais podem contratar extras', 403))
@@ -177,7 +177,7 @@ router.post('/addon-checkout', auth(), requireCompany, async (req, res) => {
   }
 })
 
-router.post('/select-plan', auth(), requireCompany, async (req, res) => {
+router.post('/select-plan', auth(), requireCompany, requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user!.companyId!
     const requestedPlanCode = req.body?.planCode
@@ -202,19 +202,14 @@ router.post('/select-plan', auth(), requireCompany, async (req, res) => {
     const updated = await prisma.companySubscription.update({
       where: { companyId },
       data: {
-        planCode: requestedPlanCode,
-        billingCycle: requestedBillingCycle,
+        pendingPlanCode: requestedPlanCode,
+        pendingBillingCycle: requestedBillingCycle,
       },
     })
 
-    await prisma.empresa.update({
-      where: { id: companyId },
-      data: { plan: requestedPlanCode },
-    })
-
     return res.json(createSuccessResponse({
-      planCode: updated.planCode,
-      billingCycle: updated.billingCycle,
+      planCode: updated.pendingPlanCode,
+      billingCycle: updated.pendingBillingCycle,
       status: updated.status,
     }))
   } catch (error: any) {
@@ -223,7 +218,7 @@ router.post('/select-plan', auth(), requireCompany, async (req, res) => {
   }
 })
 
-router.post('/cancel-trial', auth(), requireCompany, async (req, res) => {
+router.post('/cancel-trial', auth(), requireCompany, requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = req.user!.companyId!
     const subscription = await prisma.companySubscription.findUnique({

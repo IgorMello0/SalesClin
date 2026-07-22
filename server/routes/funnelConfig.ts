@@ -1,9 +1,10 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 
 export const router = Router()
+router.use(auth(), requireModule('funnel'))
 
 // Configuração padrão dos funis (fallback)
 const DEFAULT_FUNNELS = [
@@ -118,9 +119,14 @@ router.put('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { label, icon, order, isActive } = req.body
+    const current = await prisma.funnelConfig.findFirst({
+      where: { id, companyId: req.user!.companyId },
+      select: { id: true },
+    })
+    if (!current) return res.status(404).json(createErrorResponse('Funil não encontrado', 404))
 
     const funnel = await prisma.funnelConfig.update({
-      where: { id },
+      where: { id: current.id },
       data: { label, icon, order, isActive },
       include: { stages: { orderBy: { order: 'asc' } } }
     })
@@ -141,8 +147,8 @@ router.delete('/:id', auth(), async (req, res) => {
     const companyId = req.user?.companyId
 
     // Buscar todas as etapas desse funil para mover leads
-    const funnel = await prisma.funnelConfig.findUnique({
-      where: { id },
+    const funnel = await prisma.funnelConfig.findFirst({
+      where: { id, companyId },
       include: { stages: true }
     })
 
@@ -191,6 +197,12 @@ router.post('/:funnelId/stages', auth(), async (req, res) => {
       return res.status(400).json(createErrorResponse('Código e nome da etapa são obrigatórios', 400))
     }
 
+    const funnel = await prisma.funnelConfig.findFirst({
+      where: { id: funnelId, companyId: req.user!.companyId },
+      select: { id: true },
+    })
+    if (!funnel) return res.status(404).json(createErrorResponse('Funil não encontrado', 404))
+
     const stage = await prisma.funnelStage.create({
       data: {
         funnelId,
@@ -219,9 +231,14 @@ router.put('/stages/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const { label, color, order, isTransition, isActive } = req.body
+    const current = await prisma.funnelStage.findFirst({
+      where: { id, funnel: { companyId: req.user!.companyId } },
+      select: { id: true },
+    })
+    if (!current) return res.status(404).json(createErrorResponse('Etapa não encontrada', 404))
 
     const stage = await prisma.funnelStage.update({
-      where: { id },
+      where: { id: current.id },
       data: { label, color, order, isTransition, isActive }
     })
 
@@ -240,8 +257,8 @@ router.delete('/stages/:id', auth(), async (req, res) => {
     const id = Number(req.params.id)
     const companyId = req.user?.companyId
 
-    const stage = await prisma.funnelStage.findUnique({
-      where: { id },
+    const stage = await prisma.funnelStage.findFirst({
+      where: { id, funnel: { companyId } },
       include: { funnel: { include: { stages: { where: { isActive: true }, orderBy: { order: 'asc' } } } } }
     })
 
@@ -278,12 +295,30 @@ router.put('/reorder/batch', auth(), async (req, res) => {
       return res.status(400).json(createErrorResponse('Dados de reordenação inválidos', 400))
     }
 
+    const funnelIds = funnels.map((funnel: any) => Number(funnel.id)).filter(Boolean)
+    const stageIds = funnels.flatMap((funnel: any) =>
+      Array.isArray(funnel.stages)
+        ? funnel.stages.map((stage: any) => Number(stage.id)).filter(Boolean)
+        : []
+    )
+    const [ownedFunnels, ownedStages] = await Promise.all([
+      prisma.funnelConfig.count({
+        where: { id: { in: funnelIds }, companyId: req.user!.companyId },
+      }),
+      prisma.funnelStage.count({
+        where: { id: { in: stageIds }, funnel: { companyId: req.user!.companyId } },
+      }),
+    ])
+    if (ownedFunnels !== new Set(funnelIds).size || ownedStages !== new Set(stageIds).size) {
+      return res.status(403).json(createErrorResponse('A reordenacao contem itens de outra clinica', 403))
+    }
+
     const operations = []
 
     for (const funnel of funnels) {
       operations.push(
         prisma.funnelConfig.update({
-          where: { id: funnel.id },
+          where: { id: Number(funnel.id) },
           data: { order: funnel.order }
         })
       )
@@ -292,7 +327,7 @@ router.put('/reorder/batch', auth(), async (req, res) => {
         for (const stage of funnel.stages) {
           operations.push(
             prisma.funnelStage.update({
-              where: { id: stage.id },
+              where: { id: Number(stage.id) },
               data: { order: stage.order }
             })
           )

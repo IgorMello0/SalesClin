@@ -1,9 +1,9 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyAccess, requireCompanyOwner } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import { ensureCompanyDefaults } from '../bootstrap/defaults.js'
-import { getBillingUsage } from '../services/billing.js'
+import { assertCanCreateClinic, BillingLimitError } from '../services/billing.js'
 import {
   diagnoseCentralEvolution,
   disconnectCentralWhatsapp,
@@ -17,35 +17,34 @@ import {
 export const router = Router()
 
 async function getRequestCompanyId(req: any) {
-  if (req.user?.type === 'profissional') {
-    const prof = await prisma.professional.findUnique({
-      where: { id: req.user.id },
-      select: { companyId: true },
-    })
-    return prof?.companyId || undefined
-  }
+  return req.user?.companyId || undefined
+}
 
-  if (req.user?.type === 'usuario') {
-    return req.user.companyId || undefined
-  }
+function sanitizeCompanySecrets(company: any) {
+  if (!company) return company
+  const {
+    apiKey,
+    metaToken,
+    metaWebhookVerifyToken,
+    metaTwoStepPin,
+    uazapiToken,
+    ...safeCompany
+  } = company
 
-  return undefined
+  return {
+    ...safeCompany,
+    hasApiKey: Boolean(apiKey),
+    hasMetaToken: Boolean(metaToken),
+    hasMetaWebhookVerifyToken: Boolean(metaWebhookVerifyToken),
+    hasMetaTwoStepPin: Boolean(metaTwoStepPin),
+    hasUazapiToken: Boolean(uazapiToken),
+  }
 }
 
 // Obter empresa do profissional logado
 router.get('/my-company', auth(), async (req, res) => {
   try {
-    let companyId: number | undefined
-
-    if (req.user?.type === 'profissional') {
-      const prof = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-        select: { companyId: true }
-      })
-      companyId = prof?.companyId || undefined
-    } else if (req.user?.type === 'usuario') {
-      companyId = req.user.companyId || undefined
-    }
+    const companyId = await getRequestCompanyId(req)
 
     if (!companyId) {
       return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
@@ -60,7 +59,7 @@ router.get('/my-company', auth(), async (req, res) => {
     }
 
 
-    res.json(createSuccessResponse(empresa))
+    res.json(createSuccessResponse(sanitizeCompanySecrets(empresa)))
   } catch (error: any) {
     console.error('[Empresas] Erro ao buscar minha empresa:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar empresa', 500))
@@ -80,7 +79,7 @@ router.get('/my-company/whatsapp/status', auth(), async (req, res) => {
   }
 })
 
-router.post('/my-company/whatsapp/connect/start', auth(), async (req, res) => {
+router.post('/my-company/whatsapp/connect/start', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -93,7 +92,7 @@ router.post('/my-company/whatsapp/connect/start', auth(), async (req, res) => {
   }
 })
 
-router.post('/my-company/whatsapp/connect/pairing-code', auth(), async (req, res) => {
+router.post('/my-company/whatsapp/connect/pairing-code', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -106,7 +105,7 @@ router.post('/my-company/whatsapp/connect/pairing-code', auth(), async (req, res
   }
 })
 
-router.post('/my-company/whatsapp/webhook/setup', auth(), async (req, res) => {
+router.post('/my-company/whatsapp/webhook/setup', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -147,7 +146,7 @@ router.get('/my-company/whatsapp/diagnostics', auth(), async (req, res) => {
   }
 })
 
-router.post('/my-company/whatsapp/disconnect', auth(), async (req, res) => {
+router.post('/my-company/whatsapp/disconnect', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -160,7 +159,7 @@ router.post('/my-company/whatsapp/disconnect', auth(), async (req, res) => {
   }
 })
 
-router.post('/my-company/whatsapp/restart', auth(), async (req, res) => {
+router.post('/my-company/whatsapp/restart', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -176,17 +175,7 @@ router.post('/my-company/whatsapp/restart', auth(), async (req, res) => {
 // Obter status do WhatsApp e QR Code da Evolution API (legado)
 router.get('/my-company/whatsapp/legacy-status', auth(), async (req, res) => {
   try {
-    let companyId: number | undefined
-
-    if (req.user?.type === 'profissional') {
-      const prof = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-        select: { companyId: true }
-      })
-      companyId = prof?.companyId || undefined
-    } else if (req.user?.type === 'usuario') {
-      companyId = req.user.companyId || undefined
-    }
+    const companyId = await getRequestCompanyId(req)
 
     if (!companyId) {
       return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
@@ -266,7 +255,7 @@ router.get('/my-company/whatsapp/legacy-status', auth(), async (req, res) => {
 })
 
 // Desconectar/Logout do WhatsApp na Evolution API (legado)
-router.post('/my-company/whatsapp/legacy-disconnect', auth(), async (req, res) => {
+router.post('/my-company/whatsapp/legacy-disconnect', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     let companyId: number | undefined
 
@@ -312,7 +301,7 @@ router.post('/my-company/whatsapp/legacy-disconnect', auth(), async (req, res) =
 })
 
 // Reiniciar Instância do WhatsApp na Evolution API
-router.post('/my-company/whatsapp/legacy-restart', auth(), async (req, res) => {
+router.post('/my-company/whatsapp/legacy-restart', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     let companyId: number | undefined
 
@@ -360,14 +349,29 @@ router.post('/my-company/whatsapp/legacy-restart', auth(), async (req, res) => {
 
 router.get('/', auth(), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
+  const allowedCompanyIds = req.user?.allowedCompanies || []
   const [items, total] = await Promise.all([
     prisma.empresa.findMany({
+      where: { id: { in: allowedCompanyIds } },
       skip,
       take,
       orderBy: { id: 'desc' },
-      include: { usuarios: true, agentesIa: true, conversas: true }
+      select: {
+        id: true,
+        ownerId: true,
+        name: true,
+        logoUrl: true,
+        domain: true,
+        whatsapp: true,
+        plan: true,
+        openHour: true,
+        closeHour: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     }),
-    prisma.empresa.count()
+    prisma.empresa.count({ where: { id: { in: allowedCompanyIds } } })
   ])
   res.json(createSuccessResponse(items, { page, pageSize, total }))
 })
@@ -425,44 +429,38 @@ router.get('/my-companies', auth(), async (req, res) => {
   }
 })
 
-router.get('/:id', auth(), async (req, res) => {
+router.get('/:id', auth(), requireCompanyAccess('id'), async (req, res) => {
   const id = Number(req.params.id)
   const item = await prisma.empresa.findUnique({
     where: { id },
-    include: { usuarios: true, agentesIa: true, conversas: true }
   })
   if (!item) return res.status(404).json(createErrorResponse('Empresa não encontrada', 404))
-  res.json(createSuccessResponse(item))
+  res.json(createSuccessResponse(sanitizeCompanySecrets(item)))
 })
 
 
 
-router.post('/', auth(), async (req, res) => {
+router.post('/', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     if (req.user?.type !== 'profissional') {
       return res.status(403).json(createErrorResponse('Apenas proprietários podem criar clínicas', 403))
     }
 
-    const usage = await getBillingUsage(req.user.id, req.user.companyId)
-    if (!usage.clinics.canCreate) {
-      return res.status(402).json(createErrorResponse('Limite de clinicas do plano atingido.', 402, {
-        limitType: 'clinics',
-        addonCode: 'extra_clinic',
-        used: usage.clinics.used,
-        limit: usage.clinics.limit,
-      }))
-    }
+    const usage = await assertCanCreateClinic(req.user.id)
 
-    const { name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour } = req.body
+    const { name, domain, whatsapp, openHour, closeHour } = req.body
+
+    if (!String(name || '').trim()) {
+      return res.status(400).json(createErrorResponse('Nome da clinica e obrigatorio', 400))
+    }
     
     const created = await prisma.empresa.create({ 
       data: { 
         name, 
         domain, 
         whatsapp, 
-        apiKey, 
-        plan, 
-        isActive, 
+        plan: usage.planCode,
+        isActive: true,
         openHour, 
         closeHour,
         ownerId: req.user.id // Vincula a empresa ao dono que está criando
@@ -472,27 +470,43 @@ router.post('/', auth(), async (req, res) => {
     res.status(201).json(createSuccessResponse(created))
   } catch (error: any) {
     console.error('[Empresas] Erro ao criar empresa:', error)
+    if (error instanceof BillingLimitError) {
+      return res.status(error.status).json(createErrorResponse(error.message, error.status, {
+        limitType: error.limitType,
+        addonCode: error.addonCode,
+        used: error.used,
+        limit: error.limit,
+      }))
+    }
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar clínica', 500))
   }
 })
 
-router.put('/:id', auth(), async (req, res) => {
+router.put('/:id', auth(), requireCompanyOwner('id'), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const {
-      name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour,
+      name, domain, whatsapp, apiKey, isActive, openHour, closeHour,
       // Campos de integração WhatsApp
       whatsappProvider, evolutionMode, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId,
       metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaWebhookVerifyToken, metaTwoStepPin, metaConnectionStatus,
       leadRoutingMode
     } = req.body
 
+    const currentCompany = await prisma.empresa.findUnique({
+      where: { id },
+      select: { isActive: true },
+    })
+    if (!currentCompany) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))
+    if (isActive === true && !currentCompany.isActive) {
+      await assertCanCreateClinic(req.user!.id)
+    }
+
     const data: any = {}
     if (name !== undefined) data.name = name
     if (domain !== undefined) data.domain = domain
     if (whatsapp !== undefined) data.whatsapp = whatsapp
     if (apiKey !== undefined) data.apiKey = apiKey
-    if (plan !== undefined) data.plan = plan
     if (isActive !== undefined) data.isActive = isActive
     if (openHour !== undefined) data.openHour = openHour
     if (closeHour !== undefined) data.closeHour = closeHour
@@ -514,14 +528,14 @@ router.put('/:id', auth(), async (req, res) => {
     }
 
     const updated = await prisma.empresa.update({ where: { id }, data })
-    res.json(createSuccessResponse(updated))
+    res.json(createSuccessResponse(sanitizeCompanySecrets(updated)))
   } catch (error: any) {
     console.error('[Empresas] Erro ao atualizar empresa:', error)
     res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar clínica', 500))
   }
 })
 
-router.delete('/:id', auth(), async (req, res) => {
+router.delete('/:id', auth(), requireCompanyOwner('id'), async (req, res) => {
   const id = Number(req.params.id)
   await prisma.empresa.delete({ where: { id } })
   res.json(createSuccessResponse({ id }))

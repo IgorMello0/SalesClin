@@ -1,10 +1,12 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import { logAudit } from '../utils/audit.js'
+import { assertLeadBelongsToCompany, assertUserBelongsToCompany } from '../services/tenant.js'
 
 export const router = Router()
+router.use(auth(), requireModule('funnel'))
 
 const PAYMENT_METHOD_ALIASES: Record<string, 'pix' | 'cartao' | 'dinheiro' | 'transferencia'> = {
   pix: 'pix',
@@ -29,7 +31,7 @@ const PAYMENT_STATUS_ALIASES: Record<string, 'pago' | 'pendente' | 'atrasado' | 
 }
 
 // Listar todos os leads
-router.get('/', auth(false), async (req, res) => {
+router.get('/', auth(), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
     const { search, status, professionalId } = req.query as any
@@ -109,7 +111,7 @@ router.get('/', auth(false), async (req, res) => {
 })
 
 // Buscar lead por ID
-router.get('/:id', auth(false), async (req, res) => {
+router.get('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const item = await prisma.lead.findUnique({
@@ -186,6 +188,8 @@ router.post('/', auth(), async (req, res) => {
     } else if (requestedSdrId !== undefined) {
       sdrId = requestedSdrId === null ? undefined : Number(requestedSdrId);
     }
+
+    if (sdrId) await assertUserBelongsToCompany(sdrId, companyId)
 
     // Verificar se o criador do lead é SDR ou Closer e o SDR não foi explicitamente definido no request
     if (req.user?.type === 'usuario' && req.user?.id) {
@@ -410,7 +414,7 @@ router.delete('/:id/activities/:activityId', auth(), async (req, res) => {
 })
 
 // Listar Propostas do Lead
-router.get('/:id/proposals', auth(false), async (req, res) => {
+router.get('/:id/proposals', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const proposals = await prisma.proposal.findMany({
@@ -939,11 +943,20 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     const { id } = req.params;
     const { sdrId, closerId } = req.body;
     
-    const lead = await prisma.lead.findUnique({ where: { id: parseInt(id) } });
+    const leadId = parseInt(id);
+    await assertLeadBelongsToCompany(leadId, req.user?.companyId);
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead) return res.status(404).json(createErrorResponse('Lead não encontrado', 404));
 
+    if (sdrId !== undefined && sdrId !== null) {
+      await assertUserBelongsToCompany(parseInt(sdrId), req.user?.companyId)
+    }
+    if (closerId !== undefined && closerId !== null) {
+      await assertUserBelongsToCompany(parseInt(closerId), req.user?.companyId)
+    }
+
     const updated = await prisma.lead.update({
-      where: { id: parseInt(id) },
+      where: { id: leadId },
       data: {
         ...(sdrId !== undefined && { sdrId: sdrId === null ? null : Number(sdrId) }),
         ...(closerId !== undefined && { closerId: closerId === null ? null : Number(closerId) })

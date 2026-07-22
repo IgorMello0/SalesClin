@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../prisma.js'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyOwner } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { logAudit } from '../utils/audit.js'
 import { getCompanyModuleEntitlements, OPERATIONAL_SUBSCRIPTION_STATUSES, ALWAYS_ALLOWED_MODULES } from '../services/billing.js'
@@ -27,13 +27,9 @@ async function getPlanPermissionContext(companyId?: number | null) {
 router.get('/professional/:id', auth(), async (req, res) => {
   try {
     const professionalId = Number(req.params.id)
-    
-    // Verificar se é admin (usuário ou profissional) ou o próprio profissional
-    const isAdmin = req.user?.role === 'admin';
-    const isProfessionalAdmin = req.user?.type === 'profissional' && req.user?.role === 'admin';
-    const isOwnProfile = req.user?.type === 'profissional' && req.user?.id === professionalId;
-    
-    if (!isAdmin && !isProfessionalAdmin && !isOwnProfile) {
+    const isOwnProfile = req.user?.type === 'profissional' && req.user.id === professionalId
+
+    if (!isOwnProfile) {
       return res.status(403).json(createErrorResponse('Acesso negado', 403))
     }
 
@@ -70,17 +66,12 @@ router.get('/professional/:id', auth(), async (req, res) => {
 })
 
 // Atualizar permissões de um profissional (apenas admin)
-router.put('/professional/:id', auth(), async (req, res) => {
+router.put('/professional/:id', auth(), requireCompanyOwner(), async (req, res) => {
   try {
-    // Apenas admin (usuário ou profissional) pode modificar permissões de profissionais
-    const isAdmin = req.user?.role === 'admin';
-    const isProfessionalAdmin = req.user?.type === 'profissional' && req.user?.role === 'admin';
-    
-    if (!isAdmin && !isProfessionalAdmin) {
+    const professionalId = Number(req.params.id)
+    if (req.user?.id !== professionalId) {
       return res.status(403).json(createErrorResponse('Acesso negado', 403))
     }
-
-    const professionalId = Number(req.params.id)
     const { permissions } = req.body as { permissions: Array<{ moduleId: number; hasAccess: boolean }> }
 
     if (!Array.isArray(permissions)) {
@@ -138,40 +129,42 @@ router.get('/user/:id', auth(), async (req, res) => {
     const userId = Number(req.params.id)
     
     // Buscar o usuário para validação
-    const user = await prisma.usuario.findUnique({
-      where: { id: userId },
-      include: { company: true },
+    const user = await prisma.usuario.findFirst({
+      where: {
+        id: userId,
+        OR: [
+          { companyId: req.user?.companyId || -1 },
+          { companyAccess: { some: { companyId: req.user?.companyId || -1, isActive: true } } },
+        ],
+      },
+      include: {
+        companyAccess: {
+          where: { companyId: req.user?.companyId || -1, isActive: true },
+          include: { role: true },
+        },
+      },
     })
 
     if (!user) {
       return res.status(404).json(createErrorResponse('Usuário não encontrado', 404))
     }
 
-    // Verificar se é profissional da mesma empresa ou admin (usuário/profissional) ou o próprio usuário
     const isProfessional = req.user?.type === 'profissional'
     const isOwnUser = req.user?.type === 'usuario' && req.user?.id === userId
-    const isAdmin = req.user?.role === 'admin'
-
-    if (isProfessional && !isAdmin) {
-      const professional = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-      })
-      if (professional?.companyId !== user.companyId) {
-        return res.status(403).json(createErrorResponse('Acesso negado', 403))
-      }
-    } else if (!isAdmin && !isOwnUser && !isProfessional) {
+    if (!isOwnUser && !isProfessional) {
       return res.status(403).json(createErrorResponse('Acesso negado', 403))
     }
 
     // Buscar permissões do usuário
-    const permissions = await prisma.userPermission.findMany({
-      where: { userId },
+    const permissions = await prisma.userCompanyPermission.findMany({
+      where: { userId, companyId: req.user?.companyId || -1 },
       include: { module: true },
     })
 
-    const rolePermissions = user.roleId
+    const activeRoleId = user.companyAccess[0]?.roleId || (user.companyId === req.user?.companyId ? user.roleId : null)
+    const rolePermissions = activeRoleId
       ? await prisma.rolePermission.findMany({
-          where: { roleId: user.roleId },
+          where: { roleId: activeRoleId },
         })
       : []
 
@@ -229,7 +222,7 @@ router.get('/user/:id', auth(), async (req, res) => {
 })
 
 // Atualizar permissões de um usuário (profissional da mesma empresa)
-router.put('/user/:id', auth(), async (req, res) => {
+router.put('/user/:id', auth(), requireCompanyOwner(), async (req, res) => {
   try {
     const userId = Number(req.params.id)
     const { permissions } = req.body as { permissions: Array<{ moduleId: number; hasAccess: boolean }> }
@@ -239,40 +232,22 @@ router.put('/user/:id', auth(), async (req, res) => {
     }
 
     // Buscar o usuário
-    const user = await prisma.usuario.findUnique({
-      where: { id: userId },
+    const companyId = req.user?.companyId || -1
+    const user = await prisma.usuario.findFirst({
+      where: {
+        id: userId,
+        OR: [
+          { companyId },
+          { companyAccess: { some: { companyId, isActive: true } } },
+        ],
+      },
     })
 
     if (!user) {
       return res.status(404).json(createErrorResponse('Usuário não encontrado', 404))
     }
 
-    // Verificar se é admin (usuário) ou profissional da mesma empresa
-    const isUserAdmin = req.user?.type === 'usuario' && req.user?.role === 'admin';
-    const isProfessional = req.user?.type === 'profissional';
-
-    if (!isUserAdmin && !isProfessional) {
-      return res.status(403).json(createErrorResponse('Apenas profissionais e admins podem gerenciar permissões de usuários', 403))
-    }
-
-    // Se for admin (usuário), verificar se é da mesma empresa
-    if (isUserAdmin && req.user.companyId !== user.companyId) {
-      return res.status(403).json(createErrorResponse('Você não pode gerenciar usuários de outra empresa', 403))
-    }
-
-    // Se for profissional (não admin), verificar empresa
-    if (isProfessional && req.user?.role !== 'admin') {
-      const professional = await prisma.professional.findUnique({
-        where: { id: req.user.id },
-      })
-
-      if (professional?.companyId !== user.companyId) {
-        return res.status(403).json(createErrorResponse('Você não pode gerenciar usuários de outra empresa', 403))
-      }
-    }
-
-    // Se não for admin, buscar permissões do profissional para validar
-    if (!isUserAdmin && isProfessional) {
+    if (req.user?.type === 'profissional') {
       const professionalPermissions = await prisma.professionalPermission.findMany({
         where: { professionalId: req.user.id },
       })
@@ -299,10 +274,11 @@ router.put('/user/:id', auth(), async (req, res) => {
     // Atualizar ou criar permissões
     const results = []
     for (const perm of permissions) {
-      const result = await prisma.userPermission.upsert({
+      const result = await prisma.userCompanyPermission.upsert({
         where: {
-          userId_moduleId: {
+          userId_companyId_moduleId: {
             userId,
+            companyId,
             moduleId: perm.moduleId,
           },
         },
@@ -311,6 +287,7 @@ router.put('/user/:id', auth(), async (req, res) => {
         },
         create: {
           userId,
+          companyId,
           moduleId: perm.moduleId,
           hasAccess: perm.hasAccess,
         },
@@ -392,8 +369,8 @@ router.get('/my-permissions', auth(), async (req, res) => {
 
       const activeAccess = user?.companyAccess?.[0]
       const rolePermissions = activeAccess?.role?.permissions || user?.role?.permissions || []
-      const userPermissions = await prisma.userPermission.findMany({
-        where: { userId: req.user.id },
+      const userPermissions = await prisma.userCompanyPermission.findMany({
+        where: { userId: req.user.id, companyId: req.user.companyId || -1 },
       })
 
       const permissions = allModules.map((module) => {

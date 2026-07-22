@@ -7,7 +7,9 @@ import {
   activateBillingAddon,
   addDays,
   getPeriodEndForCycle,
+  getProductIdForAddon,
   getProductIdForPlan,
+  isAddonCode,
   isBillingCycle,
   isPlanCode,
   markWebhookEventProcessed,
@@ -24,6 +26,13 @@ import {
 } from '../services/whatsapp-integration.js';
 
 export const router = Router();
+
+function secureStringEquals(left: string | undefined, right: string | undefined) {
+  if (!left || !right) return false;
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
 
 function planAndCycleFromProductId(productId?: string | null) {
   if (!productId) return null;
@@ -188,6 +197,7 @@ async function activatePendingSignup(params: {
         planCode,
         billingCycle,
         status: params.normalizedStatus,
+        accessSource: 'abacatepay',
         trialEndsAt,
         currentPeriodEndsAt: params.normalizedStatus === 'active' ? getPeriodEndForCycle(billingCycle) : null,
         abacateSubscriptionId: params.subscriptionId || null,
@@ -221,7 +231,12 @@ router.post('/abacate-pay', async (req, res) => {
     const expectedSecret = process.env.ABACATEPAY_WEBHOOK_SECRET;
     const querySecret = typeof req.query.webhookSecret === 'string' ? req.query.webhookSecret : undefined;
 
-    if (expectedSecret && querySecret !== expectedSecret) {
+    if (!expectedSecret) {
+      console.error('[Webhook/AbacatePay] ABACATEPAY_WEBHOOK_SECRET nao configurado.');
+      return res.status(503).json(createErrorResponse('Webhook indisponivel', 503));
+    }
+
+    if (!secureStringEquals(querySecret, expectedSecret)) {
       console.warn('[Webhook/AbacatePay] Secret invalido ou ausente.', {
         hasExpectedSecret: true,
         hasQuerySecret: Boolean(querySecret),
@@ -287,14 +302,23 @@ router.post('/abacate-pay', async (req, res) => {
       ? parsedCompanyId
       : companyIdFromExternalId(checkout.externalId || payment.externalId || subscription.externalId || body.externalId);
     const productMatch = planAndCycleFromProductId(itemProductId);
-    const planCode = metadata.planCode || productMatch?.planCode;
-    const billingCycle = metadata.billingCycle || productMatch?.billingCycle;
+    const planCode = productMatch?.planCode || metadata.planCode;
+    const billingCycle = productMatch?.billingCycle || metadata.billingCycle;
 
     const normalizedStatus = normalizeAbacateStatus(eventName, subscription.status || checkout.status || payment.status);
     const resolvedPlanCode = isPlanCode(planCode) ? planCode : undefined;
     const resolvedBillingCycle = isBillingCycle(billingCycle) ? billingCycle : undefined;
     const subscriptionId = subscription.id || data.subscriptionId || body.subscriptionId || null;
     const checkoutId = checkout.id || data.checkoutId || body.checkoutId || null;
+    const isOperationalEvent = ['trialing', 'active'].includes(normalizedStatus);
+
+    if (isOperationalEvent && !subscriptionId) {
+      return res.status(400).json(createErrorResponse('Evento operacional sem assinatura recorrente', 400));
+    }
+
+    if (isOperationalEvent && !billingAddonId && !productMatch) {
+      return res.status(400).json(createErrorResponse('Produto do pagamento nao reconhecido', 400));
+    }
 
     if (eventName.toLowerCase().includes('plan_changed')) {
       const planChangeStatus = data.status || data.update?.status || 'PENDING';
@@ -333,6 +357,17 @@ router.post('/abacate-pay', async (req, res) => {
     }
 
     if (pendingSignupId) {
+      const pending = await prisma.pendingSignup.findUnique({ where: { id: pendingSignupId } });
+      if (!pending) {
+        return res.status(404).json(createErrorResponse('Cadastro pendente nao encontrado', 404));
+      }
+      if (
+        isOperationalEvent &&
+        (pending.planCode !== resolvedPlanCode || pending.billingCycle !== resolvedBillingCycle)
+      ) {
+        return res.status(409).json(createErrorResponse('Produto divergente do cadastro pendente', 409));
+      }
+
       const activation = await activatePendingSignup({
         pendingSignupId,
         normalizedStatus,
@@ -347,15 +382,25 @@ router.post('/abacate-pay', async (req, res) => {
     }
 
     if (billingAddonId) {
-      const addonBillingCycle = isBillingCycle(metadata.billingCycle) ? metadata.billingCycle : resolvedBillingCycle;
-      const quantity = Number(metadata.quantity || checkout.items?.[0]?.quantity || subscription.items?.[0]?.quantity || 1);
+      const addon = await prisma.billingAddon.findUnique({ where: { id: billingAddonId } });
+      if (!addon || !isAddonCode(addon.addonCode) || !isBillingCycle(addon.billingCycle)) {
+        return res.status(404).json(createErrorResponse('Adicional de cobranca nao encontrado', 404));
+      }
+
+      if (isOperationalEvent) {
+        const expectedProductId = getProductIdForAddon(addon.addonCode, addon.billingCycle);
+        if (!itemProductId || !expectedProductId || itemProductId !== expectedProductId) {
+          return res.status(409).json(createErrorResponse('Produto divergente do adicional solicitado', 409));
+        }
+      }
+
       const addonActivation = await activateBillingAddon({
         billingAddonId,
         normalizedStatus,
         subscriptionId,
         checkoutId,
-        billingCycle: addonBillingCycle,
-        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+        billingCycle: addon.billingCycle,
+        quantity: addon.quantity,
       });
 
       await markWebhookEventProcessed(eventId, eventName, body);
@@ -364,6 +409,21 @@ router.post('/abacate-pay', async (req, res) => {
 
     if (!companyId) {
       return res.status(400).json(createErrorResponse('Evento sem clinica vinculada', 400));
+    }
+
+    const currentSubscription = await prisma.companySubscription.findUnique({
+      where: { companyId },
+    });
+    if (!currentSubscription) {
+      return res.status(404).json(createErrorResponse('Assinatura nao encontrada', 404));
+    }
+
+    if (isOperationalEvent) {
+      const expectedPlanCode = currentSubscription.pendingPlanCode || currentSubscription.planCode;
+      const expectedBillingCycle = currentSubscription.pendingBillingCycle || currentSubscription.billingCycle;
+      if (resolvedPlanCode !== expectedPlanCode || resolvedBillingCycle !== expectedBillingCycle) {
+        return res.status(409).json(createErrorResponse('Produto divergente da assinatura solicitada', 409));
+      }
     }
 
     const trialEndsAt = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : undefined;
@@ -376,18 +436,23 @@ router.post('/abacate-pay', async (req, res) => {
     await prisma.companySubscription.update({
       where: { companyId },
       data: {
-        ...(resolvedPlanCode ? { planCode: resolvedPlanCode } : {}),
-        ...(resolvedBillingCycle ? { billingCycle: resolvedBillingCycle } : {}),
+        ...(isOperationalEvent && resolvedPlanCode ? { planCode: resolvedPlanCode } : {}),
+        ...(isOperationalEvent && resolvedBillingCycle ? { billingCycle: resolvedBillingCycle } : {}),
         status: normalizedStatus,
+        ...(isOperationalEvent ? { accessSource: 'abacatepay' } : {}),
         ...(trialEndsAt ? { trialEndsAt } : {}),
         currentPeriodEndsAt: normalizedStatus === 'active' ? getPeriodEndForCycle(resolvedBillingCycle || 'monthly') : undefined,
         abacateSubscriptionId: subscriptionId,
         abacateCheckoutId: checkoutId,
         canceledAt,
+        ...(isOperationalEvent ? {
+          pendingPlanCode: null,
+          pendingBillingCycle: null,
+        } : {}),
       },
     });
 
-    if (resolvedPlanCode) {
+    if (isOperationalEvent && resolvedPlanCode) {
       await prisma.empresa.update({
         where: { id: companyId },
         data: { plan: resolvedPlanCode },

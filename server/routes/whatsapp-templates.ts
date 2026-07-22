@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { auth } from '../middleware/auth.js'
+import { auth, requireCompanyOwner, requireModule } from '../middleware/auth.js'
 import { prisma } from '../prisma.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import { listWhatsAppTemplates, syncMetaTemplates } from '../services/whatsapp-templates.js'
@@ -18,7 +18,7 @@ async function getRequestCompanyId(req: any) {
   return null
 }
 
-router.get('/', auth(), async (req, res) => {
+router.get('/', auth(), requireModule('conversas'), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
@@ -30,7 +30,7 @@ router.get('/', auth(), async (req, res) => {
   }
 })
 
-router.post('/sync', auth(), async (req, res) => {
+router.post('/sync', auth(), requireModule('conversas'), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
