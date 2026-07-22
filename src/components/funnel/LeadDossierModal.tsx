@@ -672,22 +672,32 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                             {/* The Vertical Line */}
                             <div className="absolute left-[15px] top-2 bottom-4 w-[2px] bg-slate-200"></div>
 
-                            {[...selectedLead.activities].reverse().map((act, idx) => (
-                              <div key={act.id} className="relative animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
-                                {/* Node Dot/Icon */}
-                                <div className={cn(
-                                  "absolute -left-[32px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white z-10",
-                                  act.color || "bg-[#001B3D]" // Default Navy
-                                )}>
-                                  <span className="material-symbols-outlined text-white text-[16px]">{act.icon}</span>
-                                </div>
+                            {[...selectedLead.activities].reverse().map((act, idx) => {
+                              const isNote = act.type === 'nota' || act.type === 'task';
+                              const isProposal = act.type === 'proposta' || act.type === 'proposal';
+                              
+                              const icon = act.icon || (isNote ? 'sticky_note_2' : isProposal ? 'description' : 'info');
+                              const color = act.color || (isNote ? 'bg-amber-500' : isProposal ? 'bg-emerald-500' : 'bg-blue-500');
+                              const user = act.user || act.createdBy || 'Sistema';
+                              const action = act.action || (isNote ? 'fez uma anotação' : isProposal ? 'gerou uma proposta comercial' : 'ação no sistema');
+                              const dateStr = act.date || safeFormatDate(act.createdAt || act.updatedAt, "dd/MM/yy 'às' HH:mm");
 
-                                {/* Content Card */}
-                                <div className="space-y-2">
-                                  <header className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                    <span className="text-sm font-extrabold text-primary font-headline">{act.user}</span>
-                                    <span className="text-xs text-slate-400 font-medium">{act.action}</span>
-                                  </header>
+                              return (
+                                <div key={act.id} className="relative animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                                  {/* Node Dot/Icon */}
+                                  <div className={cn(
+                                    "absolute -left-[32px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white z-10",
+                                    color
+                                  )}>
+                                    <span className="material-symbols-outlined text-white text-[16px]">{icon}</span>
+                                  </div>
+
+                                  {/* Content Card */}
+                                  <div className="space-y-2">
+                                    <header className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                      <span className="text-sm font-extrabold text-primary font-headline">{user}</span>
+                                      <span className="text-xs text-slate-400 font-medium">{action}</span>
+                                    </header>
 
                                   {act.result && (
                                     <div className="space-y-1">
@@ -760,11 +770,12 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
 
                                   <footer className="text-[10px] font-bold text-slate-300 pt-1 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-[12px]">schedule</span>
-                                    {act.date}
+                                    {dateStr}
                                   </footer>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                             {selectedLead.activities.length === 0 && (
                               <div className="text-center py-10">
                                 <p className="text-sm text-slate-400 italic">Nenhuma atividade registrada.</p>

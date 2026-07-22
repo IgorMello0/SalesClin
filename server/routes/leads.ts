@@ -799,7 +799,107 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
   }
 })
 
-// Deletar lead
+// Deletar múltiplos leads de uma vez
+router.delete('/bulk', auth(), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json(createErrorResponse('IDs inválidos', 400));
+    }
+
+    let companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      companyId = prof?.companyId || undefined;
+    }
+
+    const numericIds = ids.map((id: any) => Number(id));
+
+    // Verificar que todos os leads pertencem à clínica
+    const leads = await prisma.lead.findMany({
+      where: { id: { in: numericIds } },
+      select: { id: true, companyId: true }
+    });
+
+    if (companyId) {
+      const unauthorized = leads.filter(l => l.companyId !== companyId);
+      if (unauthorized.length > 0) {
+        return res.status(403).json(createErrorResponse('Acesso negado a um ou mais leads', 403));
+      }
+    }
+
+    await prisma.lead.deleteMany({ where: { id: { in: numericIds } } });
+    
+    logAudit(req.user!, 'BULK_DELETAR_LEADS', 'Lead', 0);
+    res.json(createSuccessResponse({ deleted: numericIds.length }));
+  } catch (error: any) {
+    console.error('[Leads] Erro ao deletar leads em massa:', error);
+    res.status(500).json(createErrorResponse('Erro ao deletar leads', 500));
+  }
+});
+
+// Atribuir múltiplos leads a SDR ou Closer em massa
+router.patch('/bulk-assignment', auth(), async (req, res) => {
+  try {
+    const { ids, sdrId, closerId } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json(createErrorResponse('IDs inválidos', 400));
+    }
+
+    let companyId = req.user?.companyId;
+    if (req.user?.type === 'profissional' && !companyId) {
+      const prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
+      companyId = prof?.companyId || undefined;
+    }
+
+    const numericIds = ids.map((id: any) => Number(id));
+
+    // Verificar que todos os leads pertencem à clínica
+    const leads = await prisma.lead.findMany({
+      where: { id: { in: numericIds } },
+      select: { id: true, companyId: true }
+    });
+
+    if (companyId) {
+      const unauthorized = leads.filter(l => l.companyId !== companyId);
+      if (unauthorized.length > 0) {
+        return res.status(403).json(createErrorResponse('Acesso negado a um ou mais leads', 403));
+      }
+    }
+
+    // Se está atribuindo a SDR, verificar que o SDR pertence à clínica
+    if (sdrId !== undefined && sdrId !== null) {
+      const sdr = await prisma.usuario.findUnique({ where: { id: parseInt(sdrId) }, select: { companyId: true } });
+      if (!sdr || (companyId && sdr.companyId !== companyId)) {
+        return res.status(403).json(createErrorResponse('SDR não pertence a esta clínica', 403));
+      }
+    }
+
+    // Se está atribuindo a Closer, verificar que o Closer pertence à clínica
+    if (closerId !== undefined && closerId !== null) {
+      const closer = await prisma.usuario.findUnique({ where: { id: parseInt(closerId) }, select: { companyId: true } });
+      if (!closer || (companyId && closer.companyId !== companyId)) {
+        return res.status(403).json(createErrorResponse('Closer não pertence a esta clínica', 403));
+      }
+    }
+
+    await prisma.lead.updateMany({
+      where: { id: { in: numericIds } },
+      data: {
+        ...(sdrId !== undefined && { sdrId: sdrId === null ? null : parseInt(sdrId) }),
+        ...(closerId !== undefined && { closerId: closerId === null ? null : parseInt(closerId) }),
+      }
+    });
+
+    logAudit(req.user!, 'BULK_ATRIBUIR_LEADS', 'Lead', 0);
+    res.json(createSuccessResponse({ updated: numericIds.length }));
+  } catch (error: any) {
+    console.error('[Leads] Erro ao reatribuir leads em massa:', error);
+    res.status(500).json(createErrorResponse('Erro ao reatribuir leads', 500));
+  }
+});
+
+
 router.delete('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
@@ -845,8 +945,8 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     const updated = await prisma.lead.update({
       where: { id: parseInt(id) },
       data: {
-        ...(sdrId !== undefined && { sdrId: sdrId === null ? null : parseInt(sdrId) }),
-        ...(closerId !== undefined && { closerId: closerId === null ? null : parseInt(closerId) })
+        ...(sdrId !== undefined && { sdrId: sdrId === null ? null : Number(sdrId) }),
+        ...(closerId !== undefined && { closerId: closerId === null ? null : Number(closerId) })
       },
       include: {
         sdr: { select: { name: true } },
@@ -864,7 +964,7 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     }
 
     if (sdrId !== undefined) {
-      const parsedSdr = sdrId === null ? null : parseInt(sdrId);
+      const parsedSdr = sdrId === null ? null : Number(sdrId);
       if (lead.sdrId !== parsedSdr) {
         const content = parsedSdr === null ? 'SDR responsável removido.' : `O SDR responsável foi alterado para ${updated.sdr?.name || 'outro usuário'}.`;
         await prisma.leadActivity.create({
@@ -874,7 +974,7 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     }
 
     if (closerId !== undefined) {
-      const parsedCloser = closerId === null ? null : parseInt(closerId);
+      const parsedCloser = closerId === null ? null : Number(closerId);
       if (lead.closerId !== parsedCloser) {
         const content = parsedCloser === null ? 'Closer responsável removido.' : `O Closer responsável foi alterado para ${updated.closer?.name || 'outro usuário'}.`;
         await prisma.leadActivity.create({

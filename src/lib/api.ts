@@ -675,11 +675,12 @@ export const categoriesApi = {
 
 // Usuários
 export const usuariosApi = {
-  getAll: async (params?: { page?: number; pageSize?: number; search?: string }) => {
+  getAll: async (params?: { page?: number; pageSize?: number; search?: string; allCompanies?: boolean }) => {
     const query = new URLSearchParams()
     if (params?.page) query.append('page', params.page.toString())
     if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
     if (params?.search) query.append('search', params.search)
+    if (params?.allCompanies) query.append('allCompanies', 'true')
     
     return apiRequest<Array<any>>(`/usuarios?${query.toString()}`)
   },
@@ -742,7 +743,10 @@ export const leadsApi = {
   updateProposal: async (id: number, proposalId: number, data: any) => apiRequest<any>(`/leads/${id}/proposals/${proposalId}`, { method: 'PUT', body: JSON.stringify(data) }),
   confirmPayment: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/confirm-payment`, { method: 'POST', body: JSON.stringify(data) }),
   updateAssignment: async (id: number, data: { sdrId?: number | null, closerId?: number | null }) => apiRequest<any>(`/leads/${id}/assignment`, { method: 'PATCH', body: JSON.stringify(data) }),
+  bulkDelete: async (ids: number[]) => apiRequest<any>('/leads/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) }),
+  bulkAssignment: async (ids: number[], data: { sdrId?: number | null, closerId?: number | null }) => apiRequest<any>('/leads/bulk-assignment', { method: 'PATCH', body: JSON.stringify({ ids, ...data }) }),
 }
+
 
 // Catálogos
 export const catalogsApi = {

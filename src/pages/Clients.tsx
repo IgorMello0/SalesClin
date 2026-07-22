@@ -53,6 +53,8 @@ interface Client {
 }
 
 const Clients = () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -150,6 +152,13 @@ const Clients = () => {
     (client.email && client.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (client.phone && client.phone.includes(searchQuery))
   );
+
+  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const paginatedClients = filteredClients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, itemsPerPage]);
 
   const handleOpenDialog = (client?: Client) => {
     if (client) {
@@ -471,7 +480,7 @@ const Clients = () => {
 
       {/* Clients Table Area */}
       <div className="premium-card overflow-hidden rounded-3xl border-0 shadow-sm">
-        <div className="p-6 border-b border-border bg-muted/30 flex flex-col gap-4">
+        <div className="p-4 sm:p-6 border-b border-border bg-muted/30 flex flex-col gap-4">
           <h3 className="text-lg font-bold text-primary font-headline flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">list_alt</span>
             Lista de Pacientes
@@ -494,6 +503,34 @@ const Clients = () => {
               </TabsList>
             </Tabs>
           </div>
+          
+          {filteredClients.length > 0 && !isLoading && (
+            <div className="flex items-center justify-between pt-4 border-t border-border/50">
+              <div className="flex items-center space-x-2 text-xs sm:text-sm text-slate-500">
+                <span>Mostrar</span>
+                <select
+                  className="h-8 w-14 sm:w-16 rounded-md border border-slate-200 bg-white text-center text-xs sm:text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                >
+                  {[20, 40, 60, 80, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span className="hidden sm:inline">por página</span>
+              </div>
+              <div className="flex items-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-slate-500">
+                <span className="hidden sm:inline">Página <span className="font-bold text-slate-700">{currentPage}</span> de {totalPages || 1}</span>
+                <span className="sm:hidden font-bold">{currentPage}/{totalPages || 1}</span>
+                <div className="flex space-x-1">
+                  <Button variant="outline" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                    <span className="material-symbols-outlined text-sm">chevron_left</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+                    <span className="material-symbols-outlined text-sm">chevron_right</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
         <div id="clients-table" className="p-0 overflow-hidden bg-card">
@@ -505,7 +542,7 @@ const Clients = () => {
           ) : isMobile ? (
             // Mobile View
             <div className="space-y-3 p-4">
-              {filteredClients.map((client) => (
+              {paginatedClients.map((client) => (
                 <div key={client.id} className="p-4 rounded-2xl border border-border bg-muted/30">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -560,7 +597,7 @@ const Clients = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredClients.map((client) => (
+                  {paginatedClients.map((client) => (
                     <TableRow key={client.id} className="hover:bg-muted/30 border-b-border transition-colors">
                       <TableCell className="px-6 py-4">
                         <div className="flex items-center space-x-3">
@@ -652,6 +689,48 @@ const Clients = () => {
               <p className="text-sm font-bold text-muted-foreground">
                 {searchQuery ? 'Nenhum paciente encontrado com essa busca.' : 'Nenhum paciente cadastrado.'}
               </p>
+            </div>
+          )}
+
+          {filteredClients.length > 0 && !isLoading && (
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-xl">
+              <div className="flex items-center space-x-2 text-sm text-slate-500">
+                <span>Mostrar</span>
+                <select
+                  className="h-8 w-16 rounded-md border border-slate-200 bg-white text-center text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                >
+                  {[20, 40, 60, 80, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span className="hidden sm:inline">por página</span>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-slate-500">
+                  Página <span className="font-bold text-slate-700">{currentPage}</span> de {totalPages || 1}
+                </span>
+                <div className="flex space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <span className="material-symbols-outlined text-sm">chevron_left</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    <span className="material-symbols-outlined text-sm">chevron_right</span>
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>

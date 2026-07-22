@@ -75,6 +75,8 @@ interface Lead {
 }
 
 const Leads = () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
@@ -102,14 +104,104 @@ const Leads = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<number | null>(null);
 
+  // Multi-select state
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  const [isAssignSdrDialogOpen, setIsAssignSdrDialogOpen] = useState(false);
+  const [isAssignCloserDialogOpen, setIsAssignCloserDialogOpen] = useState(false);
+  const [bulkAssignSdrId, setBulkAssignSdrId] = useState('');
+  const [bulkAssignCloserId, setBulkAssignCloserId] = useState('');
+  const [closers, setClosers] = useState<any[]>([]);
+
   const loadSdrs = async () => {
     try {
-      const res = await usuariosApi.getAll({ pageSize: 50 });
+      const res = await usuariosApi.getAll({ pageSize: 100 });
       if (res.success && res.data) {
         setSdrs(res.data.filter((u: any) => u.isSdr || (u.role && u.role.isSDR) || (u.role && u.role.isSdr)));
+        setClosers(res.data.filter((u: any) => u.isCloser || (u.role && u.role.isCloser) || (u.role && u.role.isCLoser)));
       }
     } catch (e) {
-      console.error("Error loading SDRs:", e);
+      console.error("Error loading SDRs/Closers:", e);
+    }
+  };
+
+  const toggleSelectMode = () => {
+    setIsSelectMode(prev => {
+      if (prev) setSelectedIds([]);
+      return !prev;
+    });
+  };
+
+  const toggleSelectLead = (id: number) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === paginatedLeads.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(paginatedLeads.map(l => l.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const response = await leadsApi.bulkDelete(selectedIds);
+      if (response.success) {
+        toast({ title: 'Leads removidos', description: `${selectedIds.length} leads foram removidos.` });
+        setSelectedIds([]);
+        setIsSelectMode(false);
+        loadLeads();
+      } else {
+        toast({ title: 'Erro', description: 'Erro ao remover leads', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Erro ao remover leads', variant: 'destructive' });
+    } finally {
+      setIsBulkDeleteDialogOpen(false);
+    }
+  };
+
+  const handleBulkAssignSdr = async () => {
+    if (!bulkAssignSdrId) return;
+    try {
+      const response = await leadsApi.bulkAssignment(selectedIds, { sdrId: Number(bulkAssignSdrId) });
+      if (response.success) {
+        toast({ title: 'SDR atribuído', description: `${selectedIds.length} leads atribuídos com sucesso.` });
+        setSelectedIds([]);
+        setIsSelectMode(false);
+        loadLeads();
+      } else {
+        toast({ title: 'Erro', description: 'Erro ao atribuir SDR', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Erro ao atribuir SDR', variant: 'destructive' });
+    } finally {
+      setIsAssignSdrDialogOpen(false);
+      setBulkAssignSdrId('');
+    }
+  };
+
+  const handleBulkAssignCloser = async () => {
+    if (!bulkAssignCloserId) return;
+    try {
+      const response = await leadsApi.bulkAssignment(selectedIds, { closerId: Number(bulkAssignCloserId) });
+      if (response.success) {
+        toast({ title: 'Closer atribuído', description: `${selectedIds.length} leads atribuídos com sucesso.` });
+        setSelectedIds([]);
+        setIsSelectMode(false);
+        loadLeads();
+      } else {
+        toast({ title: 'Erro', description: 'Erro ao atribuir Closer', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Erro ao atribuir Closer', variant: 'destructive' });
+    } finally {
+      setIsAssignCloserDialogOpen(false);
+      setBulkAssignCloserId('');
     }
   };
 
@@ -396,6 +488,13 @@ const Leads = () => {
     return selectedTags.every(tag => leadTags.includes(tag));
   });
 
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const paginatedLeads = filteredLeads.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTags, itemsPerPage]);
+
   const getStatusLabel = (status: string) => {
     const stage = allAvailableStages.find(s => s.id === status);
     if (stage) return stage.label;
@@ -450,6 +549,8 @@ const Leads = () => {
             <span className="hidden sm:inline">Ver no Funil</span>
             <span className="sm:hidden">Funil</span>
           </Button>
+
+
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -698,19 +799,101 @@ const Leads = () => {
 
       {/* Table Area */}
       <div className="premium-card overflow-hidden rounded-3xl border-0 shadow-sm">
-        <div className="p-6 border-b border-border bg-muted/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="text-lg font-bold text-primary font-headline flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary">list_alt</span>
-            Gerenciamento de Leads
-          </h3>
-          <div className="relative w-full sm:w-80">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-            <Input
-              placeholder="Buscar por nome, fone ou origem..."
-              className="pl-10 bg-card border-border transition-all rounded-xl h-11 shadow-sm"
-              value={searchDebounce}
-              onChange={(e) => setSearchDebounce(e.target.value)}
-            />
+        <div className="p-4 sm:p-6 border-b border-border bg-muted/50 flex flex-col gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <h3 className="text-lg font-bold text-primary font-headline flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary">list_alt</span>
+                Gerenciamento de Leads
+              </h3>
+              
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
+                <Button
+                  onClick={toggleSelectMode}
+                  variant={isSelectMode ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    "h-9 px-3 sm:px-4 font-bold gap-1 sm:gap-2 rounded-xl text-xs transition-all",
+                    isSelectMode
+                      ? "bg-primary text-white border-primary shadow-sm"
+                      : "border-slate-200 text-slate-600 hover:border-primary/30"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-base">{isSelectMode ? 'close' : 'checklist'}</span>
+                  <span className="hidden sm:inline">{isSelectMode ? 'Cancelar Seleção' : 'Multisseleção'}</span>
+                  <span className="sm:hidden">{isSelectMode ? 'Cancelar' : 'Multisseleção'}</span>
+                </Button>
+
+                {isSelectMode && selectedIds.length > 0 && (
+                  <>
+                    <Button
+                      onClick={() => setIsBulkDeleteDialogOpen(true)}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3 font-bold gap-1 rounded-xl text-xs border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-base">delete_sweep</span>
+                      <span className="hidden sm:inline">Apagar ({selectedIds.length})</span>
+                    </Button>
+                    <Button
+                      onClick={() => setIsAssignSdrDialogOpen(true)}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3 font-bold gap-1 rounded-xl text-xs border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-base">person_pin</span>
+                      <span className="hidden sm:inline">SDR</span>
+                    </Button>
+                    <Button
+                      onClick={() => setIsAssignCloserDialogOpen(true)}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3 font-bold gap-1 rounded-xl text-xs border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-400 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-base">handshake</span>
+                      <span className="hidden sm:inline">Closer</span>
+                    </Button>
+                  </>
+                )}
+
+                <div className="relative w-full sm:flex-1 lg:w-64 xl:w-80">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+                  <Input
+                    placeholder="Buscar por nome, fone..."
+                    className="pl-10 bg-card border-border transition-all rounded-xl h-9 shadow-sm text-sm"
+                    value={searchDebounce}
+                    onChange={(e) => setSearchDebounce(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {filteredLeads.length > 0 && !isLoading && (
+              <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                <div className="flex items-center space-x-2 text-xs sm:text-sm text-slate-500">
+                  <span>Mostrar</span>
+                  <select
+                    className="h-8 w-14 sm:w-16 rounded-md border border-slate-200 bg-white text-center text-xs sm:text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/30"
+                    value={itemsPerPage}
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  >
+                    {[20, 40, 60, 80, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <span className="hidden sm:inline">por página</span>
+                </div>
+                <div className="flex items-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-slate-500">
+                  <span className="hidden sm:inline">Página <span className="font-bold text-slate-700">{currentPage}</span> de {totalPages || 1}</span>
+                  <span className="sm:hidden font-bold">{currentPage}/{totalPages || 1}</span>
+                  <div className="flex space-x-1">
+                    <Button variant="outline" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                      <span className="material-symbols-outlined text-sm">chevron_left</span>
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+                      <span className="material-symbols-outlined text-sm">chevron_right</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         
@@ -724,6 +907,16 @@ const Leads = () => {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow className="hover:bg-transparent border-b-slate-100/50">
+                  {isSelectMode && (
+                    <TableHead className="w-10 px-4">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 w-4 h-4 cursor-pointer accent-primary"
+                        checked={selectedIds.length > 0 && selectedIds.length === paginatedLeads.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                  )}
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12 px-6">Lead</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12">Tags</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest text-slate-400 h-12">Status</TableHead>
@@ -732,9 +925,31 @@ const Leads = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLeads.map((lead) => (
-                  <TableRow key={lead.id} className="hover:bg-muted/50 border-b-border transition-colors">
-                    <TableCell className="px-6 py-4 cursor-pointer group/lead" onClick={() => { setSelectedDetailsLead(lead); setIsDetailsModalOpen(true); }}>
+                {paginatedLeads.map((lead) => (
+                  <TableRow 
+                    key={lead.id} 
+                    className={cn(
+                      "hover:bg-muted/50 border-b-border transition-colors",
+                      isSelectMode && selectedIds.includes(lead.id) && "bg-primary/5"
+                    )}
+                  >
+                    {isSelectMode && (
+                      <TableCell className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="rounded border-slate-300 w-4 h-4 cursor-pointer accent-primary"
+                          checked={selectedIds.includes(lead.id)}
+                          onChange={() => toggleSelectLead(lead.id)}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell 
+                      className="px-6 py-4 cursor-pointer group/lead" 
+                      onClick={() => {
+                        if (isSelectMode) { toggleSelectLead(lead.id); }
+                        else { setSelectedDetailsLead(lead); setIsDetailsModalOpen(true); }
+                      }}
+                    >
                       <div className="flex items-center space-x-3">
                         <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 flex-shrink-0 group-hover/lead:bg-secondary/10 group-hover/lead:border-secondary/20 transition-all">
                           <span className="text-sm font-bold text-primary font-headline group-hover/lead:text-secondary">
@@ -821,9 +1036,51 @@ const Leads = () => {
               <p className="text-sm font-bold text-slate-500">Nenhum lead encontrado com estes filtros.</p>
             </div>
           )}
+
+          {filteredLeads.length > 0 && !isLoading && (
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-xl">
+              <div className="flex items-center space-x-2 text-sm text-slate-500">
+                <span>Mostrar</span>
+                <select
+                  className="h-8 w-16 rounded-md border border-slate-200 bg-white text-center text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                >
+                  {[20, 40, 60, 80, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span className="hidden sm:inline">por página</span>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-slate-500">
+                  Página <span className="font-bold text-slate-700">{currentPage}</span> de {totalPages || 1}
+                </span>
+                <div className="flex space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <span className="material-symbols-outlined text-sm">chevron_left</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    <span className="material-symbols-outlined text-sm">chevron_right</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+
 
       
       <LeadDetailsModal
@@ -836,7 +1093,7 @@ const Leads = () => {
               l.id === updatedLead.id ? { ...l, ...updatedLead } : l
             ));
           }
-          fetchLeads();
+          loadLeads();
         }}
         funnels={funnelList}
         allStages={editStages}
@@ -924,6 +1181,136 @@ const Leads = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* BULK DELETE DIALOG */}
+      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-3xl border-0 shadow-2xl max-w-[400px]">
+          <AlertDialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4 mx-auto">
+              <span className="material-symbols-outlined text-red-500 text-2xl">delete_sweep</span>
+            </div>
+            <AlertDialogTitle className="text-center font-headline text-xl">Remover {selectedIds.length} Leads</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-slate-500">
+              Tem certeza que deseja remover <strong>{selectedIds.length} leads</strong> permanentemente? Esta ação não poderá ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center flex-row gap-3 mt-4">
+            <AlertDialogCancel className="w-full sm:w-auto h-11 px-6 rounded-xl font-bold border-slate-200 hover:bg-slate-50 mt-0">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="w-full sm:w-auto h-11 px-6 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white"
+            >
+              Sim, Remover Todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ASSIGN TO SDR DIALOG */}
+      <Dialog open={isAssignSdrDialogOpen} onOpenChange={setIsAssignSdrDialogOpen}>
+        <DialogContent className="rounded-3xl border-0 shadow-2xl max-w-[420px] p-0 overflow-hidden">
+          <div className="p-6 bg-[#0B1525] text-white rounded-t-3xl">
+            <DialogTitle className="text-xl font-bold font-headline flex items-center gap-2">
+              <span className="material-symbols-outlined text-secondary">person_pin</span>
+              Atribuir a SDR
+            </DialogTitle>
+            <p className="text-sm text-white/70 mt-1">{selectedIds.length} leads selecionados</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Selecione o SDR</Label>
+              <Select value={bulkAssignSdrId} onValueChange={setBulkAssignSdrId}>
+                <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
+                  <SelectValue placeholder="Escolha um SDR desta clínica...">
+                    {bulkAssignSdrId ? sdrs.find((s: any) => s.id.toString() === bulkAssignSdrId)?.name : ''}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
+                  {sdrs.length === 0 && (
+                    <div className="px-4 py-3 text-sm text-slate-400 text-center">Nenhum SDR encontrado nesta clínica</div>
+                  )}
+                  {sdrs.map((sdr: any) => (
+                    <SelectItem key={sdr.id} value={sdr.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
+                          {sdr.name?.charAt(0).toUpperCase()}
+                        </div>
+                        {sdr.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="ghost" onClick={() => setIsAssignSdrDialogOpen(false)} className="flex-1 rounded-xl font-bold h-11">
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleBulkAssignSdr}
+                disabled={!bulkAssignSdrId}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-11"
+              >
+                Atribuir
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ASSIGN TO CLOSER DIALOG */}
+      <Dialog open={isAssignCloserDialogOpen} onOpenChange={setIsAssignCloserDialogOpen}>
+        <DialogContent className="rounded-3xl border-0 shadow-2xl max-w-[420px] p-0 overflow-hidden">
+          <div className="p-6 bg-[#0B1525] text-white rounded-t-3xl">
+            <DialogTitle className="text-xl font-bold font-headline flex items-center gap-2">
+              <span className="material-symbols-outlined text-secondary">handshake</span>
+              Atribuir a Closer
+            </DialogTitle>
+            <p className="text-sm text-white/70 mt-1">{selectedIds.length} leads selecionados</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Selecione o Closer</Label>
+              <Select value={bulkAssignCloserId} onValueChange={setBulkAssignCloserId}>
+                <SelectTrigger className="h-11 rounded-xl bg-muted border-border">
+                  <SelectValue placeholder="Escolha um Closer desta clínica...">
+                    {bulkAssignCloserId ? closers.find((c: any) => c.id.toString() === bulkAssignCloserId)?.name : ''}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl bg-white border-slate-100 shadow-xl z-[200]">
+                  {closers.length === 0 && (
+                    <div className="px-4 py-3 text-sm text-slate-400 text-center">Nenhum Closer encontrado nesta clínica</div>
+                  )}
+                  {closers.map((closer: any) => (
+                    <SelectItem key={closer.id} value={closer.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-[10px] font-bold text-purple-600">
+                          {closer.name?.charAt(0).toUpperCase()}
+                        </div>
+                        {closer.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="ghost" onClick={() => setIsAssignCloserDialogOpen(false)} className="flex-1 rounded-xl font-bold h-11">
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleBulkAssignCloser}
+                disabled={!bulkAssignCloserId}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold h-11"
+              >
+                Atribuir
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

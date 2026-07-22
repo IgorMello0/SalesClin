@@ -270,7 +270,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
   const loadTeam = async () => {
     try {
       setLoading(true);
-      const res = await usuariosApi.getAll({ pageSize: 50 });
+      const res = await usuariosApi.getAll({ pageSize: 50, allCompanies: true });
       if (res.success && res.data) {
         setTeam(res.data);
       }

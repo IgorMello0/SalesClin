@@ -133,6 +133,19 @@ router.get('/', auth(), async (req, res) => {
         professional.companyId,
         ...professional.ownedCompanies.map(c => c.id),
       ].filter(Boolean) as number[]))
+
+      // Se o frontend enviou X-Company-Id, filtrar apenas por essa clínica
+      const requestedCompanyId = req.headers['x-company-id'] ? Number(req.headers['x-company-id']) : null;
+      const allCompanies = req.query.allCompanies === 'true';
+
+      if (!allCompanies) {
+        if (requestedCompanyId && ownedCompanyIds.includes(requestedCompanyId)) {
+          ownedCompanyIds = [requestedCompanyId];
+        } else if (req.user.companyId && ownedCompanyIds.includes(req.user.companyId)) {
+          // Se companyId do token foi sobrescrito pelo middleware (via X-Company-Id), usar ele
+          ownedCompanyIds = [req.user.companyId];
+        }
+      }
     }
 
     if (ownedCompanyIds.length === 0) {
