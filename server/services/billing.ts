@@ -913,12 +913,16 @@ export async function createPendingSignupCheckout(input: {
 }
 
 export function verifyAbacateWebhookSignature(rawBody: string, signature: string | undefined) {
-  const secret = process.env.ABACATEPAY_WEBHOOK_SECRET
-  if (!secret) return true
+  const hmacKey =
+    process.env.ABACATEPAY_WEBHOOK_PUBLIC_KEY ||
+    process.env.ABACATEPAY_PUBLIC_KEY ||
+    process.env.ABACATEPAY_HMAC_KEY
+
+  if (!hmacKey) return true
   if (!signature) return false
 
   const expected = crypto
-    .createHmac('sha256', secret)
+    .createHmac('sha256', hmacKey)
     .update(Buffer.from(rawBody, 'utf8'))
     .digest('base64')
 

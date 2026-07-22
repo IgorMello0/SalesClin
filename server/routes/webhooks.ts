@@ -222,20 +222,38 @@ router.post('/abacate-pay', async (req, res) => {
     const querySecret = typeof req.query.webhookSecret === 'string' ? req.query.webhookSecret : undefined;
 
     if (expectedSecret && querySecret !== expectedSecret) {
+      console.warn('[Webhook/AbacatePay] Secret invalido ou ausente.', {
+        hasExpectedSecret: true,
+        hasQuerySecret: Boolean(querySecret),
+      });
       return res.status(401).json(createErrorResponse('Webhook nao autorizado', 401));
     }
 
     const rawBody = (req as any).rawBody || JSON.stringify(req.body || {});
-    const signature = req.headers['x-webhook-signature'];
+    const signature = req.headers['x-webhook-signature'] || req.headers['x-abacate-signature'];
     const signatureValue = Array.isArray(signature) ? signature[0] : signature;
 
     if (!verifyAbacateWebhookSignature(rawBody, signatureValue)) {
+      console.warn('[Webhook/AbacatePay] Assinatura invalida.', {
+        hasSignature: Boolean(signatureValue),
+        hasHmacKey: Boolean(
+          process.env.ABACATEPAY_WEBHOOK_PUBLIC_KEY ||
+          process.env.ABACATEPAY_PUBLIC_KEY ||
+          process.env.ABACATEPAY_HMAC_KEY
+        ),
+      });
       return res.status(401).json(createErrorResponse('Assinatura invalida', 401));
     }
 
     const body = req.body || {};
     const eventId = body.id || body.eventId;
     const eventName = body.event || body.type || body.eventType || 'unknown';
+
+    console.info('[Webhook/AbacatePay] Evento recebido.', {
+      eventId,
+      eventName,
+      devMode: body.devMode,
+    });
 
     if (!eventId) {
       return res.status(400).json(createErrorResponse('Evento sem id', 400));

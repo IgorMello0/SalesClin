@@ -221,6 +221,11 @@ export function normalizePhone(raw: string): string {
   return String(raw || '').replace(/@.*$/, '').replace(/\D/g, '')
 }
 
+type WhatsAppPersistence = Pick<
+  typeof prisma,
+  'empresa' | 'lead' | 'conversa' | 'mensagem' | 'leadActivity' | 'whatsAppWebhookEvent'
+>
+
 export async function findCompanyByInstance(instance: string) {
   const trimmed = instance.trim()
   return prisma.empresa.findFirst({
@@ -235,8 +240,11 @@ export async function findCompanyByInstance(instance: string) {
   })
 }
 
-export async function findCompanyByMetaPhoneId(phoneNumberId: string) {
-  return prisma.empresa.findFirst({
+export async function findCompanyByMetaPhoneId(
+  phoneNumberId: string,
+  db: WhatsAppPersistence = prisma,
+) {
+  return db.empresa.findFirst({
     where: { metaPhoneNumberId: phoneNumberId, isActive: true },
     select: { id: true, ownerId: true, name: true },
   })
@@ -1087,7 +1095,7 @@ export async function processIncomingMessage(opts: {
   rawPayload: any
   origin: string
   providerMessageId?: string | null
-}) {
+}, db: WhatsAppPersistence = prisma) {
   const { companyId, ownerId, phone, pushName, messageText, rawPayload, origin, providerMessageId } = opts
 
   if (!ownerId) {
@@ -1095,14 +1103,14 @@ export async function processIncomingMessage(opts: {
     return { action: 'ignored', reason: 'no_owner' }
   }
 
-  let lead = await prisma.lead.findFirst({
+  let lead = await db.lead.findFirst({
     where: { phone, companyId },
   })
 
   let action: 'created' | 'existing' | 'duplicate_message' = 'existing'
 
   if (!lead) {
-    lead = await prisma.lead.create({
+    lead = await db.lead.create({
       data: {
         professionalId: ownerId,
         companyId,
@@ -1120,12 +1128,12 @@ export async function processIncomingMessage(opts: {
     action = 'created'
   }
 
-  let conversa = await prisma.conversa.findFirst({
+  let conversa = await db.conversa.findFirst({
     where: { phone, companyId },
   })
 
   if (!conversa) {
-    conversa = await prisma.conversa.create({
+    conversa = await db.conversa.create({
       data: {
         companyId,
         leadId: lead.id,
@@ -1137,14 +1145,14 @@ export async function processIncomingMessage(opts: {
       },
     })
   } else if (!conversa.leadId) {
-    conversa = await prisma.conversa.update({
+    conversa = await db.conversa.update({
       where: { id: conversa.id },
       data: { leadId: lead.id },
     })
   }
 
   if (providerMessageId) {
-    const existingMessage = await prisma.mensagem.findFirst({
+    const existingMessage = await db.mensagem.findFirst({
       where: { conversationId: conversa.id, providerMessageId },
       select: { id: true },
     })
@@ -1154,7 +1162,7 @@ export async function processIncomingMessage(opts: {
     }
   }
 
-  const mensagem = await prisma.mensagem.create({
+  const mensagem = await db.mensagem.create({
     data: {
       conversationId: conversa.id,
       sender: 'cliente',
@@ -1165,12 +1173,12 @@ export async function processIncomingMessage(opts: {
     },
   })
 
-  await prisma.conversa.update({
+  await db.conversa.update({
     where: { id: conversa.id },
     data: { updatedAt: new Date() },
   })
 
-  await prisma.leadActivity.create({
+  await db.leadActivity.create({
     data: {
       leadId: lead.id,
       type: 'sistema',
@@ -1184,7 +1192,11 @@ export async function processIncomingMessage(opts: {
   return { action, leadId: lead.id, conversaId: conversa.id, messageId: mensagem.id }
 }
 
-export async function handleEvolutionPayload(body: any, empresa: { id: number; ownerId: number | null; name: string }) {
+export async function handleEvolutionPayload(
+  body: any,
+  empresa: { id: number; ownerId: number | null; name: string },
+  db: WhatsAppPersistence = prisma,
+) {
   const event = body.event || ''
   if (!event.includes('messages') && !event.includes('MESSAGES')) {
     return { received: true, ignored: true, reason: 'not_message_event' }
@@ -1225,12 +1237,16 @@ export async function handleEvolutionPayload(body: any, empresa: { id: number; o
     rawPayload: body,
     origin: 'WhatsApp',
     providerMessageId,
-  })
+  }, db)
 
   return { success: true, ...result }
 }
 
-export async function handleUazapiPayload(body: any, empresa: { id: number; ownerId: number | null; name: string }) {
+export async function handleUazapiPayload(
+  body: any,
+  empresa: { id: number; ownerId: number | null; name: string },
+  db: WhatsAppPersistence = prisma,
+) {
   const event = String(body?.event || body?.EventType || body?.eventType || '').toLowerCase()
   if (event && event !== 'messages' && event !== 'message') {
     return { received: true, ignored: true, reason: 'not_message_event' }
@@ -1280,12 +1296,16 @@ export async function handleUazapiPayload(body: any, empresa: { id: number; owne
     rawPayload: body,
     origin: 'WhatsApp',
     providerMessageId,
-  })
+  }, db)
 
   return { success: true, ...result }
 }
 
-export async function handleMetaMessages(body: any, empresaOverride?: { id: number; ownerId: number | null; name: string }) {
+export async function handleMetaMessages(
+  body: any,
+  empresaOverride?: { id: number; ownerId: number | null; name: string },
+  db: WhatsAppPersistence = prisma,
+) {
   if (!body.entry || !Array.isArray(body.entry)) return
 
   for (const entry of body.entry) {
@@ -1303,7 +1323,7 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
       let empresa = empresaOverride
       if (!empresa) {
         if (!phoneNumberId) continue
-        empresa = await findCompanyByMetaPhoneId(phoneNumberId)
+        empresa = await findCompanyByMetaPhoneId(phoneNumberId, db)
         if (!empresa) continue
       }
 
@@ -1313,7 +1333,7 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
         const status = String(statusEvent?.status || '').toLowerCase()
         const eventKey = `meta:status:${providerMessageId}:${status}:${statusEvent?.timestamp || ''}`
         try {
-          await prisma.whatsAppWebhookEvent.create({
+          await db.whatsAppWebhookEvent.create({
             data: {
               companyId: empresa.id,
               provider: 'meta',
@@ -1339,7 +1359,7 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
             ? new Date(Number(statusEvent.timestamp) * 1000)
             : new Date(),
         })
-        await prisma.whatsAppWebhookEvent.update({
+        await db.whatsAppWebhookEvent.update({
           where: { eventKey },
           data: { status: 'processed', processedAt: new Date() },
         })
@@ -1350,7 +1370,7 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
 
         const eventKey = `meta:message:${msg.id || `${msg.from}:${msg.timestamp || ''}`}`
         try {
-          await prisma.whatsAppWebhookEvent.create({
+          await db.whatsAppWebhookEvent.create({
             data: {
               companyId: empresa.id,
               provider: 'meta',
@@ -1380,8 +1400,8 @@ export async function handleMetaMessages(body: any, empresaOverride?: { id: numb
           rawPayload: msg,
           origin: 'WhatsApp Official',
           providerMessageId: msg.id || null,
-        })
-        await prisma.whatsAppWebhookEvent.update({
+        }, db)
+        await db.whatsAppWebhookEvent.update({
           where: { eventKey },
           data: { status: 'processed', processedAt: new Date() },
         })

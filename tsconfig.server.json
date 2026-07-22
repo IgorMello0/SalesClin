@@ -16,6 +16,7 @@
   "exclude": [
     "node_modules",
     "dist",
+    "server/**/*.test.ts",
     "server/scripts/create-admin.ts",
     "server/scripts/make-admin.ts",
     "server/scripts/make-professional-admin.ts",
