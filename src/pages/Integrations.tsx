@@ -375,7 +375,7 @@ const Integrations = () => {
   }
 
   return (
-    <div className="w-full space-y-6 p-4 sm:p-6 md:p-8">
+    <div className="w-full min-w-0 space-y-5 p-3 sm:p-5 lg:p-6">
       <div className="mx-auto max-w-7xl space-y-1">
         <p className="text-xs font-black uppercase tracking-[0.3em] text-blue-600">Central de canais</p>
         <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Integrações</h1>
@@ -384,8 +384,8 @@ const Integrations = () => {
         </p>
       </div>
 
-      <div className="mx-auto grid max-w-7xl items-start gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-      <Card className={`${selectedOption ? 'hidden lg:block' : 'block'} rounded-2xl border-slate-200 bg-white shadow-sm lg:sticky lg:top-6`}>
+      <div className="mx-auto grid min-w-0 max-w-7xl items-start gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <Card className={`${selectedOption ? 'hidden xl:block' : 'block'} min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm xl:sticky xl:top-6`}>
         <CardContent className="p-4">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
@@ -439,7 +439,7 @@ const Integrations = () => {
 
       {selectedOption && (
         <Card className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm">
-          <CardHeader className="border-b border-slate-100">
+          <CardHeader className="min-w-0 border-b border-slate-100 p-4 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Button
@@ -447,7 +447,7 @@ const Integrations = () => {
                   variant="outline"
                   size="icon"
                   onClick={() => setSelectedIntegration(null)}
-                  className="shrink-0 lg:hidden"
+                  className="shrink-0 xl:hidden"
                   aria-label="Voltar para integrações"
                 >
                   <ArrowLeft size={17} />
@@ -459,12 +459,12 @@ const Integrations = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedIntegration(null)}
-                    className="hidden text-xs font-black uppercase tracking-[0.2em] text-blue-600 hover:text-blue-800 lg:inline"
+                    className="hidden text-xs font-black uppercase tracking-[0.2em] text-blue-600 hover:text-blue-800 xl:inline"
                   >
                     Integrações / trocar canal
                   </button>
-                  <CardTitle className="mt-1">{selectedOption.title}</CardTitle>
-                  <CardDescription>{selectedOption.description}</CardDescription>
+                  <CardTitle className="mt-1 break-words text-xl sm:text-2xl">{selectedOption.title}</CardTitle>
+                  <CardDescription className="break-words">{selectedOption.description}</CardDescription>
                 </div>
               </div>
               <Button variant="outline" onClick={() => navigate('/conversations')}>
@@ -475,8 +475,8 @@ const Integrations = () => {
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             {selectedIntegration === 'whatsappOfficial' && (
-              <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
-                <div className="space-y-5">
+              <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="min-w-0 space-y-5">
                   {!metaStatus?.serverSecretConfigured && (
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
                       A integracao oficial ainda nao esta disponivel. Entre em contato com o suporte do SellClin.
@@ -488,7 +488,7 @@ const Integrations = () => {
                       type="button"
                       onClick={() => void connectMeta('cloud_api')}
                       disabled={workingKey === 'whatsappOfficial'}
-                      className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left transition hover:border-blue-400 disabled:opacity-60"
+                      className="min-w-0 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left transition hover:border-blue-400 disabled:opacity-60"
                     >
                       <p className="font-black text-slate-950">Numero exclusivo da Cloud API</p>
                       <p className="mt-1 text-sm font-medium text-slate-600">Fluxo oficial padrao para um numero dedicado ao SellClin.</p>
@@ -497,11 +497,11 @@ const Integrations = () => {
                       type="button"
                       onClick={() => void connectMeta('coexistence')}
                       disabled={!metaStatus?.coexistenceAllowed || !metaStatus?.coexistenceConfigured || workingKey === 'whatsappOfficial'}
-                      className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-black text-slate-950">WhatsApp Business com coexistencia</p>
-                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-emerald-700">Teste controlado</span>
+                        <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-emerald-700">Teste controlado</span>
                       </div>
                       <p className="mt-1 text-sm font-medium text-slate-600">Mantem o app WhatsApp Business no celular e conecta a API Oficial.</p>
                     </button>
@@ -595,7 +595,7 @@ const Integrations = () => {
                   {metaStatus?.connected && <TemplateCatalog compact />}
                 </div>
 
-                <div className="space-y-3">
+                <div className="min-w-0 space-y-3">
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                     <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Status</p>
                     <p className={`mt-2 text-sm font-black ${metaStatus?.connected ? 'text-emerald-700' : 'text-slate-900'}`}>
@@ -621,8 +621,8 @@ const Integrations = () => {
             )}
 
             {selectedIntegration === 'whatsappUazapi' && (
-              <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
-                <div className="space-y-5">
+              <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="min-w-0 space-y-5">
                   {uazapiStatus?.serverConfigured === false && (
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
                       A conexao por QR Code esta temporariamente indisponivel. Entre em contato com o suporte do SellClin.
@@ -704,7 +704,7 @@ const Integrations = () => {
 
                 </div>
 
-                <div className="space-y-3">
+                <div className="min-w-0 space-y-3">
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                     <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Status</p>
                     <p className={`mt-2 text-sm font-black ${uazapiStatus?.connected ? 'text-emerald-700' : 'text-slate-900'}`}>
@@ -763,7 +763,7 @@ const Integrations = () => {
         </Card>
       )}
       {!selectedOption && (
-        <Card className="hidden min-h-[420px] items-center justify-center rounded-2xl border-dashed border-slate-200 bg-slate-50/60 shadow-none lg:flex">
+        <Card className="hidden min-h-[420px] items-center justify-center rounded-2xl border-dashed border-slate-200 bg-slate-50/60 shadow-none xl:flex">
           <CardContent className="max-w-md p-8 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
               <ArrowRight size={24} />
