@@ -213,8 +213,19 @@ export function buildMetaConnectUrl(
   url.searchParams.set('redirect_uri', redirectUri)
   url.searchParams.set('state', state)
   url.searchParams.set('response_type', 'code')
+  url.searchParams.set('override_default_response_type', 'true')
   url.searchParams.set('config_id', configId)
   url.searchParams.set('scope', 'business_management,whatsapp_business_management,whatsapp_business_messaging')
+
+  if (officialMode === 'coexistence') {
+    url.searchParams.set('extras', JSON.stringify({
+      setup: {},
+      featureType: 'whatsapp_business_app_onboarding',
+      sessionInfoVersion: '3',
+      version: 'v3',
+    }))
+  }
+
   return url.toString()
 }
 

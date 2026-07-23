@@ -148,6 +148,13 @@ test('Coexistencia usa configuracao dedicada e recebe pelo pipeline oficial', as
 
   const connectUrl = new URL(buildMetaConnectUrl(8, 21, 'coexistence'))
   assert.equal(connectUrl.searchParams.get('config_id'), 'coexistence-config-id')
+  assert.equal(connectUrl.searchParams.get('override_default_response_type'), 'true')
+  assert.deepEqual(JSON.parse(connectUrl.searchParams.get('extras') || '{}'), {
+    setup: {},
+    featureType: 'whatsapp_business_app_onboarding',
+    sessionInfoVersion: '3',
+    version: 'v3',
+  })
 
   const stateToken = connectUrl.searchParams.get('state')
   assert.ok(stateToken)
