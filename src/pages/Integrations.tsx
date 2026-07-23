@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ArrowLeft,
   ArrowRight,
   CalendarDays,
   CheckCircle2,
@@ -374,57 +375,61 @@ const Integrations = () => {
   }
 
   return (
-    <div className="w-full space-y-8 p-4 sm:p-6 md:p-8">
-      <div className="mx-auto max-w-5xl space-y-2 text-center">
-        <p className="text-xs font-black uppercase tracking-[0.35em] text-blue-600">Central de canais</p>
-        <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Onde sua IA vai atender?</h1>
-        <p className="mx-auto max-w-2xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">
-          Conecte agenda e canais oficiais para transformar mensagens novas em leads no SellClin.
+    <div className="w-full space-y-6 p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-1">
+        <p className="text-xs font-black uppercase tracking-[0.3em] text-blue-600">Central de canais</p>
+        <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Integrações</h1>
+        <p className="max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">
+          Escolha um canal e configure a conexão da sua clínica no painel ao lado.
         </p>
       </div>
 
-      <Card className="mx-auto max-w-5xl rounded-[28px] border-slate-200 bg-white shadow-sm">
-        <CardContent className="p-4 sm:p-6">
-          <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="mx-auto grid max-w-7xl items-start gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <Card className={`${selectedOption ? 'hidden lg:block' : 'block'} rounded-2xl border-slate-200 bg-white shadow-sm lg:sticky lg:top-6`}>
+        <CardContent className="p-4">
+          <div className="mb-4 flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Passo 1 de 2</p>
-              <h2 className="mt-1 text-lg font-black text-slate-950">Escolha uma integracao</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Canais disponíveis</p>
+              <h2 className="mt-1 text-base font-black text-slate-950">Escolha uma integração</h2>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedIntegration(null)} disabled={!selectedIntegration}>
-              Trocar canal
-            </Button>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid gap-2">
             {integrationOptions.map((option) => {
               const active = selectedIntegration === option.id;
+              const connected = option.id === 'whatsappOfficial'
+                ? !!metaStatus?.connected
+                : option.id === 'whatsappUazapi'
+                  ? !!uazapiStatus?.connected
+                  : false;
+              const visibleStatus = connected ? 'Conectado' : option.status;
               return (
                 <button
                   key={option.id}
                   type="button"
                   onClick={() => option.available ? setSelectedIntegration(option.id) : showComingSoon(option.title)}
-                  className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${
+                  className={`group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
                     active
-                      ? 'border-blue-300 bg-blue-50/70 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
+                      ? 'border-blue-400 bg-blue-50 shadow-sm ring-1 ring-blue-100'
+                      : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-slate-200">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-slate-200">
                     {option.logo}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-black text-slate-950">{option.title}</p>
+                      <p className="text-sm font-black text-slate-950">{option.title}</p>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                        option.available ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        connected ? 'bg-blue-100 text-blue-700' : option.available ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
                       }`}>
-                        {option.status}
+                        {visibleStatus}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-xs font-black uppercase tracking-[0.2em] text-slate-400">{option.eyebrow}</p>
-                    <p className="mt-1 text-sm font-medium text-slate-500">{option.description}</p>
+                    <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{option.eyebrow}</p>
+                    <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-slate-500">{option.description}</p>
                   </div>
-                  {active ? <CheckCircle2 size={20} className="text-blue-600" /> : <ArrowRight size={18} className="text-slate-300" />}
+                  {active ? <CheckCircle2 size={19} className="shrink-0 text-blue-600" /> : <ArrowRight size={17} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500" />}
                 </button>
               );
             })}
@@ -433,15 +438,31 @@ const Integrations = () => {
       </Card>
 
       {selectedOption && (
-        <Card className="mx-auto max-w-5xl rounded-[28px] border-slate-200 bg-white shadow-sm">
+        <Card className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardHeader className="border-b border-slate-100">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setSelectedIntegration(null)}
+                  className="shrink-0 lg:hidden"
+                  aria-label="Voltar para integrações"
+                >
+                  <ArrowLeft size={17} />
+                </Button>
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200">
                   {selectedOption.logo}
                 </div>
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-600">Passo 2 de 2</p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIntegration(null)}
+                    className="hidden text-xs font-black uppercase tracking-[0.2em] text-blue-600 hover:text-blue-800 lg:inline"
+                  >
+                    Integrações / trocar canal
+                  </button>
                   <CardTitle className="mt-1">{selectedOption.title}</CardTitle>
                   <CardDescription>{selectedOption.description}</CardDescription>
                 </div>
@@ -454,7 +475,7 @@ const Integrations = () => {
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             {selectedIntegration === 'whatsappOfficial' && (
-              <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+              <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
                 <div className="space-y-5">
                   {!metaStatus?.serverSecretConfigured && (
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
@@ -600,7 +621,7 @@ const Integrations = () => {
             )}
 
             {selectedIntegration === 'whatsappUazapi' && (
-              <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+              <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
                 <div className="space-y-5">
                   {uazapiStatus?.serverConfigured === false && (
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
@@ -741,6 +762,20 @@ const Integrations = () => {
           </CardContent>
         </Card>
       )}
+      {!selectedOption && (
+        <Card className="hidden min-h-[420px] items-center justify-center rounded-2xl border-dashed border-slate-200 bg-slate-50/60 shadow-none lg:flex">
+          <CardContent className="max-w-md p-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
+              <ArrowRight size={24} />
+            </div>
+            <h2 className="mt-5 text-lg font-black text-slate-950">Selecione um canal</h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
+              A configuração será aberta aqui, sem tirar você desta página.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+      </div>
     </div>
   );
 };
