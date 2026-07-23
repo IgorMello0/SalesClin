@@ -45,6 +45,8 @@ import SobrePage from "./pages/SobrePage";
 import CampanhasPage from "./pages/CampanhasPage";
 import Campaigns from "./pages/Campaigns";
 import LegalPage from "./pages/LegalPage";
+import WhatsAppTemplates from "./pages/WhatsAppTemplates";
+import WhatsAppTemplateCreate from "./pages/WhatsAppTemplateCreate";
 
 const queryClient = new QueryClient();
 
@@ -87,6 +89,8 @@ const App = () => (
                   <Route path="reports" element={<Reports />} />
                   <Route path="payments" element={<ProtectedRoute moduleCode="pagamentos" moduleName="Financeiro"><Payments /></ProtectedRoute>} />
                   <Route path="conversations" element={<ProtectedRoute moduleCode="conversas" moduleName="Conversas"><Conversations /></ProtectedRoute>} />
+                  <Route path="templates" element={<ProtectedRoute moduleCode="conversas" moduleName="Templates"><WhatsAppTemplates /></ProtectedRoute>} />
+                  <Route path="templates/new" element={<ProtectedRoute moduleCode="conversas" moduleName="Templates"><WhatsAppTemplateCreate /></ProtectedRoute>} />
                   <Route path="catalogs" element={<ProtectedRoute moduleCode="catalogos" moduleName="Catálogos"><Catalogs /></ProtectedRoute>} />
                   <Route path="catalogs/:id" element={<ProtectedRoute moduleCode="catalogos" moduleName="Catálogos"><CatalogDetail /></ProtectedRoute>} />
                   <Route path="settings" element={<Settings />} />

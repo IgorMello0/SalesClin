@@ -3,19 +3,13 @@ import { CheckCircle2, Loader2, RefreshCcw, XCircle } from 'lucide-react';
 import { whatsappTemplatesApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import type { WhatsAppTemplate } from '@/types/whatsapp-template';
+import { useNavigate } from 'react-router-dom';
 
-export type WhatsAppTemplate = {
-  id: number;
-  name: string;
-  language: string;
-  category: string;
-  status: string;
-  qualityScore?: string | null;
-  rejectionReason?: string | null;
-  components?: Array<{ type?: string; text?: string }>;
-};
+export type { WhatsAppTemplate } from '@/types/whatsapp-template';
 
 export function TemplateCatalog({ compact = false }: { compact?: boolean }) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,10 +46,12 @@ export function TemplateCatalog({ compact = false }: { compact?: boolean }) {
           <p className="font-black text-slate-950">Templates de mensagem</p>
           <p className="mt-1 text-xs font-medium text-slate-500">Aprovados pela Meta para iniciar conversas e campanhas.</p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void sync()} disabled={syncing}>
-          {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-          Sincronizar
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => navigate('/templates')}>Gerenciar</Button>
+          <Button type="button" variant="outline" size="icon" title="Sincronizar templates" onClick={() => void sync()} disabled={syncing}>
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       <div className={`mt-4 space-y-2 ${compact ? 'max-h-52' : 'max-h-72'} overflow-y-auto pr-1`}>

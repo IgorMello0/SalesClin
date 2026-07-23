@@ -912,6 +912,9 @@ export const whatsappTemplatesApi = {
   list: async (status?: string) =>
     apiRequest<any[]>(`/whatsapp/templates${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   sync: async () => apiRequest<any[]>('/whatsapp/templates/sync', { method: 'POST' }),
+  create: async (data: import('@/types/whatsapp-template').CreateWhatsAppTemplateInput) =>
+    apiRequest<any>('/whatsapp/templates', { method: 'POST', body: JSON.stringify(data) }),
+  delete: async (id: number) => apiRequest<any>(`/whatsapp/templates/${id}`, { method: 'DELETE' }),
 }
 
 export const whatsappUazapiApi = {

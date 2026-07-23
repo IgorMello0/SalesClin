@@ -55,6 +55,12 @@ const menuItems = [
     moduleCode: 'conversas',
   },
   {
+    title: 'Templates',
+    url: '/templates',
+    icon: 'quick_reply',
+    moduleCode: 'conversas',
+  },
+  {
     title: 'Catálogos',
     url: '/catalogs',
     icon: 'inventory_2',

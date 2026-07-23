@@ -571,7 +571,7 @@ const Integrations = () => {
                     )}
                   </div>
 
-                  {metaStatus?.connected && <TemplateCatalog />}
+                  {metaStatus?.connected && <TemplateCatalog compact />}
                 </div>
 
                 <div className="space-y-3">
