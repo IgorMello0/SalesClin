@@ -57,7 +57,7 @@ const menuItems = [
   {
     title: 'Templates',
     url: '/templates',
-    icon: 'quick_reply',
+    icon: 'text_snippet',
     moduleCode: 'conversas',
   },
   {
