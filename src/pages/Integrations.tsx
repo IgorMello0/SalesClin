@@ -5,13 +5,19 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
+  Cloud,
   Copy,
   Eye,
   EyeOff,
+  Link2,
   Loader2,
   MessageCircle,
+  MessagesSquare,
   QrCode,
   RefreshCcw,
+  ShieldCheck,
+  Smartphone,
   Unplug,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TemplateCatalog } from '@/components/whatsapp/TemplateCatalog';
 
-type IntegrationKey = 'whatsappOfficial' | 'whatsappUazapi' | 'instagram' | 'messenger' | 'googleCalendar';
+type IntegrationKey = 'whatsappOfficial' | 'whatsappCoexistence' | 'whatsappUazapi' | 'instagram' | 'messenger' | 'googleCalendar';
 
 type MetaStatus = {
   connected?: boolean;
@@ -85,9 +91,9 @@ const logoClass = 'h-7 w-7 object-contain';
 const integrationOptions: IntegrationOption[] = [
   {
     id: 'whatsappOfficial',
-    title: 'WhatsApp Oficial',
+    title: 'API Oficial',
     eyebrow: 'Cloud API',
-    description: 'Use Phone Number ID, WABA ID e token permanente da propria clinica.',
+    description: 'Numero exclusivo conectado diretamente a plataforma oficial da Meta.',
     status: 'Disponivel',
     available: true,
     logo: (
@@ -98,10 +104,24 @@ const integrationOptions: IntegrationOption[] = [
     ),
   },
   {
+    id: 'whatsappCoexistence',
+    title: 'Coexistencia',
+    eyebrow: 'WhatsApp Business',
+    description: 'Mantenha o aplicativo no celular e conecte o mesmo numero ao SellClin.',
+    status: 'Acesso controlado',
+    available: true,
+    logo: (
+      <span className="relative flex h-8 w-8 items-center justify-center">
+        <img src="/integrations/whatsapp.webp" alt="WhatsApp Business" className="h-7 w-7 object-contain" />
+        <Smartphone className="absolute -bottom-1 -right-1 h-4 w-4 rounded bg-white p-0.5 text-blue-600 shadow-sm" />
+      </span>
+    ),
+  },
+  {
     id: 'whatsappUazapi',
-    title: 'WhatsApp Não Oficial',
-    eyebrow: 'WhatsApp',
-    description: 'Conecte por QR Code ou codigo de pareamento, sem preencher credenciais tecnicas.',
+    title: 'WhatsApp por QR Code',
+    eyebrow: 'Conexao rapida',
+    description: 'Escaneie o QR Code ou use um codigo de pareamento para conectar.',
     status: 'Disponivel',
     available: true,
     logo: (
@@ -162,6 +182,7 @@ const Integrations = () => {
   const [uazapiStatus, setUazapiStatus] = useState<UazapiStatus | null>(null);
   const [uazapiPhone, setUazapiPhone] = useState('');
   const [uazapiPolling, setUazapiPolling] = useState(false);
+  const [uazapiMethod, setUazapiMethod] = useState<'qr' | 'pairing'>('qr');
   const [showToken, setShowToken] = useState(false);
   const selectedOption = integrationOptions.find((option) => option.id === selectedIntegration);
 
@@ -239,7 +260,7 @@ const Integrations = () => {
   };
 
   const connectMeta = async (mode: 'cloud_api' | 'coexistence') => {
-    setWorkingKey('whatsappOfficial');
+    setWorkingKey(mode === 'coexistence' ? 'whatsappCoexistence' : 'whatsappOfficial');
     try {
       const response = await whatsappMetaApi.connect(mode);
       if (!response.success || !response.data?.url) throw new Error(response.error?.message || 'Nao foi possivel iniciar a conexao.');
@@ -361,10 +382,59 @@ const Integrations = () => {
     });
   };
 
+  const isIntegrationConnected = (key: IntegrationKey) => {
+    if (key === 'whatsappOfficial') {
+      return !!metaStatus?.connected && metaStatus.officialMode !== 'coexistence';
+    }
+    if (key === 'whatsappCoexistence') {
+      return !!metaStatus?.connected && metaStatus.officialMode === 'coexistence';
+    }
+    if (key === 'whatsappUazapi') return !!uazapiStatus?.connected;
+    return false;
+  };
+
+  const renderIntegrationCard = (option: IntegrationOption) => {
+    const connected = isIntegrationConnected(option.id);
+    const isWhatsApp = option.id.startsWith('whatsapp');
+
+    return (
+      <button
+        key={option.id}
+        type="button"
+        onClick={() => option.available ? setSelectedIntegration(option.id) : showComingSoon(option.title)}
+        className="group flex min-h-40 w-full flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        <div className="flex w-full items-start justify-between gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+            {option.logo}
+          </div>
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
+            connected
+              ? 'bg-emerald-50 text-emerald-700'
+              : option.available
+                ? isWhatsApp ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
+                : 'bg-slate-100 text-slate-400'
+          }`}>
+            {connected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+            {connected ? 'Conectado' : option.status}
+          </span>
+        </div>
+        <div className="mt-5 w-full">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{option.eyebrow}</p>
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <h3 className="text-base font-black text-slate-950">{option.title}</h3>
+            <ArrowRight size={17} className="shrink-0 text-slate-300 transition group-hover:translate-x-1 group-hover:text-orange-500" />
+          </div>
+          <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">{option.description}</p>
+        </div>
+      </button>
+    );
+  };
+
   if (!canManageIntegrations) {
     return (
       <div className="w-full p-4 sm:p-6 md:p-8">
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+        <div className="rounded-lg border border-dashed border-slate-200 bg-white p-8 text-center">
           <h1 className="text-xl font-bold text-slate-900">Integracoes restritas</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Apenas administradores da clinica podem configurar integracoes.
@@ -375,71 +445,56 @@ const Integrations = () => {
   }
 
   return (
-    <div className="w-full min-w-0 space-y-5 p-3 sm:p-5 lg:p-6">
-      <div className="mx-auto max-w-7xl space-y-1">
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-blue-600">Central de canais</p>
-        <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Integrações</h1>
-        <p className="max-w-3xl text-sm font-medium leading-relaxed text-slate-500 sm:text-base">
-          Escolha um canal e configure a conexão da sua clínica no painel ao lado.
-        </p>
-      </div>
+    <div className="w-full min-w-0 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-orange-500">Central de canais</p>
+            <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">Integrações</h1>
+            <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
+              Conecte os canais usados pela clínica e acompanhe cada configuração separadamente.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/conversations')} className="w-full sm:w-auto">
+            <MessagesSquare size={16} className="mr-2" />
+            Abrir conversas
+          </Button>
+        </div>
 
-      <div className="mx-auto grid min-w-0 max-w-7xl items-start gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-      <Card className={`${selectedOption ? 'hidden xl:block' : 'block'} min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm xl:sticky xl:top-6`}>
-        <CardContent className="p-4">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Canais disponíveis</p>
-              <h2 className="mt-1 text-base font-black text-slate-950">Escolha uma integração</h2>
+        <div className="mt-6 min-w-0">
+      {!selectedOption && (
+        <div className="space-y-7">
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <MessageCircle size={18} className="text-emerald-600" />
+              <div>
+                <h2 className="text-base font-black text-slate-950">WhatsApp</h2>
+                <p className="text-xs font-medium text-slate-500">Escolha uma forma de conexão.</p>
+              </div>
             </div>
-          </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {integrationOptions.filter((option) => option.id.startsWith('whatsapp')).map(renderIntegrationCard)}
+            </div>
+          </section>
 
-          <div className="grid gap-2">
-            {integrationOptions.map((option) => {
-              const active = selectedIntegration === option.id;
-              const connected = option.id === 'whatsappOfficial'
-                ? !!metaStatus?.connected
-                : option.id === 'whatsappUazapi'
-                  ? !!uazapiStatus?.connected
-                  : false;
-              const visibleStatus = connected ? 'Conectado' : option.status;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => option.available ? setSelectedIntegration(option.id) : showComingSoon(option.title)}
-                  className={`group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
-                    active
-                      ? 'border-blue-400 bg-blue-50 shadow-sm ring-1 ring-blue-100'
-                      : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-slate-200">
-                    {option.logo}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-black text-slate-950">{option.title}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                        connected ? 'bg-blue-100 text-blue-700' : option.available ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {visibleStatus}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{option.eyebrow}</p>
-                    <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-slate-500">{option.description}</p>
-                  </div>
-                  {active ? <CheckCircle2 size={19} className="shrink-0 text-blue-600" /> : <ArrowRight size={17} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500" />}
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <Link2 size={18} className="text-blue-600" />
+              <div>
+                <h2 className="text-base font-black text-slate-950">Outros canais</h2>
+                <p className="text-xs font-medium text-slate-500">Agenda e redes sociais da clínica.</p>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {integrationOptions.filter((option) => !option.id.startsWith('whatsapp')).map(renderIntegrationCard)}
+            </div>
+          </section>
+        </div>
+      )}
 
       {selectedOption && (
-        <Card className="min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm">
-          <CardHeader className="min-w-0 border-b border-slate-100 p-4 sm:p-6">
+        <Card className="min-w-0 rounded-lg border-slate-200 bg-white shadow-sm">
+          <CardHeader className="min-w-0 border-b border-slate-100 p-4 sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Button
@@ -447,66 +502,67 @@ const Integrations = () => {
                   variant="outline"
                   size="icon"
                   onClick={() => setSelectedIntegration(null)}
-                  className="shrink-0 xl:hidden"
+                  className="shrink-0"
                   aria-label="Voltar para integrações"
                 >
                   <ArrowLeft size={17} />
                 </Button>
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-50 ring-1 ring-slate-200">
                   {selectedOption.logo}
                 </div>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedIntegration(null)}
-                    className="hidden text-xs font-black uppercase tracking-[0.2em] text-blue-600 hover:text-blue-800 xl:inline"
-                  >
-                    Integrações / trocar canal
-                  </button>
-                  <CardTitle className="mt-1 break-words text-xl sm:text-2xl">{selectedOption.title}</CardTitle>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{selectedOption.eyebrow}</p>
+                  <CardTitle className="mt-0.5 break-words text-xl">{selectedOption.title}</CardTitle>
                   <CardDescription className="break-words">{selectedOption.description}</CardDescription>
                 </div>
               </div>
-              <Button variant="outline" onClick={() => navigate('/conversations')}>
-                Ir para Conversas
-                <ArrowRight size={16} className="ml-2" />
-              </Button>
+              <span className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black ${
+                isIntegrationConnected(selectedOption.id) ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                <span className={`h-2 w-2 rounded-full ${isIntegrationConnected(selectedOption.id) ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                {isIntegrationConnected(selectedOption.id) ? 'Conectado' : 'Não conectado'}
+              </span>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6">
+          <CardContent className="p-4 sm:p-5">
             {selectedIntegration === 'whatsappOfficial' && (
               <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="min-w-0 space-y-5">
                   {!metaStatus?.serverSecretConfigured && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
                       A integracao oficial ainda nao esta disponivel. Entre em contato com o suporte do SellClin.
                     </div>
                   )}
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <button
+                  <div className="flex flex-col gap-4 rounded-lg border border-blue-100 bg-blue-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm">
+                        <Cloud size={20} />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-950">Conectar um número exclusivo</p>
+                        <p className="mt-1 max-w-xl text-sm font-medium text-slate-600">
+                          Use o cadastro da Meta para vincular um número dedicado à API Oficial.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
                       type="button"
                       onClick={() => void connectMeta('cloud_api')}
-                      disabled={workingKey === 'whatsappOfficial'}
-                      className="min-w-0 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left transition hover:border-blue-400 disabled:opacity-60"
+                      disabled={workingKey === 'whatsappOfficial' || !metaStatus?.serverSecretConfigured}
+                      className="shrink-0 bg-slate-950 font-bold hover:bg-slate-800"
                     >
-                      <p className="font-black text-slate-950">Numero exclusivo da Cloud API</p>
-                      <p className="mt-1 text-sm font-medium text-slate-600">Fluxo oficial padrao para um numero dedicado ao SellClin.</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void connectMeta('coexistence')}
-                      disabled={!metaStatus?.coexistenceAllowed || !metaStatus?.coexistenceConfigured || workingKey === 'whatsappOfficial'}
-                      className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-black text-slate-950">WhatsApp Business com coexistencia</p>
-                        <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-emerald-700">Teste controlado</span>
-                      </div>
-                      <p className="mt-1 text-sm font-medium text-slate-600">Mantem o app WhatsApp Business no celular e conecta a API Oficial.</p>
-                    </button>
+                      {workingKey === 'whatsappOfficial' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
+                      Conectar com a Meta
+                    </Button>
                   </div>
 
+                  <details className="group rounded-lg border border-slate-200 bg-white">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 font-black text-slate-900">
+                      <span className="flex items-center gap-2"><ShieldCheck size={17} className="text-slate-500" /> Configuração manual</span>
+                      <ChevronDown size={17} className="text-slate-400 transition group-open:rotate-180" />
+                    </summary>
+                    <div className="space-y-5 border-t border-slate-100 p-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label>Phone Number ID</Label>
@@ -562,7 +618,7 @@ const Integrations = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Webhook Callback URL</p>
                     <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                       <Input value={metaStatus?.webhookUrl || 'Salve a configuracao para gerar a URL'} readOnly className="bg-white font-mono text-xs" />
@@ -575,6 +631,8 @@ const Integrations = () => {
                       No painel da Meta, cole essa URL em Webhooks e use exatamente o Verify Token salvo acima.
                     </p>
                   </div>
+                    </div>
+                  </details>
 
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button onClick={saveMetaConfig} disabled={workingKey === 'meta-save'} className="font-bold">
@@ -584,7 +642,7 @@ const Integrations = () => {
                     <Button variant="outline" onClick={() => loadMetaStatus()} disabled={!!workingKey} className="font-bold">
                       Atualizar status
                     </Button>
-                    {metaStatus?.connected && (
+                    {isIntegrationConnected('whatsappOfficial') && (
                       <Button variant="outline" onClick={disconnectMeta} disabled={workingKey === 'meta-disconnect'} className="font-bold text-red-600 hover:text-red-700">
                         {workingKey === 'meta-disconnect' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Unplug size={16} className="mr-2" />}
                         Desconectar
@@ -592,14 +650,14 @@ const Integrations = () => {
                     )}
                   </div>
 
-                  {metaStatus?.connected && <TemplateCatalog compact />}
+                  {isIntegrationConnected('whatsappOfficial') && <TemplateCatalog compact />}
                 </div>
 
                 <div className="min-w-0 space-y-3">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Status</p>
-                    <p className={`mt-2 text-sm font-black ${metaStatus?.connected ? 'text-emerald-700' : 'text-slate-900'}`}>
-                      {metaStatus?.connected ? 'Conectado' : 'Pendente'}
+                    <p className={`mt-2 text-sm font-black ${isIntegrationConnected('whatsappOfficial') ? 'text-emerald-700' : 'text-slate-900'}`}>
+                      {isIntegrationConnected('whatsappOfficial') ? 'Conectado' : 'Pendente'}
                     </p>
                     <p className="mt-3 text-xs font-black uppercase tracking-[0.25em] text-slate-400">Phone Number ID</p>
                     <p className="mt-2 break-all font-mono text-sm text-slate-900">{metaStatus?.phoneNumberId || '-'}</p>
@@ -609,7 +667,7 @@ const Integrations = () => {
                     <p className="mt-2 text-sm font-semibold text-slate-700">{metaStatus?.officialMode === 'coexistence' ? 'Coexistencia' : 'Cloud API'}</p>
                   </div>
 
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
                     <MessageCircle className="mb-2 h-5 w-5" />
                     <p className="font-black">Mensagem recebida vira lead</p>
                     <p className="mt-1 leading-relaxed">
@@ -620,16 +678,123 @@ const Integrations = () => {
               </div>
             )}
 
+            {selectedIntegration === 'whatsappCoexistence' && (
+              <div className="space-y-5">
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+                  <div className="min-w-0 space-y-5">
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-5">
+                      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-600 shadow-sm">
+                            <Smartphone size={20} />
+                          </div>
+                          <div>
+                            <p className="font-black text-slate-950">Conectar o WhatsApp Business atual</p>
+                            <p className="mt-1 max-w-xl text-sm font-medium leading-relaxed text-slate-600">
+                              O número continua funcionando no aplicativo e também passa a atender pelo SellClin.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => void connectMeta('coexistence')}
+                          disabled={workingKey === 'whatsappCoexistence' || !metaStatus?.coexistenceAllowed || !metaStatus?.coexistenceConfigured}
+                          className="shrink-0 bg-emerald-600 font-bold hover:bg-emerald-700"
+                        >
+                          {workingKey === 'whatsappCoexistence' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
+                          Conectar com a Meta
+                        </Button>
+                      </div>
+                    </div>
+
+                    {(!metaStatus?.coexistenceAllowed || !metaStatus?.coexistenceConfigured) && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
+                        A coexistência ainda não está habilitada para esta conta. O suporte do SellClin pode liberar o acesso controlado.
+                      </div>
+                    )}
+
+                    <div className="grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-3">
+                      {[
+                        ['01', 'Entrar com a Meta', 'Use o administrador da empresa.'],
+                        ['02', 'Escolher o número', 'Selecione o WhatsApp Business atual.'],
+                        ['03', 'Concluir', 'A conexão e o webhook são configurados.'],
+                      ].map(([number, title, description]) => (
+                        <div key={number} className="bg-white p-4">
+                          <span className="text-[10px] font-black tracking-[0.2em] text-emerald-600">{number}</span>
+                          <p className="mt-2 text-sm font-black text-slate-950">{title}</p>
+                          <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">{description}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {metaStatus?.connected && metaStatus.officialMode === 'coexistence' && <TemplateCatalog compact />}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Conexão</p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${isIntegrationConnected('whatsappCoexistence') ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        <p className="text-sm font-black text-slate-900">{isIntegrationConnected('whatsappCoexistence') ? 'Ativa' : 'Pendente'}</p>
+                      </div>
+                      <div className="mt-4 border-t border-slate-200 pt-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Número</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-700">{metaStatus?.displayPhoneNumber || 'Não informado'}</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" onClick={() => loadMetaStatus()} disabled={!!workingKey} className="w-full font-bold">
+                      <RefreshCcw size={16} className="mr-2" /> Atualizar status
+                    </Button>
+                    {isIntegrationConnected('whatsappCoexistence') && (
+                      <Button variant="outline" onClick={disconnectMeta} disabled={workingKey === 'meta-disconnect'} className="w-full font-bold text-red-600 hover:text-red-700">
+                        {workingKey === 'meta-disconnect' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Unplug size={16} className="mr-2" />}
+                        Desconectar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {selectedIntegration === 'whatsappUazapi' && (
               <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="min-w-0 space-y-5">
                   {uazapiStatus?.serverConfigured === false && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
                       A conexao por QR Code esta temporariamente indisponivel. Entre em contato com o suporte do SellClin.
                     </div>
                   )}
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  {uazapiStatus?.connected && (
+                    <div className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50 p-5">
+                      <CheckCircle2 className="h-8 w-8 shrink-0 text-emerald-600" />
+                      <div>
+                        <p className="font-black text-slate-950">WhatsApp conectado</p>
+                        <p className="mt-1 text-sm font-medium text-slate-600">{uazapiStatus.profileName || uazapiStatus.owner || 'Conexão ativa para esta clínica'}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!uazapiStatus?.connected && (
+                    <div className="grid grid-cols-2 rounded-lg bg-slate-100 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setUazapiMethod('qr')}
+                        className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-bold transition ${uazapiMethod === 'qr' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                      >
+                        <QrCode size={16} /> QR Code
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUazapiMethod('pairing')}
+                        className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-bold transition ${uazapiMethod === 'pairing' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                      >
+                        <Smartphone size={16} /> Código
+                      </button>
+                    </div>
+                  )}
+
+                  {uazapiMethod === 'qr' && !uazapiStatus?.connected && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 sm:p-5">
                     <div className="flex items-start gap-3">
                       <QrCode className="mt-0.5 h-5 w-5 text-emerald-600" />
                       <div>
@@ -640,7 +805,7 @@ const Integrations = () => {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex min-h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="mt-4 flex min-h-64 items-center justify-center rounded-lg border border-slate-200 bg-white p-5">
                       {qrCodeSource ? (
                         <img src={qrCodeSource} alt="QR Code para conectar WhatsApp" className="h-56 w-56 object-contain" />
                       ) : uazapiStatus?.connected ? (
@@ -669,9 +834,10 @@ const Integrations = () => {
                       </Button>
                     )}
                   </div>
+                  )}
 
-                  {!uazapiStatus?.connected && (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                  {!uazapiStatus?.connected && uazapiMethod === 'pairing' && (
+                    <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
                       <p className="font-black text-slate-950">Conectar sem QR Code</p>
                       <p className="mt-1 text-sm font-medium text-slate-500">
                         Informe o telefone com DDI e DDD para gerar um codigo de pareamento.
@@ -694,7 +860,7 @@ const Integrations = () => {
                         </Button>
                       </div>
                       {uazapiStatus?.pairingCode && (
-                        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-center">
+                        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
                           <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">Codigo de pareamento</p>
                           <p className="mt-2 font-mono text-2xl font-black tracking-widest text-slate-950">{uazapiStatus.pairingCode}</p>
                         </div>
@@ -705,7 +871,7 @@ const Integrations = () => {
                 </div>
 
                 <div className="min-w-0 space-y-3">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Status</p>
                     <p className={`mt-2 text-sm font-black ${uazapiStatus?.connected ? 'text-emerald-700' : 'text-slate-900'}`}>
                       {uazapiStatus?.connected ? 'Conectado' : uazapiStatus?.configured ? 'Aguardando conexao' : 'Nao configurado'}
@@ -733,7 +899,7 @@ const Integrations = () => {
                     </Button>
                   )}
 
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
                     <MessageCircle className="mb-2 h-5 w-5" />
                     <p className="font-black">Mensagem recebida vira lead</p>
                     <p className="mt-1 leading-relaxed">Numeros novos entram no funil e a conversa fica salva sem duplicar mensagens.</p>
@@ -743,7 +909,7 @@ const Integrations = () => {
             )}
 
             {selectedIntegration === 'googleCalendar' && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
                 <div className="flex items-start gap-3">
                   <CalendarDays className="mt-0.5 text-blue-600" size={22} />
                   <div>
@@ -762,19 +928,7 @@ const Integrations = () => {
           </CardContent>
         </Card>
       )}
-      {!selectedOption && (
-        <Card className="hidden min-h-[420px] items-center justify-center rounded-2xl border-dashed border-slate-200 bg-slate-50/60 shadow-none xl:flex">
-          <CardContent className="max-w-md p-8 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
-              <ArrowRight size={24} />
-            </div>
-            <h2 className="mt-5 text-lg font-black text-slate-950">Selecione um canal</h2>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-              A configuração será aberta aqui, sem tirar você desta página.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        </div>
       </div>
     </div>
   );
