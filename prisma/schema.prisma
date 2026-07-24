@@ -186,9 +186,11 @@ model Proposal {
   sdrId           Int?     @map("sdr_id")
   tags            String[] @default([])
   status          String   @default("pending")
-  justification   String?
-  discountApplied Boolean  @default(false) @map("discount_applied")
-  createdAt       DateTime @default(now()) @map("created_at")
+  justification      String?
+  discountApplied    Boolean  @default(false) @map("discount_applied")
+  discountValue      Decimal? @map("discount_value")
+  discountPercentage Decimal? @map("discount_percentage")
+  createdAt          DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
   lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   salesperson     Usuario? @relation("SalespersonProposals", fields: [salespersonId], references: [id])
@@ -290,7 +292,7 @@ model Payment {
   updatedAt       DateTime      @updatedAt @map("updated_at")
   companyId       Int?          @map("company_id")
   appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
-  client          Client        @relation(fields: [clientId], references: [id])
+  client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   company         Empresa?      @relation(fields: [companyId], references: [id])
   professional    Professional  @relation(fields: [professionalId], references: [id])
 
@@ -415,6 +417,7 @@ model Empresa {
   uazapiConnectedAt      DateTime? @map("uazapi_connected_at")
   webhookToken           String?   @unique @default(uuid()) @map("webhook_token")
   plan                   String?
+  maxDiscountPercentage  Decimal?  @default(0) @map("max_discount_percentage")
   leadRoutingMode        String    @default("manual") @map("lead_routing_mode")
   openHour               String    @default("08:00") @map("open_hour")
   closeHour              String    @default("20:00") @map("close_hour")

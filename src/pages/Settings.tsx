@@ -34,6 +34,7 @@ import LeadOriginsSettingsView from './settings/LeadOriginsSettingsView';
 import { LeadRoutingSettingsView } from './settings/LeadRoutingSettingsView';
 import { BillingSettingsView } from './settings/BillingSettingsView';
 import { SecuritySettingsView } from './settings/SecuritySettingsView';
+import DiscountSettingsView from './settings/DiscountSettingsView';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { catalogsApi, professionalsApi, usuariosApi, permissionsApi, empresasApi, rolesApi, modulesApi, billingApi, type BillingStatus, type BillingUsage } from '@/lib/api';
@@ -1976,6 +1977,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   lead_origins: LeadOriginsSettingsView,
   lead_routing: LeadRoutingSettingsView,
   billing: BillingSettingsView,
+  discount: DiscountSettingsView,
 };
 
 const Settings = () => {
@@ -2017,6 +2019,7 @@ const Settings = () => {
         { key: 'lead_statuses', name: 'Status', description: 'Status rápidos dos negócios', icon: 'label', ownerOnly: true },
         { key: 'lead_origins', name: 'Origens', description: 'Fontes de captação de leads', icon: 'share', ownerOnly: true },
         { key: 'lead_routing', name: 'Roteamento', description: 'Distribuição automática de leads', icon: 'route', ownerOnly: true },
+        { key: 'discount', name: 'Desconto', description: 'Configurar limites de descontos', icon: 'local_offer', ownerOnly: true },
       ],
     },
   ];

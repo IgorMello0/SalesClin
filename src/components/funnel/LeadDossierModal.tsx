@@ -54,7 +54,12 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
   const [isViewingProposal, setIsViewingProposal] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
+  const [editingProposal, setEditingProposal] = useState<any>(null);
   
+  const isAdminOrGestor = professional?.role === 'profissional' || ['admin', 'manager', 'gestor', 'administrador'].some(r => 
+    professional?.role?.toLowerCase().includes(r) || professional?.specialization?.toLowerCase().includes(r)
+  );
+
   const [team, setTeam] = useState<any[]>([]);
 
   useEffect(() => {
@@ -77,6 +82,15 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    // Implement delete note logic
+  };
+
+  const handleViewProposal = (proposal: any) => {
+    setSelectedProposal(proposal);
+    setIsViewingProposal(true);
   };
 
   const loadLeadDetails = async (id: string) => {
@@ -278,7 +292,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
         dueDate: newTaskDate || new Date().toISOString(),
         leadId: selectedLead.id,
         assignedToId: Number(professional?.id),
-        assigneeType: professional?.type === 'usuario' ? 'user' : 'profissional'
+        assigneeType: localStorage.getItem('userType') === 'user' ? 'user' : 'profissional'
       };
       const res = await tasksApi.create(payload);
       if (res.success) {
@@ -288,6 +302,8 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
         setNewTaskDate("");
         loadTasks(Number(selectedLead.id));
         toast({ title: "Tarefa adicionada com sucesso" });
+      } else {
+        toast({ title: "Erro ao adicionar tarefa", description: res.error?.message || "Permissão negada ou erro interno", variant: "destructive" });
       }
     } catch (e) {
       toast({ title: "Erro ao adicionar tarefa", variant: "destructive" });
@@ -789,7 +805,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Propostas Comerciais</h4>
                             <Button 
                               onClick={() => {
-                                setProposalLeadId(selectedLead.id);
+                                setEditingProposal(null);
                                 setIsCreatingProposal(true);
                               }}
                               variant="secondary"
@@ -806,7 +822,20 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                                 className="group bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md hover:border-secondary/20 transition-all cursor-pointer relative overflow-hidden"
                                 onClick={() => handleViewProposal(proposal)}
                               >
-                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute top-0 right-0 p-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {isAdminOrGestor && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingProposal(proposal);
+                                        setIsCreatingProposal(true);
+                                      }}
+                                      className="p-1.5 rounded-lg hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors"
+                                      title="Editar Proposta"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                                   <Eye className="w-5 h-5 text-secondary" />
                                 </div>
                                 
@@ -815,7 +844,15 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                                     <FileText className="w-6 h-6" />
                                   </div>
                                   <div className="space-y-1">
-                                    <h5 className="font-bold text-primary text-sm line-clamp-1">{proposal.title}</h5>
+                                    <div className="flex items-center gap-2">
+                                      <h5 className="font-bold text-primary text-sm line-clamp-1">{proposal.title}</h5>
+                                      {proposal.status === 'accepted' && (
+                                        <span className="flex items-center gap-1 bg-green-50 text-green-600 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap">
+                                          <CheckCircle2 className="w-3 h-3" />
+                                          Paga
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="text-xs text-slate-400 font-medium">#{proposal.id}</p>
                                   </div>
                                 </div>
@@ -846,7 +883,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                                 <p className="text-xs text-slate-400 mt-1">Gere sua primeira proposta para este lead.</p>
                                 <Button 
                                   onClick={() => {
-                                    setProposalLeadId(selectedLead.id);
+                                    setEditingProposal(null);
                                     setIsCreatingProposal(true);
                                   }}
                                   variant="secondary"
@@ -976,5 +1013,35 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
           )}
         </DialogContent>
       </Dialog>
+      
+      <ProposalViewer
+        open={isViewingProposal}
+        onOpenChange={(open) => {
+          setIsViewingProposal(open);
+          if (!open) setSelectedProposal(null);
+        }}
+        proposal={selectedProposal}
+        lead={selectedLead}
+      />
+      
+      <ProposalDialog 
+        open={isCreatingProposal}
+        onOpenChange={(open) => {
+          setIsCreatingProposal(open);
+          if (!open) setEditingProposal(null);
+        }}
+        lead={selectedLead}
+        professional={professional}
+        services={services}
+        editingProposal={editingProposal}
+        onSuccess={() => {
+          leadsApi.getProposals(Number(selectedLead?.id)).then(res => {
+            if (res.success) setLeadProposals(res.data || []);
+          });
+          setEditingProposal(null);
+          if (onUpdate) onUpdate();
+        }}
+      />
+    </>
   );
 };

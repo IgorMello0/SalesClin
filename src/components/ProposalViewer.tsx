@@ -235,6 +235,12 @@ export function ProposalViewer({ open, onOpenChange, proposal, lead, companyInfo
                       Desconto Aplicado
                     </p>
                   )}
+                  {proposal.status === 'accepted' && (
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-green-400 mt-1 flex items-center justify-end gap-1">
+                      <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                      Proposta Paga
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

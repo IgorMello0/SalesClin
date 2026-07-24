@@ -120,6 +120,7 @@ export default function Tasks() {
   const [taskToDeleteId, setTaskToDeleteId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isTeamMode, setIsTeamMode] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -503,12 +504,22 @@ export default function Tasks() {
   // Metrics Calculations (Bento Grid)
   const totalCount = tasks.length;
   const completedCount = tasks.filter(t => t.status === 'completed').length;
-  const pendingCount = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length;
-  const overdueCount = tasks.filter(t => isOverdue(t.dueDate, t.status)).length;
+  const visibleTasks = tasks.filter(t => {
+    if (t.status === 'completed') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const isArchived = new Date(t.updatedAt || t.createdAt) < sevenDaysAgo;
+      return showArchived ? isArchived : !isArchived;
+    }
+    return !showArchived;
+  });
+
+  const pendingCount = visibleTasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length;
+  const overdueCount = visibleTasks.filter(t => isOverdue(t.dueDate, t.status)).length;
 
   // Render Kanban Columns
   const renderKanbanColumn = (colStatus: 'pending' | 'in_progress' | 'completed', colTitle: string, colIcon: React.ReactNode, themeClass: string) => {
-    const colTasks = tasks.filter(t => t.status === colStatus);
+    const colTasks = visibleTasks.filter(t => t.status === colStatus);
 
     return (
       <Card 
@@ -727,6 +738,32 @@ export default function Tasks() {
             >
               <UserCheck className="w-3.5 h-3.5" />
               Equipe
+            </button>
+          </div>
+          
+          {/* Archive Toggle */}
+          <div className="flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 ml-2">
+            <button
+              onClick={() => setShowArchived(false)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
+                !showArchived 
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200" 
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
+              )}
+            >
+              Ativas
+            </button>
+            <button
+              onClick={() => setShowArchived(true)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold font-headline flex items-center gap-1.5 transition-all cursor-pointer",
+                showArchived 
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200" 
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
+              )}
+            >
+              Arquivadas
             </button>
           </div>
 
@@ -974,7 +1011,7 @@ export default function Tasks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.map(task => {
+                {visibleTasks.map(task => {
                   const taskOverdue = isOverdue(task.dueDate, task.status);
                   const initials = task.assignedTo?.name
                     ? task.assignedTo.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()

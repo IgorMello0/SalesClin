@@ -264,20 +264,23 @@ const SalesFunnel = () => {
   // Mapeamento de Leads e Orçamentos para os cartões do Funil Kanban
   const boardCards = useMemo(() => {
     return leads.flatMap((lead: any) => {
-      if (!lead.proposals || lead.proposals.length === 0) {
-        // Lead sem propostas
+      // Filtrar propostas ativas (ignorando aceitas e rejeitadas)
+      const activeProposals = lead.proposals ? lead.proposals.filter((p: any) => p.status !== 'accepted' && p.status !== 'rejected') : [];
+
+      if (!activeProposals || activeProposals.length === 0) {
+        // Lead sem propostas ativas (cai no status original do lead, ex: comercial_closed)
         return [{
           ...lead,
           cardId: `lead-${lead.id}`, // Identificador único do cartão
           isProposal: false,
           value: Number(lead.value) || 0,
           displayName: lead.name,
-          subtitle: 'Sem propostas',
+          subtitle: (!lead.proposals || lead.proposals.length === 0) ? 'Sem propostas' : 'Proposta aceita/rejeitada',
           displayValue: 0
         }];
       } else {
-        // Lead com propostas: cada proposta vira um cartão
-        return lead.proposals.map((prop: any) => {
+        // Lead com propostas ativas: cada proposta vira um cartão
+        return activeProposals.map((prop: any) => {
           // Se o status da proposta não for um ID de fase válido (por exemplo, "pending"), cai no status do lead ou comercial_proposal
           const isStageId = (status: string) => {
             return status && status !== 'pending' && status !== 'accepted' && status !== 'rejected';

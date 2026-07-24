@@ -707,7 +707,24 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
       return res.status(403).json(createErrorResponse('Acesso negado', 403));
     }
 
-    const { payments, proposalId } = req.body // Array of { amount, date, method, status } + optional proposalId
+    const { payments, proposalId, discountValue, discountPercentage, justification } = req.body // Array of { amount, date, method, status } + optional proposalId
+
+    if (Number(discountValue) > 0 || Number(discountPercentage) > 0) {
+      if (!justification || justification.trim().length === 0) {
+        return res.status(400).json(createErrorResponse('Justificativa é obrigatória quando há desconto.', 400));
+      }
+
+      // Validate user discount limits
+      if (req.user?.type === 'usuario') {
+        if (req.user?.role === 'sdr' || req.user?.role === 'closer') {
+          const empresa = await prisma.empresa.findUnique({ where: { id: _companyId || _checkEntity.companyId! }, select: { maxDiscountPercentage: true } });
+          const maxAllowed = Number(empresa?.maxDiscountPercentage || 0);
+          if (Number(discountPercentage) > maxAllowed) {
+            return res.status(403).json(createErrorResponse(`Desconto excede o limite autorizado de ${maxAllowed}%. Peça autorização.`, 403));
+          }
+        }
+      }
+    }
 
     if (!Array.isArray(payments) || payments.length === 0) {
       return res.status(400).json(createErrorResponse('Informe ao menos um pagamento.', 400))
@@ -781,10 +798,38 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
 
     // Se uma proposta foi vinculada, marcar como aceita
     if (proposalId) {
+      const updateData: any = { status: 'accepted' };
+      if (Number(discountValue) > 0 || Number(discountPercentage) > 0) {
+        updateData.discountApplied = true;
+        updateData.discountValue = Number(discountValue) || 0;
+        updateData.discountPercentage = Number(discountPercentage) || 0;
+        updateData.justification = justification;
+      }
+      
       await prisma.proposal.update({
         where: { id: Number(proposalId) },
-        data: { status: 'accepted' }
-      })
+        data: updateData
+      });
+    }
+
+    if (Number(discountValue) > 0 || Number(discountPercentage) > 0) {
+      let userName = 'Usuário';
+      if (req.user?.type === 'usuario') {
+        const u = await prisma.usuario.findUnique({ where: { id: req.user.id }, select: { name: true }});
+        if (u) userName = u.name;
+      } else if (req.user?.type === 'profissional') {
+        const p = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { name: true }});
+        if (p) userName = p.name;
+      }
+
+      await prisma.leadActivity.create({
+        data: {
+          leadId: id,
+          type: 'DESCONTO_APLICADO',
+          content: `${userName} deu ${Number(discountPercentage)}% (R$ ${Number(discountValue)}) de desconto. Justificativa: ${justification}`,
+          createdBy: String(req.user?.id)
+        }
+      });
     }
 
     // Atualiza status do Lead para pago e move para o funil pós-venda ou similar se quiser

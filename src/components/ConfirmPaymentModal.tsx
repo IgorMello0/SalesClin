@@ -29,16 +29,19 @@ interface ConfirmPaymentModalProps {
   onOpenChange: (open: boolean) => void;
   leadId: string | null;
   leadValue: number;
+  proposalId?: number | string | null;
   onSuccess: () => void;
 }
 
-export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onSuccess }: ConfirmPaymentModalProps) {
+export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, proposalId, onSuccess }: ConfirmPaymentModalProps) {
   const [paymentBlocks, setPaymentBlocks] = useState<PaymentBlock[]>([]);
   const [installments, setInstallments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [selectedProposalId, setSelectedProposalId] = useState<string>('none');
   const [loadingProposals, setLoadingProposals] = useState(false);
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [justification, setJustification] = useState<string>('');
   const { toast } = useToast();
 
   // Buscar propostas do lead quando o modal abre
@@ -59,11 +62,16 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
       const res = await leadsApi.getProposals(Number(leadId));
       if (res.success && res.data) {
         setProposals(res.data);
-        const validProposals = res.data.filter((p: Proposal) => p.status !== 'rejected' && p.status !== 'lost');
-        if (validProposals.length === 1) {
-          setSelectedProposalId(validProposals[0].id.toString());
-        } else if (res.data.length === 1) {
-          setSelectedProposalId(res.data[0].id.toString());
+        
+        if (proposalId) {
+          setSelectedProposalId(proposalId.toString());
+        } else {
+          const validProposals = res.data.filter((p: Proposal) => p.status !== 'rejected' && p.status !== 'lost');
+          if (validProposals.length === 1) {
+            setSelectedProposalId(validProposals[0].id.toString());
+          } else if (res.data.length === 1) {
+            setSelectedProposalId(res.data[0].id.toString());
+          }
         }
       }
     } catch (e) {
@@ -73,9 +81,13 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
     }
   };
 
-  const getActiveValue = () => {
+  const getOriginalValue = () => {
     const selectedProposal = proposals.find(p => p.id.toString() === selectedProposalId);
     return selectedProposal ? Number(selectedProposal.value) : leadValue;
+  };
+
+  const getActiveValue = () => {
+    return Math.max(0, getOriginalValue() - discountValue);
   };
 
   // Inicializa o primeiro bloco com o valor total
@@ -89,7 +101,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
         totalValue: activeValue
       }]);
     }
-  }, [open, selectedProposalId, leadValue, proposals]);
+  }, [open, selectedProposalId, leadValue, proposals, discountValue]);
 
   // Recalcular detalhamento das parcelas sempre que os blocos mudarem
   useEffect(() => {
@@ -204,8 +216,12 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
 
     setLoading(true);
     try {
+      const originalValue = getOriginalValue();
       const payload = {
         proposalId: selectedProposalId !== 'none' ? Number(selectedProposalId) : null,
+        discountValue: discountValue,
+        discountPercentage: originalValue > 0 ? Number(((discountValue / originalValue) * 100).toFixed(2)) : 0,
+        justification: justification,
         payments: installments.map(i => ({
           amount: Number(i.amount),
           date: new Date(i.date).toISOString(),
@@ -240,7 +256,7 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl bg-white border-0 shadow-2xl rounded-3xl p-0 overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+      <DialogContent className="max-w-4xl bg-white border-0 shadow-2xl rounded-3xl p-0 overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
         <div className="p-6 border-b border-slate-100 flex items-start gap-4 bg-white shrink-0">
           <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 shadow-inner">
             <span className="material-symbols-outlined text-[24px]">payments</span>
@@ -304,6 +320,61 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, onS
               )}
             </div>
           )}
+
+          {/* Seção de Desconto */}
+          <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm animate-in fade-in">
+            <Label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">local_offer</span>
+              Desconto
+            </Label>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5 relative">
+                <Label className="text-[10px] uppercase text-slate-500 font-bold">Valor do Desconto (R$)</Label>
+                <span className="absolute left-3 top-8 text-slate-400 font-medium text-sm">R$</span>
+                <Input 
+                  type="number"
+                  value={discountValue === 0 ? '' : discountValue}
+                  onChange={e => {
+                    let v = Number(e.target.value);
+                    if (v < 0) v = 0;
+                    const originalValue = getOriginalValue();
+                    if (v > originalValue) v = originalValue;
+                    setDiscountValue(v);
+                  }}
+                  className="h-10 text-sm pl-9 bg-slate-50 border-slate-200 font-semibold text-slate-700 focus:bg-white"
+                />
+              </div>
+              <div className="space-y-1.5 relative">
+                <Label className="text-[10px] uppercase text-slate-500 font-bold">Porcentagem (%)</Label>
+                <Input 
+                  type="number"
+                  value={getOriginalValue() > 0 && discountValue > 0 ? Number((discountValue / getOriginalValue()) * 100).toFixed(2) : ''}
+                  onChange={e => {
+                    let p = Number(e.target.value);
+                    if (p < 0) p = 0;
+                    if (p > 100) p = 100;
+                    setDiscountValue((p / 100) * getOriginalValue());
+                  }}
+                  className="h-10 text-sm bg-slate-50 border-slate-200 font-semibold text-slate-700 focus:bg-white pr-8"
+                />
+                <span className="absolute right-3 top-8 text-slate-400 font-bold text-sm">%</span>
+              </div>
+            </div>
+
+            {discountValue > 0 && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                <Label className="text-[10px] uppercase text-slate-500 font-bold">Justificativa (Obrigatória)</Label>
+                <textarea 
+                  value={justification}
+                  onChange={e => setJustification(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none resize-none transition-all"
+                  rows={2}
+                  placeholder="Por que este desconto foi concedido?"
+                />
+              </div>
+            )}
+          </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">

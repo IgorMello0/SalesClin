@@ -43,6 +43,11 @@ export function ProposalDialog({
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [proposals, setProposals] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const isAdminOrGestor = professional?.role === 'profissional' || ['admin', 'manager', 'gestor', 'administrador'].some(r => 
+    professional?.role?.toLowerCase().includes(r) || professional?.specialization?.toLowerCase().includes(r)
+  );
 
   // Carregar profissionais e especialistas internamente
   useEffect(() => {
@@ -81,7 +86,6 @@ export function ProposalDialog({
           treatment: '',
           tags: lead.tags || [] as string[],
           justification: '',
-          justificationType: '' as 'desconto' | 'remocao' | '',
           showJustification: false,
           removedTags: [] as string[]
         }
@@ -113,7 +117,6 @@ export function ProposalDialog({
         treatment: '',
         tags: lead.tags || [] as string[],
         justification: '',
-        justificationType: '' as 'desconto' | 'remocao' | '',
         showJustification: false,
         removedTags: [] as string[]
       }
@@ -186,7 +189,6 @@ export function ProposalDialog({
         const proposalData = proposals[index];
         const newValue = parseCurrency(proposalData.value);
         const isLowerValue = newValue < lead.value;
-        const discountApplied = isLowerValue && proposalData.justificationType === 'desconto';
 
         // 1. Salvar a Proposta Oficial
         const res = await (targetType === 'client' ? clientsApi : leadsApi).addProposal(Number(lead.id), {
@@ -197,8 +199,7 @@ export function ProposalDialog({
           specialistId: proposalData.specialist ? Number(proposalData.specialist) : null,
           sdrId: proposalData.sdr ? Number(proposalData.sdr) : null,
           tags: proposalData.tags,
-          justification: proposalData.justification || null,
-          discountApplied: discountApplied
+          justification: proposalData.justification || null
         });
 
         if (!res.success) {
@@ -208,7 +209,7 @@ export function ProposalDialog({
         // 2. Salvar Atividade
         await (targetType === 'client' ? clientsApi : leadsApi).addActivity(Number(lead.id), {
           type: 'proposta',
-          content: `${proposalData.treatment || proposalData.title} - Valor: ${formatCurrency(proposalData.value)}${discountApplied ? ' (Desconto Aplicado)' : ''}`,
+          content: `${proposalData.treatment || proposalData.title} - Valor: ${formatCurrency(proposalData.value)}${isLowerValue && proposalData.justification ? ' (Motivo: ' + proposalData.justification + ')' : ''}`,
           createdBy: professional?.name || 'Vendedor'
         });
       }
@@ -226,6 +227,7 @@ export function ProposalDialog({
       }
       toast({ title: "Propostas Salvas com Sucesso!" });
       onSuccess();
+      setShowConfirmModal(false);
       onOpenChange(false);
     } catch (e) {
       console.error('[ProposalDialog] Erro ao salvar propostas:', e);
@@ -236,6 +238,7 @@ export function ProposalDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[850px] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-3xl border-0 sm:border sm:border-slate-100 bg-white p-0 shadow-2xl">
         <div className="p-4 sm:p-8 bg-gradient-to-br from-orange-50 to-transparent border-b border-orange-100 flex items-center justify-between">
@@ -355,21 +358,6 @@ export function ProposalDialog({
                     {isLowerValue && (
                       <div className="space-y-4 p-4 bg-orange-50 rounded-2xl border border-orange-100 animate-in fade-in slide-in-from-top-2">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Motivo do Valor Menor</Label>
-                          <Select 
-                            value={proposal.justificationType}
-                            onValueChange={(v: any) => updateProposalField(index, 'justificationType', v)}
-                          >
-                            <SelectTrigger className="rounded-xl border-orange-200 bg-white">
-                              <SelectValue placeholder="Selecione o motivo" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white">
-                              <SelectItem value="desconto">Desconto Financeiro</SelectItem>
-                              <SelectItem value="remocao">Remoção de Procedimentos</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
                           <Label className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Justificativa Detalhada</Label>
                           <Textarea 
                             value={proposal.justification}
@@ -450,17 +438,91 @@ export function ProposalDialog({
 
         <DialogFooter className="p-8 bg-slate-50/50 border-t border-slate-100">
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">Cancelar</Button>
+          {isAdminOrGestor ? (
+            <Button 
+              onClick={handleSaveProposal}
+              disabled={isSaving}
+              variant="secondary"
+              className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20 gap-2"
+            >
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Gerar e Salvar Propostas
+            </Button>
+          ) : (
+            <Button 
+              onClick={() => setShowConfirmModal(true)}
+              variant="secondary"
+              className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20 gap-2"
+            >
+              Revisar e Gerar
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Confirmation Modal */}
+    <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden bg-white border-0 rounded-3xl shadow-2xl z-[110]">
+        <DialogHeader className="p-6 bg-slate-50 border-b border-slate-100">
+          <DialogTitle className="text-xl font-bold text-slate-800">
+            Confirme os Dados da Proposta
+          </DialogTitle>
+          <p className="text-sm text-slate-500 mt-1">
+            Verifique os dados abaixo antes de gerar a proposta para o lead.
+          </p>
+        </DialogHeader>
+        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          {proposals.map((p, idx) => (
+            <div key={idx} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                <span className="text-xs font-bold text-slate-400 uppercase">Proposta</span>
+                <span className="text-sm font-bold text-primary">{p.title || 'Sem título'}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                <span className="text-xs font-bold text-slate-400 uppercase">Valor</span>
+                <span className="text-base font-black text-secondary">{formatCurrency(p.value) || 'R$ 0,00'}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                <span className="text-xs font-bold text-slate-400 uppercase">Especialista</span>
+                <span className="text-sm font-medium text-slate-700">
+                  {specialists.find(s => s.id.toString() === p.specialist)?.name || '-'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                <span className="text-xs font-bold text-slate-400 uppercase">Closer</span>
+                <span className="text-sm font-medium text-slate-700">
+                  {closers.find(c => c.id.toString() === p.salesperson)?.name || '-'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-1">
+                <span className="text-xs font-bold text-slate-400 uppercase">SDR</span>
+                <span className="text-sm font-medium text-slate-700">
+                  {sdrs.find(s => s.id.toString() === p.sdr)?.name || '-'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <DialogFooter className="p-6 border-t border-slate-100 bg-white">
+          <Button variant="ghost" onClick={() => setShowConfirmModal(false)} className="rounded-xl">
+            Revisar Dados
+          </Button>
           <Button 
-            onClick={handleSaveProposal}
+            onClick={() => {
+              handleSaveProposal();
+            }}
             disabled={isSaving}
-            variant="secondary"
-            className="rounded-xl px-10 font-bold shadow-lg shadow-secondary/20 gap-2"
-          >
-            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Gerar e Salvar Propostas
+            className="bg-secondary hover:bg-secondary/90 text-white rounded-xl gap-2 font-bold px-6">
+            {isSaving ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</>
+            ) : (
+              'Confirmar e Salvar'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

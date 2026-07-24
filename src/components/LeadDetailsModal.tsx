@@ -99,6 +99,12 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
 
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
   const [viewingProposal, setViewingProposal] = useState<any>(null);
+  const [editingProposal, setEditingProposal] = useState<any>(null);
+
+  const isAdminOrGestor = professional?.role === 'profissional' || ['admin', 'manager', 'gestor', 'administrador'].some(r => 
+    professional?.role?.toLowerCase().includes(r) || professional?.specialization?.toLowerCase().includes(r)
+  );
+
   const [services, setServices] = useState<any[]>([]);
 
   useEffect(() => {
@@ -317,7 +323,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
         dueDate: newTaskDate ? new Date(newTaskDate).toISOString() : undefined,
         leadId: Number(selectedLead.id),
         assignedToId: Number(professional?.id),
-        assigneeType: professional?.type === 'usuario' ? 'user' : 'profissional'
+        assigneeType: localStorage.getItem('userType') === 'user' ? 'user' : 'profissional'
       });
       if (res.success) {
         toast({ title: "Tarefa adicionada!" });
@@ -1002,7 +1008,20 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                                 className="group bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md hover:border-secondary/20 transition-all cursor-pointer relative overflow-hidden"
                                 onClick={() => handleViewProposal(proposal)}
                               >
-                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute top-0 right-0 p-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {isAdminOrGestor && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingProposal(proposal);
+                                        setIsCreatingProposal(true);
+                                      }}
+                                      className="p-1.5 rounded-lg hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors"
+                                      title="Editar Proposta"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                                   <Eye className="w-5 h-5 text-secondary" />
                                 </div>
                                 
@@ -1011,7 +1030,15 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                                     <FileText className="w-6 h-6" />
                                   </div>
                                   <div className="space-y-1">
-                                    <h5 className="font-bold text-primary text-sm line-clamp-1">{proposal.title}</h5>
+                                    <div className="flex items-center gap-2">
+                                      <h5 className="font-bold text-primary text-sm line-clamp-1">{proposal.title}</h5>
+                                      {proposal.status === 'accepted' && (
+                                        <span className="flex items-center gap-1 bg-green-50 text-green-600 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap">
+                                          <Check className="w-3 h-3" />
+                                          Paga
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="text-xs text-slate-400 font-medium">#{proposal.id}</p>
                                   </div>
                                 </div>
@@ -1245,10 +1272,14 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
       {/* Proposal Dialog */}
       <ProposalDialog 
         open={isCreatingProposal}
-        onOpenChange={setIsCreatingProposal}
+        onOpenChange={(open) => {
+          setIsCreatingProposal(open);
+          if (!open) setEditingProposal(null);
+        }}
         lead={selectedLead}
         professional={professional}
         services={services}
+        editingProposal={editingProposal}
         onSuccess={() => {
           leadsApi.getProposals(Number(selectedLead?.id)).then(res => {
             if (res.success) {
@@ -1258,6 +1289,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
               onUpdate(updated);
             }
           });
+          setEditingProposal(null);
         }}
       />
     </>

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn, formatPhone } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin, FileText, Eye, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -62,6 +71,7 @@ const Clients = () => {
   const [showTimeline, setShowTimeline] = useState<number | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [viewingFormId, setViewingFormId] = useState<string | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -84,7 +94,6 @@ const Clients = () => {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'todos' | 'inadimplente'>('todos');
   const [searchDebounce, setSearchDebounce] = useState('');
 
   // Carregar clientes do banco
@@ -106,8 +115,7 @@ const Clients = () => {
       const response = await clientsApi.getAll({ 
         page: 1, 
         pageSize: 100, 
-        search: searchQuery || undefined,
-        status: statusFilter !== 'todos' ? statusFilter : undefined
+        search: searchQuery || undefined
       });
       if (response.success && response.data) {
         const clientsData = response.data.map((client: any) => ({
@@ -140,12 +148,12 @@ const Clients = () => {
     }
   };
 
-  // Recarregar quando searchQuery ou statusFilter mudar
+  // Recarregar quando searchQuery mudar
   useEffect(() => {
     if (!isLoading) {
       loadClients();
     }
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery]);
 
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -158,7 +166,7 @@ const Clients = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, itemsPerPage]);
+  }, [searchQuery, itemsPerPage]);
 
   const handleOpenDialog = (client?: Client) => {
     if (client) {
@@ -471,7 +479,7 @@ const Clients = () => {
           </div>
           <div className="pt-2">
             <div className="text-3xl font-extrabold text-primary font-headline tracking-tight">
-              {clients.reduce((acc, client) => acc + client.totalAppointments, 0)}
+              {clients.reduce((acc, client) => acc + (client.totalAppointments || 0), 0)}
             </div>
             <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">Histórico Total</p>
           </div>
@@ -495,13 +503,6 @@ const Clients = () => {
                 onChange={(e) => setSearchDebounce(e.target.value)}
               />
             </div>
-            
-            <Tabs value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)} className="w-full sm:w-auto">
-              <TabsList className="grid w-full sm:w-auto grid-cols-2 bg-slate-100 p-1 rounded-xl">
-                <TabsTrigger value="todos" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Todos</TabsTrigger>
-                <TabsTrigger value="inadimplente" className="rounded-lg data-[state=active]:bg-red-500 data-[state=active]:text-white data-[state=active]:shadow-sm">Boletos Pendentes</TabsTrigger>
-              </TabsList>
-            </Tabs>
           </div>
           
           {filteredClients.length > 0 && !isLoading && (
@@ -666,12 +667,12 @@ const Clients = () => {
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(client.id)}
-                            className="h-9 w-9 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg"
-                          >
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setClientToDelete(client.id)}
+                              className="h-9 w-9 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg"
+                            >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </Button>
                         </div>
@@ -772,6 +773,38 @@ const Clients = () => {
           template={viewingTemplate}
         />
       )}
+
+      <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
+        <AlertDialogContent className="sm:max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mb-3">
+              <span className="material-symbols-outlined text-red-500 text-[24px]">delete</span>
+            </div>
+            <AlertDialogTitle className="text-center text-xl font-bold text-slate-800">
+              Apagar Cliente
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-slate-500 mt-2">
+              Você está prestes a excluir este cliente permanentemente. Esta ação não poderá ser desfeita e removerá também pagamentos, agendamentos e históricos associados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-3 mt-4 sm:justify-center w-full">
+            <AlertDialogCancel className="flex-1 mt-0 bg-white border-slate-200 hover:bg-slate-50 text-slate-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (clientToDelete) {
+                  handleDelete(clientToDelete);
+                  setClientToDelete(null);
+                }
+              }} 
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white border-0"
+            >
+              Sim, apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

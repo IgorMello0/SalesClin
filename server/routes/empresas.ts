@@ -417,6 +417,7 @@ router.get('/my-companies', auth(), async (req, res) => {
         whatsapp: true,
         openHour: true,
         closeHour: true,
+        maxDiscountPercentage: true,
         isActive: true,
         createdAt: true,
       },
@@ -490,7 +491,7 @@ router.put('/:id', auth(), requireCompanyOwner('id'), async (req, res) => {
       // Campos de integração WhatsApp
       whatsappProvider, evolutionMode, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId,
       metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaWebhookVerifyToken, metaTwoStepPin, metaConnectionStatus,
-      leadRoutingMode
+      leadRoutingMode, maxDiscountPercentage
     } = req.body
 
     const currentCompany = await prisma.empresa.findUnique({
@@ -507,6 +508,8 @@ router.put('/:id', auth(), requireCompanyOwner('id'), async (req, res) => {
     if (domain !== undefined) data.domain = domain
     if (whatsapp !== undefined) data.whatsapp = whatsapp
     if (apiKey !== undefined) data.apiKey = apiKey
+    if (maxDiscountPercentage !== undefined) data.maxDiscountPercentage = Number(maxDiscountPercentage)
+    if (plan !== undefined) data.plan = plan
     if (isActive !== undefined) data.isActive = isActive
     if (openHour !== undefined) data.openHour = openHour
     if (closeHour !== undefined) data.closeHour = closeHour
