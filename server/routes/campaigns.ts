@@ -211,7 +211,11 @@ router.post('/', auth(), async (req, res) => {
         startTime: { gte: new Date() },
         status: { in: ['agendado', 'confirmado'] }
       },
-      orderBy: { startTime: 'asc' }
+      orderBy: { startTime: 'asc' },
+      include: {
+        professional: { select: { name: true } },
+        especialista: { select: { name: true } },
+      },
     })
 
     // Buscar agendamentos concluídos (passados) em lote
@@ -223,7 +227,11 @@ router.post('/', auth(), async (req, res) => {
         ],
         status: 'concluido'
       },
-      orderBy: { startTime: 'desc' }
+      orderBy: { startTime: 'desc' },
+      include: {
+        professional: { select: { name: true } },
+        especialista: { select: { name: true } },
+      },
     })
 
     // Criar mapas O(1) de busca por cliente/lead
@@ -275,14 +283,16 @@ router.post('/', auth(), async (req, res) => {
                 : `spreadsheet_${r.phone}`
             const upcomingAppt = upcomingMap.get(key)
             const pastAppt = pastMap.get(key)
+            const variables = buildRecipientVariables(r, upcomingAppt, pastAppt)
+            const resolvedRecipient = { ...r, variables }
             return {
               name: r.name,
               phone: r.phone,
               sourceType: r.sourceType,
               sourceId: r.sourceId ?? null,
               status: 'pending',
-              variables: r.variables || undefined,
-              renderedMessage: renderMessage(message, r, upcomingAppt, pastAppt)
+              variables,
+              renderedMessage: renderMessage(message, resolvedRecipient, upcomingAppt, pastAppt)
             }
           })
         }
@@ -763,6 +773,25 @@ async function resolveAudience(
   }
 }
 
+function buildRecipientVariables(recipient: RecipientData, upcomingAppt?: any, pastAppt?: any) {
+  const existing = recipient.variables && typeof recipient.variables === 'object' ? recipient.variables : {}
+  const upcomingProfessional = upcomingAppt?.especialista?.name || upcomingAppt?.professional?.name || ''
+  const pastProfessional = pastAppt?.especialista?.name || pastAppt?.professional?.name || ''
+
+  return {
+    ...existing,
+    nome: recipient.name,
+    primeiro_nome: recipient.name.split(' ')[0] || recipient.name,
+    telefone: recipient.phone,
+    proxima_data: upcomingAppt ? formatDate(upcomingAppt.startTime) : '',
+    proxima_hora: upcomingAppt ? formatTime(upcomingAppt.startTime) : '',
+    ultima_data: pastAppt ? formatDate(pastAppt.startTime) : '',
+    ultima_hora: pastAppt ? formatTime(pastAppt.startTime) : '',
+    especialista: String(existing.especialista || existing.dr || upcomingProfessional || pastProfessional || ''),
+    profissional: String(existing.especialista || existing.dr || upcomingProfessional || pastProfessional || ''),
+  }
+}
+
 // Renderiza mensagem substituindo variáveis
 function renderMessage(
   template: string, 
@@ -773,7 +802,7 @@ function renderMessage(
   const variables = (recipient.variables && typeof recipient.variables === 'object') ? recipient.variables : {}
   const spreadsheetDate = String(variables.data || variables.date || '')
   const spreadsheetTime = String(variables.hora || variables.time || '')
-  const spreadsheetSpecialist = String(variables.especialista || variables.specialist || variables.dr || '')
+  const spreadsheetSpecialist = String(variables.especialista || variables.profissional || variables.specialist || variables.dr || '')
 
   let msg = template
     .replace(/\{\{nome\}\}/gi, recipient.name)
@@ -785,9 +814,9 @@ function renderMessage(
     .replace(/\{\{dr\}\}/gi, spreadsheetSpecialist)
 
   // Substituição para o próximo agendamento (futuro)
-  if (upcomingAppt) {
-    const upcomingDate = formatDate(upcomingAppt.startTime)
-    const upcomingTime = formatTime(upcomingAppt.startTime)
+  const upcomingDate = upcomingAppt ? formatDate(upcomingAppt.startTime) : String(variables.proxima_data || '')
+  const upcomingTime = upcomingAppt ? formatTime(upcomingAppt.startTime) : String(variables.proxima_hora || '')
+  if (upcomingDate || upcomingTime) {
     msg = msg
       .replace(/\{\{data_agendamento\}\}/gi, upcomingDate)
       .replace(/\{\{hora_agendamento\}\}/gi, upcomingTime)
@@ -802,9 +831,9 @@ function renderMessage(
   }
 
   // Substituição para o último agendamento (passado concluído)
-  if (pastAppt) {
-    const pastDate = formatDate(pastAppt.startTime)
-    const pastTime = formatTime(pastAppt.startTime)
+  const pastDate = pastAppt ? formatDate(pastAppt.startTime) : String(variables.ultima_data || '')
+  const pastTime = pastAppt ? formatTime(pastAppt.startTime) : String(variables.ultima_hora || '')
+  if (pastDate || pastTime) {
     msg = msg
       .replace(/\{\{ultima_data\}\}/gi, pastDate)
       .replace(/\{\{ultima_hora\}\}/gi, pastTime)

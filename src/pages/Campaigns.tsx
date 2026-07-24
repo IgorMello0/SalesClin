@@ -10,6 +10,30 @@ import type { WhatsAppTemplate } from '@/components/whatsapp/TemplateCatalog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Clock3,
+  FileSpreadsheet,
+  Image as ImageIcon,
+  Info,
+  MessageSquareText,
+  Paperclip,
+  Plus,
+  Send,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  Upload,
+  Users,
+  Video,
+  Volume2,
+  X,
+} from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 const safeFormat = (d: any, f: string = "dd/MM/yy 'às' HH:mm") => {
   try { return d ? format(new Date(d), f, { locale: ptBR }) : '—'; } catch { return '—'; }
@@ -24,18 +48,48 @@ const AUDIENCE_OPTIONS = [
   { value: 'spreadsheet', label: 'Planilha', icon: 'table_chart', desc: 'Importar contatos por CSV ou TSV' },
 ];
 
-const VARIABLES = [
+const CORE_VARIABLES = [
   { key: '{{nome}}', label: 'Nome completo' },
   { key: '{{primeiro_nome}}', label: 'Primeiro nome' },
   { key: '{{telefone}}', label: 'Telefone' },
+];
+
+const SPREADSHEET_VARIABLES = [
   { key: '{{data}}', label: 'Data da planilha' },
   { key: '{{hora}}', label: 'Hora da planilha' },
-  { key: '{{especialista}}', label: 'Dr/especialista da planilha' },
+  { key: '{{especialista}}', label: 'Profissional da planilha' },
+];
+
+const APPOINTMENT_VARIABLES = [
   { key: '{{proxima_data}}', label: 'Data da próxima consulta' },
   { key: '{{proxima_hora}}', label: 'Hora da próxima consulta' },
   { key: '{{ultima_data}}', label: 'Data da última consulta' },
   { key: '{{ultima_hora}}', label: 'Hora da última consulta' },
+  { key: '{{especialista}}', label: 'Profissional do agendamento' },
 ];
+
+const getAvailableVariables = (audienceType: string) => [
+  ...CORE_VARIABLES,
+  ...(audienceType === 'spreadsheet' ? SPREADSHEET_VARIABLES : APPOINTMENT_VARIABLES),
+];
+
+const getTemplateBodyText = (template?: WhatsAppTemplate) =>
+  template?.components?.find(component => String(component.type).toUpperCase() === 'BODY')?.text || '';
+
+const getTemplateParameterCount = (template?: WhatsAppTemplate) =>
+  (getTemplateBodyText(template).match(/\{\{[^}]+\}\}/g) || []).length;
+
+const renderPreviewMessage = (value: string) => value
+  .replace(/\{\{nome\}\}/gi, 'Mariana Oliveira')
+  .replace(/\{\{primeiro_nome\}\}/gi, 'Mariana')
+  .replace(/\{\{telefone\}\}/gi, '(11) 99999-9999')
+  .replace(/\{\{data\}\}/gi, '25/07/2026')
+  .replace(/\{\{hora\}\}/gi, '14:30')
+  .replace(/\{\{especialista\}\}/gi, 'Dra. Ana')
+  .replace(/\{\{proxima_data\}\}/gi, '25/07/2026')
+  .replace(/\{\{proxima_hora\}\}/gi, '14:30')
+  .replace(/\{\{ultima_data\}\}/gi, '10/06/2026')
+  .replace(/\{\{ultima_hora\}\}/gi, '09:00');
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: string }> = {
   draft: { label: 'Rascunho', color: 'bg-slate-100 text-slate-600', icon: 'edit_note' },
@@ -459,6 +513,43 @@ export default function Campaigns() {
 
   const insertVariable = (v: string) => setMessage(prev => prev + v);
 
+  const availableMessageVariables = getAvailableVariables(audienceType);
+  const selectedMetaTemplate = approvedTemplates.find(template => String(template.id) === metaTemplateId);
+  const selectedTemplateParameterCount = getTemplateParameterCount(selectedMetaTemplate);
+  const metaParameterValues = metaTemplateParameters
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+  const positionalPreview = metaParameterValues.reduce((preview, parameter, index) => {
+    const sampleValue = renderPreviewMessage(parameter);
+    return preview.replace(new RegExp(`\\{\\{${index + 1}\\}\\}`, 'g'), sampleValue);
+  }, message || 'Sua mensagem aparecerá aqui.');
+  const messagePreview = renderPreviewMessage(positionalPreview);
+
+  const updateMetaParameter = (index: number, value: string) => {
+    const next = Array.from({ length: Math.max(selectedTemplateParameterCount, index + 1) }, (_, parameterIndex) =>
+      metaParameterValues[parameterIndex] || availableMessageVariables[parameterIndex]?.key || '{{nome}}'
+    );
+    next[index] = value;
+    setMetaTemplateParameters(next.join(', '));
+  };
+
+  const selectApprovedTemplate = (value: string) => {
+    setMetaTemplateId(value);
+    const selected = approvedTemplates.find(template => String(template.id) === value);
+    if (!selected) return;
+
+    setMetaTemplateName(selected.name);
+    setMetaTemplateLanguage(selected.language);
+    const bodyText = getTemplateBodyText(selected);
+    const parameterCount = getTemplateParameterCount(selected);
+    const defaultParameters = Array.from({ length: parameterCount }, (_, index) =>
+      availableMessageVariables[index]?.key || '{{nome}}'
+    );
+    setMetaTemplateParameters(defaultParameters.join(', '));
+    if (bodyText) setMessage(bodyText);
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -583,37 +674,69 @@ export default function Campaigns() {
 
       {/* ═══ CREATE CAMPAIGN DIALOG ═══ */}
       <Dialog open={isCreating} onOpenChange={(o) => !o && resetForm()}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-white rounded-3xl">
-          <div className="h-1 w-full bg-gradient-to-r from-secondary to-orange-400" />
-          <div className="p-6 sm:p-8">
-            <DialogHeader className="mb-6">
-              <DialogTitle className="text-xl font-extrabold text-primary">
-                {step === 1 ? '📋 Configurar Campanha' : step === 2 ? '✍️ Compor Mensagem' : '🚀 Confirmar Envio'}
-              </DialogTitle>
-              <div className="flex items-center gap-2 mt-3">
-                {[1,2,3].map(s => (
-                  <div key={s} className={`h-1.5 rounded-full flex-1 transition-all ${s <= step ? 'bg-secondary' : 'bg-slate-100'}`} />
-                ))}
+        <DialogContent className="h-[100dvh] max-h-[100dvh] w-full max-w-none gap-0 overflow-hidden bg-[#f7f9fc] p-0 sm:h-[min(900px,94vh)] sm:max-h-[94vh] sm:w-[calc(100vw-2rem)] sm:max-w-[1180px] sm:rounded-2xl">
+          <div className="border-b border-slate-200 bg-white px-5 py-4 sm:px-7 sm:py-5">
+            <DialogHeader className="pr-10">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600">Nova campanha</p>
+                  <DialogTitle className="mt-1 text-xl font-black text-slate-950 sm:text-2xl">
+                    {step === 1 ? 'Escolha quem vai receber' : step === 2 ? 'Prepare a mensagem' : 'Revise antes de criar'}
+                  </DialogTitle>
+                </div>
+                <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+                  {[
+                    { value: 1, label: 'Público', icon: Users },
+                    { value: 2, label: 'Mensagem', icon: MessageSquareText },
+                    { value: 3, label: 'Revisão', icon: CheckCircle2 },
+                  ].map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => item.value < step && setStep(item.value)}
+                        disabled={item.value > step}
+                        className={`flex min-w-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-bold transition-colors ${
+                          item.value === step
+                            ? 'bg-white text-slate-950 shadow-sm'
+                            : item.value < step
+                              ? 'text-slate-600 hover:bg-white/70'
+                              : 'cursor-default text-slate-400'
+                        }`}
+                      >
+                        <Icon className={`h-4 w-4 ${item.value <= step ? 'text-orange-600' : ''}`} />
+                        <span className="hidden sm:inline">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </DialogHeader>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">
 
             {step === 1 && (
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Nome da Campanha</label>
-                  <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Promoção de Junho" className="rounded-xl h-11" />
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <label className="mb-2 block text-xs font-bold text-slate-700">Nome da campanha</label>
+                  <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Confirmação de consultas de julho" className="h-11 rounded-lg border-slate-200" />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Audiência</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <div className="mb-4">
+                    <p className="text-sm font-black text-slate-950">Selecione o público</p>
+                    <p className="mt-1 text-xs text-slate-500">O sistema valida os telefones e remove duplicados antes de criar a campanha.</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {AUDIENCE_OPTIONS.map(opt => (
                       <button key={opt.value} onClick={() => setAudienceType(opt.value)}
-                        className={`p-3 rounded-xl border-2 text-left transition-all ${audienceType === opt.value ? 'border-secondary bg-secondary/5' : 'border-slate-100 hover:border-slate-200'}`}>
+                        className={`min-h-28 rounded-lg border p-3 text-left transition-all ${audienceType === opt.value ? 'border-orange-300 bg-orange-50 ring-1 ring-orange-200' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <span className={`material-symbols-outlined text-lg ${audienceType === opt.value ? 'text-secondary' : 'text-slate-400'}`}>{opt.icon}</span>
-                          <span className="font-bold text-sm text-primary">{opt.label}</span>
+                          <span className={`material-symbols-outlined text-lg ${audienceType === opt.value ? 'text-orange-600' : 'text-slate-400'}`}>{opt.icon}</span>
+                          <span className="text-sm font-bold text-slate-900">{opt.label}</span>
+                          {audienceType === opt.value && <Check className="ml-auto h-4 w-4 text-orange-600" />}
                         </div>
-                        <p className="text-[11px] text-muted-foreground mt-1">{opt.desc}</p>
+                        <p className="mt-2 text-xs leading-5 text-slate-500">{opt.desc}</p>
                       </button>
                     ))}
                   </div>
@@ -766,7 +889,27 @@ export default function Campaigns() {
                     </p>
                   )}
                 </div>
-                <div className="flex justify-end">
+                <aside className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+                    {audienceType === 'spreadsheet' ? <FileSpreadsheet className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                  </div>
+                  <p className="mt-4 text-sm font-black text-slate-950">Resumo do público</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {audienceType ? AUDIENCE_OPTIONS.find(option => option.value === audienceType)?.desc : 'Escolha uma fonte para calcular os destinatários.'}
+                  </p>
+                  <div className="mt-5 rounded-lg bg-slate-950 px-4 py-4 text-white">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Contatos válidos</p>
+                    <p className="mt-1 text-3xl font-black">{previewRecipients}</p>
+                  </div>
+                  {audienceType === 'spreadsheet' && spreadsheetFileName && (
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">
+                      <FileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-600" />
+                      <span className="truncate">{spreadsheetFileName}</span>
+                    </div>
+                  )}
+                </aside>
+                <div className="flex items-center justify-between border-t border-slate-200 pt-4 lg:col-span-2">
+                  <p className="hidden text-xs text-slate-500 sm:block">Você poderá revisar tudo antes de criar.</p>
                   <Button onClick={() => {
                     if (!name || !audienceType) {
                       toast({ title: 'Preencha todos os campos', variant: 'destructive' });
@@ -778,69 +921,70 @@ export default function Campaigns() {
                     }
                     setStep(2);
                   }}
-                    className="bg-primary text-white rounded-xl px-6 h-10 font-bold">
-                    Próximo <span className="material-symbols-outlined text-sm ml-1">chevron_right</span>
+                    className="h-11 rounded-lg bg-slate-950 px-5 font-bold text-white hover:bg-slate-800">
+                    Preparar mensagem <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
               </div>
             )}
 
             {step === 2 && (
-              <div className="space-y-6">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
                 {/* Text Message Input */}
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Mensagem Principal</label>
-                  <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
+                <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-950">Conteúdo da mensagem</p>
+                      <p className="mt-1 text-xs text-slate-500">Escreva o texto ou selecione um template oficial.</p>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-400">{message.length} caracteres</span>
+                  </div>
+                  <textarea value={message} onChange={e => setMessage(e.target.value)} rows={7}
                     placeholder="Olá {{primeiro_nome}}, temos uma novidade especial para você! ✨"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary" />
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-orange-300 focus:bg-white focus:ring-2 focus:ring-orange-100" />
                 </div>
 
                 {/* Variables */}
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Variáveis Dinâmicas</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {VARIABLES.map(v => (
+                <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-950">Personalização</p>
+                      <p className="mt-1 text-xs text-slate-500">Variáveis disponíveis para {AUDIENCE_OPTIONS.find(option => option.value === audienceType)?.label.toLowerCase()}.</p>
+                    </div>
+                    <Sparkles className="h-5 w-5 text-orange-500" />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {availableMessageVariables.map(v => (
                       <button key={v.key} onClick={() => insertVariable(v.key)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono hover:border-secondary hover:bg-secondary/5 transition-colors">
-                        {v.key} <span className="text-muted-foreground ml-1">({v.label})</span>
+                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left transition-colors hover:border-orange-300 hover:bg-orange-50">
+                        <span className="block font-mono text-[11px] font-bold text-orange-700">{v.key}</span>
+                        <span className="mt-0.5 block text-[10px] font-medium text-slate-500">{v.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl space-y-3">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      id="chk-meta-template"
-                      checked={useMetaTemplate}
-                      onChange={e => setUseMetaTemplate(e.target.checked)}
-                      className="mt-1 w-4 h-4 rounded border-blue-200 text-blue-600 focus:ring-blue-500 accent-blue-600"
-                    />
-                    <label htmlFor="chk-meta-template" className="cursor-pointer">
-                      <span className="block text-xs font-bold text-blue-900 uppercase tracking-wide">
-                        Usar template aprovado da Meta
-                      </span>
-                      <span className="block text-xs text-blue-700 leading-relaxed mt-0.5">
-                        Necessario para iniciar conversas/campanhas pela API Oficial fora da janela de 24h.
-                      </span>
-                    </label>
+                <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/70 p-5 lg:col-start-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <label htmlFor="chk-meta-template" className="cursor-pointer text-sm font-black text-slate-950">Template oficial da Meta</label>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">Use para iniciar conversas fora da janela de atendimento de 24 horas.</p>
+                      </div>
+                    </div>
+                    <Switch id="chk-meta-template" checked={useMetaTemplate} onCheckedChange={setUseMetaTemplate} />
                   </div>
 
                   {useMetaTemplate && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                    <div className="grid grid-cols-1 gap-3 border-t border-blue-200 pt-4 md:grid-cols-2">
                       {approvedTemplates.length > 0 && (
                         <div className="md:col-span-2">
-                          <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Template sincronizado</label>
-                          <Select value={metaTemplateId} onValueChange={(value) => {
-                            setMetaTemplateId(value);
-                            const selected = approvedTemplates.find((template) => String(template.id) === value);
-                            if (selected) {
-                              setMetaTemplateName(selected.name);
-                              setMetaTemplateLanguage(selected.language);
-                            }
-                          }}>
-                            <SelectTrigger className="rounded-xl bg-white"><SelectValue placeholder="Selecione um template aprovado" /></SelectTrigger>
+                          <label className="mb-1.5 block text-xs font-bold text-slate-700">Template aprovado</label>
+                          <Select value={metaTemplateId} onValueChange={selectApprovedTemplate}>
+                            <SelectTrigger className="h-11 rounded-lg bg-white"><SelectValue placeholder="Selecione um template aprovado" /></SelectTrigger>
                             <SelectContent>{approvedTemplates.map((template) => <SelectItem key={template.id} value={String(template.id)}>{template.name} · {template.language}</SelectItem>)}</SelectContent>
                           </Select>
                         </div>
@@ -864,37 +1008,52 @@ export default function Campaigns() {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Parametros do corpo, em ordem</label>
-                        <Input
-                          value={metaTemplateParameters}
-                          onChange={e => setMetaTemplateParameters(e.target.value)}
-                          placeholder="{{nome}}, {{data}}, {{hora}}, {{especialista}}"
-                          className="rounded-xl h-10 bg-white"
-                        />
-                        <p className="mt-1 text-[10px] text-blue-600 leading-relaxed">
-                          Separe por virgula. A quantidade precisa bater com as variaveis do template aprovado na Meta.
-                        </p>
+                        <label className="mb-2 block text-xs font-bold text-slate-700">Vincule as variáveis do template</label>
+                        {selectedTemplateParameterCount > 0 ? (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {Array.from({ length: selectedTemplateParameterCount }, (_, index) => (
+                              <div key={index} className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white p-2">
+                                <span className="flex h-7 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 font-mono text-xs font-black text-blue-700">{`{{${index + 1}}}`}</span>
+                                <Select value={metaParameterValues[index] || availableMessageVariables[index]?.key || '{{nome}}'} onValueChange={value => updateMetaParameter(index, value)}>
+                                  <SelectTrigger className="h-8 flex-1 border-0 bg-transparent px-2 shadow-none"><SelectValue /></SelectTrigger>
+                                  <SelectContent>{availableMessageVariables.map(variable => <SelectItem key={variable.key} value={variable.key}>{variable.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Input value={metaTemplateParameters} onChange={e => setMetaTemplateParameters(e.target.value)} placeholder="{{nome}}, {{data}}, {{hora}}" className="h-10 rounded-lg bg-white" />
+                        )}
+                        <p className="mt-2 text-[11px] leading-5 text-blue-700">Cada posição do template recebe o campo escolhido do contato ou da planilha.</p>
                       </div>
                     </div>
                   )}
                 </div>
 
                 {/* Media Attachment section */}
-                <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
-                      <span className="material-symbols-outlined text-base text-[#F97316]">attach_file</span>
-                      Anexar Mídias (Múltiplas Opcionais)
+                <details className="group rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><Paperclip className="h-5 w-5" /></div>
+                      <div>
+                        <p className="text-sm font-black text-slate-950">Mídias</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{attachments.length ? `${attachments.length} arquivo(s) anexado(s)` : 'Imagens, vídeos ou áudios opcionais'}</p>
+                      </div>
                     </div>
+                    <Settings2 className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div className="mt-5 space-y-3 border-t border-slate-100 pt-4">
+                  <div className="flex items-center justify-end">
                     {attachments.length > 0 && (
                       <button 
                         type="button" 
                         onClick={() => setAttachments([])}
-                        className="text-[10px] font-bold text-red-500 hover:underline uppercase"
+                        className="flex items-center gap-1 text-[10px] font-bold uppercase text-red-500 hover:text-red-700"
                       >
-                        Limpar Todos
+                        <Trash2 className="h-3.5 w-3.5" /> Limpar todos
                       </button>
                     )}
+                  </div>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -943,7 +1102,7 @@ export default function Campaigns() {
                             </>
                           ) : (
                             <>
-                              <span className="material-symbols-outlined text-sm text-[#F97316]">cloud_upload</span>
+                              <Upload className="h-4 w-4 text-orange-600" />
                               Selecionar Arquivo
                             </>
                           )}
@@ -977,7 +1136,7 @@ export default function Campaigns() {
                           disabled={!mediaUrl.trim()}
                           className="bg-primary hover:bg-primary/95 text-white h-10 rounded-xl px-3 font-bold"
                         >
-                          <span className="material-symbols-outlined text-sm">add</span>
+                          <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -988,10 +1147,12 @@ export default function Campaigns() {
                       <label className="block text-[10px] font-bold text-muted-foreground uppercase">Formato do Arquivo a adicionar</label>
                       <div className="flex gap-2">
                         {[
-                          { value: 'image', label: '🖼️ Imagem' },
-                          { value: 'video', label: '🎥 Vídeo' },
-                          { value: 'audio', label: '🔊 Áudio' },
-                        ].map((opt) => (
+                          { value: 'image', label: 'Imagem', icon: ImageIcon },
+                          { value: 'video', label: 'Vídeo', icon: Video },
+                          { value: 'audio', label: 'Áudio', icon: Volume2 },
+                        ].map((opt) => {
+                          const Icon = opt.icon;
+                          return (
                           <button
                             key={opt.value}
                             type="button"
@@ -1002,9 +1163,10 @@ export default function Campaigns() {
                                 : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
-                            {opt.label}
+                            <Icon className="mr-1.5 inline h-3.5 w-3.5" />{opt.label}
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1040,23 +1202,28 @@ export default function Campaigns() {
                               onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== index))}
                               className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors flex-shrink-0"
                             >
-                              <span className="material-symbols-outlined text-base">delete</span>
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
-                </div>
+                </details>
 
                 {/* Anti-ban & Delay settings */}
-                <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
-                      <span className="material-symbols-outlined text-base text-[#F97316]">shield</span>
-                      Segurança & Intervalo Seguro (Anti-Ban)
+                <details className="group rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><Clock3 className="h-5 w-5" /></div>
+                      <div>
+                        <p className="text-sm font-black text-slate-950">Ritmo de envio</p>
+                        <p className="mt-0.5 text-xs text-slate-500">Intervalo de {minDelay}s a {maxDelay}s {randomize ? 'com variações' : ''}</p>
+                      </div>
                     </div>
-                  </div>
+                    <Settings2 className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div className="mt-5 space-y-4 border-t border-slate-100 pt-4">
 
                   {/* Delay range inputs */}
                   <div className="grid grid-cols-2 gap-3">
@@ -1081,8 +1248,8 @@ export default function Campaigns() {
                       />
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-medium italic mt-1">
-                    *Recomendado: 180 a 200 segundos por envio para máxima proteção da sua linha.
+                  <p className="text-[11px] leading-5 text-slate-500">
+                    O intervalo reduz picos de envio. Ajuste conforme o volume e as políticas do seu canal.
                   </p>
 
                   <div className="border-t border-slate-200/60 pt-3 space-y-3">
@@ -1095,7 +1262,7 @@ export default function Campaigns() {
                         className="w-4 h-4 rounded border-slate-300 text-secondary focus:ring-secondary accent-[#F97316]" 
                       />
                       <label htmlFor="chk-randomize" className="text-xs font-bold text-slate-700 cursor-pointer">
-                        Randomizar variações de texto (Evita bloqueio do WhatsApp)
+                        Alternar variações da mensagem
                       </label>
                     </div>
 
@@ -1133,51 +1300,67 @@ export default function Campaigns() {
                                   onClick={() => setVariations(variations.filter((_, i) => i !== idx))} 
                                   className="text-red-500 hover:text-red-700 font-bold"
                                 >
-                                  ✖
+                                  <X className="h-4 w-4" />
                                 </button>
                               </div>
                             ))}
                           </div>
                         )}
                         <p className="text-[10px] text-slate-400 font-semibold italic mt-1">
-                          *Adicione mensagens com palavras ou saudações diferentes. O sistema enviará aleatoriamente uma delas para cada lead.
+                          Uma variação será escolhida para cada destinatário.
                         </p>
                       </div>
                     )}
                   </div>
-                </div>
-
-                {message && (
-                  <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                    <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wide mb-1.5">Preview da Mensagem Principal</p>
-                    <p className="text-sm text-emerald-800 whitespace-pre-wrap">
-                      {message
-                        .replace(/\{\{nome\}\}/gi, 'João da Silva')
-                        .replace(/\{\{primeiro_nome\}\}/gi, 'João')
-                        .replace(/\{\{telefone\}\}/gi, '(11) 99999-9999')
-                        .replace(/\{\{data\}\}/gi, '15/07/2026')
-                        .replace(/\{\{hora\}\}/gi, '14:30')
-                        .replace(/\{\{especialista\}\}/gi, 'Dra. Ana')
-                        .replace(/\{\{dr\}\}/gi, 'Dra. Ana')}
-                    </p>
                   </div>
-                )}
+                </details>
 
-                <div className="flex justify-between">
-                  <Button variant="outline" onClick={() => setStep(1)} className="rounded-xl h-10">
-                    <span className="material-symbols-outlined text-sm mr-1">chevron_left</span> Voltar
+                <aside className="self-start rounded-xl border border-slate-200 bg-white p-4 lg:sticky lg:top-0 lg:col-start-2 lg:row-span-5 lg:row-start-1">
+                  <div className="flex items-center justify-between gap-3 px-1 pb-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-950">Prévia no WhatsApp</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">Exemplo com dados preenchidos</p>
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${useMetaTemplate ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {useMetaTemplate ? 'Template oficial' : 'Mensagem livre'}
+                    </span>
+                  </div>
+                  <div className="min-h-[420px] rounded-xl bg-[#efeae2] p-4 shadow-inner">
+                    <div className="ml-auto max-w-[92%] rounded-lg rounded-tr-sm bg-[#d9fdd3] p-3 shadow-sm">
+                      {attachments.length > 0 && (
+                        <div className="mb-3 flex h-28 items-center justify-center rounded-md bg-white/70 text-emerald-700">
+                          {attachments[0].type === 'image' ? <ImageIcon className="h-7 w-7" /> : attachments[0].type === 'video' ? <Video className="h-7 w-7" /> : <Volume2 className="h-7 w-7" />}
+                        </div>
+                      )}
+                      <p className="whitespace-pre-wrap text-[13px] leading-5 text-slate-900">{messagePreview}</p>
+                      <p className="mt-1 text-right text-[9px] font-medium text-slate-500">agora <span className="text-blue-500">✓✓</span></p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-[11px] leading-5 text-slate-500">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    A prévia usa dados fictícios. Cada destinatário receberá seus próprios dados.
+                  </div>
+                </aside>
+
+                <div className="flex items-center justify-between border-t border-slate-200 pt-4 lg:col-span-2">
+                  <Button variant="outline" onClick={() => setStep(1)} className="h-11 rounded-lg">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                   </Button>
                   <Button onClick={() => { if (message.trim()) setStep(3); else toast({ title: 'Escreva a mensagem', variant: 'destructive' }); }}
-                    className="bg-primary text-white rounded-xl px-6 h-10 font-bold">
-                    Próximo <span className="material-symbols-outlined text-sm ml-1">chevron_right</span>
+                    className="h-11 rounded-lg bg-slate-950 px-5 font-bold text-white hover:bg-slate-800">
+                    Revisar campanha <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
               </div>
             )}
 
             {step === 3 && (
-              <div className="space-y-5">
-                <div className="bg-slate-50 rounded-xl p-5 space-y-3">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><CheckCircle2 className="h-5 w-5" /></div>
+                    <div><p className="text-sm font-black text-slate-950">Configuração da campanha</p><p className="mt-0.5 text-xs text-slate-500">Confira público, conteúdo e ritmo de envio.</p></div>
+                  </div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Campanha</span><span className="font-bold text-primary">{name}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Audiência</span><span className="font-bold text-primary">{AUDIENCE_OPTIONS.find(a => a.value === audienceType)?.label}</span></div>
                   {audienceType === 'by_tags' && (
@@ -1217,12 +1400,12 @@ export default function Campaigns() {
                   ) : null}
 
                   {/* Delay confirmation */}
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Intervalo de Envio</span><span className="font-bold text-primary">{minDelay}s a {maxDelay}s (aleatório)</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Intervalo de envio</span><span className="font-bold text-primary">{minDelay}s a {maxDelay}s</span></div>
 
                   {/* Variations confirmation */}
                   {randomize && variations.length > 0 && (
                     <div className="text-sm space-y-1">
-                      <span className="text-muted-foreground">Variações Anti-Ban</span>
+                      <span className="text-muted-foreground">Variações da mensagem</span>
                       <div className="bg-white p-2.5 rounded-lg border border-slate-100 text-xs text-slate-500 max-h-24 overflow-y-auto space-y-1">
                         <p className="font-bold text-slate-700">Mensagem 1 (Principal):</p>
                         <p className="italic truncate mb-2">{message}</p>
@@ -1236,20 +1419,30 @@ export default function Campaigns() {
                     </div>
                   )}
 
-                  <hr className="border-slate-200" />
-                  <div><p className="text-xs text-muted-foreground mb-1">Mensagem Principal:</p><p className="text-sm whitespace-pre-wrap bg-white rounded-lg p-3 border border-slate-100">{message}</p></div>
                 </div>
-                <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 flex items-start gap-2">
-                  <span className="material-symbols-outlined text-amber-500 text-lg mt-0.5">info</span>
-                  <p className="text-xs text-amber-700">A campanha será salva como rascunho. Você poderá enviar depois clicando no botão de envio na lista.</p>
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 lg:col-start-1">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <div><p className="text-xs font-bold text-amber-900">A campanha será criada como rascunho</p><p className="mt-1 text-xs leading-5 text-amber-700">O envio só começa quando você clicar em enviar na lista de campanhas.</p></div>
                 </div>
-                <div className="flex justify-between">
-                  <Button variant="outline" onClick={() => setStep(2)} className="rounded-xl h-10">
-                    <span className="material-symbols-outlined text-sm mr-1">chevron_left</span> Voltar
+                <aside className="self-start rounded-xl border border-slate-200 bg-slate-950 p-5 text-white lg:sticky lg:top-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-400">Resumo do disparo</p>
+                  <p className="mt-3 text-2xl font-black">{previewRecipients} contatos</p>
+                  <p className="mt-1 text-xs text-slate-400">{AUDIENCE_OPTIONS.find(option => option.value === audienceType)?.label}</p>
+                  <div className="mt-5 rounded-lg bg-white/10 p-4">
+                    <p className="line-clamp-6 whitespace-pre-wrap text-sm leading-6 text-slate-100">{messagePreview}</p>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-white/5 p-3"><p className="text-slate-500">Canal</p><p className="mt-1 font-bold">{useMetaTemplate ? 'Meta oficial' : 'WhatsApp'}</p></div>
+                    <div className="rounded-lg bg-white/5 p-3"><p className="text-slate-500">Intervalo</p><p className="mt-1 font-bold">{minDelay}-{maxDelay}s</p></div>
+                  </div>
+                </aside>
+                <div className="flex items-center justify-between border-t border-slate-200 pt-4 lg:col-span-2">
+                  <Button variant="outline" onClick={() => setStep(2)} className="h-11 rounded-lg">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                   </Button>
                   <Button onClick={handleCreate} disabled={isSending}
-                    className="bg-secondary hover:bg-secondary/90 text-white rounded-xl px-8 h-11 font-bold shadow-lg shadow-secondary/20">
-                    {isSending ? <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span> : <span className="material-symbols-outlined mr-2">campaign</span>}
+                    className="h-11 rounded-lg bg-orange-600 px-6 font-bold text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700">
+                    {isSending ? <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span> : <Send className="mr-2 h-4 w-4" />}
                     Criar Campanha
                   </Button>
                 </div>
@@ -1313,7 +1506,9 @@ export default function Campaigns() {
                     if (Array.isArray(parsed)) {
                       parsedAttachments = parsed;
                     }
-                  } catch {}
+                  } catch {
+                    // URLs antigas foram salvas como texto simples, não como uma lista JSON.
+                  }
 
                   if (parsedAttachments.length > 0) {
                     return (
@@ -1350,7 +1545,7 @@ export default function Campaigns() {
                   );
                 })()}
 
-                {/* Render anti-ban security parameters */}
+                {/* Render sending interval settings */}
                 <div className="border-t border-slate-200/60 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase block">Configurações de Atraso</span>
