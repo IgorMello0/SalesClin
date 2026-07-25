@@ -206,7 +206,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
   const [resendingInviteId, setResendingInviteId] = useState<number | null>(null);
   
   const isOwner = professional?.type === 'profissional' || professional?.role === 'profissional' || professional?.role === 'admin';
-  const [selectedClinicFilter, setSelectedClinicFilter] = useState<string>(professional?.companyId ? String(professional.companyId) : 'all');
+  const [selectedClinicFilter, setSelectedClinicFilter] = useState<string>(professional?.companyId ? String(professional.companyId) : '');
 
   const validRoles = roles.filter((role) => role?.id !== undefined && role?.id !== null && (isSpecialistMode ? role.isSpecialist : !role.isSpecialist));
   
@@ -217,8 +217,8 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
     
     if (selectedClinicFilter !== 'all') {
       const filterId = Number(selectedClinicFilter);
-      const belongsDirectly = user.companyId === filterId;
-      const belongsViaAccess = user.companyAccess?.some((ca: any) => ca.companyId === filterId);
+      const belongsDirectly = user.companyId === filterId && !user.companyAccess?.length;
+      const belongsViaAccess = user.companyAccess?.some((ca: any) => ca.companyId === filterId && ca.isActive);
       return belongsDirectly || belongsViaAccess;
     }
     
@@ -258,13 +258,19 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
         for (const clinic of res.data || []) {
           if (clinic?.id) merged.set(Number(clinic.id), clinic);
         }
-        setClinicas(Array.from(merged.values()));
+        const availableClinics = Array.from(merged.values());
+        setClinicas(availableClinics);
+        setSelectedClinicFilter((current) => current || (availableClinics[0]?.id ? String(availableClinics[0].id) : ''));
       } else {
-        setClinicas(professional?.companies || []);
+        const availableClinics = professional?.companies || [];
+        setClinicas(availableClinics);
+        setSelectedClinicFilter((current) => current || (availableClinics[0]?.id ? String(availableClinics[0].id) : ''));
       }
     } catch (e) {
       console.error('Erro ao carregar clínicas', e);
-      setClinicas(professional?.companies || []);
+      const availableClinics = professional?.companies || [];
+      setClinicas(availableClinics);
+      setSelectedClinicFilter((current) => current || (availableClinics[0]?.id ? String(availableClinics[0].id) : ''));
     }
   };
 
@@ -282,9 +288,9 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
     }
   };
 
-  const loadBillingUsage = async () => {
+  const loadBillingUsage = async (companyId?: number) => {
     try {
-      const res = await billingApi.getUsage();
+      const res = await billingApi.getUsage(companyId);
       if (res.success && res.data) setBillingUsage(res.data);
     } catch (e) {
       console.error('Erro ao carregar limites de billing:', e);
@@ -295,8 +301,12 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
     loadTeam();
     loadRoles();
     loadClinicas();
-    loadBillingUsage();
   }, []);
+
+  useEffect(() => {
+    const companyId = Number(selectedClinicFilter);
+    if (companyId) loadBillingUsage(companyId);
+  }, [selectedClinicFilter]);
 
   const handleBuyUserExtra = async () => {
     setBuyingUserExtra(true);
@@ -340,7 +350,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
         setIsAdding(false);
         setNewMember({ name: '', email: '', roleId: '', companyIds: [], leadRoutingWeight: 1 });
         loadTeam();
-        loadBillingUsage();
+        loadBillingUsage(Number(selectedClinicFilter) || undefined);
       } else {
         throw new Error(res.error?.message || 'Erro ao adicionar');
       }
@@ -374,7 +384,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
         toast({ title: 'Sucesso', description: 'Membro removido da equipe.' });
         if (selectedUserId === id) setSelectedUserId(null);
         loadTeam();
-        loadBillingUsage();
+        loadBillingUsage(Number(selectedClinicFilter) || undefined);
       }
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });
@@ -544,7 +554,7 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
           </h3>
           {billingUsage && (
             <p className="text-xs text-muted-foreground mt-1">
-              {billingUsage.users.used} / {billingUsage.users.limit ?? 'ilimitado'} usuários nesta clínica
+              {billingUsage.users.used} / {billingUsage.users.limit ?? 'ilimitado'} usuários ativos nesta clínica
             </p>
           )}
         </div>
@@ -553,13 +563,10 @@ const EquipeView = ({ isSpecialistMode = false }: { isSpecialistMode?: boolean }
             <Select value={selectedClinicFilter} onValueChange={setSelectedClinicFilter}>
               <SelectTrigger className="h-8 text-xs w-[180px]">
                 <SelectValue placeholder="Filtrar por clínica...">
-                  {selectedClinicFilter === 'all' 
-                    ? 'Todas as Clínicas' 
-                    : clinicas.find(c => String(c.id) === selectedClinicFilter)?.name || 'Carregando...'}
+                  {clinicas.find(c => String(c.id) === selectedClinicFilter)?.name || 'Selecione a clínica'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as Clínicas</SelectItem>
                 {clinicas.map(c => (
                   <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                 ))}

@@ -450,23 +450,31 @@ async function getOwnedClinicIds(ownerProfessionalId: number) {
   ]))
 }
 
-async function countActiveUsersForCompany(companyId: number, excludeUserId?: number | null) {
-  return prisma.usuario.count({
-    where: {
-      isActive: true,
-      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
-      OR: [
-        { companyId },
-        {
-          companyAccess: {
-            some: {
-              companyId,
-              isActive: true,
-            },
+export function buildActiveUsersForCompanyWhere(companyId: number, excludeUserId?: number | null) {
+  return {
+    isActive: true,
+    ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    OR: [
+      {
+        companyAccess: {
+          some: {
+            companyId,
+            isActive: true,
           },
         },
-      ],
-    },
+      },
+      {
+        // Compatibilidade para usuarios antigos, criados antes da tabela de vinculos.
+        companyId,
+        companyAccess: { none: {} },
+      },
+    ],
+  }
+}
+
+async function countActiveUsersForCompany(companyId: number, excludeUserId?: number | null) {
+  return prisma.usuario.count({
+    where: buildActiveUsersForCompanyWhere(companyId, excludeUserId),
   })
 }
 
@@ -554,9 +562,12 @@ export async function expirePastDueBillingRecords() {
 
 export async function getBillingUsage(ownerProfessionalId: number, activeCompanyId?: number | null) {
   const ownedClinicIds = await getOwnedClinicIds(ownerProfessionalId)
-  const targetCompanyId = activeCompanyId && ownedClinicIds.includes(activeCompanyId)
-    ? activeCompanyId
-    : ownedClinicIds[0] || null
+
+  if (activeCompanyId && !ownedClinicIds.includes(activeCompanyId)) {
+    throw new Error('Clinica selecionada nao pertence ao profissional.')
+  }
+
+  const targetCompanyId = activeCompanyId || ownedClinicIds[0] || null
 
   if (!targetCompanyId) {
     throw new Error('Clinica ativa nao encontrada.')

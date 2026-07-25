@@ -162,8 +162,11 @@ router.get('/', auth(), async (req, res) => {
     // Buscar usuários que pertencem diretamente OU que têm acesso via tabela ponte
     const where = {
       OR: [
-        { companyId: { in: ownedCompanyIds } },
-        { companyAccess: { some: { companyId: { in: ownedCompanyIds }, isActive: true } } }
+        { companyAccess: { some: { companyId: { in: ownedCompanyIds }, isActive: true } } },
+        {
+          companyId: { in: ownedCompanyIds },
+          companyAccess: { none: {} },
+        },
       ]
     }
     

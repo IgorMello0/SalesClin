@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { afterEach, describe, it } from 'node:test'
 import {
+  buildActiveUsersForCompanyWhere,
   getEffectiveSubscriptionStatus,
   verifyAbacateWebhookSignature,
 } from './billing.js'
@@ -82,6 +83,18 @@ describe('billing entitlement status', () => {
       trialEndsAt: past,
       manualAccessEndsAt: future,
     }), 'active')
+  })
+})
+
+describe('billing usage per clinic', () => {
+  it('uses active clinic links and only falls back to legacy users without links', () => {
+    assert.deepEqual(buildActiveUsersForCompanyWhere(16), {
+      isActive: true,
+      OR: [
+        { companyAccess: { some: { companyId: 16, isActive: true } } },
+        { companyId: 16, companyAccess: { none: {} } },
+      ],
+    })
   })
 })
 

@@ -33,6 +33,8 @@ export interface BillingStatus {
   status: string
   trialEndsAt: string
   currentPeriodEndsAt?: string | null
+  accessSource?: 'trial' | 'abacatepay' | 'manual' | string | null
+  manualAccessEndsAt?: string | null
   daysRemaining: number
   modules: Array<{ code: string; name: string; icon?: string | null }>
   abacateSubscriptionId?: string | null
@@ -795,7 +797,9 @@ export const permissionsApi = {
 
 export const billingApi = {
   getStatus: async () => apiRequest<BillingStatus>('/billing/status'),
-  getUsage: async () => apiRequest<BillingUsage>('/billing/usage'),
+  getUsage: async (companyId?: number) => apiRequest<BillingUsage>(
+    `/billing/usage${companyId ? `?companyId=${companyId}` : ''}`,
+  ),
   selectPlan: async (planCode: string, billingCycle: BillingCycle = 'monthly') =>
     apiRequest<{ planCode: string; billingCycle: string; status: string }>('/billing/select-plan', {
       method: 'POST',

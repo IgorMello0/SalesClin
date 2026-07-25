@@ -105,6 +105,35 @@ export const BillingSettingsView = () => {
   const isActive = billingStatus.status === 'active' || billingStatus.status === 'trialing';
   const isEnterprise = billingStatus.planCode === 'enterprise';
 
+  const renewalInfo = (() => {
+    if (billingStatus.status === 'trialing') {
+      return {
+        label: 'Fim do período de teste',
+        value: billingStatus.trialEndsAt ? format(parseISO(billingStatus.trialEndsAt), 'dd/MM/yyyy') : '--/--/----',
+      };
+    }
+
+    if (billingStatus.status === 'active' && billingStatus.accessSource === 'manual') {
+      return { label: 'Acesso manual', value: 'Sem renovação automática' };
+    }
+
+    if (billingStatus.status === 'canceled') {
+      return {
+        label: 'Data de expiração',
+        value: billingStatus.currentPeriodEndsAt
+          ? format(parseISO(billingStatus.currentPeriodEndsAt), 'dd/MM/yyyy')
+          : '--/--/----',
+      };
+    }
+
+    return {
+      label: billingStatus.status === 'active' ? 'Próxima renovação' : 'Situação da cobrança',
+      value: billingStatus.currentPeriodEndsAt
+        ? format(parseISO(billingStatus.currentPeriodEndsAt), 'dd/MM/yyyy')
+        : billingStatus.status === 'active' ? '--/--/----' : 'Aguardando pagamento',
+    };
+  })();
+
   // Calculate Usage percentages
   const userUsage = billingUsage?.users;
   const userPercent = userUsage?.limit ? Math.min((userUsage.used / userUsage.limit) * 100, 100) : 0;
@@ -144,13 +173,11 @@ export const BillingSettingsView = () => {
 
           <div className="flex flex-col gap-1 md:text-right border-t md:border-t-0 pt-4 md:pt-0">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              {billingStatus.status === 'canceled' ? 'Data de Expiração' : 'Próxima Renovação'}
+              {renewalInfo.label}
             </p>
             <p className="text-base font-bold flex items-center md:justify-end gap-1.5 text-slate-900">
               <Activity className="h-4 w-4 text-blue-500" />
-              {billingStatus.currentPeriodEndsAt 
-                ? format(parseISO(billingStatus.currentPeriodEndsAt), "dd/MM/yyyy")
-                : '--/--/----'}
+              {renewalInfo.value}
             </p>
           </div>
         </div>
