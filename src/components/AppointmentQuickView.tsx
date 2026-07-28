@@ -5,6 +5,7 @@ import { appointmentsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,7 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { professional } = useAuth();
 
   useEffect(() => {
     if (isOpen && appointmentId) {
@@ -124,14 +126,15 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
   const appointmentDate = data ? format(parseISO(data.startTime), "dd/MM/yyyy") : '';
   const appointmentTime = data ? format(parseISO(data.startTime), "HH:mm") : '';
 
-  const whatsappReminderMsg = `Oi ${clientName.split(' ')[0]}, aqui é a ${profName} da SellClin. Passando aqui para confirmar a sua consulta no dia ${appointmentDate} às ${appointmentTime}.`;
+  const companyName = professional?.companyName || 'SellClin';
+  const whatsappReminderMsg = `Oi ${clientName.split(' ')[0]}, aqui é a ${profName} da ${companyName}. Passando aqui para confirmar a sua consulta no dia ${appointmentDate} às ${appointmentTime}.`;
   
   const whatsappReminderLink = clientPhone 
     ? `https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappReminderMsg)}`
     : '#';
 
   const whatsappLink = clientPhone 
-    ? `https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=Olá ${clientName.split(' ')[0]}, tudo bem? Aqui é da SellClin.`
+    ? `https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=Olá ${clientName.split(' ')[0]}, tudo bem? Aqui é da ${companyName}.`
     : '#';
 
   const getStatusBadge = (status: string) => {

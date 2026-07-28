@@ -405,15 +405,14 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     logAudit(req.user.id, 'ATUALIZAR_AGENDAMENTO', 'Appointment', id)
   }
 
-  // Update Lead's isScheduled status and auto-transition status if concluded
+  // Update Lead's isScheduled status
   if (updated.leadId) {
     const leadUpdateData: any = { isScheduled: true };
     
-    // REGRA: Se a consulta foi concluída (Compareceu), move o lead para "Consulta Feita"
     if (status === 'concluido') {
-      leadUpdateData.status = 'comercial_consult';
+      leadUpdateData.status = 'prospect_attended';
     }
-    
+
     await prisma.lead.update({ 
       where: { id: updated.leadId }, 
       data: leadUpdateData 

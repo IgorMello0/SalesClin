@@ -13,11 +13,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import { professionalsApi, uploadApi, getImageUrl } from '@/lib/api';
 
 const Profile = ({ embedded = false }: { embedded?: boolean }) => {
   const { professional, updateProfileData } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -532,7 +534,7 @@ const Profile = ({ embedded = false }: { embedded?: boolean }) => {
                     </p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-xl">
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={() => navigate('/settings?tab=security')}>
                   Alterar
                 </Button>
               </div>
@@ -549,7 +551,7 @@ const Profile = ({ embedded = false }: { embedded?: boolean }) => {
                     </p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-xl">
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={() => navigate('/settings?tab=notifications')}>
                   Configurar
                 </Button>
               </div>

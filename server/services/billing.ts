@@ -139,9 +139,33 @@ export async function ensureCompanySubscription(
 
 export async function getCompanyBillingStatus(companyId: number) {
   const subscription = await ensureCompanySubscription(prisma, companyId)
-  const effectiveStatus = getEffectiveSubscriptionStatus(subscription)
+  let effectiveStatus = getEffectiveSubscriptionStatus(subscription)
+  let planCode = subscription.planCode
+  let isInherited = false
 
-  if (effectiveStatus === 'expired' && subscription.status !== 'expired') {
+  // Herda assinatura multi-clínicas do dono da empresa (Pro ou Enterprise)
+  const company = await prisma.empresa.findUnique({
+    where: { id: companyId },
+    select: { ownerId: true }
+  })
+
+  if (company?.ownerId) {
+    const ownerSubs = await prisma.companySubscription.findMany({
+      where: { company: { ownerId: company.ownerId } }
+    })
+    
+    const masterSub = ownerSubs.find(sub => 
+      ['pro', 'enterprise'].includes(sub.planCode) && getEffectiveSubscriptionStatus(sub) === 'active'
+    )
+    
+    if (masterSub) {
+      effectiveStatus = 'active'
+      planCode = masterSub.planCode
+      isInherited = true
+    }
+  }
+
+  if (!isInherited && effectiveStatus === 'expired' && subscription.status !== 'expired') {
     await prisma.companySubscription.update({
       where: { companyId },
       data: { status: 'expired' },
@@ -149,7 +173,7 @@ export async function getCompanyBillingStatus(companyId: number) {
   }
 
   const planModules = await prisma.planModule.findMany({
-    where: { planCode: subscription.planCode },
+    where: { planCode: planCode },
     include: { module: true },
     orderBy: { moduleId: 'asc' },
   })
@@ -161,7 +185,7 @@ export async function getCompanyBillingStatus(companyId: number) {
   }))
 
   return {
-    planCode: subscription.planCode,
+    planCode: planCode,
     status: effectiveStatus,
     trialEndsAt: subscription.trialEndsAt,
     currentPeriodEndsAt: subscription.currentPeriodEndsAt,

@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const Dashboard = () => {
   const { professional, switchCompany, hasPermission } = useAuth();
   const showBilling = hasPermission('dashboard', 'verFaturamento');
-  const [filter, setFilter] = useState<'today' | '7days' | '30days' | 'this_month' | 'custom'>('30days');
+  const [filter, setFilter] = useState<'today' | '7days' | '30days' | 'this_month' | 'custom'>('this_month');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [customEndDate, setCustomEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));

@@ -146,6 +146,15 @@ export function NewAppointmentModal({
         });
         const sdrUsers = usrRes.data.filter((u: any) => u.role?.isSDR);
         setSdrs(sdrUsers);
+        
+        // Auto-select logged in user as SDR if they are in the list
+        if (professional?.id) {
+          const isUserSdr = sdrUsers.find((u: any) => u.id.toString() === professional.id.toString());
+          if (isUserSdr) {
+            setSelectedSdrId(professional.id.toString());
+          }
+        }
+
         const existingIds = new Set(allProfs.map(p => p.id.toString()));
         medics.forEach((m: any) => {
           if (!existingIds.has(m.id.toString())) {
@@ -242,7 +251,6 @@ export function NewAppointmentModal({
 
       const response = await appointmentsApi.create({
         professionalId: Number(selectedProfessionalId),
-        especialistaId: Number(selectedProfessionalId), // Add it here too since selected professional could be the specialist
         sdrId: selectedSdrId !== "none" ? Number(selectedSdrId) : undefined,
         clientId: initialLeadId ? null : Number(selectedClient),
         leadId: initialLeadId ? Number(initialLeadId) : null,

@@ -395,33 +395,74 @@ router.put('/:id', auth(), async (req, res) => {
       }
     })
 
-    // Notificar criador se outra pessoa concluiu a tarefa dele
-    const isCreatorUser = updated.createdByUserId ? true : false;
-    const isUpdaterSelf = updated.createdByUserId 
-      ? (req.user!.type === 'usuario' && updated.createdByUserId === req.user!.id)
-      : (req.user!.type === 'profissional' && updated.createdById === req.user!.id);
+      // Lógica de Notificações Aprimorada: Notificar Administradores e Criador
+      const isUpdaterSelf = updated.createdByUserId 
+        ? (req.user!.type === 'usuario' && updated.createdByUserId === req.user!.id)
+        : (req.user!.type === 'profissional' && updated.createdById === req.user!.id);
+  
+      if (isNowCompleted) {
+        const updaterName = req.user!.type === 'usuario' ? updated.assignedToUser?.name : updated.assignedTo?.name;
+        
+        const baseNotification = {
+          title: 'Tarefa concluída',
+          content: `${updaterName || 'Alguém'} concluiu a tarefa: "${updated.title}"`,
+          type: 'task_completed',
+          companyId: updated.companyId,
+          taskId: updated.id
+        };
 
-    if (isNowCompleted && !isUpdaterSelf) {
-      const updaterName = req.user!.type === 'usuario' ? updated.assignedToUser?.name : updated.assignedTo?.name;
-      
-      const notificationData: any = {
-        title: 'Tarefa concluída',
-        content: `${updaterName || 'Alguém'} concluiu a tarefa: "${updated.title}"`,
-        type: 'task_completed',
-        companyId: updated.companyId,
-        taskId: updated.id
-      };
+        const recipientsToNotify = new Set<string>();
+        
+        // 1. O dono da clínica (admin principal)
+        const company = await prisma.empresa.findUnique({ where: { id: updated.companyId } });
+        if (company && company.ownerId) {
+          recipientsToNotify.add(`prof_${company.ownerId}`);
+        }
 
-      if (isCreatorUser) {
-        notificationData.recipientUserId = updated.createdByUserId;
-      } else {
-        notificationData.recipientId = updated.createdById;
+        // 2. Outros administradores / gerentes
+        const adminUsers = await prisma.usuario.findMany({
+          where: {
+            isActive: true,
+            companyAccess: { some: { companyId: updated.companyId } },
+            role: { isManager: true }
+          }
+        });
+        
+        for (const admin of adminUsers) {
+          recipientsToNotify.add(`user_${admin.id}`);
+        }
+
+        // 3. O criador da tarefa (se diferente de quem está atualizando)
+        if (!isUpdaterSelf) {
+          if (updated.createdByUserId) {
+            recipientsToNotify.add(`user_${updated.createdByUserId}`);
+          } else if (updated.createdById) {
+            recipientsToNotify.add(`prof_${updated.createdById}`);
+          }
+        }
+
+        // Remover o próprio updater para ele não ser notificado das próprias ações
+        if (req.user!.type === 'usuario') {
+          recipientsToNotify.delete(`user_${req.user!.id}`);
+        } else {
+          recipientsToNotify.delete(`prof_${req.user!.id}`);
+        }
+
+        const notificationsData = Array.from(recipientsToNotify).map(recipient => {
+          const [type, idStr] = recipient.split('_');
+          return {
+            ...baseNotification,
+            recipientUserId: type === 'user' ? Number(idStr) : null,
+            recipientId: type === 'prof' ? Number(idStr) : null,
+          };
+        });
+
+        if (notificationsData.length > 0) {
+          await prisma.notification.createMany({
+            data: notificationsData
+          });
+        }
       }
-
-      await prisma.notification.create({
-        data: notificationData
-      })
-    }
 
     // Lógica de Recorrência Automática
     if (isNowCompleted && updated.isRecurring && updated.recurrenceRule) {

@@ -71,7 +71,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
     if (companyId) baseWhere.companyId = companyId;
 
     const appointmentWhere: any = {
-      startTime: { gte: startDate, lte: endDate },
+      createdAt: { gte: startDate, lte: endDate },
       professionalId: { in: professionalIds }
     };
     if (companyId) appointmentWhere.companyId = companyId;
@@ -182,13 +182,11 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
     const finalProspectStages = prospectStages.length > 0 ? prospectStages : ['prospect_lead', 'prospect_qualified', 'prospect_scheduled', 'prospect_attended'];
     const finalCommercialStages = commercialStages.length > 0 ? commercialStages : ['comercial_proposal', 'comercial_follow', 'comercial_closed'];
 
-    // Attended: último do prospect + todos do commercial
-    const lastProspectStage = finalProspectStages[finalProspectStages.length - 1];
-    const attendedStages = lastProspectStage ? [lastProspectStage, ...finalCommercialStages] : finalCommercialStages;
+    // Attended: 'prospect_attended' + todos do commercial
+    const attendedStages = ['prospect_attended', ...finalCommercialStages];
 
-    // Closed: último do commercial + hardcodes históricos
-    const lastCommercialStage = finalCommercialStages[finalCommercialStages.length - 1] || 'comercial_closed';
-    const closedStages = Array.from(new Set([lastCommercialStage, 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post']));
+    // Closed: 'comercial_closed' + hardcodes históricos
+    const closedStages = Array.from(new Set(['comercial_closed', 'sales_payment', 'sales_contract', 'sales_post']));
 
     // 3. Consultas em Paralelo para Performance
     const [
@@ -208,7 +206,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       
       // 2. Avaliações Agendadas (Para o período selecionado)
       prisma.appointment.count({ 
-        where: { ...appointmentWhere, status: { in: ['agendado', 'confirmado'] } } 
+        where: appointmentWhere
       }),
       
       // 3. Avaliações Comparecidas (Leads que estão em status de comparecimento ou superior)
@@ -225,7 +223,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       // 5. Faturamento Total (Tudo que foi orçado - Leads em Proposta ou superior - Total histórico ou período)
       prisma.lead.aggregate({
         _sum: { value: true },
-        where: buildLeadWhere(finalCommercialStages, false)
+        where: buildLeadWhere(finalCommercialStages, true)
       }),
 
       // 6. Total de Vendas Fechadas (Mudaram para status de fechamento no período)
