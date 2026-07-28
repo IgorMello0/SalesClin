@@ -5,7 +5,6 @@ export const INTERNAL_TEST_EMAILS = [
 
 export const HIDDEN_DEVELOPMENT_MODULES = [
   'pagamentos',
-  'conversas',
   'catalogos',
   'contratos',
   'relatorios',

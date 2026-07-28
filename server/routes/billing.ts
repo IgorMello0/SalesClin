@@ -75,11 +75,17 @@ router.get('/usage', auth(), requireCompany, requireCompanyOwner(), async (req, 
       return res.status(403).json(createErrorResponse('Apenas profissionais podem consultar limites da conta', 403))
     }
 
-    const usage = await getBillingUsage(req.user.id, req.user.companyId)
+    const requestedCompanyId = req.query.companyId ? Number(req.query.companyId) : req.user.companyId
+    if (!requestedCompanyId || !Number.isInteger(requestedCompanyId)) {
+      return res.status(400).json(createErrorResponse('Clinica selecionada invalida', 400))
+    }
+
+    const usage = await getBillingUsage(req.user.id, requestedCompanyId)
     return res.json(createSuccessResponse(usage))
   } catch (error: any) {
     console.error('[Billing] Erro ao buscar uso:', error)
-    return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar limites', 500))
+    const status = error.message?.includes('nao pertence') ? 403 : 500
+    return res.status(status).json(createErrorResponse(error.message || 'Erro ao buscar limites', status))
   }
 })
 

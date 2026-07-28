@@ -487,7 +487,7 @@ router.put('/:id', auth(), requireCompanyOwner('id'), async (req, res) => {
   try {
     const id = Number(req.params.id)
     const {
-      name, domain, whatsapp, apiKey, isActive, openHour, closeHour,
+      name, domain, whatsapp, apiKey, plan, isActive, openHour, closeHour,
       // Campos de integração WhatsApp
       whatsappProvider, evolutionMode, evolutionApiUrl, evolutionInstance, metaToken, metaPhoneNumberId,
       metaWabaId, metaBusinessId, metaPhoneDisplayNumber, metaWebhookVerifyToken, metaTwoStepPin, metaConnectionStatus,
