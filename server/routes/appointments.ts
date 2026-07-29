@@ -6,6 +6,7 @@ import {
   assertClientBelongsToCompany,
   assertUserBelongsToCompany,
   getCompanyOwnerProfessionalId,
+  assertProfessionalBelongsToCompany
 } from '../services/tenant.js'
 import { logAudit } from '../utils/audit.js'
 import { deleteAppointmentFromGoogle, syncAppointmentToGoogle } from '../services/google-calendar.js'
@@ -253,7 +254,13 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
     const { clientId, leadId, tags, serviceId, startTime, endTime, status, notes, sdrId, especialistaId } = req.body
     
-    const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
+    let professionalId: number;
+    if (req.body.professionalId) {
+      professionalId = Number(req.body.professionalId);
+      await assertProfessionalBelongsToCompany(professionalId, req.user?.companyId);
+    } else {
+      professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId);
+    }
 
     if (clientId) await assertClientBelongsToCompany(Number(clientId), req.user?.companyId)
     if (leadId) {
@@ -338,7 +345,11 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     const current = await prisma.appointment.findFirst({ where: { id, companyId: req.user!.companyId } });
     if (!current) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404));
 
-    const professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId)
+    let professionalId = current.professionalId;
+    if (req.body.professionalId) {
+      professionalId = Number(req.body.professionalId);
+      await assertProfessionalBelongsToCompany(professionalId, req.user?.companyId);
+    }
     if (clientId) await assertClientBelongsToCompany(Number(clientId), req.user?.companyId)
     if (serviceId) {
       const service = await prisma.catalogItem.findFirst({
@@ -366,7 +377,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     // Overbooking Validation
     const conflicting = startTime && endTime ? await prisma.appointment.findFirst({
       where: {
-        professionalId: current.professionalId,
+        professionalId: professionalId,
         id: { not: id },
         status: { not: 'cancelado' },
         AND: [
@@ -383,6 +394,7 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     const updated = await prisma.appointment.update({
       where: { id },
       data: { 
+        professionalId: req.body.professionalId ? Number(req.body.professionalId) : undefined,
         clientId: clientId ? Number(clientId) : undefined, 
         serviceId: serviceId ? Number(serviceId) : undefined, 
         startTime: startTime ? new Date(startTime) : undefined, 
