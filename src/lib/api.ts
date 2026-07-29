@@ -714,8 +714,11 @@ export const appointmentsApi = {
     const query = new URLSearchParams({ professionalId, startTime, endTime })
     return apiRequest<any>(`/agendamentos/check-availability?${query.toString()}`)
   },
-  getAvailableSlots: async (professionalId: string, date: string, durationMinutes: number) => {
+  getAvailableSlots: async (professionalId: string, date: string, durationMinutes: number, isUsuario?: boolean) => {
     const query = new URLSearchParams({ professionalId, date, durationMinutes: durationMinutes.toString() })
+    if (isUsuario) {
+      query.append('isUsuario', 'true')
+    }
     return apiRequest<string[]>(`/agendamentos/available-slots?${query.toString()}`)
   },
   update: async (id: number, data: any) => apiRequest<any>(`/agendamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

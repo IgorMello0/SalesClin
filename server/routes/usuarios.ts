@@ -308,7 +308,7 @@ router.post('/', auth(), requireCompanyOwner(), async (req, res) => {
         email: emailAddress,
         passwordHash: '',
         roleId, 
-        isActive: false,
+        isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
         emailVerified: false,
         emailVerifiedAt: null,
         leadRoutingWeight: req.body.leadRoutingWeight !== undefined ? Number(req.body.leadRoutingWeight) : 1

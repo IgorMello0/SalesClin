@@ -132,7 +132,7 @@ router.get('/check-availability', auth(), requireModule('agendamentos'), async (
 // Horários disponíveis para um dia específico
 router.get('/available-slots', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
-    const { professionalId, date, durationMinutes } = req.query as any
+    const { professionalId, date, durationMinutes, isUsuario } = req.query as any
     if (!professionalId || !date) {
       return res.status(400).json(createErrorResponse('Parâmetros incompletos', 400))
     }
@@ -141,13 +141,28 @@ router.get('/available-slots', auth(), requireModule('agendamentos'), async (req
     const SLOT_INTERVAL = 15 // minutos
 
     // 1. Busca os horários da empresa
-    const prof = await prisma.professional.findUnique({
-      where: { id: Number(professionalId) },
-      include: { company: { select: { openHour: true, closeHour: true } } }
-    })
+    let openHourStr = "08:00";
+    let closeHourStr = "20:00";
     
-    const openHourStr = prof?.company?.openHour || "08:00"
-    const closeHourStr = prof?.company?.closeHour || "20:00"
+    if (isUsuario === 'true') {
+      const user = await prisma.usuario.findUnique({
+        where: { id: Number(professionalId) },
+        include: { company: { select: { openHour: true, closeHour: true } } }
+      })
+      if (user?.company) {
+        openHourStr = user.company.openHour || openHourStr;
+        closeHourStr = user.company.closeHour || closeHourStr;
+      }
+    } else {
+      const prof = await prisma.professional.findUnique({
+        where: { id: Number(professionalId) },
+        include: { company: { select: { openHour: true, closeHour: true } } }
+      })
+      if (prof?.company) {
+        openHourStr = prof.company.openHour || openHourStr;
+        closeHourStr = prof.company.closeHour || closeHourStr;
+      }
+    }
 
     const [openH, openM] = openHourStr.split(':').map(Number)
     const [closeH, closeM] = closeHourStr.split(':').map(Number)
@@ -159,12 +174,19 @@ router.get('/available-slots', auth(), requireModule('agendamentos'), async (req
     // Busca todos agendamentos do profissional no dia usando fuso de Brasília (UTC-3)
     const dayStart = new Date(`${date}T00:00:00.000-03:00`)
     const dayEnd   = new Date(`${date}T23:59:59.999-03:00`)
+    const whereClause: any = {
+      status: { not: 'cancelado' },
+      startTime: { gte: dayStart, lte: dayEnd }
+    };
+    if (isUsuario === 'true') {
+      whereClause.especialistaId = Number(professionalId);
+    } else {
+      whereClause.professionalId = Number(professionalId);
+      whereClause.especialistaId = null;
+    }
+
     const existingAppointments = await prisma.appointment.findMany({
-      where: {
-        professionalId: Number(professionalId),
-        status: { not: 'cancelado' },
-        startTime: { gte: dayStart, lte: dayEnd }
-      },
+      where: whereClause,
       select: { startTime: true, endTime: true }
     })
 
@@ -281,15 +303,22 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
     if (especialistaId) await assertUserBelongsToCompany(Number(especialistaId), req.user?.companyId)
 
     // Overbooking Validation
+    const overbookingWhere: any = {
+      status: { not: 'cancelado' },
+      AND: [
+        { startTime: { lt: new Date(endTime) } },
+        { endTime: { gt: new Date(startTime) } }
+      ]
+    };
+    if (req.body.especialistaId) {
+      overbookingWhere.especialistaId = Number(req.body.especialistaId);
+    } else {
+      overbookingWhere.professionalId = professionalId;
+      overbookingWhere.especialistaId = null;
+    }
+
     const conflicting = await prisma.appointment.findFirst({
-      where: {
-        professionalId,
-        status: { not: 'cancelado' },
-        AND: [
-          { startTime: { lt: new Date(endTime) } },
-          { endTime: { gt: new Date(startTime) } }
-        ]
-      }
+      where: overbookingWhere
     });
 
     if (conflicting) {
@@ -375,16 +404,26 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     if (!canEdit) return res.status(403).json(createErrorResponse('Acesso negado', 403));
 
     // Overbooking Validation
+    const putOverbookingWhere: any = {
+      id: { not: id },
+      status: { not: 'cancelado' },
+      AND: [
+        { startTime: { lt: new Date(endTime || current.endTime) } },
+        { endTime: { gt: new Date(startTime || current.startTime) } }
+      ]
+    };
+    
+    const finalEspecialistaId = req.body.hasOwnProperty('especialistaId') ? req.body.especialistaId : current.especialistaId;
+    
+    if (finalEspecialistaId) {
+      putOverbookingWhere.especialistaId = Number(finalEspecialistaId);
+    } else {
+      putOverbookingWhere.professionalId = professionalId;
+      putOverbookingWhere.especialistaId = null;
+    }
+
     const conflicting = startTime && endTime ? await prisma.appointment.findFirst({
-      where: {
-        professionalId: professionalId,
-        id: { not: id },
-        status: { not: 'cancelado' },
-        AND: [
-          { startTime: { lt: new Date(endTime) } },
-          { endTime: { gt: new Date(startTime) } }
-        ]
-      }
+      where: putOverbookingWhere
     }) : null;
 
     if (conflicting) {
@@ -419,16 +458,27 @@ router.put('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
 
   // Update Lead's isScheduled status
   if (updated.leadId) {
-    const leadUpdateData: any = { isScheduled: true };
+    const leadUpdateData: any = {};
     
     if (status === 'concluido') {
       leadUpdateData.status = 'prospect_attended';
     }
 
-    await prisma.lead.update({ 
-      where: { id: updated.leadId }, 
-      data: leadUpdateData 
-    });
+    if (status === 'cancelado') {
+      const remainingAppointments = await prisma.appointment.count({
+        where: { leadId: updated.leadId, id: { not: updated.id }, status: { not: 'cancelado' } }
+      });
+      leadUpdateData.isScheduled = remainingAppointments > 0;
+    } else {
+      leadUpdateData.isScheduled = true;
+    }
+
+    if (Object.keys(leadUpdateData).length > 0) {
+      await prisma.lead.update({ 
+        where: { id: updated.leadId }, 
+        data: leadUpdateData 
+      });
+    }
   }
   
     res.json(createSuccessResponse(synced || updated))
@@ -461,6 +511,18 @@ router.delete('/:id', auth(), requireModule('agendamentos'), async (req, res) =>
   await deleteAppointmentFromGoogle(id)
   await prisma.appointment.delete({ where: { id } })
   
+  if (current.leadId) {
+    const remainingAppointments = await prisma.appointment.count({
+      where: { leadId: current.leadId, status: { not: 'cancelado' } }
+    });
+    if (remainingAppointments === 0) {
+      await prisma.lead.update({
+        where: { id: current.leadId },
+        data: { isScheduled: false }
+      });
+    }
+  }
+
   if (req.user?.type === 'profissional') {
     logAudit(req.user.id, 'DELETAR_AGENDAMENTO', 'Appointment', id)
   }

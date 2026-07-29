@@ -211,10 +211,10 @@ export const InteractiveAppBrowser = () => {
         </div>
 
         {/* App Browser Wrapper */}
-        <div className="bg-slate-50 border border-slate-200/60 rounded-3xl shadow-[0_30px_100px_-20px_rgba(15,23,42,0.1)] overflow-hidden flex flex-col md:flex-row h-[780px] max-h-[92vh]">
+        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl sm:rounded-3xl shadow-[0_30px_100px_-20px_rgba(15,23,42,0.1)] overflow-hidden flex flex-col md:flex-row md:h-[780px] md:max-h-[92vh]">
           
           {/* Left Navigation Sidebar */}
-          <div className="w-full md:w-72 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col shrink-0">
+          <div className="w-full md:w-72 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex md:flex-col shrink-0">
             {/* macOS window controls */}
             <div className="p-4 flex gap-2 border-b border-slate-100 hidden md:flex">
               <div className="w-3 h-3 rounded-full bg-red-400" />
@@ -222,14 +222,14 @@ export const InteractiveAppBrowser = () => {
               <div className="w-3 h-3 rounded-full bg-emerald-400" />
             </div>
 
-            <div className="p-6">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Funcionalidades</h3>
-              <nav className="space-y-2">
+            <div className="p-3 md:p-6 overflow-x-auto md:overflow-x-visible">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 md:mb-4 hidden md:block">Funcionalidades</h3>
+              <nav className="flex md:flex-col gap-1.5 md:gap-2 min-w-max md:min-w-0">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${
+                    className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3.5 rounded-xl text-xs md:text-sm font-bold transition-all whitespace-nowrap md:whitespace-normal w-auto md:w-full ${
                       activeTab === tab.id 
                         ? 'bg-blue-50 text-blue-600 shadow-sm border border-blue-100/50' 
                         : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
@@ -266,7 +266,7 @@ export const InteractiveAppBrowser = () => {
           </div>
 
           {/* Right Main Content Area */}
-          <div className="flex-1 bg-[#FAFAFA] relative overflow-hidden flex flex-col">
+          <div className="flex-1 bg-[#FAFAFA] relative overflow-hidden flex flex-col min-h-[500px] md:min-h-0">
             
             {/* Tab 0: Dashboard (EXACT CRM REPLICA) */}
             {activeTab === 0 && (

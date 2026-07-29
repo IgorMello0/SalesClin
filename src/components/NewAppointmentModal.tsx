@@ -136,15 +136,16 @@ export function NewAppointmentModal({
       
       let allProfs: any[] = [];
       if (profsRes.success && profsRes.data) {
-        allProfs = [...profsRes.data];
+        allProfs = [...profsRes.data.map((p: any) => ({ ...p, _isUsuario: false }))];
       }
       if (usrRes.success && usrRes.data) {
         const medics = usrRes.data.filter((u: any) => {
+          if (u.isActive === false) return false;
           if (u.role?.isSpecialist) return true;
           const role = (u.role?.name || u.role || '').toLowerCase();
           return role.includes('medico') || role.includes('médico') || role.includes('doutor') || role.includes('especialista');
         });
-        const sdrUsers = usrRes.data.filter((u: any) => u.role?.isSDR);
+        const sdrUsers = usrRes.data.filter((u: any) => u.isActive !== false && u.role?.isSDR);
         setSdrs(sdrUsers);
         
         // Auto-select logged in user as SDR if they are in the list
@@ -158,7 +159,7 @@ export function NewAppointmentModal({
         const existingIds = new Set(allProfs.map(p => p.id.toString()));
         medics.forEach((m: any) => {
           if (!existingIds.has(m.id.toString())) {
-            allProfs.push(m);
+            allProfs.push({ ...m, _isUsuario: true });
             existingIds.add(m.id.toString());
           }
         });
@@ -215,10 +216,13 @@ export function NewAppointmentModal({
     setSlotsLoading(true);
     setTime(""); // Reset time when inputs change
     try {
+      const selectedProf = companyProfessionals.find(p => p.id.toString() === selectedProfessionalId);
+      const isUsuario = selectedProf ? selectedProf._isUsuario : false;
       const res = await appointmentsApi.getAvailableSlots(
         selectedProfessionalId,
         date,
-        serviceDuration
+        serviceDuration,
+        isUsuario
       );
       if (res.success && res.data) {
         setAvailableSlots(res.data);
@@ -249,8 +253,11 @@ export function NewAppointmentModal({
       const startDateTime = new Date(`${date}T${time}:00`);
       const endDateTime = new Date(startDateTime.getTime() + serviceDuration * 60000);
 
+      const selectedProf = companyProfessionals.find(p => p.id.toString() === selectedProfessionalId);
+
       const response = await appointmentsApi.create({
-        professionalId: Number(selectedProfessionalId),
+        professionalId: selectedProf && !selectedProf._isUsuario ? Number(selectedProfessionalId) : undefined,
+        especialistaId: selectedProf && selectedProf._isUsuario ? Number(selectedProfessionalId) : undefined,
         sdrId: selectedSdrId !== "none" ? Number(selectedSdrId) : undefined,
         clientId: initialLeadId ? null : Number(selectedClient),
         leadId: initialLeadId ? Number(initialLeadId) : null,

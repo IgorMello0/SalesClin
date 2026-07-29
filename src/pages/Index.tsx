@@ -65,9 +65,9 @@ const Index = () => {
       <SiteNavbar />
 
       {/* 2. HERO — ANCHORED BLUEPRINT */}
-      <section className="relative min-h-screen flex items-center overflow-hidden bg-white pt-28 pb-16 lg:pt-24 lg:pb-20">
-        <div className="max-w-[1440px] mx-auto px-6 sm:px-8 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.86fr)_minmax(540px,1.14fr)] gap-12 lg:gap-14 items-center">
+      <section className="relative min-h-[90vh] lg:min-h-screen flex items-center overflow-hidden bg-white pt-24 pb-12 sm:pt-28 sm:pb-16 lg:pt-24 lg:pb-20">
+        <div className="max-w-[1440px] mx-auto px-5 sm:px-8 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.86fr)_minmax(540px,1.14fr)] gap-8 sm:gap-12 lg:gap-14 items-center">
             <motion.div 
               initial="hidden"
               animate="visible"
@@ -85,7 +85,7 @@ const Index = () => {
                   hidden: { opacity: 0, y: 30 },
                   visible: { opacity: 1, y: 0, transition: { duration: 1.4, ease: [0.16, 1, 0.3, 1] } }
                 }}
-                className="text-4xl md:text-5xl xl:text-[58px] font-headline font-black text-[#0F172A] leading-[1.08] tracking-tighter mb-5 max-w-2xl"
+                className="text-[32px] sm:text-4xl md:text-5xl xl:text-[58px] font-headline font-black text-[#0F172A] leading-[1.08] tracking-tighter mb-5 max-w-2xl"
               >
                 CRM feito para clínicas que querem vender mais com <span className="shimmer-text">inteligência comercial.</span>
               </motion.h1>
@@ -103,12 +103,12 @@ const Index = () => {
                   hidden: { opacity: 0, y: 20 },
                   visible: { opacity: 1, y: 0, transition: { duration: 1.4, ease: [0.16, 1, 0.3, 1] } }
                 }}
-                className="flex flex-wrap items-center gap-5 sm:gap-8 mb-10"
+                className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 sm:gap-8 mb-10"
               >
-                <Link to="/signup" className="bg-[#F97316] text-white px-10 py-5 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-orange-200 hover:scale-105 transition-all flex items-center gap-3">
+                <Link to="/signup" className="bg-[#F97316] text-white px-8 sm:px-10 py-4 sm:py-5 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-orange-200 hover:scale-105 transition-all flex items-center gap-3 w-full sm:w-auto justify-center">
                   Começar agora <ArrowRight size={16}/>
                 </Link>
-                <a href="#funcionalidades" className="text-xs font-black uppercase tracking-[0.2em] text-[#64748B] hover:text-[#0F172A] transition-all">
+                <a href="#funcionalidades" className="text-xs font-black uppercase tracking-[0.2em] text-[#64748B] hover:text-[#0F172A] transition-all py-3 px-4 sm:py-2 sm:px-0">
                   Por que usar?
                 </a>
               </motion.div>
@@ -117,7 +117,7 @@ const Index = () => {
                   hidden: { opacity: 0, y: 20 },
                   visible: { opacity: 1, y: 0, transition: { duration: 1.4, ease: [0.16, 1, 0.3, 1] } }
                 }}
-                className="flex items-center gap-10 sm:gap-12 border-l-2 border-slate-100 pl-8"
+                className="hidden sm:flex items-center gap-10 sm:gap-12 border-l-2 border-slate-100 pl-8"
               >
                 {[
                   { icon: <BarChart size={18}/>, t: "Escala", d: "Crescimento real." },
@@ -140,12 +140,12 @@ const Index = () => {
               initial={{ opacity: 0, x: 100, rotateY: -15 }}
               animate={{ opacity: 1, x: 0, rotateY: 0 }}
               transition={{ duration: 1.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="relative z-0 min-w-0 w-full lg:translate-x-4 xl:translate-x-8"
+              className="relative z-0 w-full lg:w-[125%] xl:w-[140%] lg:translate-x-[5%] xl:translate-x-[10%]"
             >
                <div className="relative w-full">
                   <div className="absolute -inset-10 bg-gradient-to-tr from-[#F97316]/10 to-blue-500/5 blur-[100px] opacity-40" />
                   <div className="relative bg-white p-2.5 sm:p-3 rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-[0_40px_90px_-30px_rgba(15,23,42,0.22)] transition-transform duration-700 hover:scale-[1.01] overflow-hidden">
-                    <img src="/dashboard%20tela.png" alt="SellClin Dashboard" className="block w-full h-auto rounded-[1.5rem] lg:rounded-[2rem]" />
+                    <img src="/dashboard-tela-sellclin-correto.png" alt="SellClin Dashboard" className="block w-full h-auto rounded-[1.5rem] lg:rounded-[2rem]" />
                   </div>
                </div>
             </motion.div>
@@ -157,7 +157,7 @@ const Index = () => {
       <InteractiveAppBrowser />
 
       {/* 4. SOCIAL PROOF — DUAL ROW MARQUEE */}
-      <section className="py-32 bg-slate-50/30 overflow-hidden relative">
+      <section className="py-16 sm:py-32 bg-slate-50/30 overflow-hidden relative">
         <motion.div 
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -166,7 +166,7 @@ const Index = () => {
           className="max-w-6xl mx-auto px-8 mb-16 text-center"
         >
           <span className="text-[#F97316] font-black text-[10px] uppercase tracking-[0.4em] mb-6 block">Resultados Reais</span>
-          <h2 className="text-4xl md:text-6xl font-headline font-black text-[#0F172A] mb-6 tracking-tighter">Quem usa, <span className="text-[#F97316]">vende mais.</span></h2>
+          <h2 className="text-3xl sm:text-4xl md:text-6xl font-headline font-black text-[#0F172A] mb-6 tracking-tighter">Quem usa, <span className="text-[#F97316]">vende mais.</span></h2>
         </motion.div>
 
         {/* Row 1 — Moving Left */}
@@ -186,7 +186,7 @@ const Index = () => {
                   { name: "Dr. Paulo Vieira", clinic: "Vision Institute", text: "A agenda inteligente é fantástica. Reduzimos o no-show em 30% usando as automações do CRM.", img: "https://i.pravatar.cc/150?u=dr3" },
                   { name: "Dra. Eliana Melo", clinic: "DermaGlow", text: "O melhor investimento que fiz este ano. O suporte é incrível e a plataforma é muito intuitiva.", img: "https://i.pravatar.cc/150?u=dr4" },
                 ].map((t, i) => (
-                  <div key={i} className="w-[380px] flex-shrink-0 bg-white p-8 rounded-[3rem] border border-[#F97316]/30 shadow-[0_0_20px_rgba(249,115,22,0.05)] hover:border-[#F97316] hover:shadow-[0_0_30px_rgba(249,115,22,0.15)] hover:-translate-y-2 transition-all duration-500">
+                  <div key={i} className="w-[85vw] sm:w-[380px] flex-shrink-0 bg-white p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-[#F97316]/30 shadow-[0_0_20px_rgba(249,115,22,0.05)] hover:border-[#F97316] hover:shadow-[0_0_30px_rgba(249,115,22,0.15)] hover:-translate-y-2 transition-all duration-500">
                     <div className="flex items-center gap-4 mb-6">
                       <img src={t.img} className="w-12 h-12 rounded-full border-2 border-orange-50" alt={t.name} />
                       <div><div className="text-sm font-black text-[#0F172A]">{t.name}</div><div className="text-[10px] font-bold text-[#F97316] uppercase tracking-wider">{t.clinic}</div></div>
@@ -216,7 +216,7 @@ const Index = () => {
                   { name: "Bruno Rocha", clinic: "Rocha & Associados", text: "Gerenciar leads nunca foi tão simples. O dashboard me dá clareza total para tomar decisões.", img: "https://i.pravatar.cc/150?u=dr7" },
                   { name: "Dra. Beatriz Ferraz", clinic: "Ferraz Pediatria", text: "Minha equipe amou a plataforma. Facilitou demais a comunicação com os pais via WhatsApp.", img: "https://i.pravatar.cc/150?u=dr8" },
                 ].map((t, i) => (
-                  <div key={i} className="w-[380px] flex-shrink-0 bg-white p-8 rounded-[3rem] border border-[#F97316]/30 shadow-[0_0_20px_rgba(249,115,22,0.05)] hover:border-[#F97316] hover:shadow-[0_0_30px_rgba(249,115,22,0.15)] hover:-translate-y-2 transition-all duration-500">
+                  <div key={i} className="w-[85vw] sm:w-[380px] flex-shrink-0 bg-white p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-[#F97316]/30 shadow-[0_0_20px_rgba(249,115,22,0.05)] hover:border-[#F97316] hover:shadow-[0_0_30px_rgba(249,115,22,0.15)] hover:-translate-y-2 transition-all duration-500">
                     <div className="flex items-center gap-4 mb-6">
                       <img src={t.img} className="w-12 h-12 rounded-full border-2 border-orange-50" alt={t.name} />
                       <div><div className="text-sm font-black text-[#0F172A]">{t.name}</div><div className="text-[10px] font-bold text-[#F97316] uppercase tracking-wider">{t.clinic}</div></div>
@@ -231,7 +231,7 @@ const Index = () => {
       </section>
 
       {/* 5. METAS — PRECISION CONSOLE */}
-      <section id="metas" className="py-40 bg-[#0F172A] relative overflow-hidden">
+      <section id="metas" className="py-20 sm:py-40 bg-[#0F172A] relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-[1px] bg-white/5" />
         <div className="max-w-7xl mx-auto px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
@@ -518,7 +518,7 @@ const Index = () => {
                     </div>
 
                     {/* Stats Row */}
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
                         { label: "Contatos", val: "1.247", color: "text-blue-600", bg: "bg-blue-50", iconPath: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2M9 7a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
                         { label: "Enviadas", val: "1.198", color: "text-emerald-600", bg: "bg-emerald-50", iconPath: "M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3" },
@@ -544,7 +544,7 @@ const Index = () => {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.8, duration: 0.8 }}
-                className="absolute -right-4 sm:-right-8 top-16 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-xl shadow-emerald-500/30 flex items-center gap-2"
+                className="absolute right-2 sm:-right-8 top-16 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl rounded-tr-sm shadow-xl shadow-emerald-500/30 flex items-center gap-2 z-10"
               >
                 <CheckCircle2 size={16} />
                 <div>
@@ -558,7 +558,7 @@ const Index = () => {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 1.2, duration: 0.8 }}
-                className="absolute -left-4 sm:-left-8 bottom-24 bg-gradient-to-r from-[#F97316] to-orange-500 text-white px-4 py-2.5 rounded-2xl rounded-bl-sm shadow-xl shadow-orange-500/30 flex items-center gap-2"
+                className="absolute left-2 sm:-left-8 bottom-24 bg-gradient-to-r from-[#F97316] to-orange-500 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl rounded-bl-sm shadow-xl shadow-orange-500/30 flex items-center gap-2 z-10"
               >
                 <MessageCircle size={16} />
                 <div>
@@ -645,7 +645,7 @@ const Index = () => {
       </section>
 
       {/* 6. PRICING */}
-      <section id="planos" className="py-40 bg-slate-50/50 relative overflow-hidden">
+      <section id="planos" className="py-20 sm:py-40 bg-slate-50/50 relative overflow-hidden">
         <div className="max-w-6xl mx-auto px-8 relative z-10">
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
@@ -655,7 +655,7 @@ const Index = () => {
             className="text-center mb-24"
           >
             <span className="text-[#F97316] font-black text-[10px] uppercase tracking-[0.4em] mb-4 block">Planos</span>
-            <h2 className="text-4xl md:text-6xl font-headline font-black text-[#0F172A] mb-8 tracking-tighter">A estrutura certa para <br/> <span className="text-[#F97316]">cada etapa.</span></h2>
+            <h2 className="text-3xl sm:text-4xl md:text-6xl font-headline font-black text-[#0F172A] mb-8 tracking-tighter">A estrutura certa para <br className="hidden sm:block"/> <span className="text-[#F97316]">cada etapa.</span></h2>
             
             {/* BILLING TOGGLE */}
             <div className="flex items-center justify-center gap-4 mb-4">
@@ -770,7 +770,7 @@ const Index = () => {
       </section>
 
       {/* 7. ABOUT US — FOUNDER HIGHLIGHT */}
-      <section id="sobre" className="py-20 sm:py-48 bg-white relative overflow-hidden border-t border-slate-100">
+      <section id="sobre" className="py-16 sm:py-48 bg-white relative overflow-hidden border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
             <motion.div 
@@ -797,11 +797,11 @@ const Index = () => {
               className="space-y-10"
             >
               <span className="text-[#F97316] font-black text-[10px] uppercase tracking-[0.5em] block">Autoridade & Legado</span>
-              <h2 className="text-3xl sm:text-5xl md:text-7xl font-headline font-black text-[#0F172A] leading-[1] tracking-tighter">O CRM criado por <br/> quem <span className="text-[#F97316]">vive a clínica.</span></h2>
-              <p className="text-xl text-slate-500 font-medium leading-relaxed italic border-l-4 border-[#F97316]/20 pl-8">
+              <h2 className="text-2xl sm:text-5xl md:text-7xl font-headline font-black text-[#0F172A] leading-[1] tracking-tighter">O CRM criado por <br className="hidden sm:block"/> quem <span className="text-[#F97316]">vive a clínica.</span></h2>
+              <p className="text-base sm:text-xl text-slate-500 font-medium leading-relaxed italic border-l-4 border-[#F97316]/20 pl-6 sm:pl-8">
                 "Não criamos um software de laboratório. Criamos a solução que eu mesmo precisava para gerenciar minhas 3 clínicas de 7 dígitos."
               </p>
-              <p className="text-slate-500 text-lg leading-relaxed">
+              <p className="text-slate-500 text-base sm:text-lg leading-relaxed">
                 A SellClin nasceu da necessidade real de um dono de clínica. Combinamos a experiência prática do Luiz Bucco com tecnologia de ponta para entregar a primeira infraestrutura comercial especializada em alto ticket do Brasil.
               </p>
               <div className="pt-8">
