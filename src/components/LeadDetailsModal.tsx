@@ -15,10 +15,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Edit2, Check, X, History, FileText, CheckSquare, Trash2, Calendar, Eye, Loader2 } from 'lucide-react';
+import { Edit2, Check, X, History, FileText, CheckSquare, Trash2, Calendar, Eye, Loader2, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { leadsApi, tasksApi, clientsApi, usuariosApi } from '@/lib/api';
+import { leadsApi, tasksApi, clientsApi, usuariosApi, empresasApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,44 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   const [tempValue, setTempValue] = useState(0);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [team, setTeam] = useState<any[]>([]);
+  const [contactCadence, setContactCadence] = useState<number>(0);
+  const [localContactCount, setLocalContactCount] = useState(lead?.contactCount || 0);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocalContactCount(selectedLead?.contactCount || 0);
+      const fetchCompany = async () => {
+        try {
+          const res = await empresasApi.getMyCompany();
+          if (res.success && res.data) {
+            setContactCadence(res.data.contactCadence ?? 5);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      fetchCompany();
+    }
+  }, [isOpen, selectedLead?.id, selectedLead?.contactCount]);
+
+  const handleContactChange = async (newCount: number) => {
+    if (newCount < 0 || (contactCadence && newCount > contactCadence)) return;
+    
+    setLocalContactCount(newCount);
+    setSelectedLead((prev: any) => ({ ...prev, contactCount: newCount }));
+    
+    try {
+      const response = await leadsApi.update(selectedLead.id, { contactCount: newCount });
+      if (response.success && response.data) {
+        if (onUpdate) onUpdate(response.data);
+      }
+    } catch (error) {
+      console.error("Error updating contact count:", error);
+      toast({ title: 'Erro', description: 'Não foi possível atualizar a cadência.', variant: 'destructive' });
+      setLocalContactCount(selectedLead.contactCount || 0);
+      setSelectedLead((prev: any) => ({ ...prev, contactCount: selectedLead.contactCount || 0 }));
+    }
+  };
 
   const loadTeam = async () => {
     try {
@@ -725,6 +763,44 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                         <p className="text-sm font-bold text-secondary">{selectedLead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                       </div>
 
+                      {contactCadence > 0 && (
+                        <div className="space-y-2 mt-4 p-4 rounded-xl bg-slate-50 border border-slate-100 relative overflow-hidden group/cadence">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-full -mr-10 -mt-10" />
+                          
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10 flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 text-primary" />
+                            Cadência de Contatos
+                          </p>
+                          
+                          <div className="flex items-center gap-3 relative z-10">
+                            <button
+                              onClick={() => handleContactChange(localContactCount - 1)}
+                              disabled={localContactCount <= 0}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                            >
+                              -
+                            </button>
+                            
+                            <div className="flex-1 flex justify-center">
+                              <span className={cn(
+                                "text-lg font-extrabold tracking-tight",
+                                localContactCount >= contactCadence ? "text-emerald-500" : "text-slate-700"
+                              )}>
+                                {localContactCount}/{contactCadence}
+                              </span>
+                            </div>
+                            
+                            <button
+                              onClick={() => handleContactChange(localContactCount + 1)}
+                              disabled={localContactCount >= contactCadence}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-emerald-500 hover:border-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <hr className="border-slate-100 my-2 w-full" />
                       <div className="space-y-3 w-full">
                         <div className="space-y-1">
@@ -740,7 +816,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             </SelectTrigger>
                             <SelectContent className="z-[9999]">
                               <SelectItem value="unassigned">Sem SDR</SelectItem>
-                              {team.filter(u => u.role?.isSDR).map(u => (
+                              {team.filter(u => u.role?.isSDR || u.role?.isManager || u.role?.isAdmin).map(u => (
                                 <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                               ))}
                             </SelectContent>
@@ -759,7 +835,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             </SelectTrigger>
                             <SelectContent className="z-[9999]">
                               <SelectItem value="unassigned">Sem Closer</SelectItem>
-                              {team.filter(u => u.role?.isCloser).map(u => (
+                              {team.filter(u => u.role?.isCloser || u.role?.isManager || u.role?.isAdmin).map(u => (
                                 <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                               ))}
                             </SelectContent>

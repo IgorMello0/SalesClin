@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { funnelConfigApi } from '@/lib/api';
+import { funnelConfigApi, empresasApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Loader2, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
@@ -55,6 +55,9 @@ export default function FunnelsSettingsView({ name }: { name?: string }) {
   const [editingStage, setEditingStage] = useState<number | null>(null);
   const [editStageData, setEditStageData] = useState({ label: '', color: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [contactCadence, setContactCadence] = useState<number>(5);
+  const [isSavingCadence, setIsSavingCadence] = useState(false);
 
   // Drag and Drop State
   const [draggedStage, setDraggedStage] = useState<{ funnelIdx: number; stageIdx: number } | null>(null);
@@ -62,7 +65,37 @@ export default function FunnelsSettingsView({ name }: { name?: string }) {
 
   useEffect(() => {
     loadFunnels();
+    loadCompanyCadence();
   }, []);
+
+  const loadCompanyCadence = async () => {
+    try {
+      const res = await empresasApi.getMyCompany();
+      if (res.success && res.data) {
+        setCompanyId(res.data.id);
+        setContactCadence(res.data.contactCadence ?? 5);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveCadence = async () => {
+    if (!companyId) return;
+    setIsSavingCadence(true);
+    try {
+      const res = await empresasApi.update(companyId, { contactCadence });
+      if (res.success) {
+        toast({ title: 'Cadência salva com sucesso!' });
+      } else {
+        toast({ title: 'Erro ao salvar cadência', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Erro ao salvar cadência', variant: 'destructive' });
+    } finally {
+      setIsSavingCadence(false);
+    }
+  };
 
   const loadFunnels = async () => {
     setIsLoading(true);
@@ -312,6 +345,43 @@ export default function FunnelsSettingsView({ name }: { name?: string }) {
         >
           <Plus className="w-4 h-4 mr-2" /> Novo Funil
         </Button>
+      </div>
+
+      {/* Help Banner */}
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3 text-sm text-blue-800 shadow-sm">
+        <div className="text-blue-500 mt-0.5">
+          <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>info</span>
+        </div>
+        <div className="space-y-2">
+          <p>
+            <strong>Como organizar seus Funis:</strong> Você pode criar diferentes funis para segmentar o processo (ex: Prospecção, Vendas) e adicionar etapas dentro de cada um. 
+            Arraste as etapas pelo ícone lateral (<GripVertical className="inline w-4 h-4 text-slate-400 -mt-0.5" />) para mudar a ordem. Para editar o nome ou a cor de uma etapa, clique no ícone do lápis.
+          </p>
+          <p>
+            <strong>Cadência de Contatos:</strong> A cadência define o objetivo de tentativas de contato com o cliente (ex: ligar 5 vezes). 
+            Esse número aparece no cartão de cada lead lá na tela do Comercial e seus vendedores podem ir somando (+1) cada vez que tentarem falar com a pessoa.
+          </p>
+        </div>
+      </div>
+
+      <div className="p-5 border border-slate-200 rounded-2xl bg-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <Label className="text-base font-semibold">Cadência de Contato (CRM)</Label>
+          <p className="text-sm text-muted-foreground">Número de tentativas (bolinhas) mostradas no cartão do Kanban.</p>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Input 
+            type="number"
+            min="1"
+            max="20"
+            value={contactCadence}
+            onChange={(e) => setContactCadence(parseInt(e.target.value) || 5)}
+            className="w-20 text-center font-medium"
+          />
+          <Button onClick={handleSaveCadence} disabled={isSavingCadence} variant="secondary">
+            {isSavingCadence ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar'}
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

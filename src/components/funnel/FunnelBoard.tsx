@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { FunnelColumn } from './FunnelColumn';
+import { empresasApi } from '@/lib/api';
 
 interface Stage {
   id: string;
@@ -70,6 +71,21 @@ export function FunnelBoard({
   const boardRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
+  const [contactCadence, setContactCadence] = useState<number>(5);
+
+  useEffect(() => {
+    const fetchCadence = async () => {
+      try {
+        const res = await empresasApi.getMyCompany();
+        if (res.success && res.data) {
+          setContactCadence(res.data.contactCadence ?? 5);
+        }
+      } catch (e) {
+        console.error('Error fetching contactCadence', e);
+      }
+    };
+    fetchCadence();
+  }, []);
 
   const checkScroll = () => {
     if (boardRef.current) {
@@ -147,6 +163,7 @@ export function FunnelBoard({
             currentSchedulingLeadId={currentSchedulingLeadId}
             professionalName={professionalName}
             quickStatuses={quickStatuses}
+            contactCadence={contactCadence}
           />
         ))}
       </div>

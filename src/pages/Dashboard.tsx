@@ -126,11 +126,11 @@ const Dashboard = () => {
         const res = await usuariosApi.getAll();
         if (res.success && res.data) {
           const sdrList = res.data.filter((u: any) => 
-            u.role?.isSDR && 
+            (u.role?.isSDR || u.role?.isManager || u.role?.isAdmin) && 
             (u.companyId === professional?.companyId || u.companyAccess?.some((ca: any) => ca.companyId === professional?.companyId))
           );
           const closerList = res.data.filter((u: any) => 
-            u.role?.isCloser && 
+            (u.role?.isCloser || u.role?.isManager || u.role?.isAdmin) && 
             (u.companyId === professional?.companyId || u.companyAccess?.some((ca: any) => ca.companyId === professional?.companyId))
           );
           setSdrs(sdrList);
@@ -145,7 +145,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     let mounted = true;
-    fetchTargetData('30days', undefined, undefined, selectedSdrId, selectedCloserId).then(targets => {
+    fetchTargetData('this_month', undefined, undefined, selectedSdrId, selectedCloserId).then(targets => {
       if (!mounted) return;
       const duration = 1000;
       const startTime = performance.now();

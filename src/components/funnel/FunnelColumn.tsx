@@ -36,6 +36,7 @@ interface FunnelColumnProps {
   currentSchedulingLeadId: number | null;
   professionalName?: string;
   quickStatuses: any[];
+  contactCadence?: number;
 }
 
 export function FunnelColumn({
@@ -64,7 +65,8 @@ export function FunnelColumn({
   isProcessingSchedule,
   currentSchedulingLeadId,
   professionalName,
-  quickStatuses
+  quickStatuses,
+  contactCadence
 }: FunnelColumnProps) {
   
   const stageLeads = leads.filter(l => l.status === stage.id);
@@ -121,6 +123,7 @@ export function FunnelColumn({
             currentSchedulingLeadId={currentSchedulingLeadId}
             professionalName={professionalName}
             quickStatuses={quickStatuses}
+            contactCadence={contactCadence}
           />
         ))}
       </div>

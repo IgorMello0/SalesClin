@@ -301,6 +301,17 @@ export function AppointmentQuickView({ appointmentId, isOpen, onClose, onUpdate 
                     <span>{data.googleSyncError || 'Sincronizacao com Google Calendar pendente.'}</span>
                   </div>
                 )}
+
+                {data.payments && data.payments.length > 0 && (
+                  <div className="pt-2 mt-2 border-t border-slate-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Consulta de Avaliação</p>
+                    <p className="text-emerald-600 text-xs font-bold flex items-center gap-1.5 bg-emerald-50 w-fit px-2 py-1 rounded-md border border-emerald-100">
+                      <span className="material-symbols-outlined text-emerald-500 text-[14px]">payments</span>
+                      R$ {Number(data.payments[0].amount).toFixed(2).replace('.', ',')} 
+                      <span className="text-emerald-600/70 text-[10px] uppercase font-semibold ml-1">({data.payments[0].method})</span>
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Observações */}

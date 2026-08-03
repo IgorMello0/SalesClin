@@ -32,7 +32,7 @@ import {
 import { Check, ChevronsUpDown, Loader2, Plus, Clock, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { clientsApi, catalogsApi, appointmentsApi, professionalsApi, usuariosApi } from "@/lib/api";
+import { clientsApi, catalogsApi, appointmentsApi, professionalsApi, usuariosApi, empresasApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -91,6 +91,11 @@ export function NewAppointmentModal({
   const [time, setTime] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
+  // Consultation fee
+  const [chargeConsultation, setChargeConsultation] = useState(false);
+  const [consultationAmount, setConsultationAmount] = useState<string>("");
+  const [consultationPaymentMethod, setConsultationPaymentMethod] = useState<string>("");
+
   // Computed
   const isQuickCreate = !!(initialLeadId || initialClientName);
   const quickClientData = {
@@ -127,12 +132,16 @@ export function NewAppointmentModal({
     if (!professional?.id) return;
     setDataLoading(true);
     try {
-      const [clientsRes, profsRes, usrRes] = await Promise.all([
+      const [clientsRes, profsRes, usrRes, empresaRes] = await Promise.all([
         clientsApi.getAll({ pageSize: 100 }),
         professionalsApi.getAll({ pageSize: 50 }),
-        usuariosApi.getAll({ pageSize: 100 })
+        usuariosApi.getAll({ pageSize: 100 }),
+        empresasApi.getMyCompany()
       ]);
       if (clientsRes.success) setClients(clientsRes.data || []);
+      if (empresaRes.success && empresaRes.data) {
+        setChargeConsultation(empresaRes.data.chargeConsultation || false);
+      }
       
       let allProfs: any[] = [];
       if (profsRes.success && profsRes.data) {
@@ -267,6 +276,10 @@ export function NewAppointmentModal({
         endTime: endDateTime.toISOString(),
         status: "agendado",
         notes,
+        ...(chargeConsultation && consultationAmount && consultationPaymentMethod ? {
+          consultationAmount: Number(consultationAmount),
+          consultationPaymentMethod,
+        } : {}),
       });
 
       if (response.success) {
@@ -295,6 +308,8 @@ export function NewAppointmentModal({
     setNotes("");
     setTime("");
     setAvailableSlots([]);
+    setConsultationAmount("");
+    setConsultationPaymentMethod("");
   };
 
   // Format time label: "09:00  →  10:30  (1h30)"
@@ -605,6 +620,44 @@ export function NewAppointmentModal({
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
+
+          {/* Consultation Fee (only if toggle is on) */}
+          {chargeConsultation && (
+            <div className="p-4 bg-amber-50/80 border border-amber-200/60 rounded-2xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-600 text-base">payments</span>
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Consulta de Avaliação</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-600">Valor (R$)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={consultationAmount}
+                    onChange={(e) => setConsultationAmount(e.target.value)}
+                    className="h-10 bg-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-600">Método</Label>
+                  <Select value={consultationPaymentMethod} onValueChange={setConsultationPaymentMethod}>
+                    <SelectTrigger className="h-10 bg-white">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pix">Pix</SelectItem>
+                      <SelectItem value="cartao">Cartão (Crédito/Débito)</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <p className="text-[10px] text-amber-600/70">Opcional — deixe vazio se a consulta for gratuita.</p>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="p-8 bg-slate-50/50 border-t border-slate-100">

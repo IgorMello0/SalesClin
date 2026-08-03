@@ -127,7 +127,7 @@ const SalesFunnel = () => {
     try {
       const res = await usuariosApi.getAll({ pageSize: 50 });
       if (res.success && res.data) {
-        setSdrs(res.data.filter((u: any) => u.isSdr || (u.role && u.role.isSDR) || (u.role && u.role.isSdr)));
+        setSdrs(res.data.filter((u: any) => u.isSdr || (u.role && u.role.isSDR) || (u.role && u.role.isSdr) || (u.role && u.role.isManager) || (u.role && u.role.isAdmin)));
       }
     } catch (e) {
       console.error("Error loading SDRs:", e);
@@ -209,9 +209,10 @@ const SalesFunnel = () => {
       el.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'cadence_asc' | 'cadence_desc'>('newest');
   const [filterOrigin, setFilterOrigin] = useState<string>('todos');
-  const [filterMenuMode, setFilterMenuMode] = useState<'main' | 'origin'>('main');
+  const [filterCadence, setFilterCadence] = useState<string>('todos');
+  const [filterMenuMode, setFilterMenuMode] = useState<'main' | 'origin' | 'cadence'>('main');
   const [filterSearchQuery, setFilterSearchQuery] = useState('');
 
   // Appointment scheduling state
@@ -421,15 +422,32 @@ const SalesFunnel = () => {
       result = result.filter(card => card.origin && card.origin.toLowerCase() === filterOrigin.toLowerCase());
     }
 
+    // Filter by cadence
+    if (filterCadence !== 'todos') {
+      if (filterCadence === '10+') {
+        result = result.filter(card => (card.contactCount || 0) >= 10);
+      } else {
+        const targetCount = parseInt(filterCadence, 10);
+        result = result.filter(card => (card.contactCount || 0) === targetCount);
+      }
+    }
+
     // Sort cards
     result.sort((a: any, b: any) => {
+      if (sortOrder === 'cadence_asc' || sortOrder === 'cadence_desc') {
+        const countA = a.contactCount || 0;
+        const countB = b.contactCount || 0;
+        if (countA !== countB) {
+          return sortOrder === 'cadence_asc' ? countA - countB : countB - countA;
+        }
+      }
       const dateA = new Date(a.rawDate || a.updatedAt || a.createdAt || 0).getTime();
       const dateB = new Date(b.rawDate || b.updatedAt || b.createdAt || 0).getTime();
-      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+      return sortOrder === 'newest' || sortOrder === 'cadence_desc' ? dateB - dateA : dateA - dateB;
     });
 
     return result;
-  }, [boardCards, searchTerm, filterOrigin, sortOrder]);
+  }, [boardCards, searchTerm, filterOrigin, filterCadence, sortOrder]);
 
   useEffect(() => {
     if (selectedLead) {
@@ -1213,7 +1231,7 @@ const SalesFunnel = () => {
                     variant="ghost"
                     className={cn(
                       "h-10 w-10 sm:h-11 sm:w-11 p-0 rounded-full flex items-center justify-center transition-colors",
-                      filterOrigin !== 'todos' ? "text-secondary bg-orange-50 hover:bg-orange-100" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                      filterOrigin !== 'todos' || filterCadence !== 'todos' ? "text-secondary bg-orange-50 hover:bg-orange-100" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                     )}
                     onClick={() => {
                       setFilterMenuMode('main');
@@ -1248,6 +1266,7 @@ const SalesFunnel = () => {
                           { id: 'phone', label: 'Telefone', icon: 'call' },
                           { id: 'email', label: 'E-mail', icon: 'mail' },
                           { id: 'origin', label: 'Origem', icon: 'sell' },
+                          { id: 'cadence', label: 'Cadência', icon: '123' },
                         ]
                           .filter(p => p.label.toLowerCase().includes(filterSearchQuery.toLowerCase()))
                           .map((prop) => (
@@ -1257,6 +1276,9 @@ const SalesFunnel = () => {
                               onClick={() => {
                                 if (prop.id === 'origin') {
                                   setFilterMenuMode('origin');
+                                  setFilterSearchQuery('');
+                                } else if (prop.id === 'cadence') {
+                                  setFilterMenuMode('cadence');
                                   setFilterSearchQuery('');
                                 } else {
                                   setIsSearchExpanded(true);
@@ -1288,6 +1310,7 @@ const SalesFunnel = () => {
                           className="w-full text-left rounded-xl py-2 px-3 flex items-center gap-3 hover:bg-red-50/50 transition-colors text-xs text-slate-500 hover:text-red-500 font-bold group"
                           onClick={() => {
                             setFilterOrigin('todos');
+                            setFilterCadence('todos');
                             setSearchTerm('');
                           }}
                         >
@@ -1296,7 +1319,7 @@ const SalesFunnel = () => {
                         </button>
                       </div>
                     </div>
-                  ) : (
+                  ) : filterMenuMode === 'origin' ? (
                     <div className="space-y-1">
                       {/* Back button */}
                       <div className="px-2 pt-1">
@@ -1362,7 +1385,63 @@ const SalesFunnel = () => {
                           ))}
                       </div>
                     </div>
-                  )}
+                  ) : filterMenuMode === 'cadence' ? (
+                    <div className="space-y-1">
+                      {/* Back button */}
+                      <div className="px-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterMenuMode('main');
+                          }}
+                          className="w-full text-left rounded-xl py-1.5 px-2 flex items-center gap-2 hover:bg-slate-50 transition-colors text-[10px] uppercase font-black tracking-wider text-slate-400 hover:text-secondary"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chevron_left</span>
+                          Voltar
+                        </button>
+                      </div>
+
+                      <div className="p-2 pb-0">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2">
+                          Tentativas de Contato
+                        </p>
+                      </div>
+
+                      {/* Cadence sub-items list */}
+                      <div className="px-1 space-y-0.5 max-h-48 overflow-y-auto scrollbar-hide pt-1">
+                        {[
+                          { value: 'todos', label: 'Todos' },
+                          { value: '0', label: 'Sem contato (0)' },
+                          { value: '1', label: '1 contato' },
+                          { value: '2', label: '2 contatos' },
+                          { value: '3', label: '3 contatos' },
+                          { value: '4', label: '4 contatos' },
+                          { value: '5', label: '5 contatos' },
+                          { value: '6', label: '6 contatos' },
+                          { value: '7', label: '7 contatos' },
+                          { value: '8', label: '8 contatos' },
+                          { value: '9', label: '9 contatos' },
+                          { value: '10+', label: '10 ou mais' }
+                        ].map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                setFilterCadence(opt.value);
+                                setFilterMenuMode('main');
+                              }}
+                              className={cn(
+                                "w-full text-left rounded-xl py-2 px-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs font-bold",
+                                filterCadence === opt.value ? "text-secondary bg-orange-50/50" : "text-slate-700 hover:text-secondary"
+                              )}
+                            >
+                              <span className="truncate font-bold">{opt.label}</span>
+                              {filterCadence === opt.value && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -1407,6 +1486,30 @@ const SalesFunnel = () => {
                   >
                     <span className="font-bold">Mais Antigos</span>
                     {sortOrder === 'oldest' && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
+                  </button>
+
+                  <div className="px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 mt-1 border-t border-slate-100">Ordenar por Cadência</div>
+                  <button 
+                    type="button"
+                    onClick={() => setSortOrder('cadence_desc')} 
+                    className={cn(
+                      "w-full text-left rounded-xl py-2 px-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs font-bold",
+                      sortOrder === 'cadence_desc' ? "text-secondary bg-orange-50/50" : "text-slate-700 hover:text-secondary"
+                    )}
+                  >
+                    <span className="font-bold">Maior Cadência</span>
+                    {sortOrder === 'cadence_desc' && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setSortOrder('cadence_asc')} 
+                    className={cn(
+                      "w-full text-left rounded-xl py-2 px-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs font-bold",
+                      sortOrder === 'cadence_asc' ? "text-secondary bg-orange-50/50" : "text-slate-700 hover:text-secondary"
+                    )}
+                  >
+                    <span className="font-bold">Menor Cadência</span>
+                    {sortOrder === 'cadence_asc' && <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px' }}>check</span>}
                   </button>
                 </DropdownMenuContent>
               </DropdownMenu>

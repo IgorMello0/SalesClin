@@ -570,7 +570,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                             </SelectTrigger>
                             <SelectContent className="z-[300]">
                               <SelectItem value="unassigned">Sem SDR</SelectItem>
-                              {team.filter(u => u.role?.isSDR).map(u => (
+                              {team.filter(u => u.role?.isSDR || u.role?.isManager || u.role?.isAdmin).map(u => (
                                 <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                               ))}
                             </SelectContent>
@@ -589,7 +589,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                             </SelectTrigger>
                             <SelectContent className="z-[300]">
                               <SelectItem value="unassigned">Sem Closer</SelectItem>
-                              {team.filter(u => u.role?.isCloser).map(u => (
+                              {team.filter(u => u.role?.isCloser || u.role?.isManager || u.role?.isAdmin).map(u => (
                                 <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                               ))}
                             </SelectContent>

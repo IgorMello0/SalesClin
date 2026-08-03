@@ -845,6 +845,7 @@ const InfoNegocioView = () => {
     openHour: '08:00',
     closeHour: '20:00',
     leadRoutingMode: 'manual',
+    chargeConsultation: false,
   });
 
   useEffect(() => {
@@ -864,6 +865,7 @@ const InfoNegocioView = () => {
           openHour: res.data.openHour || '08:00',
           closeHour: res.data.closeHour || '20:00',
           leadRoutingMode: res.data.leadRoutingMode || 'manual',
+          chargeConsultation: res.data.chargeConsultation || false,
         });
       }
     } catch (e) {
@@ -887,6 +889,7 @@ const InfoNegocioView = () => {
         plan: companyData.plan || null,
         openHour: companyData.openHour,
         closeHour: companyData.closeHour,
+        chargeConsultation: companyData.chargeConsultation,
       });
       if (res.success) {
         toast({ title: 'Salvo!', description: 'Informações da empresa atualizadas.' });
@@ -970,6 +973,18 @@ const InfoNegocioView = () => {
           className="bg-muted cursor-not-allowed"
         />
         <p className="text-xs text-muted-foreground">O plano é gerenciado pela plataforma.</p>
+      </div>
+
+      {/* Toggle Consulta Paga */}
+      <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900">
+        <div className="space-y-1">
+          <Label className="font-bold text-sm">Cobrar Consulta de Avaliação?</Label>
+          <p className="text-xs text-muted-foreground">Ao ativar, o modal de agendamento mostrará campos para valor e método de pagamento da consulta.</p>
+        </div>
+        <Switch
+          checked={companyData.chargeConsultation}
+          onCheckedChange={(val) => setCompanyData({...companyData, chargeConsultation: val})}
+        />
       </div>
 
       <Button className="w-full" onClick={handleSave} disabled={saving}>

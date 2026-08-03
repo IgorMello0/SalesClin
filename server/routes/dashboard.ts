@@ -39,28 +39,22 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
     if (filter === 'today') {
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
-      endDate.setDate(endDate.getDate() + 1);
-      // Adiciona 1 dia para evitar problemas com fuso horário (banco em UTC vs servidor)
-      endDate.setDate(endDate.getDate() + 1);
     } else if (filter === '7days') {
       startDate.setDate(startDate.getDate() - 7);
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
-      endDate.setDate(endDate.getDate() + 1);
     } else if (filter === '30days') {
       startDate.setDate(startDate.getDate() - 30);
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
-      endDate.setDate(endDate.getDate() + 1);
     } else if (filter === 'custom' && req.query.startDate && req.query.endDate) {
       startDate = new Date(req.query.startDate as string);
       endDate = new Date(req.query.endDate as string);
       endDate.setHours(23, 59, 59, 999);
-      endDate.setDate(endDate.getDate() + 1);
     } else {
-      // Custom / Mês Atual (fallback)
-      startDate.setDate(1);
-      startDate.setHours(0, 0, 0, 0);
+      // 'this_month' ou fallback
+      startDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1, 0, 0, 0, 0);
+      endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
     }
     
     // Condições Base Isoladas por Tenant e Data
@@ -79,6 +73,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
     // 2.5 Lógica de Filtros por SDR e Closer
     const leadExtraFilters: any = {};
     const paymentExtraFilters: any = {};
+    const paymentExtraConditions: any[] = [];
 
     // Regra de Visibilidade de Leads
     if (req.user?.type === 'usuario') {
@@ -98,12 +93,14 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
           { lead: { closerId: req.user.id } }
         ];
 
-        paymentExtraFilters.appointment = {
+        paymentExtraConditions.push({
           OR: [
-            { sdrId: req.user.id },
-            { lead: { closerId: req.user.id } }
+            { appointment: { sdrId: req.user.id } },
+            { appointment: { lead: { closerId: req.user.id } } },
+            { client: { originLead: { sdrId: req.user.id } } },
+            { client: { originLead: { closerId: req.user.id } } }
           ]
-        };
+        });
       }
     }
 
@@ -120,12 +117,12 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
         Object.assign(appointmentWhere, sdrCondition);
       }
 
-      if (paymentExtraFilters.appointment) {
-        paymentExtraFilters.appointment.AND = paymentExtraFilters.appointment.AND || [];
-        paymentExtraFilters.appointment.AND.push(sdrCondition);
-      } else {
-        paymentExtraFilters.appointment = sdrCondition;
-      }
+      paymentExtraConditions.push({
+        OR: [
+          { appointment: { sdrId: parsedSdrId } },
+          { client: { originLead: { sdrId: parsedSdrId } } }
+        ]
+      });
     }
 
     if (closerId && closerId !== 'all') {
@@ -141,26 +138,30 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
         appointmentWhere.lead = { closerId: parsedCloserId };
       }
 
-      if (paymentExtraFilters.appointment) {
-        paymentExtraFilters.appointment.AND = paymentExtraFilters.appointment.AND || [];
-        paymentExtraFilters.appointment.AND.push(leadCloserCondition);
-      } else {
-        paymentExtraFilters.appointment = leadCloserCondition;
-      }
+      paymentExtraConditions.push({
+        OR: [
+          { appointment: { lead: { closerId: parsedCloserId } } },
+          { client: { originLead: { closerId: parsedCloserId } } }
+        ]
+      });
+    }
+
+    if (paymentExtraConditions.length > 0) {
+      paymentExtraFilters.AND = paymentExtraConditions;
     }
 
     // Mesclando filtros extras ao baseWhere
     Object.assign(baseWhere, leadExtraFilters);
 
     // Função utilitária para montar os where das demais consultas de lead
-    const buildLeadWhere = (statusIn: string[], useUpdatedAt = false) => {
+    const buildLeadWhere = (statusIn: string[], dateField?: string) => {
       const where: any = {
         professionalId: { in: professionalIds },
         ...leadExtraFilters
       };
       if (companyId) where.companyId = companyId;
-      if (useUpdatedAt) {
-        where.updatedAt = { gte: startDate, lte: endDate };
+      if (dateField) {
+        where[dateField] = { gte: startDate, lte: endDate };
       }
       if (statusIn.length > 0) {
         where.status = { in: statusIn };
@@ -210,25 +211,24 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       }),
       
       // 3. Avaliações Comparecidas (Leads que estão em status de comparecimento ou superior)
-      // Nota: Filtramos por updatedAt para pegar quem mudou para esse status no período
       prisma.lead.count({ 
-        where: buildLeadWhere(attendedStages, true) 
+        where: buildLeadWhere(attendedStages, 'attendedAt') 
       }),
       
       // 4. Oportunidades (Leads em Proposta ou superior no período)
       prisma.lead.count({ 
-        where: buildLeadWhere(finalCommercialStages, true) 
+        where: buildLeadWhere(finalCommercialStages, 'proposalAt') 
       }),
       
       // 5. Faturamento Total (Tudo que foi orçado - Leads em Proposta ou superior - Total histórico ou período)
       prisma.lead.aggregate({
         _sum: { value: true },
-        where: buildLeadWhere(finalCommercialStages, true)
+        where: buildLeadWhere(finalCommercialStages, 'proposalAt')
       }),
 
       // 6. Total de Vendas Fechadas (Mudaram para status de fechamento no período)
       prisma.lead.count({
-        where: buildLeadWhere(closedStages, true)
+        where: buildLeadWhere(closedStages, 'closedAt')
       }),
 
       // 7. Faturamento por Método (Baseado na tabela de Pagamentos - O MAIS PRECISO)
@@ -341,7 +341,8 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
           method: 'transferencia',
           professionalId: { in: professionalIds },
           ...(companyId && { companyId }),
-          createdAt: { gte: startDate, lte: endDate }
+          createdAt: { gte: startDate, lte: endDate },
+          ...paymentExtraFilters
         },
         _count: { id: true }
       });

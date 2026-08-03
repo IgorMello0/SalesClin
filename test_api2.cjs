@@ -1,0 +1,1 @@
+﻿const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const app = await prisma.appointment.findFirst({ where: { lead: { name: 'teste 1 11' } }, orderBy: { id: 'desc' } }); console.log(app); } main().finally(() => prisma.$disconnect());

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Loader2, Star } from 'lucide-react';
+import { leadsApi } from '@/lib/api';
 
 interface Lead {
   id: number;
@@ -23,6 +24,7 @@ interface Lead {
   subStatus?: string | null;
   isScheduled?: boolean;
   isPaid?: boolean;
+  contactCount?: number;
   appointments?: any[];
   tags?: string[];
   subtitle?: string;
@@ -50,6 +52,7 @@ interface FunnelCardProps {
   currentSchedulingLeadId: number | null;
   professionalName?: string;
   quickStatuses: any[];
+  contactCadence?: number;
 }
 
 export function FunnelCard({
@@ -73,9 +76,35 @@ export function FunnelCard({
   isProcessingSchedule,
   currentSchedulingLeadId,
   professionalName,
-  quickStatuses
+  quickStatuses,
+  contactCadence
 }: FunnelCardProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [localContactCount, setLocalContactCount] = useState(lead.contactCount || 0);
+
+  useEffect(() => {
+    setLocalContactCount(lead.contactCount || 0);
+  }, [lead.contactCount]);
+
+  const handleContactChange = async (e: React.MouseEvent, newCount: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (newCount < 0 || (contactCadence && newCount > contactCadence)) return;
+
+    const previousCount = localContactCount;
+    setLocalContactCount(newCount);
+    
+    try {
+      const res = await leadsApi.update(lead.id, { contactCount: newCount });
+      if (!res.success) {
+        throw new Error('Falha ao atualizar');
+      }
+    } catch (err) {
+      console.error('Failed to update contact count', err);
+      setLocalContactCount(previousCount); // Revert on failure
+    }
+  };
   
   return (
     <div 
@@ -125,6 +154,38 @@ export function FunnelCard({
               <span className="material-symbols-outlined text-[12px] text-emerald-500 shrink-0">chat</span>
               <p className="text-[10px] text-slate-500 font-bold tracking-tight truncate">{lead.phone}</p>
             </div>
+            {contactCadence !== undefined && contactCadence > 0 && (
+              <div 
+                className="flex items-center gap-1.5 mt-2 mb-1 px-1.5 py-1 bg-slate-50 border border-slate-100 rounded-md w-fit" 
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  disabled={localContactCount <= 0}
+                  onClick={(e) => handleContactChange(e, localContactCount - 1)}
+                  className="w-4 h-4 flex items-center justify-center rounded-sm bg-slate-200 text-slate-500 hover:bg-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:hover:bg-slate-200 transition-colors"
+                  title="Diminuir"
+                >
+                  <span className="material-symbols-outlined text-[12px] font-bold">remove</span>
+                </button>
+                
+                <span className="text-[9px] font-bold text-slate-600 min-w-[24px] text-center tracking-widest">
+                  {localContactCount}/{contactCadence}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={localContactCount >= contactCadence}
+                  onClick={(e) => handleContactChange(e, localContactCount + 1)}
+                  className="w-4 h-4 flex items-center justify-center rounded-sm bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary disabled:opacity-50 disabled:hover:bg-primary/10 transition-colors"
+                  title="Aumentar"
+                >
+                  <span className="material-symbols-outlined text-[12px] font-bold">add</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">

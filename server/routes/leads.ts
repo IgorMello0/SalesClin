@@ -30,11 +30,45 @@ const PAYMENT_STATUS_ALIASES: Record<string, 'pago' | 'pendente' | 'atrasado' | 
   cancelled: 'cancelado',
 }
 
+async function assertLeadAccess(leadId: number, reqUser: any) {
+  const lead = await prisma.lead.findUnique({ 
+    where: { id: leadId }, 
+    select: { companyId: true, professionalId: true, sdrId: true, closerId: true } 
+  });
+  if (!lead) {
+    return { error: true, status: 404, message: 'Lead nÃ£o encontrado' };
+  }
+  
+  let _companyId = reqUser?.companyId;
+  if (reqUser?.type === 'profissional' && !_companyId) {
+    const _prof = await prisma.professional.findUnique({ where: { id: reqUser.id }, select: { companyId: true } });
+    _companyId = _prof?.companyId || undefined;
+  }
+  
+  if (_companyId && lead.companyId !== _companyId) {
+    return { error: true, status: 403, message: 'Acesso negado' };
+  } else if (!_companyId && reqUser?.id && lead.professionalId !== reqUser.id) {
+    return { error: true, status: 403, message: 'Acesso negado' };
+  }
+
+  // BOLA/IDOR Fix: Check if user is SDR or Closer
+  if (reqUser?.type === 'usuario') {
+    const dbUser = await prisma.usuario.findUnique({ where: { id: reqUser.id }, include: { role: true } });
+    if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
+      if (lead.sdrId !== reqUser.id && lead.closerId !== reqUser.id && (lead.sdrId !== null || lead.closerId !== null)) {
+        return { error: true, status: 403, message: 'Acesso negado' };
+      }
+    }
+  }
+
+  return { error: false, lead };
+}
+
 // Listar todos os leads
 router.get('/', auth(), async (req, res) => {
   try {
     const { skip, take, page, pageSize } = parsePagination(req.query)
-    const { search, status, professionalId } = req.query as any
+    const { search, status, professionalId, cadenceSort } = req.query as any
     let companyId = req.user?.companyId;
 
     if (req.user?.type === 'profissional' && !companyId) {
@@ -46,7 +80,7 @@ router.get('/', auth(), async (req, res) => {
     }
 
     if (!companyId) {
-      return res.status(400).json(createErrorResponse('Clínica não identificada.', 400));
+      return res.status(400).json(createErrorResponse('ClÃ­nica nÃ£o identificada.', 400));
     }
 
     const where: any = { companyId: companyId };
@@ -58,8 +92,8 @@ router.get('/', auth(), async (req, res) => {
         include: { role: true }
       });
       if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
-        // Se não for Admin nem Gestor Comercial, só vê leads atribuídos a si mesmo (como SDR ou Closer)
-        // OU leads antigos que ainda não possuem nenhuma atribuição
+        // Se nÃ£o for Admin nem Gestor Comercial, sÃ³ vÃª leads atribuÃ­dos a si mesmo (como SDR ou Closer)
+        // OU leads antigos que ainda nÃ£o possuem nenhuma atribuiÃ§Ã£o
         where.AND = [
           {
             OR: [
@@ -99,7 +133,7 @@ router.get('/', auth(), async (req, res) => {
           proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } },
           appointments: { orderBy: { startTime: 'desc' }, take: 1 }
         },
-        orderBy: { updatedAt: 'desc' }
+        orderBy: cadenceSort === 'asc' ? [{ contactCount: 'asc' }, { updatedAt: 'desc' }] : [{ updatedAt: 'desc' }]
       }),
       prisma.lead.count({ where })
     ])
@@ -121,17 +155,10 @@ router.get('/:id', auth(), async (req, res) => {
         proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } }
       }
     })
-    if (!item) return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+    if (!item) return res.status(404).json(createErrorResponse('Lead nÃ£o encontrado', 404))
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    if (_companyId && item.companyId && item.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
-    
+    const access = await assertLeadAccess(id, req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
     res.json(createSuccessResponse(item))
   } catch (error: any) {
     console.error('[Leads] Erro ao buscar lead:', error)
@@ -145,7 +172,7 @@ router.post('/', auth(), async (req, res) => {
     let { name, value, origin, status, avatar, phone, email, notes, responsible, tags, sdrId: requestedSdrId } = req.body
     
     if (!name) {
-      return res.status(400).json(createErrorResponse('O nome é obrigatório', 400))
+      return res.status(400).json(createErrorResponse('O nome Ã© obrigatÃ³rio', 400))
     }
 
     if (phone) {
@@ -165,14 +192,14 @@ router.post('/', auth(), async (req, res) => {
         companyId = professional?.companyId || null;
       }
     } else if (req.user?.type === 'usuario') {
-      // Buscar o dono da empresa do usuário
+      // Buscar o dono da empresa do usuÃ¡rio
       const empresa = await prisma.empresa.findUnique({
         where: { id: req.user.companyId! },
         select: { ownerId: true }
       });
 
       if (!empresa || !empresa.ownerId) {
-        return res.status(400).json(createErrorResponse('Empresa ou Profissional responsável não encontrado', 400));
+        return res.status(400).json(createErrorResponse('Empresa ou Profissional responsÃ¡vel nÃ£o encontrado', 400));
       }
       professionalId = empresa.ownerId;
     } else {
@@ -182,16 +209,16 @@ router.post('/', auth(), async (req, res) => {
     let sdrId: number | undefined = undefined;
     let closerId: number | undefined = undefined;
 
-    // Se a interface enviar o SDR (pode ser um ID numérico, null para forçar nenhum, ou undefined/'random')
+    // Se a interface enviar o SDR (pode ser um ID numÃ©rico, null para forÃ§ar nenhum, ou undefined/'random')
     if (requestedSdrId === 'random') {
-      sdrId = undefined; // Força a roleta
+      sdrId = undefined; // ForÃ§a a roleta
     } else if (requestedSdrId !== undefined) {
       sdrId = requestedSdrId === null ? undefined : Number(requestedSdrId);
     }
 
     if (sdrId) await assertUserBelongsToCompany(sdrId, companyId)
 
-    // Verificar se o criador do lead é SDR ou Closer e o SDR não foi explicitamente definido no request
+    // Verificar se o criador do lead Ã© SDR ou Closer e o SDR nÃ£o foi explicitamente definido no request
     if (req.user?.type === 'usuario' && req.user?.id) {
       const criador = await prisma.usuario.findUnique({
         where: { id: req.user.id },
@@ -201,16 +228,16 @@ router.post('/', auth(), async (req, res) => {
         const isSdrPuro = criador.role.isSDR && !criador.role.isAdmin && !criador.role.isManager;
         
         if (isSdrPuro) {
-          sdrId = req.user.id; // SDR puro não pode delegar, sempre vai para ele
+          sdrId = req.user.id; // SDR puro nÃ£o pode delegar, sempre vai para ele
         } else if (criador.role.isSDR && requestedSdrId === undefined) {
-          sdrId = req.user.id; // Para quem também é admin, mas não enviou sdrId
+          sdrId = req.user.id; // Para quem tambÃ©m Ã© admin, mas nÃ£o enviou sdrId
         }
         
         if (criador.role.isCloser) closerId = req.user.id;
       }
     }
     
-    // Roteamento Automático de SDRs (apenas se quem criou NÃO for um SDR)
+    // Roteamento AutomÃ¡tico de SDRs (apenas se quem criou NÃƒO for um SDR)
     if (!sdrId && companyId) {
       const empresa = await prisma.empresa.findUnique({
         where: { id: companyId },
@@ -229,11 +256,11 @@ router.post('/', auth(), async (req, res) => {
 
         if (sdrs.length > 0) {
           if (empresa.leadRoutingMode === 'automatic_equal') {
-            // Distribuição uniforme (Roleta randomizada)
+            // DistribuiÃ§Ã£o uniforme (Roleta randomizada)
             const randomIndex = Math.floor(Math.random() * sdrs.length);
             sdrId = sdrs[randomIndex].id;
           } else if (empresa.leadRoutingMode === 'semi_automatic') {
-            // Distribuição ponderada (Pesos customizados)
+            // DistribuiÃ§Ã£o ponderada (Pesos customizados)
             const totalWeight = sdrs.reduce((acc, sdr) => acc + (sdr.leadRoutingWeight || 1), 0);
             let random = Math.random() * totalWeight;
             for (const sdr of sdrs) {
@@ -298,7 +325,7 @@ router.post('/', auth(), async (req, res) => {
           data: { 
             leadId: created.id, 
             type: 'system', 
-            content: `O lead foi atribuído para o SDR ${assignedSdr.name}.`,
+            content: `O lead foi atribuÃ­do para o SDR ${assignedSdr.name}.`,
             createdBy: actCreator 
           }
         });
@@ -311,7 +338,7 @@ router.post('/', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[Leads] Erro ao criar lead:', error)
     if (error.code === 'P2002') {
-      return res.status(400).json(createErrorResponse('Já existe um lead com este número de telefone nesta clínica.', 400))
+      return res.status(400).json(createErrorResponse('JÃ¡ existe um lead com este nÃºmero de telefone nesta clÃ­nica.', 400))
     }
     res.status(500).json(createErrorResponse(error.message || 'Erro ao criar lead', 500))
   }
@@ -322,18 +349,10 @@ router.post('/:id/activities', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(Number(req.params.id), req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const _checkEntity = access.lead;
+    const _companyId = _checkEntity.companyId;
 
     const { type, content, createdBy } = req.body
     
@@ -358,18 +377,10 @@ router.put('/:id/activities/:activityId', auth(), async (req, res) => {
   try {
     const activityId = Number(req.params.activityId)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(Number(req.params.id), req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const _checkEntity = access.lead;
+    const _companyId = _checkEntity.companyId;
 
     const { content } = req.body
     
@@ -390,18 +401,10 @@ router.delete('/:id/activities/:activityId', auth(), async (req, res) => {
   try {
     const activityId = Number(req.params.activityId)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(Number(req.params.id), req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const _checkEntity = access.lead;
+    const _companyId = _checkEntity.companyId;
 
     await prisma.leadActivity.delete({
       where: { id: activityId }
@@ -437,18 +440,10 @@ router.post('/:id/proposals', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(Number(req.params.id), req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const _checkEntity = access.lead;
+    const _companyId = _checkEntity.companyId;
 
     const { title, value, validUntil, salespersonId, specialistId, sdrId, tags, justification, discountApplied } = req.body
     
@@ -484,18 +479,10 @@ router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(Number(req.params.id), req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const _checkEntity = access.lead;
+    const _companyId = _checkEntity.companyId;
 
     const proposalId = Number(req.params.proposalId)
     const { title, value, validUntil, salespersonId, specialistId, sdrId, tags, justification, discountApplied, stage, status } = req.body
@@ -539,18 +526,8 @@ router.put('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(id, req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
 
     const data = req.body
 
@@ -580,15 +557,26 @@ router.put('/:id', auth(), async (req, res) => {
       delete prismaData.remarketing_proposals
     }
 
-    // Buscar lead atual para verificar se já foi convertido
+    // Buscar lead atual para verificar se jÃ¡ foi convertido
     const currentLead = await prisma.lead.findUnique({ where: { id } })
     if (!currentLead) {
-      return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+      return res.status(404).json(createErrorResponse('Lead nÃ£o encontrado', 404))
     }
 
     // Regra de Negócio: Cancelamento/Rollback automático ao voltar estágio
     if (prismaData.status && prismaData.status !== currentLead.status) {
       const newStatus = prismaData.status;
+
+      // TIMESTAMP LOGIC
+      if (['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'].includes(newStatus)) {
+        if (!currentLead.attendedAt) prismaData.attendedAt = new Date();
+      }
+      if (['comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'].includes(newStatus)) {
+        if (!currentLead.proposalAt) prismaData.proposalAt = new Date();
+      }
+      if (['comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'].includes(newStatus)) {
+        if (!currentLead.closedAt) prismaData.closedAt = new Date();
+      }
 
       // 1. Se voltou para antes de Agendados (Novos Leads ou Qualificados)
       if (newStatus === 'prospect_lead' || newStatus === 'prospect_qualified') {
@@ -616,20 +604,20 @@ router.put('/:id', auth(), async (req, res) => {
         });
       }
 
-      // 3. Se voltou para antes de Fechado (Comercial ou Prospecção)
+      // 3. Se voltou para antes de Fechado (Comercial ou ProspecÃ§Ã£o)
       const beforeClosedStatuses = [
         'prospect_lead', 'prospect_qualified', 'prospect_scheduled',
         'prospect_attended', 'comercial_proposal', 'comercial_follow'
       ];
       if (beforeClosedStatuses.includes(newStatus)) {
-        // Resetar o estado de conversão do lead para que possa ser convertido novamente
+        // Resetar o estado de conversÃ£o do lead para que possa ser convertido novamente
         prismaData.convertedToClientId = null;
         prismaData.convertedAt = null;
         prismaData.isPaid = false; // resetar flag de pago
       }
     }
 
-    // Conversão automática: quando status muda para 'comercial_closed' OU quando há propostas de remarketing (fechamento parcial)
+    // ConversÃ£o automÃ¡tica: quando status muda para 'comercial_closed' OU quando hÃ¡ propostas de remarketing (fechamento parcial)
     const isClosing = prismaData.status === 'comercial_closed' && currentLead.status !== 'comercial_closed'
     const isPartialClosing = prismaData.remarketingProposals !== undefined
     const alreadyConverted = !!currentLead.convertedToClientId
@@ -648,7 +636,7 @@ router.put('/:id', auth(), async (req, res) => {
         }
       })
 
-      // Atualizar lead com referência ao cliente criado
+      // Atualizar lead com referÃªncia ao cliente criado
       prismaData.convertedToClientId = newClient.id
       prismaData.convertedAt = new Date()
 
@@ -683,7 +671,7 @@ router.put('/:id', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[Leads] Erro ao atualizar lead:', error)
     if (error.code === 'P2025') {
-      return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+      return res.status(404).json(createErrorResponse('Lead nÃ£o encontrado', 404))
     }
     res.status(500).json(createErrorResponse(error.message || 'Erro ao atualizar lead', 500))
   }
@@ -694,24 +682,16 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(Number(req.params.id), req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const _checkEntity = access.lead;
+    const _companyId = _checkEntity.companyId;
 
     const { payments, proposalId, discountValue, discountPercentage, justification } = req.body // Array of { amount, date, method, status } + optional proposalId
 
     if (Number(discountValue) > 0 || Number(discountPercentage) > 0) {
       if (!justification || justification.trim().length === 0) {
-        return res.status(400).json(createErrorResponse('Justificativa é obrigatória quando há desconto.', 400));
+        return res.status(400).json(createErrorResponse('Justificativa Ã© obrigatÃ³ria quando hÃ¡ desconto.', 400));
       }
 
       // Validate user discount limits
@@ -720,7 +700,7 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
           const empresa = await prisma.empresa.findUnique({ where: { id: _companyId || _checkEntity.companyId! }, select: { maxDiscountPercentage: true } });
           const maxAllowed = Number(empresa?.maxDiscountPercentage || 0);
           if (Number(discountPercentage) > maxAllowed) {
-            return res.status(403).json(createErrorResponse(`Desconto excede o limite autorizado de ${maxAllowed}%. Peça autorização.`, 403));
+            return res.status(403).json(createErrorResponse(`Desconto excede o limite autorizado de ${maxAllowed}%. PeÃ§a autorizaÃ§Ã£o.`, 403));
           }
         }
       }
@@ -751,11 +731,11 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
     }
 
     const lead = await prisma.lead.findUnique({ where: { id } })
-    if (!lead) return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+    if (!lead) return res.status(404).json(createErrorResponse('Lead nÃ£o encontrado', 404))
 
     let clientId = lead.convertedToClientId
 
-    // Se o lead ainda não foi convertido, criar cliente
+    // Se o lead ainda nÃ£o foi convertido, criar cliente
     if (!clientId) {
       const newClient = await prisma.client.create({
         data: {
@@ -813,7 +793,7 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
     }
 
     if (Number(discountValue) > 0 || Number(discountPercentage) > 0) {
-      let userName = 'Usuário';
+      let userName = 'UsuÃ¡rio';
       if (req.user?.type === 'usuario') {
         const u = await prisma.usuario.findUnique({ where: { id: req.user.id }, select: { name: true }});
         if (u) userName = u.name;
@@ -832,12 +812,12 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
       });
     }
 
-    // Atualiza status do Lead para pago e move para o funil pós-venda ou similar se quiser
+    // Atualiza status do Lead para pago e move para o funil pÃ³s-venda ou similar se quiser
     const updatedLead = await prisma.lead.update({
       where: { id },
       data: { 
         isPaid: true,
-        status: 'comercial_closed' // Garantir que não volte pra trás devido a race condition do drag and drop
+        status: 'comercial_closed' // Garantir que nÃ£o volte pra trÃ¡s devido a race condition do drag and drop
       } 
     })
 
@@ -848,33 +828,18 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
   }
 })
 
-// Deletar múltiplos leads de uma vez
+// Deletar mÃºltiplos leads de uma vez
 router.delete('/bulk', auth(), async (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json(createErrorResponse('IDs inválidos', 400));
-    }
-
-    let companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !companyId) {
-      const prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      companyId = prof?.companyId || undefined;
+      return res.status(400).json(createErrorResponse('IDs invÃ¡lidos', 400));
     }
 
     const numericIds = ids.map((id: any) => Number(id));
-
-    // Verificar que todos os leads pertencem à clínica
-    const leads = await prisma.lead.findMany({
-      where: { id: { in: numericIds } },
-      select: { id: true, companyId: true }
-    });
-
-    if (companyId) {
-      const unauthorized = leads.filter(l => l.companyId !== companyId);
-      if (unauthorized.length > 0) {
-        return res.status(403).json(createErrorResponse('Acesso negado a um ou mais leads', 403));
-      }
+    for (const leadId of numericIds) {
+      const access = await assertLeadAccess(leadId, req.user);
+      if (access.error) return res.status(access.status).json(createErrorResponse(`Acesso negado ao lead ${leadId}`, access.status));
     }
 
     await prisma.lead.deleteMany({ where: { id: { in: numericIds } } });
@@ -887,13 +852,15 @@ router.delete('/bulk', auth(), async (req, res) => {
   }
 });
 
-// Atribuir múltiplos leads a SDR ou Closer em massa
+// Atribuir mÃºltiplos leads a SDR ou Closer em massa
 router.patch('/bulk-assignment', auth(), async (req, res) => {
   try {
     const { ids, sdrId, closerId } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json(createErrorResponse('IDs inválidos', 400));
+      return res.status(400).json(createErrorResponse('IDs invÃ¡lidos', 400));
     }
+
+    const numericIds = ids.map((id: any) => Number(id));
 
     let companyId = req.user?.companyId;
     if (req.user?.type === 'profissional' && !companyId) {
@@ -901,34 +868,24 @@ router.patch('/bulk-assignment', auth(), async (req, res) => {
       companyId = prof?.companyId || undefined;
     }
 
-    const numericIds = ids.map((id: any) => Number(id));
-
-    // Verificar que todos os leads pertencem à clínica
-    const leads = await prisma.lead.findMany({
-      where: { id: { in: numericIds } },
-      select: { id: true, companyId: true }
-    });
-
-    if (companyId) {
-      const unauthorized = leads.filter(l => l.companyId !== companyId);
-      if (unauthorized.length > 0) {
-        return res.status(403).json(createErrorResponse('Acesso negado a um ou mais leads', 403));
-      }
+    for (const leadId of numericIds) {
+      const access = await assertLeadAccess(leadId, req.user);
+      if (access.error) return res.status(access.status).json(createErrorResponse(`Acesso negado ao lead ${leadId}`, access.status));
     }
 
-    // Se está atribuindo a SDR, verificar que o SDR pertence à clínica
+    // Se estÃ¡ atribuindo a SDR, verificar que o SDR pertence Ã  clÃ­nica
     if (sdrId !== undefined && sdrId !== null) {
       const sdr = await prisma.usuario.findUnique({ where: { id: parseInt(sdrId) }, select: { companyId: true } });
       if (!sdr || (companyId && sdr.companyId !== companyId)) {
-        return res.status(403).json(createErrorResponse('SDR não pertence a esta clínica', 403));
+        return res.status(403).json(createErrorResponse('SDR nÃ£o pertence a esta clÃ­nica', 403));
       }
     }
 
-    // Se está atribuindo a Closer, verificar que o Closer pertence à clínica
+    // Se estÃ¡ atribuindo a Closer, verificar que o Closer pertence Ã  clÃ­nica
     if (closerId !== undefined && closerId !== null) {
       const closer = await prisma.usuario.findUnique({ where: { id: parseInt(closerId) }, select: { companyId: true } });
       if (!closer || (companyId && closer.companyId !== companyId)) {
-        return res.status(403).json(createErrorResponse('Closer não pertence a esta clínica', 403));
+        return res.status(403).json(createErrorResponse('Closer nÃ£o pertence a esta clÃ­nica', 403));
       }
     }
 
@@ -953,18 +910,10 @@ router.delete('/:id', auth(), async (req, res) => {
   try {
     const id = Number(req.params.id)
 
-    let _companyId = req.user?.companyId;
-    if (req.user?.type === 'profissional' && !_companyId) {
-      const _prof = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { companyId: true } });
-      _companyId = _prof?.companyId || undefined;
-    }
-    const _checkEntity = await prisma.lead.findUnique({ where: { id: Number(req.params.id) }, select: { companyId: true, professionalId: true } });
-    if (!_checkEntity) return res.status(404).json(createErrorResponse('lead não encontrado', 404));
-    if (_companyId && _checkEntity.companyId !== _companyId) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    } else if (!_companyId && req.user?.id && _checkEntity.professionalId !== req.user.id) {
-      return res.status(403).json(createErrorResponse('Acesso negado', 403));
-    }
+    const access = await assertLeadAccess(Number(req.params.id), req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const _checkEntity = access.lead;
+    const _companyId = _checkEntity.companyId;
 
     await prisma.lead.delete({ where: { id } })
     
@@ -976,22 +925,22 @@ router.delete('/:id', auth(), async (req, res) => {
   } catch (error: any) {
     console.error('[Leads] Erro ao deletar lead:', error)
     if (error.code === 'P2025') {
-      return res.status(404).json(createErrorResponse('Lead não encontrado', 404))
+      return res.status(404).json(createErrorResponse('Lead nÃ£o encontrado', 404))
     }
     res.status(500).json(createErrorResponse(error.message || 'Erro ao deletar lead', 500))
   }
 })
 
-// Atualizar atribuição de equipe (SDR/Closer)
+// Atualizar atribuiÃ§Ã£o de equipe (SDR/Closer)
 router.patch('/:id/assignment', auth(), async (req, res) => {
   try {
     const { id } = req.params;
     const { sdrId, closerId } = req.body;
     
     const leadId = parseInt(id);
-    await assertLeadBelongsToCompany(leadId, req.user?.companyId);
-    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
-    if (!lead) return res.status(404).json(createErrorResponse('Lead não encontrado', 404));
+    const access = await assertLeadAccess(leadId, req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    const lead = access.lead;
 
     if (sdrId !== undefined && sdrId !== null) {
       await assertUserBelongsToCompany(parseInt(sdrId), req.user?.companyId)
@@ -1024,7 +973,7 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     if (sdrId !== undefined) {
       const parsedSdr = sdrId === null ? null : Number(sdrId);
       if (lead.sdrId !== parsedSdr) {
-        const content = parsedSdr === null ? 'SDR responsável removido.' : `O SDR responsável foi alterado para ${updated.sdr?.name || 'outro usuário'}.`;
+        const content = parsedSdr === null ? 'SDR responsÃ¡vel removido.' : `O SDR responsÃ¡vel foi alterado para ${updated.sdr?.name || 'outro usuÃ¡rio'}.`;
         await prisma.leadActivity.create({
           data: { leadId: updated.id, type: 'system', content, createdBy: userName }
         });
@@ -1034,7 +983,7 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     if (closerId !== undefined) {
       const parsedCloser = closerId === null ? null : Number(closerId);
       if (lead.closerId !== parsedCloser) {
-        const content = parsedCloser === null ? 'Closer responsável removido.' : `O Closer responsável foi alterado para ${updated.closer?.name || 'outro usuário'}.`;
+        const content = parsedCloser === null ? 'Closer responsÃ¡vel removido.' : `O Closer responsÃ¡vel foi alterado para ${updated.closer?.name || 'outro usuÃ¡rio'}.`;
         await prisma.leadActivity.create({
           data: { leadId: updated.id, type: 'system', content, createdBy: userName }
         });
@@ -1048,3 +997,44 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     res.status(500).json(createErrorResponse('Erro ao reatribuir equipe', 500));
   }
 });
+
+// Registrar novo contato na cadência
+router.post('/:id/cadence-contact', auth(), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const access = await assertLeadAccess(id, req.user);
+    if (access.error) return res.status(access.status).json(createErrorResponse(access.message, access.status));
+    
+    let userName = 'Sistema';
+    if (req.user?.type === 'usuario') {
+      const u = await prisma.usuario.findUnique({ where: { id: req.user.id }, select: { name: true }});
+      if (u) userName = u.name;
+    } else if (req.user?.type === 'profissional') {
+      const p = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { name: true }});
+      if (p) userName = p.name;
+    }
+
+    const updated = await prisma.lead.update({
+      where: { id },
+      data: {
+        contactCount: { increment: 1 }
+      }
+    });
+
+    await prisma.leadActivity.create({
+      data: {
+        leadId: id,
+        type: 'contact',
+        content: `Contato de cadência realizado (Contato #${updated.contactCount})`,
+        createdBy: userName
+      }
+    });
+
+    logAudit(req.user!, 'REGISTRAR_CONTATO_CADENCIA', 'Lead', id);
+    res.json(createSuccessResponse({ contactCount: updated.contactCount }));
+  } catch (error: any) {
+    console.error('[Leads] Erro ao registrar contato da cadência:', error);
+    res.status(500).json(createErrorResponse('Erro ao registrar contato', 500));
+  }
+});
+

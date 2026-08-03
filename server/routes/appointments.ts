@@ -274,7 +274,7 @@ router.get('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
 
 router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
-    const { clientId, leadId, tags, serviceId, startTime, endTime, status, notes, sdrId, especialistaId } = req.body
+    const { clientId, leadId, tags, serviceId, startTime, endTime, status, notes, sdrId, especialistaId, consultationAmount, consultationPaymentMethod } = req.body
     
     let professionalId: number;
     if (req.body.professionalId) {
@@ -354,6 +354,60 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
         especialista: { select: { id: true, name: true,  } }
       }
     })
+
+    // Create consultation payment if provided
+    if (consultationAmount && consultationPaymentMethod && Number(consultationAmount) > 0) {
+      let paymentClientId = created.clientId;
+      let finalLeadId = created.leadId;
+      
+      if (!paymentClientId && finalLeadId) {
+        const lead = await prisma.lead.findUnique({ where: { id: finalLeadId } });
+        if (lead) {
+          if (lead.convertedToClientId) {
+            paymentClientId = lead.convertedToClientId;
+          } else {
+            // Auto-convert to client to receive the payment
+            const newClient = await prisma.client.create({
+              data: {
+                professionalId,
+                companyId: req.user.companyId,
+                name: lead.name,
+                email: lead.email || null,
+                phone: lead.phone || null,
+                notes: lead.notes || null,
+                avatar: lead.avatar || null,
+              }
+            });
+            await prisma.lead.update({
+              where: { id: finalLeadId },
+              data: { convertedToClientId: newClient.id, convertedAt: new Date() }
+            });
+            paymentClientId = newClient.id;
+            
+            // Link appointment to this new client
+            await prisma.appointment.update({
+              where: { id: created.id },
+              data: { clientId: paymentClientId }
+            });
+          }
+        }
+      }
+
+      if (paymentClientId) {
+        await prisma.payment.create({
+          data: {
+            appointmentId: created.id,
+            clientId: paymentClientId,
+            professionalId,
+            companyId: req.user.companyId,
+            amount: Number(consultationAmount),
+            method: consultationPaymentMethod,
+            status: 'pago',
+            date: new Date(),
+          }
+        });
+      }
+    }
 
     const synced = await syncAppointmentToGoogle(created.id)
     

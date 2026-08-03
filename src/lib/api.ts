@@ -184,7 +184,8 @@ function getMockResponse(endpoint: string, options: RequestInit): ApiResponse<an
         domain: 'sellclin.com',
         isActive: true,
         openHour: '08:00',
-        closeHour: '20:00'
+        closeHour: '20:00',
+        chargeConsultation: false
       }
     }
   }

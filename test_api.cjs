@@ -1,0 +1,1 @@
+﻿const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const app = await prisma.appointment.findUnique({ where: { id: 187 }, include: { payments: true } }); console.log(app); } main().finally(() => prisma.$disconnect());
