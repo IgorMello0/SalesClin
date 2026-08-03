@@ -247,20 +247,20 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       prisma.lead.groupBy({
         by: ['status'],
         _count: { id: true },
-        where: buildLeadWhere([], false)
+        where: buildLeadWhere([])
       }),
 
       // 9. Leads por Origem (Total Histórico)
       prisma.lead.groupBy({
         by: ['origin'],
         _count: { id: true },
-        where: buildLeadWhere([], false)
+        where: buildLeadWhere([])
       }),
 
       // 11. Faturamento Fechado (Valor dos leads que viraram fechamento no periodo)
       prisma.lead.aggregate({
         _sum: { value: true },
-        where: buildLeadWhere(closedStages, true)
+        where: buildLeadWhere(closedStages, 'closedAt')
       })
     ]);
 
