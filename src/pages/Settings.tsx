@@ -29,6 +29,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import InfoNegocioView from './settings/InfoNegocioView';
 import FunnelsSettingsView from './settings/FunnelsSettingsView';
+import CadenceSettingsView from './settings/CadenceSettingsView';
 import LeadStatusesSettingsView from './settings/LeadStatusesSettingsView';
 import LeadOriginsSettingsView from './settings/LeadOriginsSettingsView';
 import { LeadRoutingSettingsView } from './settings/LeadRoutingSettingsView';
@@ -1995,6 +1996,7 @@ const ViewsMap: Record<string, React.FC<any>> = {
   clinics: ClinicasView,
   business: InfoNegocioView,
   funnels: FunnelsSettingsView,
+  cadence: CadenceSettingsView,
   lead_statuses: LeadStatusesSettingsView,
   lead_origins: LeadOriginsSettingsView,
   lead_routing: LeadRoutingSettingsView,
@@ -2038,6 +2040,7 @@ const Settings = () => {
       title: 'Comercial',
       items: [
         { key: 'funnels', name: 'Funis de Vendas', description: 'Pipelines e etapas do comercial', icon: 'view_kanban', ownerOnly: true },
+        { key: 'cadence', name: 'Cadência de Contatos', description: 'Fluxos de acompanhamento', icon: 'timelapse', ownerOnly: true },
         { key: 'lead_statuses', name: 'Status', description: 'Status rápidos dos negócios', icon: 'label', ownerOnly: true },
         { key: 'lead_origins', name: 'Origens', description: 'Fontes de captação de leads', icon: 'share', ownerOnly: true },
         { key: 'lead_routing', name: 'Roteamento', description: 'Distribuição automática de leads', icon: 'route', ownerOnly: true },

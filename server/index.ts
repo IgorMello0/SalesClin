@@ -35,16 +35,29 @@ import { router as whatsappMetaRouter } from './routes/whatsapp-meta.js'
 import { router as whatsappUazapiRouter } from './routes/whatsapp-uazapi.js'
 import { router as whatsappTemplatesRouter } from './routes/whatsapp-templates.js'
 import leadStatusesRouter from './routes/lead-statuses.js'
+import { router as cadenceRouter } from './routes/cadence.js'
 import { createErrorResponse } from './utils/response.js'
 import { prisma } from './prisma.js'
 import { bootstrapSystemDefaults } from './bootstrap/defaults.js'
 import { expirePastDueBillingRecords } from './services/billing.js'
 import path from 'path'
+import rateLimit from 'express-rate-limit'
 
 assertProductionSecurityConfig()
 
 const app = express()
+
+// Basic Rate Limiter
+const apiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutos
+  max: 1000, // Limite generoso para o frontend (1000 requests / 5min por IP)
+  message: 'Muitas requisições deste IP, tente novamente em 5 minutos',
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 app.use(cors())
+app.use(apiLimiter)
 app.use(json({
   limit: '20mb',
   verify: (req, _res, buffer) => {
@@ -98,6 +111,7 @@ app.use('/api/whatsapp/uazapi', whatsappUazapiRouter)
 app.use('/api/whatsapp/templates', whatsappTemplatesRouter)
 app.use('/api/lead-statuses', leadStatusesRouter)
 app.use('/api/lead-origins', leadOriginsRouter)
+app.use('/api/cadence', cadenceRouter)
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
 

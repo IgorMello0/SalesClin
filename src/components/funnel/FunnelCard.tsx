@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Loader2, Star } from 'lucide-react';
-import { leadsApi } from '@/lib/api';
+import { leadsApi, tasksApi } from '@/lib/api';
 
 interface Lead {
   id: number;
@@ -26,6 +26,7 @@ interface Lead {
   isPaid?: boolean;
   contactCount?: number;
   appointments?: any[];
+  tasks?: any[];
   tags?: string[];
   subtitle?: string;
 }
@@ -105,6 +106,9 @@ export function FunnelCard({
       setLocalContactCount(previousCount); // Revert on failure
     }
   };
+
+  const pendingCadenceTask = lead.tasks?.[0];
+  const isCadenceOverdue = pendingCadenceTask && new Date(pendingCadenceTask.dueDate) < new Date();
   
   return (
     <div 
@@ -263,6 +267,35 @@ export function FunnelCard({
           {lead.lastUpdate}
         </div>
       </div>
+
+      {pendingCadenceTask && (
+        <div className={cn(
+          "flex items-center justify-between px-2 py-1.5 mt-2 rounded-md text-[10px] font-bold uppercase tracking-wide border",
+          isCadenceOverdue 
+            ? "bg-red-50 text-red-600 border-red-100" 
+            : "bg-blue-50 text-blue-600 border-blue-100"
+        )}>
+          <div className="flex items-center gap-1">
+            <span className="material-symbols-outlined text-xs">
+              {isCadenceOverdue ? 'warning' : 'schedule'}
+            </span>
+            <span className="truncate max-w-[120px]" title={pendingCadenceTask.title}>
+              {isCadenceOverdue ? 'Cadência Atrasada' : 'Próximo Passo'}
+            </span>
+          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              tasksApi.update(pendingCadenceTask.id, { status: 'completed' })
+                .then(() => window.location.reload());
+            }}
+            className="flex items-center justify-center p-1 hover:bg-black/5 rounded-full transition-colors"
+            title="Concluir passo da cadência"
+          >
+            <span className="material-symbols-outlined text-xs">check</span>
+          </button>
+        </div>
+      )}
 
       {/* Stage specific actions */}
       <div className="flex flex-col gap-1 mt-2 pt-1.5 border-t border-slate-100">

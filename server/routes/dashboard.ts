@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma.js'
 import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
+import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
 export const router = Router()
 
@@ -32,29 +33,52 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       professionalIds = [req.user!.id];
     }
 
-    // 2. Configuração do Range de Datas
-    let startDate = new Date();
-    let endDate = new Date();
+    // 2. Configuração do Range de Datas (Corrigido com Timezone)
+    const timeZone = 'America/Sao_Paulo';
+    let startDate: Date;
+    let endDate: Date;
+
+    const now = new Date();
+    // Pega o momento atual no fuso do Brasil, mantendo o "tempo de relógio" igual para usar os métodos Date locais
+    const nowZoned = toZonedTime(now, timeZone);
     
     if (filter === 'today') {
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
+      nowZoned.setHours(0, 0, 0, 0);
+      startDate = fromZonedTime(nowZoned, timeZone);
+      
+      nowZoned.setHours(23, 59, 59, 999);
+      endDate = fromZonedTime(nowZoned, timeZone);
     } else if (filter === '7days') {
-      startDate.setDate(startDate.getDate() - 7);
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
+      nowZoned.setHours(23, 59, 59, 999);
+      endDate = fromZonedTime(nowZoned, timeZone);
+
+      nowZoned.setDate(nowZoned.getDate() - 7);
+      nowZoned.setHours(0, 0, 0, 0);
+      startDate = fromZonedTime(nowZoned, timeZone);
     } else if (filter === '30days') {
-      startDate.setDate(startDate.getDate() - 30);
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
+      nowZoned.setHours(23, 59, 59, 999);
+      endDate = fromZonedTime(nowZoned, timeZone);
+
+      nowZoned.setDate(nowZoned.getDate() - 30);
+      nowZoned.setHours(0, 0, 0, 0);
+      startDate = fromZonedTime(nowZoned, timeZone);
     } else if (filter === 'custom' && req.query.startDate && req.query.endDate) {
-      startDate = new Date(req.query.startDate as string);
-      endDate = new Date(req.query.endDate as string);
-      endDate.setHours(23, 59, 59, 999);
+      const customStart = new Date(req.query.startDate as string);
+      const customStartZoned = toZonedTime(customStart, timeZone);
+      customStartZoned.setHours(0, 0, 0, 0);
+      startDate = fromZonedTime(customStartZoned, timeZone);
+
+      const customEnd = new Date(req.query.endDate as string);
+      const customEndZoned = toZonedTime(customEnd, timeZone);
+      customEndZoned.setHours(23, 59, 59, 999);
+      endDate = fromZonedTime(customEndZoned, timeZone);
     } else {
       // 'this_month' ou fallback
-      startDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1, 0, 0, 0, 0);
-      endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
+      const startOfMonth = new Date(nowZoned.getFullYear(), nowZoned.getMonth(), 1, 0, 0, 0, 0);
+      startDate = fromZonedTime(startOfMonth, timeZone);
+      
+      const endOfMonth = new Date(nowZoned.getFullYear(), nowZoned.getMonth() + 1, 0, 23, 59, 59, 999);
+      endDate = fromZonedTime(endOfMonth, timeZone);
     }
     
     // Condições Base Isoladas por Tenant e Data

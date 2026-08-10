@@ -4,6 +4,7 @@ import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
 import { logAudit } from '../utils/audit.js'
 import { assertLeadBelongsToCompany, assertUserBelongsToCompany } from '../services/tenant.js'
+import { triggerCadenceForLead } from '../services/cadence.js'
 
 export const router = Router()
 router.use(auth(), requireModule('funnel'))
@@ -131,7 +132,8 @@ router.get('/', auth(), async (req, res) => {
         include: {
           activities: { orderBy: { createdAt: 'asc' } },
           proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } },
-          appointments: { orderBy: { startTime: 'desc' }, take: 1 }
+          appointments: { orderBy: { startTime: 'desc' }, take: 1 },
+          tasks: { where: { status: 'pending', cadenceStageCode: { not: null } }, orderBy: { dueDate: 'asc' }, take: 1 }
         },
         orderBy: cadenceSort === 'asc' ? [{ contactCount: 'asc' }, { updatedAt: 'desc' }] : [{ updatedAt: 'desc' }]
       }),
@@ -152,7 +154,8 @@ router.get('/:id', auth(), async (req, res) => {
       where: { id },
       include: {
         activities: { orderBy: { createdAt: 'asc' } },
-        proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } }
+        proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } },
+        tasks: { where: { status: 'pending', cadenceStageCode: { not: null } }, orderBy: { dueDate: 'asc' }, take: 1 }
       }
     })
     if (!item) return res.status(404).json(createErrorResponse('Lead nÃ£o encontrado', 404))
@@ -325,13 +328,16 @@ router.post('/', auth(), async (req, res) => {
           data: { 
             leadId: created.id, 
             type: 'system', 
-            content: `O lead foi atribuÃ­do para o SDR ${assignedSdr.name}.`,
+            content: `O lead foi atribuído para o SDR ${assignedSdr.name}.`,
             createdBy: actCreator 
           }
         });
       }
     }
     
+    // Disparar cadência ao criar o lead (se a etapa atual tiver uma configurada)
+    triggerCadenceForLead(created.id, created.companyId!, created.status, created.sdrId || created.closerId, created.professionalId).catch(console.error);
+
     logAudit(req.user, 'CRIAR_LEAD', 'Lead', created.id)
     
     res.status(201).json(createSuccessResponse(created))
@@ -567,7 +573,7 @@ router.put('/:id', auth(), async (req, res) => {
     if (prismaData.status && prismaData.status !== currentLead.status) {
       const newStatus = prismaData.status;
 
-      // TIMESTAMP LOGIC
+      // TIMESTAMP LOGIC & SUB-STATUS AUTOMATION
       if (['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'].includes(newStatus)) {
         if (!currentLead.attendedAt) prismaData.attendedAt = new Date();
       }
@@ -576,6 +582,8 @@ router.put('/:id', auth(), async (req, res) => {
       }
       if (['comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'].includes(newStatus)) {
         if (!currentLead.closedAt) prismaData.closedAt = new Date();
+        // Se avançou para uma etapa de fechamento, marcar automaticamente como Ganho
+        prismaData.subStatus = 'won';
       }
 
       // 1. Se voltou para antes de Agendados (Novos Leads ou Qualificados)
@@ -647,6 +655,11 @@ router.put('/:id', auth(), async (req, res) => {
         data: prismaData
       })
       
+      // Trigger Cadence if status changed
+      if (prismaData.status && prismaData.status !== currentLead.status) {
+        triggerCadenceForLead(id, currentLead.companyId!, prismaData.status, currentLead.sdrId || currentLead.closerId, currentLead.professionalId).catch(console.error);
+      }
+      
       if (req.user?.type === 'profissional') {
         logAudit(req.user.id, 'CONVERTER_LEAD_EM_CLIENTE', 'Lead', id)
       }
@@ -662,6 +675,11 @@ router.put('/:id', auth(), async (req, res) => {
       where: { id },
       data: prismaData
     })
+    
+    // Trigger Cadence if status changed
+    if (prismaData.status && prismaData.status !== currentLead.status) {
+      triggerCadenceForLead(id, currentLead.companyId!, prismaData.status, currentLead.sdrId || currentLead.closerId, currentLead.professionalId).catch(console.error);
+    }
     
     if (req.user?.type === 'profissional') {
       logAudit(req.user.id, 'ATUALIZAR_LEAD', 'Lead', id)

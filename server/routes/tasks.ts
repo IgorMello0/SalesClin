@@ -8,6 +8,7 @@ import {
   assertProfessionalBelongsToCompany,
   assertUserBelongsToCompany,
 } from '../services/tenant.js'
+import { processCadenceTaskCompletion } from '../services/cadence.js'
 
 export const router = Router()
 router.use(auth(), requireModule('tarefas'))
@@ -108,7 +109,7 @@ router.get('/', auth(), async (req, res) => {
   try {
     const professionalId = req.user!.id
     const companyId = req.user!.companyId
-    const { status, priority, dueDateRange, search, team, leadId } = req.query as any
+    const { status, priority, dueDateRange, search, team, leadId, includeCadence } = req.query as any
 
     if (!companyId) {
       return res.status(400).json(createErrorResponse('Clínica não definida', 400))
@@ -120,6 +121,10 @@ router.get('/', auth(), async (req, res) => {
 
     if (leadId) {
       where.leadId = Number(leadId)
+    }
+
+    if (includeCadence !== 'true') {
+      where.cadenceStageCode = null;
     }
 
     // Se não for rota da equipe, restringe às tarefas atribuídas ou criadas pelo usuário
@@ -529,6 +534,11 @@ router.put('/:id', auth(), async (req, res) => {
           data: nextNotificationData
         })
       }
+    }
+
+    // Lógica de Cadência: Se foi concluída e for uma task de cadência, avança o passo
+    if (isNowCompleted && updated.cadenceStageCode && updated.cadenceStepIndex !== null) {
+      processCadenceTaskCompletion(updated.id).catch(console.error);
     }
 
     res.json(createSuccessResponse(mapTaskResponse(updated)))

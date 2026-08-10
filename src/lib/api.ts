@@ -1034,14 +1034,15 @@ export const uploadApi = {
 
 // Tarefas (Tasks)
 export const tasksApi = {
-  getAll: async (params?: { status?: string; priority?: string; dueDateRange?: string; search?: string; team?: boolean; leadId?: number }) => {
+  getAll: async (params?: { status?: string; priority?: string; dueDateRange?: string; search?: string; team?: boolean | string; leadId?: number; includeCadence?: boolean | string }) => {
     const query = new URLSearchParams()
     if (params?.status) query.append('status', params.status)
     if (params?.priority) query.append('priority', params.priority)
     if (params?.dueDateRange) query.append('dueDateRange', params.dueDateRange)
     if (params?.search) query.append('search', params.search)
-    if (params?.team) query.append('team', params.team.toString())
+    if (params?.team !== undefined) query.append('team', params.team.toString())
     if (params?.leadId) query.append('leadId', params.leadId.toString())
+    if (params?.includeCadence !== undefined) query.append('includeCadence', params.includeCadence.toString())
     return apiRequest<Array<any>>(`/tasks?${query.toString()}`)
   },
   create: async (data: any) => apiRequest<any>('/tasks', { method: 'POST', body: JSON.stringify(data) }),
@@ -1125,3 +1126,8 @@ export const campaignsApi = {
 export const paymentsApi = { 
   update: async (id: number, data: any) => apiRequest<any>(`/pagamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }) 
 };
+
+export const cadenceApi = {
+  getByStage: async (stageCode: string) => apiRequest<any>(`/cadence/${stageCode}`),
+  update: async (stageCode: string, data: any) => apiRequest<any>(`/cadence/${stageCode}`, { method: 'PUT', body: JSON.stringify(data) })
+}

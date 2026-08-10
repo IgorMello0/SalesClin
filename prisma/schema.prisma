@@ -455,6 +455,7 @@ model Empresa {
   whatsappConnection       WhatsAppConnection?
   whatsappTemplates        WhatsAppTemplate[]
   whatsappWebhookEvents    WhatsAppWebhookEvent[]
+  cadenceConfigs           CadenceConfig[]
 
   @@map("empresas")
 }
@@ -1054,6 +1055,8 @@ model Task {
   isRecurring      Boolean  @default(false) @map("is_recurring")
   recurrenceRule   String?  @map("recurrence_rule") // daily, weekly, monthly
   parentTaskId     Int?     @map("parent_task_id")
+  cadenceStageCode String?  @map("cadence_stage_code")
+  cadenceStepIndex Int?     @map("cadence_step_index")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -1089,6 +1092,22 @@ model Notification {
   task          Task?         @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+// ==================== CADÊNCIA DE CONTATO ====================
+model CadenceConfig {
+  id          Int      @id @default(autoincrement())
+  companyId   Int      @map("company_id")
+  stageCode   String   @map("stage_code") // Relacionado ao lead.status
+  isActive    Boolean  @default(true) @map("is_active")
+  steps       Json     // Array de objetos JSON: [{ id, method, waitMinutes, title, template }]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  company     Empresa  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, stageCode])
+  @@map("cadence_configs")
 }
 
 // ==================== CAMPANHAS DE MENSAGENS ====================

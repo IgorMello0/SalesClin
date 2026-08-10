@@ -321,7 +321,13 @@ const Conversations = () => {
         <aside className="flex w-80 flex-shrink-0 flex-col border-r border-slate-200 bg-white">
           <div className="space-y-2 border-b border-slate-200 bg-slate-50 p-3">
             <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input placeholder="Buscar por nome ou telefone" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} className="h-9 bg-white pl-9" /></div>
-            <Select value={filter} onValueChange={setFilter}><SelectTrigger className="h-9 bg-white text-xs font-semibold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as conversas</SelectItem><SelectItem value="in_progress">Em andamento</SelectItem><SelectItem value="converted">Convertidas</SelectItem></SelectContent></Select>
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="h-9 bg-white text-xs font-semibold">
+                <SelectValue>
+                  {filter === 'all' ? 'Todas as conversas' : filter === 'in_progress' ? 'Em andamento' : 'Convertidas'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent><SelectItem value="all">Todas as conversas</SelectItem><SelectItem value="in_progress">Em andamento</SelectItem><SelectItem value="converted">Convertidas</SelectItem></SelectContent></Select>
           </div>
           <div className="border-b border-slate-100 px-4 py-2 text-[10px] font-bold uppercase text-slate-400">{filtered.length} conversa{filtered.length === 1 ? '' : 's'}</div>
           <div className="flex-1 overflow-y-auto">
@@ -347,7 +353,16 @@ const Conversations = () => {
               <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-xs font-black text-white">{initials(contactName(selected))}</div><div><p className="text-sm font-black text-slate-950">{contactName(selected)}</p><p className="flex items-center gap-1 text-xs text-slate-500"><Phone className="h-3 w-3" />{contactPhone(selected)}</p></div></div>
               <div className="flex items-center gap-2">
                 {selected.serviceWindow?.isOfficial && <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${!officialWindowClosed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}><Clock3 className="h-3.5 w-3.5" />{formatWindowRemaining(windowRemaining || 0)}</span>}
-                <Select value={selected.agentId ? String(selected.agentId) : 'manual'} onValueChange={assignAgent}><SelectTrigger disabled={assigningAgent} className="h-9 w-[190px] bg-white text-xs font-bold"><div className="flex items-center gap-1.5">{selected.agentId ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}<SelectValue /></div></SelectTrigger><SelectContent><SelectItem value="manual">Atendimento manual</SelectItem>{agents.map((agent) => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}<SelectItem value="new"><span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" />Novo agente</span></SelectItem></SelectContent></Select>
+                <Select value={selected.agentId ? String(selected.agentId) : 'manual'} onValueChange={assignAgent}>
+                  <SelectTrigger disabled={assigningAgent} className="h-9 w-[190px] bg-white text-xs font-bold">
+                    <div className="flex items-center gap-1.5">
+                      {selected.agentId ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                      <SelectValue>
+                        {selected.agentId ? agents.find(a => String(a.id) === String(selected.agentId))?.name : 'Atendimento manual'}
+                      </SelectValue>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent><SelectItem value="manual">Atendimento manual</SelectItem>{agents.map((agent) => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}<SelectItem value="new"><span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" />Novo agente</span></SelectItem></SelectContent></Select>
               </div>
             </div>
 

@@ -198,7 +198,9 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
       
       const loadTasks = async () => {
         try {
-          const res = await tasksApi.getAll({ leadId: Number(lead.id) });
+          // Add team: 'true' to ensure we get tasks assigned to other team members (like the cadence tasks assigned to SDRs)
+          // Add includeCadence: 'true' to fetch cadence tasks which are otherwise filtered out of the generic tasks view
+          const res = await tasksApi.getAll({ leadId: Number(lead.id), team: 'true', includeCadence: 'true' });
           if (res.success) {
             setLeadTasks(res.data || []);
           }
@@ -211,6 +213,8 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   }, [lead, funnels]);
 
   const editStages = funnels?.find(f => String(f.code || f.id) === selectedFunnelForEdit)?.stages || [];
+
+  const pendingCadenceTask = leadTasks?.find((t: any) => t.status === 'pending' && t.cadenceStageCode);
 
   const handleUpdate = (field, value) => {
     setSelectedLead(prev => ({ ...prev, [field]: value }));
@@ -887,6 +891,51 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                         </div>
                       </div>
                       
+                      {pendingCadenceTask && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-blue-600">schedule</span>
+                            </div>
+                            <div>
+                              <h5 className="font-bold text-blue-900 text-sm flex items-center gap-2">
+                                Próximo Passo: {pendingCadenceTask.title}
+                              </h5>
+                              {pendingCadenceTask.description && (
+                                <p className="text-xs text-blue-800/80 mt-1 whitespace-pre-wrap max-h-24 overflow-y-auto">
+                                  {pendingCadenceTask.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            onClick={async () => {
+                              try {
+                                await tasksApi.update(pendingCadenceTask.id, { status: 'completed' });
+                                toast({ title: "Passo concluído!" });
+                                
+                                // Refresh local tasks
+                                const res = await tasksApi.getAll({ leadId: Number(selectedLead.id), team: 'true', includeCadence: 'true' });
+                                if (res.success) setLeadTasks(res.data || []);
+
+                                // Refresh lead to get new activities from backend
+                                const resLead = await leadsApi.getById(Number(selectedLead.id));
+                                if (resLead.success) {
+                                  setSelectedLead(resLead.data);
+                                  if (onUpdate) onUpdate(resLead.data);
+                                }
+                              } catch (e) {
+                                toast({ title: "Erro ao concluir", variant: "destructive" });
+                              }
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm shrink-0 font-bold"
+                          >
+                            <Check className="w-4 h-4 mr-2" />
+                            Marcar como Feito
+                          </Button>
+                        </div>
+                      )}
+                      
                       <div className="space-y-3">
                         <Textarea 
                           value={noteText}
@@ -1285,10 +1334,12 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                                               }`}></span>
                                               {getPriorityLabel(task.priority)}
                                             </div>
-                                            {task.dueDate && (
+                                            {(task.dueDate || task.status === 'completed') && (
                                               <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">
                                                 <Calendar className="w-3 h-3" />
-                                                {safeFormatDate(task.dueDate)}
+                                                {task.status === 'completed' 
+                                                  ? `Concluída: ${safeFormatDate(task.updatedAt)}` 
+                                                  : safeFormatDate(task.dueDate)}
                                               </div>
                                             )}
                                           </div>
