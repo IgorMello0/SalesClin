@@ -35,7 +35,7 @@ async function check() {
   const nextYear = new Date();
   nextYear.setFullYear(nextYear.getFullYear() + 2);
   const weirdAppointments = await p.appointment.count({
-    where: { date: { gt: nextYear } }
+    where: { startTime: { gt: nextYear } }
   });
   console.log('Agendamentos bizarros (2 anos no futuro):', weirdAppointments);
 }
