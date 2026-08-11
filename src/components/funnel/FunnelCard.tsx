@@ -38,6 +38,7 @@ interface FunnelCardProps {
   onToggleSelection: (id: number) => void;
   onSelect: (lead: Lead) => void;
   onDragStart: (e: React.DragEvent, cardId: string) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
   isDragged: boolean;
   activeFunnel: string;
   stageId: string;
@@ -63,6 +64,7 @@ export function FunnelCard({
   onToggleSelection,
   onSelect,
   onDragStart,
+  onDragEnd,
   isDragged,
   activeFunnel,
   stageId,
@@ -114,6 +116,7 @@ export function FunnelCard({
     <div 
       draggable
       onDragStart={(e) => onDragStart(e, lead.cardId || `lead-${lead.id}`)}
+      onDragEnd={onDragEnd}
       onClick={() => onSelect(lead)}
       className={cn(
         "premium-card p-3 cursor-grab active:cursor-grabbing group animate-in fade-in slide-in-from-top-2 relative",

@@ -132,7 +132,12 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       const parsedSdrId = sdrId === 'none' ? null : parseInt(sdrId as string);
       leadExtraFilters.sdrId = parsedSdrId;
       
-      const sdrCondition = { sdrId: parsedSdrId };
+      const sdrCondition = { 
+        OR: [
+          { sdrId: parsedSdrId },
+          { lead: { sdrId: parsedSdrId } }
+        ]
+      };
       
       if (appointmentWhere.OR) {
         appointmentWhere.AND = appointmentWhere.AND || [];
@@ -144,6 +149,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       paymentExtraConditions.push({
         OR: [
           { appointment: { sdrId: parsedSdrId } },
+          { appointment: { lead: { sdrId: parsedSdrId } } },
           { client: { originLead: { sdrId: parsedSdrId } } }
         ]
       });
@@ -153,17 +159,23 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       const parsedCloserId = closerId === 'none' ? null : parseInt(closerId as string);
       leadExtraFilters.closerId = parsedCloserId;
       
-      const leadCloserCondition = { lead: { closerId: parsedCloserId } };
+      const leadCloserCondition = { 
+        OR: [
+          { especialistaId: parsedCloserId },
+          { lead: { closerId: parsedCloserId } }
+        ]
+      };
       
       if (appointmentWhere.OR) {
         appointmentWhere.AND = appointmentWhere.AND || [];
         appointmentWhere.AND.push(leadCloserCondition);
       } else {
-        appointmentWhere.lead = { closerId: parsedCloserId };
+        Object.assign(appointmentWhere, leadCloserCondition);
       }
 
       paymentExtraConditions.push({
         OR: [
+          { appointment: { especialistaId: parsedCloserId } },
           { appointment: { lead: { closerId: parsedCloserId } } },
           { client: { originLead: { closerId: parsedCloserId } } }
         ]

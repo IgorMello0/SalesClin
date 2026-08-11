@@ -711,7 +711,7 @@ const SalesFunnel = () => {
     const finalStatus = newStatus;
 
     setLeads(prev => prev.map(lead => {
-      if (lead.id === leadId) {
+      if (lead.id.toString() === leadId.toString()) {
         return { ...lead, status: finalStatus, lastUpdate: 'Agora mesmo' };
       }
       return lead;
@@ -756,7 +756,7 @@ const SalesFunnel = () => {
     if (isProposal) {
       targetLead = leads.find(l => l.proposals && l.proposals.some((p: any) => p.id === dbId));
     } else {
-      targetLead = leads.find(l => l.id === dbId.toString());
+      targetLead = leads.find(l => l.id == dbId.toString());
     }
 
     if (!targetLead) return;
@@ -855,15 +855,24 @@ const SalesFunnel = () => {
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, cardId: string) => {
-    setDraggedCardId(cardId);
-    e.dataTransfer.setData('cardId', cardId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
+    const handleDragStart = (e: React.DragEvent, cardId: string) => {
+      e.dataTransfer.setData('cardId', cardId);
+      e.dataTransfer.effectAllowed = 'move';
+      
+      // Delay state update to allow browser to capture opaque drag ghost
+      setTimeout(() => {
+        setDraggedCardId(cardId);
+      }, 0);
+    };
 
   const handleDragOver = (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
     setDropTargetStage(stageId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCardId(null);
+    setDropTargetStage(null);
   };
 
     const handleDrop = (e: React.DragEvent, stageId: string) => {
@@ -1672,6 +1681,7 @@ const SalesFunnel = () => {
         onAddLead={openAddLead}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onDragEnd={handleDragEnd}
         onDragLeave={() => setDropTargetStage(null)}
         dropTargetStage={dropTargetStage}
         isMultiSelectMode={isMultiSelectMode}

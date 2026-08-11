@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { funnelConfigApi, cadenceApi } from '@/lib/api';
-import { Save, Plus, Trash, Clock, Phone, MessageCircle, Mail } from 'lucide-react';
+import { Save, Plus, Trash, Clock, Phone, MessageCircle, Mail, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const METHOD_ICONS: Record<string, React.ReactNode> = {
@@ -23,6 +23,7 @@ export default function CadenceSettingsView() {
   const [selectedStage, setSelectedStage] = useState<string>('');
   const [config, setConfig] = useState<{ isActive: boolean; steps: any[] }>({ isActive: true, steps: [] });
   const [isLoading, setIsLoading] = useState(false);
+  const [isBannerOpen, setIsBannerOpen] = useState(false);
 
   useEffect(() => {
     loadFunnels();
@@ -105,6 +106,37 @@ export default function CadenceSettingsView() {
         <p className="text-muted-foreground">Automatize o fluxo de contatos para os leads em cada etapa do funil.</p>
       </div>
 
+      <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4 flex gap-4 text-blue-900 transition-all">
+        <div className="bg-blue-100 p-3 rounded-full h-fit shrink-0">
+          <MessageCircle className="h-6 w-6 text-blue-600" />
+        </div>
+        <div className="flex-1">
+          <div 
+            className="flex items-center justify-between cursor-pointer select-none"
+            onClick={() => setIsBannerOpen(!isBannerOpen)}
+          >
+            <h3 className="font-semibold text-lg m-0">Como funciona a Cadência Automática?</h3>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-700 hover:text-blue-800 hover:bg-blue-200/50 rounded-full">
+              {isBannerOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </Button>
+          </div>
+          
+          {isBannerOpen && (
+            <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <p className="text-sm text-blue-800/80 mb-3">
+                A cadência de contatos é uma sequência de ações pré-programadas para garantir que o seu time comercial ou de atendimento 
+                siga o roteiro ideal de abordagem. Ao mover um lead para a etapa configurada, o SellClin criará <b>automaticamente</b> as tarefas para os consultores executarem.
+              </p>
+              <ul className="text-sm text-blue-800/80 space-y-2 list-disc list-inside">
+                <li><b>1º Passo:</b> Será agendado logo após o lead entrar na etapa (ou com o atraso configurado).</li>
+                <li><b>Passos seguintes:</b> Quando o atendente clica em "Concluir Tarefa" no card do lead, o sistema lê esta configuração e agenda automaticamente o <b>próximo passo</b> respeitando o tempo de espera.</li>
+                <li>Use o campo de "Template/Roteiro" para escrever instruções ou a mensagem exata que o SDR deve copiar e enviar no WhatsApp!</li>
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Selecionar Funil e Etapa</CardTitle>
@@ -145,23 +177,6 @@ export default function CadenceSettingsView() {
         </CardContent>
       </Card>
 
-      <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-6 flex gap-4 text-blue-900">
-        <div className="bg-blue-100 p-3 rounded-full h-fit">
-          <MessageCircle className="h-6 w-6 text-blue-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-lg mb-2">Como funciona a Cadência Automática?</h3>
-          <p className="text-sm text-blue-800/80 mb-3">
-            A cadência de contatos é uma sequência de ações pré-programadas para garantir que o seu time comercial ou de atendimento 
-            siga o roteiro ideal de abordagem. Ao mover um lead para a etapa configurada, o SellClin criará <b>automaticamente</b> as tarefas para os consultores executarem.
-          </p>
-          <ul className="text-sm text-blue-800/80 space-y-2 list-disc list-inside">
-            <li><b>1º Passo:</b> Será agendado logo após o lead entrar na etapa (ou com o atraso configurado).</li>
-            <li><b>Passos seguintes:</b> Quando o atendente clica em "Concluir Tarefa" no card do lead, o sistema lê esta configuração e agenda automaticamente o <b>próximo passo</b> respeitando o tempo de espera.</li>
-            <li>Use o campo de "Template/Roteiro" para escrever instruções ou a mensagem exata que o SDR deve copiar e enviar no WhatsApp!</li>
-          </ul>
-        </div>
-      </div>
 
       {selectedStage && (
         <Card>

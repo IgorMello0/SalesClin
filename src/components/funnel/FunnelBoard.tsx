@@ -24,6 +24,7 @@ interface FunnelBoardProps {
   onToggleLeadSelection: (id: number) => void;
   onSelectLead: (lead: any) => void;
   onDragStart: (e: React.DragEvent, cardId: string) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
   draggedCardId: string | null;
   activeFunnel: string;
   onOpenWhatsApp: (phone: string) => void;
@@ -53,6 +54,7 @@ export function FunnelBoard({
   onToggleLeadSelection,
   onSelectLead,
   onDragStart,
+  onDragEnd,
   draggedCardId,
   activeFunnel,
   onOpenWhatsApp,
@@ -149,6 +151,7 @@ export function FunnelBoard({
             onToggleLeadSelection={onToggleLeadSelection}
             onSelectLead={onSelectLead}
             onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
             draggedCardId={draggedCardId}
             activeFunnel={activeFunnel}
             onOpenWhatsApp={onOpenWhatsApp}

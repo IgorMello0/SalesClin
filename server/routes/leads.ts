@@ -131,7 +131,7 @@ router.get('/', auth(), async (req, res) => {
         take,
         include: {
           activities: { orderBy: { createdAt: 'asc' } },
-          proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } },
+          proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true, sdr: true } },
           appointments: { orderBy: { startTime: 'desc' }, take: 1 },
           tasks: { where: { status: 'pending', cadenceStageCode: { not: null } }, orderBy: { dueDate: 'asc' }, take: 1 }
         },
@@ -154,7 +154,7 @@ router.get('/:id', auth(), async (req, res) => {
       where: { id },
       include: {
         activities: { orderBy: { createdAt: 'asc' } },
-        proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true } },
+        proposals: { orderBy: { createdAt: 'desc' }, include: { specialist: true, salesperson: true, sdr: true } },
         tasks: { where: { status: 'pending', cadenceStageCode: { not: null } }, orderBy: { dueDate: 'asc' }, take: 1 }
       }
     })
@@ -468,9 +468,13 @@ router.post('/:id/proposals', auth(), async (req, res) => {
       }
     })
     
+    const leadUpdateData: any = { value: Number(value) || 0 };
+    if (sdrId) leadUpdateData.sdrId = Number(sdrId);
+    if (salespersonId) leadUpdateData.closerId = Number(salespersonId);
+    
     await prisma.lead.update({
       where: { id },
-      data: { value: Number(value) || 0 }
+      data: leadUpdateData
     })
     
     res.status(201).json(createSuccessResponse(proposal))
@@ -512,11 +516,18 @@ router.put('/:id/proposals/:proposalId', auth(), async (req, res) => {
       data: updateData
     })
     
-    if (value !== undefined) {
-      await prisma.lead.update({
-        where: { id },
-        data: { value: Number(value) || 0 }
-      })
+    if (value !== undefined || sdrId !== undefined || salespersonId !== undefined) {
+      const leadUpdateData: any = {};
+      if (value !== undefined) leadUpdateData.value = Number(value) || 0;
+      if (sdrId !== undefined) leadUpdateData.sdrId = sdrId ? Number(sdrId) : null;
+      if (salespersonId !== undefined) leadUpdateData.closerId = salespersonId ? Number(salespersonId) : null;
+      
+      if (Object.keys(leadUpdateData).length > 0) {
+        await prisma.lead.update({
+          where: { id },
+          data: leadUpdateData
+        })
+      }
     }
     
     res.json(createSuccessResponse(proposal))

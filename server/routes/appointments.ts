@@ -284,13 +284,32 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
       professionalId = await getCompanyOwnerProfessionalId(req.user?.companyId);
     }
 
-    if (clientId) await assertClientBelongsToCompany(Number(clientId), req.user?.companyId)
+    let finalSdrId = sdrId ? Number(sdrId) : null;
+    let finalEspecialistaId = especialistaId ? Number(especialistaId) : null;
+
+    if (clientId) {
+      await assertClientBelongsToCompany(Number(clientId), req.user?.companyId);
+      if (!finalSdrId || !finalEspecialistaId) {
+        const client = await prisma.client.findUnique({
+          where: { id: Number(clientId) },
+          include: { originLead: { select: { sdrId: true, closerId: true } } }
+        });
+        if (client?.originLead) {
+          if (!finalSdrId && client.originLead.sdrId) finalSdrId = client.originLead.sdrId;
+          if (!finalEspecialistaId && client.originLead.closerId) finalEspecialistaId = client.originLead.closerId;
+        }
+      }
+    }
+
     if (leadId) {
       const lead = await prisma.lead.findFirst({
         where: { id: Number(leadId), companyId: req.user!.companyId },
-        select: { id: true },
+        select: { id: true, sdrId: true, closerId: true },
       })
       if (!lead) return res.status(400).json(createErrorResponse('Lead inválido para esta clínica', 400))
+      
+      if (!finalSdrId && lead.sdrId) finalSdrId = lead.sdrId;
+      if (!finalEspecialistaId && lead.closerId) finalEspecialistaId = lead.closerId;
     }
     if (serviceId) {
       const service = await prisma.catalogItem.findFirst({
@@ -345,8 +364,8 @@ router.post('/', auth(), requireModule('agendamentos'), async (req, res) => {
         endTime: new Date(endTime), 
         status: status || 'agendado', 
         notes,
-        sdrId: sdrId ? Number(sdrId) : null,
-        especialistaId: especialistaId ? Number(especialistaId) : null
+        sdrId: finalSdrId,
+        especialistaId: finalEspecialistaId
       },
       include: { 
         professional: { select: { id: true, name: true, specialization: true } }, client: true, lead: true, service: true, appointmentLogs: true, payments: true,

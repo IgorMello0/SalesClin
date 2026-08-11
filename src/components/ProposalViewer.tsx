@@ -176,8 +176,16 @@ export function ProposalViewer({ open, onOpenChange, proposal, lead, companyInfo
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#64748b]">Consultor:</span>
-                    <span className="font-bold">{proposal.salespersonName || "Consultor SellClin"}</span>
+                    <span className="text-[#64748b]">Closer:</span>
+                    <span className="font-bold">{proposal.salesperson?.name || proposal.salespersonName || "Nǜo informado"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#64748b]">SDR:</span>
+                    <span className="font-bold">{proposal.sdr?.name || "Nǜo informado"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#64748b]">Profissional:</span>
+                    <span className="font-bold">{proposal.specialist?.name || "Nǜo informado"}</span>
                   </div>
                 </div>
               </div>

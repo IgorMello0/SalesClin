@@ -425,9 +425,13 @@ export default function Tasks() {
 
   // Drag and Drop Handlers
   const handleDragStart = (e: React.DragEvent, taskId: number) => {
-    setDraggedTaskId(taskId);
     e.dataTransfer.setData('taskId', String(taskId));
     e.dataTransfer.effectAllowed = 'move';
+    
+    // Delay state update to allow browser to capture opaque drag ghost
+    setTimeout(() => {
+      setDraggedTaskId(taskId);
+    }, 0);
   };
 
   const handleDragOver = (e: React.DragEvent, status: 'pending' | 'in_progress' | 'completed') => {

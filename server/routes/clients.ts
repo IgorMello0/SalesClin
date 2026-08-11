@@ -256,7 +256,8 @@ router.get('/:id/dossier', auth(), requireModule('clientes'), async (req, res) =
         originLead: {
           include: {
             proposals: {
-              orderBy: { createdAt: 'desc' }
+              orderBy: { createdAt: 'desc' },
+              include: { specialist: true, salesperson: true, sdr: true }
             }
           }
         }
@@ -422,7 +423,7 @@ router.post('/:id/proposals', auth(), requireModule('clientes'), async (req, res
       return res.status(403).json(createErrorResponse('Acesso negado', 403));
     }
 
-    const { title, value, status, validUntil } = req.body
+    const { title, value, status, validUntil, salespersonId, specialistId, sdrId, tags, justification, discountApplied } = req.body
 
     const client = await prisma.client.findUnique({
       where: { id: clientId },
@@ -435,21 +436,33 @@ router.post('/:id/proposals', auth(), requireModule('clientes'), async (req, res
 
     let leadId = client.originLead?.id
 
-    // If client doesn't have an origin lead, we create one and link it
-    if (!leadId) {
-      const newLead = await prisma.lead.create({
-        data: {
-          professionalId: client.professionalId,
-          companyId: client.companyId,
-          name: client.name,
-          email: client.email,
-          phone: client.phone,
-          status: 'comercial_proposal',
-          convertedToClientId: client.id,
+    if (!client.originLead) {
+        // Criar um lead base para anexar a proposta
+        const newLead = await prisma.lead.create({
+          data: {
+            professionalId: client.professionalId,
+            companyId: client.companyId,
+            name: client.name,
+            email: client.email,
+            phone: client.phone,
+            status: 'comercial_proposal',
+            convertedToClientId: client.id,
+            sdrId: sdrId ? Number(sdrId) : null,
+            closerId: salespersonId ? Number(salespersonId) : null,
+          }
+        })
+        leadId = newLead.id
+      } else {
+        const leadUpdateData: any = {};
+        if (sdrId !== undefined) leadUpdateData.sdrId = sdrId ? Number(sdrId) : null;
+        if (salespersonId !== undefined) leadUpdateData.closerId = salespersonId ? Number(salespersonId) : null;
+        if (Object.keys(leadUpdateData).length > 0) {
+           await prisma.lead.update({
+             where: { id: client.originLead.id },
+             data: leadUpdateData
+           });
         }
-      })
-      leadId = newLead.id
-    }
+      }
 
     const proposal = await prisma.proposal.create({
       data: {
@@ -457,7 +470,13 @@ router.post('/:id/proposals', auth(), requireModule('clientes'), async (req, res
         title: title || 'Nova Proposta',
         value: value || 0,
         status: status || 'pending',
-        validUntil: validUntil ? new Date(validUntil) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
+        validUntil: validUntil ? new Date(validUntil) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        salespersonId: salespersonId ? Number(salespersonId) : null,
+        specialistId: specialistId ? Number(specialistId) : null,
+        sdrId: sdrId ? Number(sdrId) : null,
+        tags: tags || [],
+        justification,
+        discountApplied: Boolean(discountApplied)
       }
     })
 

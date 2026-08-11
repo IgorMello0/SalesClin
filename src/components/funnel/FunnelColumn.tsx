@@ -22,6 +22,7 @@ interface FunnelColumnProps {
   onToggleLeadSelection: (id: number) => void;
   onSelectLead: (lead: any) => void;
   onDragStart: (e: React.DragEvent, cardId: string) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
   draggedCardId: string | null;
   activeFunnel: string;
   onOpenWhatsApp: (phone: string) => void;
@@ -52,6 +53,7 @@ export function FunnelColumn({
   onToggleLeadSelection,
   onSelectLead,
   onDragStart,
+  onDragEnd,
   draggedCardId,
   activeFunnel,
   onOpenWhatsApp,
@@ -76,7 +78,6 @@ export function FunnelColumn({
       className="flex-shrink-0 w-[280px] sm:w-72 flex flex-col gap-3 snap-center"
       onDragOver={(e) => onDragOver(e, stage.id)}
       onDrop={(e) => onDrop(e, stage.id)}
-      onDragLeave={onDragLeave}
     >
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-2">
@@ -97,7 +98,7 @@ export function FunnelColumn({
       <div className={cn(
         "flex-1 min-h-[500px] rounded-2xl p-2.5 space-y-2 transition-all duration-200",
         "bg-slate-50/50 border border-slate-100/50",
-        isOver && "bg-slate-100/80 border-secondary/30 scale-[1.01]"
+        isOver && "bg-slate-100/80 border-secondary/30"
       )}>
         {stageLeads.map((lead) => (
           <FunnelCard 
@@ -108,6 +109,7 @@ export function FunnelColumn({
             onToggleSelection={onToggleLeadSelection}
             onSelect={onSelectLead}
             onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
             isDragged={draggedCardId === (lead.cardId || `lead-${lead.id}`)}
             activeFunnel={activeFunnel}
             stageId={stage.id}
