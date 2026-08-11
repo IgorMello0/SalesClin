@@ -176,6 +176,22 @@ test('Coexistencia usa configuracao dedicada e recebe pelo pipeline oficial', as
   assert.equal(state.messages[0].content, 'Mensagem pelo numero coexistente')
 })
 
+test('Coexistencia habilitada libera conexao sem allowlist de teste', async () => {
+  const { isCoexistenceAllowed } = await import('./whatsapp-connections.js')
+
+  process.env.WHATSAPP_COEXISTENCE_ENABLED = 'true'
+  delete process.env.WHATSAPP_COEXISTENCE_RESTRICT_EMAILS
+  delete process.env.WHATSAPP_COEXISTENCE_TEST_EMAILS
+
+  assert.equal(isCoexistenceAllowed('cliente@sellclin.test'), true)
+
+  process.env.WHATSAPP_COEXISTENCE_RESTRICT_EMAILS = 'true'
+  process.env.WHATSAPP_COEXISTENCE_TEST_EMAILS = 'igormello403@gmail.com'
+
+  assert.equal(isCoexistenceAllowed('cliente@sellclin.test'), false)
+  assert.equal(isCoexistenceAllowed('igormello403@gmail.com'), true)
+})
+
 test('WhatsApp Nao Oficial cria lead e ignora mensagem repetida', async () => {
   const { db, state } = createFakeDatabase()
   const payload = {

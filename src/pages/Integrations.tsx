@@ -105,10 +105,10 @@ const integrationOptions: IntegrationOption[] = [
   },
   {
     id: 'whatsappCoexistence',
-    title: 'Coexistencia',
+    title: 'Coexistencia WhatsApp',
     eyebrow: 'WhatsApp Business',
     description: 'Mantenha o aplicativo no celular e conecte o mesmo numero ao SellClin.',
-    status: 'Acesso controlado',
+    status: 'Disponivel',
     available: true,
     logo: (
       <span className="relative flex h-8 w-8 items-center justify-center">
@@ -216,6 +216,21 @@ const Integrations = () => {
 
   useEffect(() => {
     if (!canManageIntegrations) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const channel = params.get('channel');
+    const channelMap: Record<string, IntegrationKey> = {
+      'whatsapp-official': 'whatsappOfficial',
+      'whatsapp-coexistence': 'whatsappCoexistence',
+      'whatsapp-uazapi': 'whatsappUazapi',
+      instagram: 'instagram',
+      messenger: 'messenger',
+      'google-calendar': 'googleCalendar',
+    };
+
+    if (channel && channelMap[channel]) {
+      setSelectedIntegration(channelMap[channel]);
+    }
 
     Promise.allSettled([loadMetaStatus(), loadUazapiStatus()]).then((results) => {
       const failed = results.find((result) => result.status === 'rejected');
@@ -697,7 +712,7 @@ const Integrations = () => {
                         </div>
                         <Button
                           onClick={() => void connectMeta('coexistence')}
-                          disabled={workingKey === 'whatsappCoexistence' || !metaStatus?.coexistenceAllowed || !metaStatus?.coexistenceConfigured}
+                          disabled={workingKey === 'whatsappCoexistence' || !metaStatus?.coexistenceEnabled || !metaStatus?.coexistenceConfigured}
                           className="shrink-0 bg-emerald-600 font-bold hover:bg-emerald-700"
                         >
                           {workingKey === 'whatsappCoexistence' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
@@ -706,9 +721,9 @@ const Integrations = () => {
                       </div>
                     </div>
 
-                    {(!metaStatus?.coexistenceAllowed || !metaStatus?.coexistenceConfigured) && (
+                    {(!metaStatus?.coexistenceEnabled || !metaStatus?.coexistenceConfigured) && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
-                        A coexistência ainda não está habilitada para esta conta. O suporte do SellClin pode liberar o acesso controlado.
+                        A coexistencia ainda nao esta habilitada no servidor. Confira WHATSAPP_COEXISTENCE_ENABLED e META_WHATSAPP_COEXISTENCE_CONFIG_ID.
                       </div>
                     )}
 

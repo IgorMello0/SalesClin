@@ -21,6 +21,9 @@ export function isCoexistenceEnabled() {
 export function isCoexistenceAllowed(email?: string | null) {
   if (!isCoexistenceEnabled()) return false
 
+  const restrictToTestEmails = String(process.env.WHATSAPP_COEXISTENCE_RESTRICT_EMAILS || '').toLowerCase() === 'true'
+  if (!restrictToTestEmails) return true
+
   const allowlist = normalizedEmails(process.env.WHATSAPP_COEXISTENCE_TEST_EMAILS)
   const allowedEmails = allowlist.length ? allowlist : DEFAULT_COEXISTENCE_TEST_EMAILS
   return Boolean(email && allowedEmails.includes(email.trim().toLowerCase()))

@@ -170,31 +170,60 @@ async function tryExchangeLongLivedToken(accessToken: string) {
   return accessToken
 }
 
-async function resolveMetaWhatsappAccount(accessToken: string) {
-  const businesses = await graphGet<{ data?: any[] }>('/me/businesses', accessToken, {
-    fields: 'id,name',
-  })
+async function getWabaPhoneNumbers(wabaId: string, accessToken: string) {
+  return graphGet<{ data?: any[] }>(`/${wabaId}/phone_numbers`, accessToken, {
+    fields: 'id,display_phone_number,verified_name',
+  }).catch(() => ({ data: [] }))
+}
 
-  for (const business of businesses.data || []) {
-    const wabas = await graphGet<{ data?: any[] }>(`/${business.id}/owned_whatsapp_business_accounts`, accessToken, {
-      fields: 'id,name,phone_numbers{id,display_phone_number,verified_name}',
-    }).catch(() => ({ data: [] }))
+async function resolveWabaFromEdge(
+  business: any,
+  edgeName: string,
+  accessToken: string,
+) {
+  const wabas = await graphGet<{ data?: any[] }>(`/${business.id}/${edgeName}`, accessToken, {
+    fields: 'id,name,phone_numbers{id,display_phone_number,verified_name}',
+  }).catch(() => ({ data: [] }))
 
-    for (const waba of wabas.data || []) {
-      const phoneNumbers = waba.phone_numbers?.data || []
-      const phone = phoneNumbers[0]
-      if (phone?.id) {
-        return {
-          businessId: String(business.id),
-          wabaId: String(waba.id),
-          phoneNumberId: String(phone.id),
-          displayPhoneNumber: phone.display_phone_number || phone.verified_name || null,
-        }
+  for (const waba of wabas.data || []) {
+    let phoneNumbers = waba.phone_numbers?.data || []
+    if (!phoneNumbers.length && waba.id) {
+      const phones = await getWabaPhoneNumbers(String(waba.id), accessToken)
+      phoneNumbers = phones.data || []
+    }
+
+    const phone = phoneNumbers[0]
+    if (phone?.id) {
+      return {
+        businessId: String(business.id),
+        wabaId: String(waba.id),
+        phoneNumberId: String(phone.id),
+        displayPhoneNumber: phone.display_phone_number || phone.verified_name || null,
+        edgeName,
       }
     }
   }
 
-  throw new Error('Nenhum numero de WhatsApp Business foi retornado pela Meta para esta autorizacao.')
+  return null
+}
+
+async function resolveMetaWhatsappAccount(accessToken: string, officialMode: WhatsAppOfficialMode) {
+  const businesses = await graphGet<{ data?: any[] }>('/me/businesses', accessToken, {
+    fields: 'id,name',
+  })
+
+  const edgeNames = officialMode === 'coexistence'
+    ? ['client_whatsapp_business_accounts', 'owned_whatsapp_business_accounts']
+    : ['owned_whatsapp_business_accounts', 'client_whatsapp_business_accounts']
+
+  for (const business of businesses.data || []) {
+    for (const edgeName of edgeNames) {
+      const account = await resolveWabaFromEdge(business, edgeName, accessToken)
+      if (account) return account
+    }
+  }
+
+  throw new Error('Nenhum numero de WhatsApp Business foi retornado pela Meta para esta autorizacao. Confirme se o onboarding compartilhou o WABA e o numero com o app do SellClin.')
 }
 
 export function buildMetaConnectUrl(
@@ -218,8 +247,13 @@ export function buildMetaConnectUrl(
   url.searchParams.set('scope', 'business_management,whatsapp_business_management,whatsapp_business_messaging')
 
   if (officialMode === 'coexistence') {
+    const solutionId = cleanOptional(
+      process.env.META_WHATSAPP_COEXISTENCE_SOLUTION_ID ||
+      process.env.META_WHATSAPP_SOLUTION_ID,
+    )
+    const setup = solutionId ? { solutionID: solutionId } : {}
     url.searchParams.set('extras', JSON.stringify({
-      setup: {},
+      setup,
       featureType: 'whatsapp_business_app_onboarding',
       sessionInfoVersion: '3',
       version: 'v3',
@@ -241,7 +275,7 @@ export function verifyMetaState(state: string): MetaStatePayload {
 export async function connectMetaWhatsappFromCode(code: string, state: string) {
   const payload = verifyMetaState(state)
   const accessToken = await exchangeCodeForToken(code)
-  const account = await resolveMetaWhatsappAccount(accessToken)
+  const account = await resolveMetaWhatsappAccount(accessToken, payload.officialMode)
   await subscribeWhatsappApp(account.wabaId, accessToken)
 
   const updated = await prisma.empresa.update({
@@ -278,7 +312,7 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
     displayPhoneNumber: account.displayPhoneNumber,
     accessToken,
     connectedAt: updated.metaConnectedAt,
-    metadata: { onboarding: 'embedded_signup' },
+    metadata: { onboarding: 'embedded_signup', edgeName: account.edgeName },
   })
 
   return { ...updated, officialMode: payload.officialMode }

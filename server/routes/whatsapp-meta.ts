@@ -70,7 +70,7 @@ router.get('/connect', ...ownerOnly, async (req, res) => {
     if (officialMode === 'coexistence') {
       const email = await getRequestEmail(req)
       if (!isCoexistenceAllowed(email)) {
-        return res.status(403).json(createErrorResponse('Coexistencia ainda nao liberada para este perfil.', 403))
+        return res.status(403).json(createErrorResponse('Coexistencia ainda nao habilitada para esta conta.', 403))
       }
     }
 
@@ -98,7 +98,8 @@ router.get('/callback', async (req, res) => {
 
   try {
     const result = await connectMetaWhatsappFromCode(code, state)
-    return res.redirect(`${appUrl}/integrations?channel=whatsapp-official&whatsappMeta=connected&mode=${result.officialMode}`)
+    const channel = result.officialMode === 'coexistence' ? 'whatsapp-coexistence' : 'whatsapp-official'
+    return res.redirect(`${appUrl}/integrations?channel=${channel}&whatsappMeta=connected&mode=${result.officialMode}`)
   } catch (err: any) {
     console.error('[WhatsApp Meta Callback] Erro:', err)
     return res.redirect(`${appUrl}/settings?view=whatsapp&whatsappMeta=error`)
