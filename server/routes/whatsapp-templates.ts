@@ -48,6 +48,31 @@ router.post('/sync', auth(), requireModule('conversas'), requireCompanyOwner(), 
   }
 })
 
+router.post('/appointment-reminder', auth(), requireModule('conversas'), requireCompanyOwner(), async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const template = await createMetaTemplate(companyId, {
+      name: 'lembrete_de_agendamento',
+      language: 'pt_BR',
+      category: 'UTILITY',
+      headerText: 'Lembrete de agendamento',
+      bodyText: 'Ola, {{1}}. Seu atendimento na {{2}} esta agendado para {{3}}. Responda para confirmar ou solicitar alteracao.',
+      bodyExamples: ['Maria', 'Clinica SellClin', '25/07 as 14h'],
+      footerText: 'Mensagem referente ao seu agendamento',
+      buttons: [
+        { type: 'QUICK_REPLY', text: 'Confirmar' },
+        { type: 'QUICK_REPLY', text: 'Solicitar alteracao' },
+      ],
+    })
+    return res.status(201).json(createSuccessResponse(template))
+  } catch (error: any) {
+    console.error('[WhatsApp Templates] Erro ao criar lembrete:', error)
+    return res.status(400).json(createErrorResponse(error.message || 'Erro ao criar template de lembrete', 400))
+  }
+})
+
 router.post('/', auth(), requireModule('conversas'), requireCompanyOwner(), async (req, res) => {
   try {
     const companyId = await getRequestCompanyId(req)

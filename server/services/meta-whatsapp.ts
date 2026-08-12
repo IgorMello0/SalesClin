@@ -168,6 +168,38 @@ async function getWabaIdsFromDebugToken(accessToken: string) {
 type MetaWebhookSubscription = {
   callbackUrl: string
   overrideVerified: boolean
+  appSubscribed: boolean
+  subscribedAppId: string | null
+  reportedCallbackUrl: string | null
+}
+
+type MetaSubscribedApp = {
+  override_callback_uri?: string
+  whatsapp_business_api_data?: {
+    id?: string
+    name?: string
+  }
+}
+
+export function inspectMetaWebhookSubscriptions(
+  subscriptions: MetaSubscribedApp[],
+  expectedAppId: string,
+  expectedCallbackUrl: string,
+): MetaWebhookSubscription {
+  const expectedId = cleanRequired(expectedAppId, 'META_APP_ID')
+  const expectedCallback = cleanRequired(expectedCallbackUrl, 'URL do webhook')
+  const app = subscriptions.find((item) => (
+    cleanOptional(item?.whatsapp_business_api_data?.id) === expectedId
+  ))
+  const reportedCallbackUrl = cleanOptional(app?.override_callback_uri)
+
+  return {
+    callbackUrl: expectedCallback,
+    appSubscribed: Boolean(app),
+    subscribedAppId: cleanOptional(app?.whatsapp_business_api_data?.id),
+    reportedCallbackUrl,
+    overrideVerified: Boolean(app && reportedCallbackUrl === expectedCallback),
+  }
 }
 
 function createWebhookVerifyToken(current?: string | null) {
@@ -180,6 +212,7 @@ async function subscribeWhatsappApp(
   webhook?: { callbackUrl: string; verifyToken: string },
 ): Promise<MetaWebhookSubscription | null> {
   try {
+    const { appId } = requireMetaCredentials()
     await graphPost(`/${wabaId}/subscribed_apps`, accessToken)
 
     if (!webhook) return null
@@ -189,21 +222,24 @@ async function subscribeWhatsappApp(
       verify_token: webhook.verifyToken,
     })
 
-    const subscriptions = await graphGet<{ data?: Array<{ override_callback_uri?: string }> }>(
+    const subscriptions = await graphGet<{ data?: MetaSubscribedApp[] }>(
       `/${wabaId}/subscribed_apps`,
       accessToken,
-    ).catch(() => ({ data: [] }))
-    const reportedCallbacks = (subscriptions.data || [])
-      .map((item) => cleanOptional(item?.override_callback_uri))
-      .filter(Boolean)
-    const overrideVerified = reportedCallbacks.length === 0
-      || reportedCallbacks.includes(webhook.callbackUrl)
+    )
+    const verification = inspectMetaWebhookSubscriptions(
+      subscriptions.data || [],
+      appId,
+      webhook.callbackUrl,
+    )
 
-    if (!overrideVerified) {
+    if (!verification.appSubscribed) {
+      throw new Error('O app SellClin nao apareceu nas assinaturas da conta do WhatsApp.')
+    }
+    if (!verification.overrideVerified) {
       throw new Error('A Meta manteve outro callback configurado para esta conta do WhatsApp.')
     }
 
-    return { callbackUrl: webhook.callbackUrl, overrideVerified }
+    return verification
   } catch (error: any) {
     throw new Error(
       `Nao foi possivel habilitar o recebimento de mensagens na Meta: ${error.message || 'verifique as permissoes do token.'}`
@@ -481,8 +517,37 @@ export async function getMetaWhatsappStatus(companyId: number) {
     ? connection.metadata as Record<string, unknown>
     : {}
   const expectedWebhookUrl = buildMetaWebhookUrl(company.webhookToken)
-  const webhookConfigured = connectionMetadata.webhookOverrideVerified === true
-    && connectionMetadata.webhookCallbackUrl === expectedWebhookUrl
+  let webhookConfigured = false
+  let webhookDiagnostic: string | null = null
+  let subscribedAppId: string | null = null
+  let reportedCallbackUrl: string | null = null
+
+  if (connected && company.metaWabaId && company.metaToken) {
+    try {
+      const { appId } = requireMetaCredentials()
+      const subscriptions = await graphGet<{ data?: MetaSubscribedApp[] }>(
+        `/${company.metaWabaId}/subscribed_apps`,
+        company.metaToken,
+      )
+      const verification = inspectMetaWebhookSubscriptions(
+        subscriptions.data || [],
+        appId,
+        expectedWebhookUrl,
+      )
+      webhookConfigured = verification.overrideVerified
+      subscribedAppId = verification.subscribedAppId
+      reportedCallbackUrl = verification.reportedCallbackUrl
+      if (!verification.appSubscribed) {
+        webhookDiagnostic = 'O app SellClin nao esta assinado nesta conta do WhatsApp.'
+      } else if (!verification.overrideVerified) {
+        webhookDiagnostic = 'A Meta esta entregando eventos para outra URL de webhook.'
+      }
+    } catch (error: any) {
+      webhookDiagnostic = error?.message || 'Nao foi possivel confirmar a assinatura do webhook na Meta.'
+    }
+  } else if (connected) {
+    webhookDiagnostic = 'A conexao nao possui WABA ID ou token para validar o recebimento.'
+  }
   const lastWebhookEvent = await prisma.whatsAppWebhookEvent.findFirst({
     where: { companyId, provider: 'meta' },
     orderBy: { createdAt: 'desc' },
@@ -510,6 +575,9 @@ export async function getMetaWhatsappStatus(companyId: number) {
     hasTwoStepPin: Boolean(company.metaTwoStepPin),
     webhookUrl: expectedWebhookUrl,
     webhookConfigured,
+    webhookDiagnostic,
+    subscribedAppId,
+    reportedCallbackUrl,
     lastWebhookEvent,
     connectedAt: company.metaConnectedAt,
     officialMode: connection?.provider === 'meta' ? (connection.officialMode || 'cloud_api') : 'cloud_api',

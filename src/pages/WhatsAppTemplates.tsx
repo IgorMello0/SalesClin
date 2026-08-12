@@ -114,6 +114,7 @@ export default function WhatsAppTemplates() {
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [creatingReminder, setCreatingReminder] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
@@ -185,6 +186,23 @@ export default function WhatsAppTemplates() {
       toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' })
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const createAppointmentReminder = async () => {
+    setCreatingReminder(true)
+    try {
+      const response = await whatsappTemplatesApi.createAppointmentReminder()
+      if (!response.success) throw new Error(response.error?.message || 'Não foi possível enviar o template para a Meta.')
+      await load()
+      toast({
+        title: 'Template enviado para a Meta',
+        description: 'O lembrete de agendamento ficará disponível após a aprovação.',
+      })
+    } catch (error: any) {
+      toast({ title: 'Erro ao criar template', description: error.message, variant: 'destructive' })
+    } finally {
+      setCreatingReminder(false)
     }
   }
 
@@ -304,7 +322,17 @@ export default function WhatsAppTemplates() {
           </div>
 
           {!loading && filtered.length === 0 && (
-            <div className="px-4 py-16 text-center"><FileText className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-semibold text-slate-700">Nenhum template encontrado</p><p className="mt-1 text-sm text-slate-500">Ajuste os filtros ou envie um novo modelo para análise.</p></div>
+            <div className="px-4 py-16 text-center">
+              <FileText className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-3 font-semibold text-slate-700">Nenhum template encontrado</p>
+              <p className="mt-1 text-sm text-slate-500">Envie um lembrete de agendamento para validar a integração com a Meta.</p>
+              {canManage && status === 'all' && category === 'all' && !query && (
+                <Button className="mt-5" onClick={() => void createAppointmentReminder()} disabled={creatingReminder}>
+                  {creatingReminder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                  Criar template de teste
+                </Button>
+              )}
+            </div>
           )}
           {loading && <div className="flex items-center justify-center gap-2 px-4 py-16 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Carregando templates</div>}
         </div>

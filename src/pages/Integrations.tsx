@@ -48,6 +48,9 @@ type MetaStatus = {
   coexistenceEnabled?: boolean;
   coexistenceConfigured?: boolean;
   webhookConfigured?: boolean;
+  webhookDiagnostic?: string | null;
+  subscribedAppId?: string | null;
+  reportedCallbackUrl?: string | null;
   lastWebhookEvent?: {
     eventType?: string | null;
     status?: string;
@@ -781,7 +784,7 @@ const Integrations = () => {
                       <div className={`rounded-lg border p-3 text-xs font-semibold ${metaStatus?.webhookConfigured ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                         {metaStatus?.webhookConfigured
                           ? 'Mensagens recebidas estao vinculadas a esta clinica.'
-                          : 'A conexao esta ativa, mas o recebimento precisa ser configurado.'}
+                          : (metaStatus?.webhookDiagnostic || 'A conexao esta ativa, mas o recebimento precisa ser configurado.')}
                       </div>
                     )}
                     {isIntegrationConnected('whatsappCoexistence') && (

@@ -923,6 +923,8 @@ export const whatsappTemplatesApi = {
   sync: async () => apiRequest<any[]>('/whatsapp/templates/sync', { method: 'POST' }),
   create: async (data: import('@/types/whatsapp-template').CreateWhatsAppTemplateInput) =>
     apiRequest<any>('/whatsapp/templates', { method: 'POST', body: JSON.stringify(data) }),
+  createAppointmentReminder: async () =>
+    apiRequest<any>('/whatsapp/templates/appointment-reminder', { method: 'POST' }),
   delete: async (id: number) => apiRequest<any>(`/whatsapp/templates/${id}`, { method: 'DELETE' }),
 }
 
