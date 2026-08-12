@@ -115,13 +115,15 @@ export function ConfirmPaymentModal({ open, onOpenChange, leadId, leadValue, pro
       const valuePerInstallment = block.totalValue / count;
       
       for (let i = 0; i < count; i++) {
+        const isBoleto = block.method === 'boleto';
+        const monthsToAdd = isBoleto ? i + 1 : i;
         newInstallments.push({
           blockId: block.id,
           installmentNumber: i + 1,
           amount: valuePerInstallment,
-          date: format(addMonths(today, i), 'yyyy-MM-dd'),
+          date: format(addMonths(today, monthsToAdd), 'yyyy-MM-dd'),
           method: block.method,
-          status: 'pago'
+          status: isBoleto ? 'pendente' : 'pago'
         });
       }
     });
