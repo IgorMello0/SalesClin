@@ -55,7 +55,7 @@ router.get('/', auth(), requireModule('agendamentos'), async (req, res) => {
       include: { 
         professional: true, 
         client: true, 
-        lead: true, 
+        lead: { include: { proposals: true } }, 
         service: true, 
         appointmentLogs: true, 
         payments: true,
@@ -81,10 +81,10 @@ router.get('/', auth(), requireModule('agendamentos'), async (req, res) => {
       if (restrictedRole) {
         let isMine = false;
         if (restrictedRole.isSDR) {
-          isMine = item.sdrId === req.user!.id;
+          isMine = item.sdrId === req.user!.id || item.lead?.sdrId === req.user!.id || !!item.lead?.proposals?.some((p: any) => p.sdrId === req.user!.id);
         }
         if (restrictedRole.isCloser) {
-          isMine = isMine || item.lead?.closerId === req.user!.id;
+          isMine = isMine || item.especialistaId === req.user!.id || item.lead?.closerId === req.user!.id || !!item.lead?.proposals?.some((p: any) => p.salespersonId === req.user!.id);
         }
         if (!isMine) {
           return {
@@ -230,14 +230,14 @@ router.get('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
   const id = Number(req.params.id)
   const item = await prisma.appointment.findFirst({
     where: { id, companyId: req.user!.companyId },
-    include: {
-      professional: { select: { id: true, name: true, specialization: true } },
-      client: true,
-      lead: true,
-      service: true,
-      appointmentLogs: true,
-      payments: true,
-    }
+      include: {
+        professional: { select: { id: true, name: true, specialization: true } },
+        client: true,
+        lead: { include: { proposals: true } },
+        service: true,
+        appointmentLogs: true,
+        payments: true,
+      }
   })
   if (!item) return res.status(404).json(createErrorResponse('Agendamento não encontrado', 404))
     let restrictedRole: any = null;
@@ -254,10 +254,10 @@ router.get('/:id', auth(), requireModule('agendamentos'), async (req, res) => {
     if (restrictedRole) {
       let isMine = false;
       if (restrictedRole.isSDR) {
-        isMine = item.sdrId === req.user!.id;
+        isMine = item.sdrId === req.user!.id || item.lead?.sdrId === req.user!.id || !!item.lead?.proposals?.some((p: any) => p.sdrId === req.user!.id);
       }
       if (restrictedRole.isCloser) {
-        isMine = isMine || item.lead?.closerId === req.user!.id;
+        isMine = isMine || item.especialistaId === req.user!.id || item.lead?.closerId === req.user!.id || !!item.lead?.proposals?.some((p: any) => p.salespersonId === req.user!.id);
       }
       if (!isMine) {
         return res.json(createSuccessResponse({

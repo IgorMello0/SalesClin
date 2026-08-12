@@ -96,13 +96,15 @@ router.get('/', auth(), async (req, res) => {
         // Se nÃ£o for Admin nem Gestor Comercial, sÃ³ vÃª leads atribuÃ­dos a si mesmo (como SDR ou Closer)
         // OU leads antigos que ainda nÃ£o possuem nenhuma atribuiÃ§Ã£o
         where.AND = [
-          {
-            OR: [
-              { sdrId: req.user.id },
-              { closerId: req.user.id },
-              { sdrId: null, closerId: null }
-            ]
-          }
+            {
+              OR: [
+                { sdrId: req.user.id },
+                { closerId: req.user.id },
+                { proposals: { some: { sdrId: req.user.id } } },
+                { proposals: { some: { salespersonId: req.user.id } } },
+                { sdrId: null, closerId: null }
+              ]
+            }
         ];
       }
     }
