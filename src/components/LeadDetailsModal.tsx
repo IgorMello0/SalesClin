@@ -573,12 +573,30 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                               onValueChange={async (newStatus) => {
                                 const statusStr = String(newStatus);
                                 let apiSuccess = false;
+                                let updatedLead = { ...selectedLead };
+                                
                                 try {
-                                  const res = await leadsApi.update(Number(selectedLead.id), { status: statusStr });
-                                  if (res.success) {
-                                    apiSuccess = true;
+                                  if (selectedLead.isProposal && selectedLead.proposalId) {
+                                    const res = await leadsApi.updateProposal(Number(selectedLead.id), Number(selectedLead.proposalId), { stage: statusStr });
+                                    if (res.success) {
+                                      apiSuccess = true;
+                                      if (updatedLead.proposals) {
+                                        updatedLead.proposals = updatedLead.proposals.map((p: any) => 
+                                          p.id === selectedLead.proposalId ? { ...p, status: statusStr } : p
+                                        );
+                                      }
+                                      updatedLead.status = statusStr;
+                                    } else {
+                                      toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
+                                    }
                                   } else {
-                                    toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
+                                    const res = await leadsApi.update(Number(selectedLead.id), { status: statusStr });
+                                    if (res.success) {
+                                      apiSuccess = true;
+                                      updatedLead.status = statusStr;
+                                    } else {
+                                      toast({ title: "Erro ao atualizar estágio", variant: "destructive" });
+                                    }
                                   }
                                 } catch (e) {
                                   console.error("[LeadDetailsModal] Erro na API ao atualizar estágio:", e);
@@ -586,9 +604,8 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                                 }
                                 
                                 if (apiSuccess) {
-                                  toast({ title: "Estágio do lead atualizado!" });
+                                  toast({ title: "Estágio atualizado!" });
                                   setStageValue(statusStr);
-                                  const updatedLead = { ...selectedLead, status: statusStr };
                                   setSelectedLead(updatedLead);
                                   try { onUpdate(updatedLead); } catch(err) { console.error("[LeadDetailsModal] Erro no onUpdate:", err); }
                                 }
