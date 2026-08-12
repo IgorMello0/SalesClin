@@ -511,7 +511,9 @@ export async function getMetaWhatsappStatus(companyId: number) {
 
   const serverSecretConfigured = Boolean(process.env.META_APP_SECRET)
   const hasAccessToken = Boolean(company.metaToken)
-  const connected = company.whatsappProvider === 'meta' && Boolean(company.metaPhoneNumberId && company.metaToken)
+  // A clinica pode manter Meta e WhatsApp nao oficial configurados ao mesmo tempo.
+  // O provedor padrao nao deve esconder uma conexao Meta valida.
+  const connected = Boolean(company.metaPhoneNumberId && company.metaToken)
   const configured = serverSecretConfigured
   const connectionMetadata = connection?.metadata && typeof connection.metadata === 'object'
     ? connection.metadata as Record<string, unknown>

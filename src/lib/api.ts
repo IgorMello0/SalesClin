@@ -1085,6 +1085,9 @@ export const campaignsApi = {
     name: string
     message: string
     audienceType: string
+    provider?: 'meta' | 'uazapi'
+    connectionMode?: 'cloud_api' | 'coexistence' | 'unofficial'
+    templateParameterMappings?: string[]
     audienceFilter?: any
     mediaUrl?: string | null
     mediaType?: string | null

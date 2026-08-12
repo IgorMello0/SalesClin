@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { campaignsApi, leadsApi, clientsApi, whatsappTemplatesApi } from '@/lib/api';
+import { campaignsApi, leadsApi, clientsApi, whatsappMetaApi, whatsappTemplatesApi, whatsappUazapiApi } from '@/lib/api';
 import type { WhatsAppTemplate } from '@/components/whatsapp/TemplateCatalog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -22,6 +23,7 @@ import {
   MessageSquareText,
   Paperclip,
   Plus,
+  RefreshCcw,
   Send,
   Settings2,
   ShieldCheck,
@@ -33,7 +35,6 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 
 const safeFormat = (d: any, f: string = "dd/MM/yy 'às' HH:mm") => {
   try { return d ? format(new Date(d), f, { locale: ptBR }) : '—'; } catch { return '—'; }
@@ -76,8 +77,15 @@ const getAvailableVariables = (audienceType: string) => [
 const getTemplateBodyText = (template?: WhatsAppTemplate) =>
   template?.components?.find(component => String(component.type).toUpperCase() === 'BODY')?.text || '';
 
-const getTemplateParameterCount = (template?: WhatsAppTemplate) =>
-  (getTemplateBodyText(template).match(/\{\{[^}]+\}\}/g) || []).length;
+const getTemplateVariableTokens = (template?: WhatsAppTemplate) => {
+  const uniqueTokens = Array.from(new Set(
+    (getTemplateBodyText(template).match(/\{\{[^}]+\}\}/g) || [])
+      .map(token => token.slice(2, -2).trim())
+      .filter(Boolean),
+  ));
+  if (String(template?.parameterFormat || '').toUpperCase() === 'NAMED') return uniqueTokens;
+  return uniqueTokens.sort((left, right) => Number(left) - Number(right));
+};
 
 const renderPreviewMessage = (value: string) => value
   .replace(/\{\{nome\}\}/gi, 'Mariana Oliveira')
@@ -90,6 +98,18 @@ const renderPreviewMessage = (value: string) => value
   .replace(/\{\{proxima_hora\}\}/gi, '14:30')
   .replace(/\{\{ultima_data\}\}/gi, '10/06/2026')
   .replace(/\{\{ultima_hora\}\}/gi, '09:00');
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const renderTemplatePreview = (template: WhatsAppTemplate | undefined, mappings: string[]) => {
+  const body = getTemplateBodyText(template) || 'Selecione um template aprovado.';
+  return getTemplateVariableTokens(template).reduce((preview, token, index) => {
+    const sample = renderPreviewMessage(mappings[index] || '{{nome}}');
+    return preview.replace(new RegExp(`\\{\\{\\s*${escapeRegExp(token)}\\s*\\}\\}`, 'g'), sample);
+  }, body);
+};
+
+type CampaignProvider = 'meta' | 'uazapi';
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: string }> = {
   draft: { label: 'Rascunho', color: 'bg-slate-100 text-slate-600', icon: 'edit_note' },
@@ -232,6 +252,7 @@ function downloadSpreadsheetTemplate() {
 export default function Campaigns() {
   const { professional } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -262,11 +283,13 @@ export default function Campaigns() {
   const [randomize, setRandomize] = useState(false);
   const [variations, setVariations] = useState<string[]>([]);
   const [newVariation, setNewVariation] = useState('');
-  const [useMetaTemplate, setUseMetaTemplate] = useState(false);
-  const [metaTemplateName, setMetaTemplateName] = useState('');
-  const [metaTemplateLanguage, setMetaTemplateLanguage] = useState('pt_BR');
-  const [metaTemplateParameters, setMetaTemplateParameters] = useState('{{nome}}');
+  const [campaignProvider, setCampaignProvider] = useState<CampaignProvider | ''>('');
+  const [metaStatus, setMetaStatus] = useState<any>(null);
+  const [uazapiStatus, setUazapiStatus] = useState<any>(null);
+  const [connectionsLoading, setConnectionsLoading] = useState(true);
+  const [isSyncingTemplates, setIsSyncingTemplates] = useState(false);
   const [metaTemplateId, setMetaTemplateId] = useState('');
+  const [metaTemplateMappings, setMetaTemplateMappings] = useState<string[]>([]);
   const [approvedTemplates, setApprovedTemplates] = useState<WhatsAppTemplate[]>([]);
 
   // Tags filter states
@@ -293,6 +316,35 @@ export default function Campaigns() {
       if (response.success) setApprovedTemplates(response.data || []);
     });
   }, []);
+
+  const loadConnections = useCallback(async () => {
+    setConnectionsLoading(true);
+    try {
+      const [metaResponse, uazapiResponse] = await Promise.allSettled([
+        whatsappMetaApi.status(),
+        whatsappUazapiApi.status(),
+      ]);
+      const nextMetaStatus = metaResponse.status === 'fulfilled' && metaResponse.value.success
+        ? metaResponse.value.data
+        : null;
+      const nextUazapiStatus = uazapiResponse.status === 'fulfilled' && uazapiResponse.value.success
+        ? uazapiResponse.value.data
+        : null;
+      setMetaStatus(nextMetaStatus);
+      setUazapiStatus(nextUazapiStatus);
+      setCampaignProvider(current => {
+        if (current === 'meta' && nextMetaStatus?.connected) return current;
+        if (current === 'uazapi' && nextUazapiStatus?.connected) return current;
+        if (nextMetaStatus?.connected) return 'meta';
+        if (nextUazapiStatus?.connected) return 'uazapi';
+        return '';
+      });
+    } finally {
+      setConnectionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadConnections(); }, [loadConnections]);
 
   // Load available tags dynamically
   useEffect(() => {
@@ -371,7 +423,8 @@ export default function Campaigns() {
   const resetForm = () => {
     setStep(1); setName(''); setMessage(''); setAudienceType(''); setSelectedTags([]); setTagTarget('both');
     setMediaUrl(''); setMediaType(''); setMinDelay(180); setMaxDelay(200); setRandomize(false); setVariations([]); setNewVariation('');
-    setUseMetaTemplate(false); setMetaTemplateId(''); setMetaTemplateName(''); setMetaTemplateLanguage('pt_BR'); setMetaTemplateParameters('{{nome}}');
+    setCampaignProvider(metaStatus?.connected ? 'meta' : uazapiStatus?.connected ? 'uazapi' : '');
+    setMetaTemplateId(''); setMetaTemplateMappings([]);
     setAttachments([]); setSpreadsheetContacts([]); setSpreadsheetFileName(''); setSpreadsheetStats(null);
     setIsCreating(false);
   };
@@ -403,7 +456,7 @@ export default function Campaigns() {
   };
 
   const handleCreate = async () => {
-    if (!name.trim() || !message.trim() || !audienceType) {
+    if (!name.trim() || !audienceType || !campaignProvider) {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' }); return;
     }
     if (audienceType === 'by_tags' && selectedTags.length === 0) {
@@ -412,8 +465,14 @@ export default function Campaigns() {
     if (audienceType === 'spreadsheet' && spreadsheetContacts.length === 0) {
       toast({ title: 'Importe uma planilha', description: 'Use CSV ou TSV com colunas nome, telefone, data, hora e especialista.', variant: 'destructive' }); return;
     }
-    if (useMetaTemplate && !metaTemplateId && !metaTemplateName.trim()) {
-      toast({ title: 'Informe o template da Meta', description: 'Use o nome exato do template aprovado no WhatsApp Manager.', variant: 'destructive' }); return;
+    if (campaignProvider === 'meta' && !metaTemplateId) {
+      toast({ title: 'Selecione um template aprovado', description: 'O canal oficial envia campanhas somente com templates sincronizados da Meta.', variant: 'destructive' }); return;
+    }
+    if (campaignProvider === 'meta' && metaTemplateMappings.some(mapping => !mapping)) {
+      toast({ title: 'Vincule todas as variaveis', description: 'Escolha o dado usado em cada variavel do template.', variant: 'destructive' }); return;
+    }
+    if (campaignProvider === 'uazapi' && !message.trim()) {
+      toast({ title: 'Escreva a mensagem', variant: 'destructive' }); return;
     }
     setIsSending(true);
     try {
@@ -422,25 +481,12 @@ export default function Campaigns() {
         : audienceType === 'spreadsheet'
           ? { source: spreadsheetFileName, contacts: spreadsheetContacts, stats: spreadsheetStats }
           : undefined;
-      const metaTemplate = useMetaTemplate
-        ? {
-            enabled: true,
-            name: metaTemplateName.trim(),
-            languageCode: metaTemplateLanguage.trim() || 'pt_BR',
-            parameters: metaTemplateParameters
-              .split(',')
-              .map(item => item.trim())
-              .filter(Boolean),
-          }
-        : undefined;
-      const audienceFilter = metaTemplate
-        ? { ...(baseAudienceFilter || {}), metaTemplate }
-        : baseAudienceFilter;
+      const audienceFilter = baseAudienceFilter;
       
       let finalMediaUrl = null;
       let finalMediaType = null;
 
-      if (attachments.length > 0) {
+      if (campaignProvider === 'uazapi' && attachments.length > 0) {
         if (attachments.length === 1) {
           finalMediaUrl = attachments[0].url;
           finalMediaType = attachments[0].type;
@@ -448,23 +494,28 @@ export default function Campaigns() {
           finalMediaUrl = JSON.stringify(attachments);
           finalMediaType = attachments[0].type;
         }
-      } else if (mediaUrl.trim()) {
+      } else if (campaignProvider === 'uazapi' && mediaUrl.trim()) {
         finalMediaUrl = mediaUrl.trim();
         finalMediaType = mediaType || 'image';
       }
 
       const res = await campaignsApi.create({ 
         name, 
-        message, 
+        message: campaignProvider === 'meta' ? getTemplateBodyText(selectedMetaTemplate) : message,
         audienceType, 
         audienceFilter,
+        provider: campaignProvider,
+        connectionMode: campaignProvider === 'meta'
+          ? (metaStatus?.officialMode === 'coexistence' ? 'coexistence' : 'cloud_api')
+          : 'unofficial',
+        templateParameterMappings: campaignProvider === 'meta' ? metaTemplateMappings : undefined,
         mediaUrl: finalMediaUrl,
         mediaType: finalMediaType,
-        minDelay: Number(minDelay),
-        maxDelay: Number(maxDelay),
-        randomize,
-        variations: randomize && variations.length > 0 ? variations : null,
-        templateId: useMetaTemplate && metaTemplateId ? Number(metaTemplateId) : null,
+        minDelay: campaignProvider === 'uazapi' ? Number(minDelay) : 0,
+        maxDelay: campaignProvider === 'uazapi' ? Number(maxDelay) : 0,
+        randomize: campaignProvider === 'uazapi' && randomize,
+        variations: campaignProvider === 'uazapi' && randomize && variations.length > 0 ? variations : null,
+        templateId: campaignProvider === 'meta' ? Number(metaTemplateId) : null,
       });
       if (res.success) {
         toast({ title: 'Campanha criada!' });
@@ -515,23 +566,18 @@ export default function Campaigns() {
 
   const availableMessageVariables = getAvailableVariables(audienceType);
   const selectedMetaTemplate = approvedTemplates.find(template => String(template.id) === metaTemplateId);
-  const selectedTemplateParameterCount = getTemplateParameterCount(selectedMetaTemplate);
-  const metaParameterValues = metaTemplateParameters
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
-  const positionalPreview = metaParameterValues.reduce((preview, parameter, index) => {
-    const sampleValue = renderPreviewMessage(parameter);
-    return preview.replace(new RegExp(`\\{\\{${index + 1}\\}\\}`, 'g'), sampleValue);
-  }, message || 'Sua mensagem aparecerá aqui.');
-  const messagePreview = renderPreviewMessage(positionalPreview);
+  const selectedTemplateTokens = getTemplateVariableTokens(selectedMetaTemplate);
+  const metaParameterValues = metaTemplateMappings;
+  const messagePreview = campaignProvider === 'meta'
+    ? renderTemplatePreview(selectedMetaTemplate, metaTemplateMappings)
+    : renderPreviewMessage(message || 'Sua mensagem aparecerá aqui.');
 
   const updateMetaParameter = (index: number, value: string) => {
-    const next = Array.from({ length: Math.max(selectedTemplateParameterCount, index + 1) }, (_, parameterIndex) =>
+    const next = Array.from({ length: Math.max(selectedTemplateTokens.length, index + 1) }, (_, parameterIndex) =>
       metaParameterValues[parameterIndex] || availableMessageVariables[parameterIndex]?.key || '{{nome}}'
     );
     next[index] = value;
-    setMetaTemplateParameters(next.join(', '));
+    setMetaTemplateMappings(next);
   };
 
   const selectApprovedTemplate = (value: string) => {
@@ -539,15 +585,51 @@ export default function Campaigns() {
     const selected = approvedTemplates.find(template => String(template.id) === value);
     if (!selected) return;
 
-    setMetaTemplateName(selected.name);
-    setMetaTemplateLanguage(selected.language);
     const bodyText = getTemplateBodyText(selected);
-    const parameterCount = getTemplateParameterCount(selected);
-    const defaultParameters = Array.from({ length: parameterCount }, (_, index) =>
-      availableMessageVariables[index]?.key || '{{nome}}'
-    );
-    setMetaTemplateParameters(defaultParameters.join(', '));
+    const templateTokens = getTemplateVariableTokens(selected);
+    const defaultParameters = templateTokens.map((token, index) => {
+      const normalizedToken = `{{${token}}}`.toLowerCase();
+      const matchingVariable = availableMessageVariables.find(variable => variable.key.toLowerCase() === normalizedToken);
+      return matchingVariable?.key || availableMessageVariables[index]?.key || '{{nome}}';
+    });
+    setMetaTemplateMappings(defaultParameters);
     if (bodyText) setMessage(bodyText);
+  };
+
+  const syncApprovedTemplates = async () => {
+    setIsSyncingTemplates(true);
+    try {
+      const response = await whatsappTemplatesApi.sync();
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel sincronizar os templates.');
+      const approved = (response.data || []).filter(template => String(template.status).toUpperCase() === 'APPROVED');
+      setApprovedTemplates(approved);
+      toast({ title: 'Templates sincronizados', description: `${approved.length} template(s) aprovado(s) disponivel(is).` });
+    } catch (error: any) {
+      toast({ title: 'Erro ao sincronizar', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSyncingTemplates(false);
+    }
+  };
+
+  const validateMessageStep = () => {
+    if (!campaignProvider) {
+      toast({ title: 'Escolha o canal de envio', variant: 'destructive' });
+      return;
+    }
+    if (campaignProvider === 'meta') {
+      if (!metaTemplateId) {
+        toast({ title: 'Selecione um template aprovado', variant: 'destructive' });
+        return;
+      }
+      if (metaTemplateMappings.length !== selectedTemplateTokens.length || metaTemplateMappings.some(mapping => !mapping)) {
+        toast({ title: 'Vincule todas as variaveis do template', variant: 'destructive' });
+        return;
+      }
+    } else if (!message.trim()) {
+      toast({ title: 'Escreva a mensagem', variant: 'destructive' });
+      return;
+    }
+    setStep(3);
   };
 
   return (
@@ -930,21 +1012,53 @@ export default function Campaigns() {
 
             {step === 2 && (
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-                {/* Text Message Input */}
-                <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                <section className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-black text-slate-950">Conteúdo da mensagem</p>
-                      <p className="mt-1 text-xs text-slate-500">Escreva o texto ou selecione um template oficial.</p>
+                      <p className="text-sm font-black text-slate-950">Canal de envio</p>
+                      <p className="mt-1 text-xs text-slate-500">A campanha usa somente o canal escolhido abaixo.</p>
                     </div>
-                    <span className="text-xs font-semibold text-slate-400">{message.length} caracteres</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void loadConnections()} disabled={connectionsLoading}>
+                      <RefreshCcw className={`mr-2 h-3.5 w-3.5 ${connectionsLoading ? 'animate-spin' : ''}`} />
+                      Atualizar conexões
+                    </Button>
                   </div>
-                  <textarea value={message} onChange={e => setMessage(e.target.value)} rows={7}
-                    placeholder="Olá {{primeiro_nome}}, temos uma novidade especial para você! ✨"
-                    className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-orange-300 focus:bg-white focus:ring-2 focus:ring-orange-100" />
-                </div>
 
-                {/* Variables */}
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <button type="button" disabled={!metaStatus?.connected} onClick={() => setCampaignProvider('meta')}
+                      className={`flex min-h-28 items-start gap-3 rounded-xl border p-4 text-left transition ${campaignProvider === 'meta' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 hover:border-blue-300'} disabled:cursor-not-allowed disabled:opacity-50`}>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700"><ShieldCheck className="h-5 w-5" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <strong className="text-sm text-slate-950">WhatsApp Oficial</strong>
+                          <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${metaStatus?.connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{metaStatus?.connected ? 'Conectado' : 'Não conectado'}</span>
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-slate-500">{metaStatus?.officialMode === 'coexistence' ? 'Coexistência Meta' : 'Cloud API'} · exige template aprovado.</span>
+                      </span>
+                    </button>
+
+                    <button type="button" disabled={!uazapiStatus?.connected} onClick={() => setCampaignProvider('uazapi')}
+                      className={`flex min-h-28 items-start gap-3 rounded-xl border p-4 text-left transition ${campaignProvider === 'uazapi' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-emerald-300'} disabled:cursor-not-allowed disabled:opacity-50`}>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><MessageSquareText className="h-5 w-5" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <strong className="text-sm text-slate-950">WhatsApp Não Oficial</strong>
+                          <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${uazapiStatus?.connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{uazapiStatus?.connected ? 'Conectado' : 'Não conectado'}</span>
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-slate-500">Mensagem livre, mídia e intervalo entre envios.</span>
+                      </span>
+                    </button>
+                  </div>
+
+                  {!connectionsLoading && !metaStatus?.connected && !uazapiStatus?.connected && (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                      <p className="text-xs font-semibold text-amber-800">Conecte pelo menos um WhatsApp antes de criar a campanha.</p>
+                      <Button type="button" size="sm" variant="outline" onClick={() => navigate('/integrations')}>Abrir integrações</Button>
+                    </div>
+                  )}
+                </section>
+
+                {campaignProvider === 'uazapi' && (
                 <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
@@ -963,7 +1077,9 @@ export default function Campaigns() {
                     ))}
                   </div>
                 </div>
+                )}
 
+                {campaignProvider === 'meta' && (
                 <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/70 p-5 lg:col-start-1">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
@@ -971,66 +1087,73 @@ export default function Campaigns() {
                         <ShieldCheck className="h-5 w-5" />
                       </div>
                       <div>
-                        <label htmlFor="chk-meta-template" className="cursor-pointer text-sm font-black text-slate-950">Template oficial da Meta</label>
-                        <p className="mt-1 text-xs leading-5 text-slate-600">Use para iniciar conversas fora da janela de atendimento de 24 horas.</p>
+                        <p className="text-sm font-black text-slate-950">Template aprovado da Meta</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">O texto, idioma e variáveis vêm do template sincronizado.</p>
                       </div>
                     </div>
-                    <Switch id="chk-meta-template" checked={useMetaTemplate} onCheckedChange={setUseMetaTemplate} />
+                    <Button type="button" variant="outline" size="sm" onClick={() => void syncApprovedTemplates()} disabled={isSyncingTemplates}>
+                      <RefreshCcw className={`mr-2 h-3.5 w-3.5 ${isSyncingTemplates ? 'animate-spin' : ''}`} /> Sincronizar
+                    </Button>
                   </div>
 
-                  {useMetaTemplate && (
-                    <div className="grid grid-cols-1 gap-3 border-t border-blue-200 pt-4 md:grid-cols-2">
-                      {approvedTemplates.length > 0 && (
-                        <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 gap-3 border-t border-blue-200 pt-4">
+                      {approvedTemplates.length > 0 ? (
+                        <div>
                           <label className="mb-1.5 block text-xs font-bold text-slate-700">Template aprovado</label>
                           <Select value={metaTemplateId} onValueChange={selectApprovedTemplate}>
                             <SelectTrigger className="h-11 rounded-lg bg-white"><SelectValue placeholder="Selecione um template aprovado" /></SelectTrigger>
-                            <SelectContent>{approvedTemplates.map((template) => <SelectItem key={template.id} value={String(template.id)}>{template.name} · {template.language}</SelectItem>)}</SelectContent>
+                            <SelectContent>{approvedTemplates.map((template) => <SelectItem key={template.id} value={String(template.id)}>{template.name} · {template.language} · {template.category}</SelectItem>)}</SelectContent>
                           </Select>
                         </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-blue-300 bg-white p-4 text-center">
+                          <p className="text-sm font-bold text-slate-800">Nenhum template aprovado sincronizado</p>
+                          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => navigate('/templates')}>Gerenciar templates</Button>
+                        </div>
                       )}
-                      <div>
-                        <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Nome do template</label>
-                        <Input
-                          value={metaTemplateName}
-                          onChange={e => setMetaTemplateName(e.target.value)}
-                          placeholder="ex: confirmacao_agendamento"
-                          className="rounded-xl h-10 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-blue-500 uppercase mb-1">Idioma</label>
-                        <Input
-                          value={metaTemplateLanguage}
-                          onChange={e => setMetaTemplateLanguage(e.target.value)}
-                          placeholder="pt_BR"
-                          className="rounded-xl h-10 bg-white"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
+                      {selectedMetaTemplate && (
+                      <div className="rounded-lg border border-blue-100 bg-white p-4">
+                        <div className="mb-4 grid gap-2 sm:grid-cols-3">
+                          <div><p className="text-[9px] font-black uppercase text-blue-500">Template</p><p className="mt-1 truncate text-xs font-bold text-slate-800">{selectedMetaTemplate.name}</p></div>
+                          <div><p className="text-[9px] font-black uppercase text-blue-500">Idioma</p><p className="mt-1 text-xs font-bold text-slate-800">{selectedMetaTemplate.language}</p></div>
+                          <div><p className="text-[9px] font-black uppercase text-blue-500">Categoria</p><p className="mt-1 text-xs font-bold text-slate-800">{selectedMetaTemplate.category}</p></div>
+                        </div>
                         <label className="mb-2 block text-xs font-bold text-slate-700">Vincule as variáveis do template</label>
-                        {selectedTemplateParameterCount > 0 ? (
+                        {selectedTemplateTokens.length > 0 ? (
                           <div className="grid gap-2 sm:grid-cols-2">
-                            {Array.from({ length: selectedTemplateParameterCount }, (_, index) => (
-                              <div key={index} className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white p-2">
-                                <span className="flex h-7 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 font-mono text-xs font-black text-blue-700">{`{{${index + 1}}}`}</span>
-                                <Select value={metaParameterValues[index] || availableMessageVariables[index]?.key || '{{nome}}'} onValueChange={value => updateMetaParameter(index, value)}>
-                                  <SelectTrigger className="h-8 flex-1 border-0 bg-transparent px-2 shadow-none"><SelectValue /></SelectTrigger>
+                            {selectedTemplateTokens.map((token, index) => (
+                              <div key={`${token}-${index}`} className="rounded-lg border border-blue-100 bg-slate-50 p-3">
+                                <div className="mb-2 flex items-center justify-between gap-2"><span className="font-mono text-xs font-black text-blue-700">{`{{${token}}}`}</span><span className="text-[10px] text-slate-400">Variável {index + 1}</span></div>
+                                <Select value={metaParameterValues[index] || ''} onValueChange={value => updateMetaParameter(index, value)}>
+                                  <SelectTrigger className="h-9 bg-white"><SelectValue placeholder="Escolha o dado" /></SelectTrigger>
                                   <SelectContent>{availableMessageVariables.map(variable => <SelectItem key={variable.key} value={variable.key}>{variable.label}</SelectItem>)}</SelectContent>
                                 </Select>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <Input value={metaTemplateParameters} onChange={e => setMetaTemplateParameters(e.target.value)} placeholder="{{nome}}, {{data}}, {{hora}}" className="h-10 rounded-lg bg-white" />
+                          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Este template não possui variáveis.</p>
                         )}
                         <p className="mt-2 text-[11px] leading-5 text-blue-700">Cada posição do template recebe o campo escolhido do contato ou da planilha.</p>
                       </div>
-                    </div>
-                  )}
+                      )}
+                  </div>
                 </div>
+                )}
+
+                {campaignProvider === 'uazapi' && (
+                <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div><p className="text-sm font-black text-slate-950">Mensagem livre</p><p className="mt-1 text-xs text-slate-500">Escreva o conteúdo enviado pelo canal não oficial.</p></div>
+                    <span className="text-xs font-semibold text-slate-400">{message.length} caracteres</span>
+                  </div>
+                  <textarea value={message} onChange={event => setMessage(event.target.value)} rows={7} placeholder="Olá {{primeiro_nome}}, temos uma novidade para você."
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-orange-300 focus:bg-white focus:ring-2 focus:ring-orange-100" />
+                </div>
+                )}
 
                 {/* Media Attachment section */}
+                {campaignProvider === 'uazapi' && (
                 <details className="group rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -1210,8 +1333,10 @@ export default function Campaigns() {
                     </div>
                   )}
                 </details>
+                )}
 
                 {/* Anti-ban & Delay settings */}
+                {campaignProvider === 'uazapi' && (
                 <details className="group rounded-xl border border-slate-200 bg-white p-5 lg:col-start-1">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -1314,6 +1439,7 @@ export default function Campaigns() {
                   </div>
                   </div>
                 </details>
+                )}
 
                 <aside className="self-start rounded-xl border border-slate-200 bg-white p-4 lg:sticky lg:top-0 lg:col-start-2 lg:row-span-5 lg:row-start-1">
                   <div className="flex items-center justify-between gap-3 px-1 pb-3">
@@ -1321,13 +1447,13 @@ export default function Campaigns() {
                       <p className="text-sm font-black text-slate-950">Prévia no WhatsApp</p>
                       <p className="mt-0.5 text-[11px] text-slate-500">Exemplo com dados preenchidos</p>
                     </div>
-                    <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${useMetaTemplate ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                      {useMetaTemplate ? 'Template oficial' : 'Mensagem livre'}
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${campaignProvider === 'meta' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                      {campaignProvider === 'meta' ? 'Template oficial' : 'Mensagem livre'}
                     </span>
                   </div>
                   <div className="min-h-[420px] rounded-xl bg-[#efeae2] p-4 shadow-inner">
                     <div className="ml-auto max-w-[92%] rounded-lg rounded-tr-sm bg-[#d9fdd3] p-3 shadow-sm">
-                      {attachments.length > 0 && (
+                      {campaignProvider === 'uazapi' && attachments.length > 0 && (
                         <div className="mb-3 flex h-28 items-center justify-center rounded-md bg-white/70 text-emerald-700">
                           {attachments[0].type === 'image' ? <ImageIcon className="h-7 w-7" /> : attachments[0].type === 'video' ? <Video className="h-7 w-7" /> : <Volume2 className="h-7 w-7" />}
                         </div>
@@ -1346,7 +1472,7 @@ export default function Campaigns() {
                   <Button variant="outline" onClick={() => setStep(1)} className="h-11 rounded-lg">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                   </Button>
-                  <Button onClick={() => { if (message.trim()) setStep(3); else toast({ title: 'Escreva a mensagem', variant: 'destructive' }); }}
+                  <Button onClick={validateMessageStep}
                     className="h-11 rounded-lg bg-slate-950 px-5 font-bold text-white hover:bg-slate-800">
                     Revisar campanha <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -1378,7 +1504,7 @@ export default function Campaigns() {
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Destinatários</span><span className="font-bold text-primary">{previewRecipients} contatos</span></div>
                   
                   {/* Media confirmation */}
-                  {attachments.length > 0 ? (
+                  {campaignProvider === 'uazapi' && attachments.length > 0 ? (
                     <div className="space-y-1.5">
                       <span className="text-[10px] text-muted-foreground font-bold uppercase block">Mídias Anexadas ({attachments.length}):</span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 bg-white p-2.5 rounded-xl border border-slate-100">
@@ -1392,18 +1518,31 @@ export default function Campaigns() {
                         ))}
                       </div>
                     </div>
-                  ) : mediaUrl.trim() ? (
+                  ) : campaignProvider === 'uazapi' && mediaUrl.trim() ? (
                     <div className="flex justify-between text-sm bg-white p-2 rounded-lg border border-slate-100">
                       <span className="text-muted-foreground">Anexo de Mídia ({mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : 'Áudio'})</span>
                       <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-secondary underline truncate max-w-xs">{mediaUrl}</a>
                     </div>
                   ) : null}
 
-                  {/* Delay confirmation */}
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Intervalo de envio</span><span className="font-bold text-primary">{minDelay}s a {maxDelay}s</span></div>
+                  {/* Delivery confirmation */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Canal de envio</span>
+                    <span className="font-bold text-primary">
+                      {campaignProvider === 'meta'
+                        ? `WhatsApp Oficial · ${metaStatus?.officialMode === 'coexistence' ? 'Coexistência' : 'Cloud API'}`
+                        : 'WhatsApp Não Oficial'}
+                    </span>
+                  </div>
+                  {campaignProvider === 'uazapi' && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Intervalo de envio</span><span className="font-bold text-primary">{minDelay}s a {maxDelay}s</span></div>
+                  )}
+                  {campaignProvider === 'meta' && selectedMetaTemplate && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Template</span><span className="font-bold text-primary">{selectedMetaTemplate.name} · {selectedMetaTemplate.language}</span></div>
+                  )}
 
                   {/* Variations confirmation */}
-                  {randomize && variations.length > 0 && (
+                  {campaignProvider === 'uazapi' && randomize && variations.length > 0 && (
                     <div className="text-sm space-y-1">
                       <span className="text-muted-foreground">Variações da mensagem</span>
                       <div className="bg-white p-2.5 rounded-lg border border-slate-100 text-xs text-slate-500 max-h-24 overflow-y-auto space-y-1">
@@ -1432,8 +1571,11 @@ export default function Campaigns() {
                     <p className="line-clamp-6 whitespace-pre-wrap text-sm leading-6 text-slate-100">{messagePreview}</p>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-white/5 p-3"><p className="text-slate-500">Canal</p><p className="mt-1 font-bold">{useMetaTemplate ? 'Meta oficial' : 'WhatsApp'}</p></div>
-                    <div className="rounded-lg bg-white/5 p-3"><p className="text-slate-500">Intervalo</p><p className="mt-1 font-bold">{minDelay}-{maxDelay}s</p></div>
+                    <div className="rounded-lg bg-white/5 p-3"><p className="text-slate-500">Canal</p><p className="mt-1 font-bold">{campaignProvider === 'meta' ? 'WhatsApp Oficial' : 'WhatsApp Não Oficial'}</p></div>
+                    <div className="rounded-lg bg-white/5 p-3">
+                      <p className="text-slate-500">{campaignProvider === 'meta' ? 'Modo' : 'Intervalo'}</p>
+                      <p className="mt-1 font-bold">{campaignProvider === 'meta' ? (metaStatus?.officialMode === 'coexistence' ? 'Coexistência' : 'Cloud API') : `${minDelay}-${maxDelay}s`}</p>
+                    </div>
                   </div>
                 </aside>
                 <div className="flex items-center justify-between border-t border-slate-200 pt-4 lg:col-span-2">

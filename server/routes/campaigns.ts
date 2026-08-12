@@ -9,6 +9,44 @@ import { getJwtSecret } from '../config/security.js'
 export const router = Router()
 
 const SPREADSHEET_CONTACT_LIMIT = 5000
+const CAMPAIGN_VARIABLE_KEYS = new Set([
+  '{{nome}}', '{{primeiro_nome}}', '{{telefone}}', '{{data}}', '{{hora}}',
+  '{{especialista}}', '{{proxima_data}}', '{{proxima_hora}}', '{{ultima_data}}', '{{ultima_hora}}',
+])
+
+type CampaignProvider = 'meta' | 'uazapi' | 'evolution'
+
+function normalizeCampaignProvider(value: unknown): CampaignProvider | null {
+  const provider = String(value || '').trim().toLowerCase()
+  return provider === 'meta' || provider === 'uazapi' || provider === 'evolution' ? provider : null
+}
+
+function getTemplateBodyDescriptor(template: { components: unknown; parameterFormat?: string | null }) {
+  const components = Array.isArray(template.components) ? template.components as Array<Record<string, unknown>> : []
+  const body = components.find(component => String(component.type || '').toUpperCase() === 'BODY')
+  const text = String(body?.text || '')
+  const tokens: string[] = []
+  for (const match of text.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
+    const token = String(match[1] || '').trim()
+    if (token && !tokens.includes(token)) tokens.push(token)
+  }
+  const parameterFormat = String(template.parameterFormat || '').toUpperCase() === 'NAMED' ? 'NAMED' : 'POSITIONAL'
+  if (parameterFormat === 'POSITIONAL') tokens.sort((left, right) => Number(left) - Number(right))
+  return { text, tokens, parameterFormat }
+}
+
+function normalizeTemplateMappings(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.map(item => String(item || '').trim()).filter(Boolean)
+}
+
+function validateTemplateMappings(mappings: string[], expectedCount: number) {
+  if (mappings.length !== expectedCount) {
+    return `Este template exige ${expectedCount} variavel(is), mas ${mappings.length} foram vinculadas.`
+  }
+  const invalid = mappings.find(mapping => !CAMPAIGN_VARIABLE_KEYS.has(mapping))
+  return invalid ? `A variavel ${invalid} nao pode ser usada nesta campanha.` : null
+}
 
 function getCampaignMediaSignature(campaignId: number, index: string) {
   return crypto.createHmac('sha256', getJwtSecret()).update(`${campaignId}:${index}`).digest('hex')
@@ -159,10 +197,25 @@ router.get('/:id', auth(), async (req, res) => {
 router.post('/', auth(), async (req, res) => {
   try {
     const { professionalId, companyId } = resolveIds(req)
-    const { name, message, audienceType, audienceFilter, mediaUrl, mediaType, minDelay, maxDelay, randomize, variations, templateId } = req.body
+    const {
+      name,
+      message,
+      audienceType,
+      audienceFilter,
+      mediaUrl,
+      mediaType,
+      minDelay,
+      maxDelay,
+      randomize,
+      variations,
+      templateId,
+      provider: requestedProvider,
+      connectionMode: requestedConnectionMode,
+      templateParameterMappings,
+    } = req.body
 
-    if (!name || !message || !audienceType) {
-      return res.status(400).json(createErrorResponse('Nome, mensagem e tipo de audiência são obrigatórios'))
+    if (!name || !audienceType) {
+      return res.status(400).json(createErrorResponse('Nome e tipo de audiencia sao obrigatorios'))
     }
 
     // Buscar professionalId para usuários
@@ -179,12 +232,66 @@ router.post('/', auth(), async (req, res) => {
       return res.status(400).json(createErrorResponse('Não foi possível identificar o profissional ou empresa'))
     }
 
+    const company = await prisma.empresa.findUnique({
+      where: { id: companyId },
+      select: {
+        whatsappProvider: true,
+        evolutionApiUrl: true,
+        apiKey: true,
+        evolutionInstance: true,
+        uazapiToken: true,
+        metaToken: true,
+        metaPhoneNumberId: true,
+        whatsappConnection: { select: { officialMode: true } },
+      },
+    })
+    if (!company) {
+      return res.status(404).json(createErrorResponse('Clinica nao encontrada'))
+    }
+
+    const provider = normalizeCampaignProvider(requestedProvider || company.whatsappProvider)
+    if (!provider) {
+      return res.status(400).json(createErrorResponse('Escolha um canal de WhatsApp para a campanha'))
+    }
+
     const selectedTemplate = templateId
       ? await prisma.whatsAppTemplate.findFirst({ where: { id: Number(templateId), companyId } })
       : null
     if (templateId && (!selectedTemplate || selectedTemplate.status.toUpperCase() !== 'APPROVED')) {
       return res.status(400).json(createErrorResponse('Selecione um template aprovado desta clinica'))
     }
+
+    if (provider === 'meta' && !selectedTemplate) {
+      return res.status(400).json(createErrorResponse('O WhatsApp Oficial exige um template aprovado da Meta'))
+    }
+    if (provider !== 'meta' && selectedTemplate) {
+      return res.status(400).json(createErrorResponse('Templates da Meta so podem ser usados no WhatsApp Oficial'))
+    }
+
+    const uazapiUrl = process.env.UAZAPI_API_URL || process.env.UAZAPI_BASE_URL || ''
+    const providerConfigured = provider === 'meta'
+      ? Boolean(company.metaToken && company.metaPhoneNumberId)
+      : provider === 'uazapi'
+        ? Boolean(uazapiUrl && company.uazapiToken)
+        : Boolean(company.evolutionApiUrl && company.apiKey && company.evolutionInstance)
+    if (!providerConfigured) {
+      return res.status(400).json(createErrorResponse('O canal escolhido nao esta conectado nesta clinica'))
+    }
+
+    const templateDescriptor = selectedTemplate ? getTemplateBodyDescriptor(selectedTemplate) : null
+    const mappings = normalizeTemplateMappings(templateParameterMappings)
+    if (templateDescriptor) {
+      const mappingError = validateTemplateMappings(mappings, templateDescriptor.tokens.length)
+      if (mappingError) return res.status(400).json(createErrorResponse(mappingError))
+    }
+
+    const campaignMessage = templateDescriptor?.text || String(message || '').trim()
+    if (!campaignMessage) {
+      return res.status(400).json(createErrorResponse('Escreva a mensagem da campanha'))
+    }
+    const connectionMode = provider === 'meta'
+      ? (requestedConnectionMode === 'coexistence' || company.whatsappConnection?.officialMode === 'coexistence' ? 'coexistence' : 'cloud_api')
+      : 'unofficial'
 
     // Buscar destinatários com base no tipo de audiência
     const audienceResolution = await resolveAudience(audienceType, audienceFilter, profId, companyId)
@@ -260,20 +367,26 @@ router.post('/', auth(), async (req, res) => {
           id: selectedTemplate.id,
           name: selectedTemplate.name,
           language: selectedTemplate.language,
+          category: selectedTemplate.category,
           components: selectedTemplate.components,
+          parameterFormat: templateDescriptor?.parameterFormat,
+          parameterTokens: templateDescriptor?.tokens,
+          parameterMappings: mappings,
         } : undefined,
+        providerSnapshot: provider,
+        connectionMode,
         name,
-        message,
+        message: campaignMessage,
         audienceType,
         audienceFilter: audienceResolution.audienceFilter || undefined,
         status: 'draft',
         totalRecipients: recipients.length,
-        mediaUrl: mediaUrl || null,
-        mediaType: mediaType || null,
-        minDelay: minDelay ? Number(minDelay) : 180,
-        maxDelay: maxDelay ? Number(maxDelay) : 200,
-        randomize: randomize !== undefined ? !!randomize : false,
-        variations: variations || null,
+        mediaUrl: provider === 'meta' ? null : (mediaUrl || null),
+        mediaType: provider === 'meta' ? null : (mediaType || null),
+        minDelay: provider === 'meta' ? 0 : (minDelay !== undefined ? Number(minDelay) : 180),
+        maxDelay: provider === 'meta' ? 0 : (maxDelay !== undefined ? Number(maxDelay) : 200),
+        randomize: provider === 'meta' ? false : (randomize !== undefined ? !!randomize : false),
+        variations: provider === 'meta' ? null : (variations || null),
         recipients: {
           create: recipients.map(r => {
             const key = r.sourceType === 'client'
@@ -292,7 +405,7 @@ router.post('/', auth(), async (req, res) => {
               sourceId: r.sourceId ?? null,
               status: 'pending',
               variables,
-              renderedMessage: renderMessage(message, resolvedRecipient, upcomingAppt, pastAppt)
+              renderedMessage: renderMessage(campaignMessage, resolvedRecipient, upcomingAppt, pastAppt)
             }
           })
         }
@@ -345,7 +458,7 @@ router.post('/:id/send', auth(), async (req, res) => {
       }
     })
 
-    const provider = empresa?.whatsappProvider || 'evolution'
+    const provider = normalizeCampaignProvider(campaign.providerSnapshot || empresa?.whatsappProvider) || 'evolution'
     const isEvolutionConfigured = provider === 'evolution' && Boolean(
       empresa?.evolutionApiUrl && empresa?.apiKey && empresa?.evolutionInstance
     )
@@ -421,12 +534,7 @@ router.post('/:id/send', auth(), async (req, res) => {
       uazapiToken: empresa!.uazapiToken!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
-      metaTemplate: campaign.template ? {
-        enabled: true,
-        name: campaign.template.name,
-        languageCode: campaign.template.language,
-        parameters: getMetaTemplateFromAudienceFilter(campaign.audienceFilter)?.parameters || [],
-      } : getMetaTemplateFromAudienceFilter(campaign.audienceFilter),
+      metaTemplate: getMetaTemplateFromCampaign(campaign),
       mediaUrl: absoluteMediaUrl,
       mediaType: campaign.mediaType,
       minDelay: campaign.minDelay,
@@ -890,6 +998,8 @@ interface WhatsAppConfig {
     name: string
     languageCode: string
     parameters: string[]
+    parameterNames?: string[]
+    parameterFormat?: 'POSITIONAL' | 'NAMED'
   } | null
   mediaUrl?: string | null
   mediaType?: string | null
@@ -968,6 +1078,30 @@ function getMetaTemplateFromAudienceFilter(audienceFilter: any): WhatsAppConfig[
     name: String(raw.name).trim(),
     languageCode: String(raw.languageCode || raw.language || 'pt_BR').trim() || 'pt_BR',
     parameters,
+  }
+}
+
+function getMetaTemplateFromCampaign(campaign: any): WhatsAppConfig['metaTemplate'] {
+  if (!campaign?.template) return getMetaTemplateFromAudienceFilter(campaign?.audienceFilter)
+
+  const snapshot = campaign.templateSnapshot && typeof campaign.templateSnapshot === 'object'
+    ? campaign.templateSnapshot as Record<string, unknown>
+    : {}
+  const fallback = getMetaTemplateFromAudienceFilter(campaign.audienceFilter)
+  const parameters = Array.isArray(snapshot.parameterMappings)
+    ? snapshot.parameterMappings.map(item => String(item || '').trim()).filter(Boolean)
+    : fallback?.parameters || []
+  const parameterNames = Array.isArray(snapshot.parameterTokens)
+    ? snapshot.parameterTokens.map(item => String(item || '').trim()).filter(Boolean)
+    : []
+
+  return {
+    enabled: true,
+    name: campaign.template.name,
+    languageCode: campaign.template.language,
+    parameters,
+    parameterNames,
+    parameterFormat: String(snapshot.parameterFormat || '').toUpperCase() === 'NAMED' ? 'NAMED' : 'POSITIONAL',
   }
 }
 
@@ -1239,8 +1373,11 @@ function buildMetaTemplatePayload(config: WhatsAppConfig, formattedPhone: string
   const template = config.metaTemplate
   if (!template?.enabled || !template.name) return null
 
-  const parameters = template.parameters.map((param) => ({
+  const parameters = template.parameters.map((param, index) => ({
     type: 'text',
+    ...(template.parameterFormat === 'NAMED' && template.parameterNames?.[index]
+      ? { parameter_name: template.parameterNames[index] }
+      : {}),
     text: renderMessage(param, recipient),
   }))
 
@@ -1269,7 +1406,8 @@ function buildMetaTemplatePayload(config: WhatsAppConfig, formattedPhone: string
 
 async function sendMetaMessage(config: WhatsAppConfig, formattedPhone: string, message: string, recipient: any) {
   // A Meta Cloud API usa a graph API para envios.
-  const url = `https://graph.facebook.com/v19.0/${config.metaPhoneId}/messages`
+  const graphVersion = process.env.META_GRAPH_VERSION || 'v25.0'
+  const url = `https://graph.facebook.com/${graphVersion}/${config.metaPhoneId}/messages`
   const templatePayload = buildMetaTemplatePayload(config, formattedPhone, recipient)
   
   const response = await fetch(url, {
@@ -1481,7 +1619,7 @@ export async function resumeInterruptedCampaigns() {
     const recipients = await prisma.campaignRecipient.findMany({
       where: { campaignId: campaign.id, status: 'pending', attempts: { lt: 4 } },
     })
-    const provider = campaign.company.whatsappProvider || 'evolution'
+    const provider = normalizeCampaignProvider(campaign.providerSnapshot || campaign.company.whatsappProvider) || 'evolution'
     const publicUrl = String(process.env.PUBLIC_APP_URL || '').replace(/\/$/, '')
     const mediaUrl = campaign.mediaUrl?.startsWith('/uploads/') && publicUrl
       ? `${publicUrl}${campaign.mediaUrl}`
@@ -1496,12 +1634,7 @@ export async function resumeInterruptedCampaigns() {
       uazapiToken: campaign.company.uazapiToken || '',
       metaToken: campaign.company.metaToken || '',
       metaPhoneId: campaign.company.metaPhoneNumberId || '',
-      metaTemplate: campaign.template ? {
-        enabled: true,
-        name: campaign.template.name,
-        languageCode: campaign.template.language,
-        parameters: getMetaTemplateFromAudienceFilter(campaign.audienceFilter)?.parameters || [],
-      } : getMetaTemplateFromAudienceFilter(campaign.audienceFilter),
+      metaTemplate: getMetaTemplateFromCampaign(campaign),
       mediaUrl,
       mediaType: campaign.mediaType,
       minDelay: campaign.minDelay,
