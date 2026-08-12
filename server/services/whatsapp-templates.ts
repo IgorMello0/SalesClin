@@ -164,6 +164,31 @@ export function buildMetaTemplatePayload(input: CreateWhatsAppTemplateInput) {
   }
 }
 
+export function buildMetaTemplateCreateRequest(
+  wabaId: string,
+  accessToken: string,
+  input: CreateWhatsAppTemplateInput,
+) {
+  const normalizedWabaId = String(wabaId || '').trim()
+  const normalizedAccessToken = String(accessToken || '').trim()
+  if (!/^\d+$/.test(normalizedWabaId)) throw new Error('WABA ID invalido para criar o template.')
+  if (!normalizedAccessToken) throw new Error('Token da Meta ausente para criar o template.')
+
+  const payload = buildMetaTemplatePayload(input)
+  return {
+    endpoint: `${GRAPH_BASE_URL}/${normalizedWabaId}/message_templates`,
+    options: {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${normalizedAccessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+    payload,
+  }
+}
+
 async function getMetaTemplateCredentials(companyId: number) {
   const [connection, company] = await Promise.all([
     getWhatsAppConnection(companyId),
@@ -274,15 +299,8 @@ export async function syncMetaTemplates(companyId: number) {
 
 export async function createMetaTemplate(companyId: number, input: CreateWhatsAppTemplateInput) {
   const { accessToken, wabaId, connectionId } = await getMetaTemplateCredentials(companyId)
-  const payload = buildMetaTemplatePayload(input)
-  const response = await fetch(`${GRAPH_BASE_URL}/${wabaId}/message_templates`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+  const { endpoint, options, payload } = buildMetaTemplateCreateRequest(wabaId, accessToken, input)
+  const response = await fetch(endpoint, options)
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
     throw new Error(body?.error?.error_user_msg || body?.error?.message || `Meta Graph API HTTP ${response.status}`)

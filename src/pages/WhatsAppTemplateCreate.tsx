@@ -114,6 +114,27 @@ export default function WhatsAppTemplateCreate() {
     setButtons((current) => current.map((button) => button.id === id ? { ...button, ...patch } : button))
   }
 
+  const applyAppointmentReminderExample = () => {
+    const buttonId = Date.now()
+    setName('lembrete_de_agendamento')
+    setLanguage('pt_BR')
+    setCategory('UTILITY')
+    setHeaderEnabled(true)
+    setHeaderText('Lembrete de agendamento')
+    setHeaderExamples([])
+    setBodyText('Olá, {{1}}. Seu atendimento na {{2}} está agendado para {{3}}. Responda para confirmar ou solicitar alteração.')
+    setBodyExamples(['Maria', 'Clínica Boca', '25/07 às 14h'])
+    setFooterText('Mensagem referente ao seu agendamento')
+    setButtons([
+      { id: buttonId, type: 'QUICK_REPLY', text: 'Confirmar', value: '' },
+      { id: buttonId + 1, type: 'QUICK_REPLY', text: 'Solicitar alteração', value: '' },
+    ])
+    toast({
+      title: 'Exemplo de utilidade preenchido',
+      description: 'Revise os dados da clínica antes de enviar para análise da Meta.',
+    })
+  }
+
   const submit = async () => {
     if (!normalizedName || !bodyText.trim()) {
       toast({ title: 'Revise os campos obrigatórios', description: 'Informe o nome e o corpo da mensagem.', variant: 'destructive' })
@@ -179,10 +200,16 @@ export default function WhatsAppTemplateCreate() {
             <h1 className="text-3xl font-bold text-slate-950">Novo template</h1>
             <p className="mt-1 text-sm text-slate-600">Crie uma mensagem e envie diretamente para análise da Meta.</p>
           </div>
-          <Button onClick={() => void submit()} disabled={submitting}>
-            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Enviar para análise
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" variant="outline" onClick={applyAppointmentReminderExample} disabled={submitting}>
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Usar exemplo de utilidade
+            </Button>
+            <Button onClick={() => void submit()} disabled={submitting}>
+              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Enviar para análise
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -353,6 +380,12 @@ export default function WhatsAppTemplateCreate() {
           <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
             <div className="flex gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" /><div><p className="font-bold">Antes de enviar</p><p className="mt-1 leading-relaxed text-blue-800">Use exemplos reais sem dados sensíveis. A categoria pode ser ajustada automaticamente pela Meta.</p></div></div>
           </section>
+
+          {category === 'UTILITY' && (
+            <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+              <div className="flex gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><p className="font-bold">Template de utilidade</p><p className="mt-1 leading-relaxed text-emerald-800">Use somente para uma ação ou atendimento já solicitado pelo cliente. Promoção, oferta, desconto ou convite comercial será tratado como marketing pela Meta.</p></div></div>
+            </section>
+          )}
 
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="font-bold text-slate-950">Validação rápida</p>
