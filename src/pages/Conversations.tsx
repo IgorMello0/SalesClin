@@ -94,8 +94,11 @@ const Conversations = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const conversationsRequestInFlight = useRef(false);
 
   const loadConversations = async (silent = false) => {
+    if (conversationsRequestInFlight.current) return;
+    conversationsRequestInFlight.current = true;
     if (silent) setRefreshing(true); else setLoading(true);
     try {
       const response = await conversationsApi.list();
@@ -116,6 +119,7 @@ const Conversations = () => {
       setLoadError(error.message || 'Erro ao carregar conversas.');
       if (!silent) toast({ title: 'Erro nas conversas', description: error.message, variant: 'destructive' });
     } finally {
+      conversationsRequestInFlight.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -129,7 +133,9 @@ const Conversations = () => {
     void whatsappTemplatesApi.list('APPROVED').then((response) => {
       if (response.success) setTemplates(response.data || []);
     });
-    const refreshTimer = window.setInterval(() => void loadConversations(true), 5000);
+    const refreshTimer = window.setInterval(() => {
+      if (!document.hidden) void loadConversations(true);
+    }, 10000);
     const clockTimer = window.setInterval(() => setClock(Date.now()), 1000);
     return () => { window.clearInterval(refreshTimer); window.clearInterval(clockTimer); };
   }, []);

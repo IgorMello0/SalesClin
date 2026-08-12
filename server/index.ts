@@ -47,13 +47,20 @@ assertProductionSecurityConfig()
 
 const app = express()
 
+// Traefik and Nginx run on private Docker networks. Trusting only private proxy
+// hops lets rate limiting use the real client IP from X-Forwarded-For.
+app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal'])
+
 // Basic Rate Limiter
 const apiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutos
-  max: 1000, // Limite generoso para o frontend (1000 requests / 5min por IP)
-  message: 'Muitas requisições deste IP, tente novamente em 5 minutos',
+  max: 3000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.originalUrl === '/api/health' || req.originalUrl.startsWith('/api/webhooks/'),
+  handler: (_req, res) => {
+    res.status(429).json(createErrorResponse('Muitas requisicoes. Aguarde um instante e tente novamente.', 429))
+  },
 })
 
 app.use(cors())

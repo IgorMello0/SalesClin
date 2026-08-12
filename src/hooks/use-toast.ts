@@ -16,11 +16,23 @@ interface ToastState {
 
 let listeners: Array<(state: ToastState) => void> = []
 let memoryState: ToastState = { toasts: [] }
+const MAX_VISIBLE_TOASTS = 3
+
+function sameToast(left: Toast, right: Omit<Toast, "id">) {
+  return left.title === right.title
+    && left.description === right.description
+    && left.variant === right.variant
+}
 
 function dispatch(toast: Omit<Toast, "id">) {
+  // Repeated polling errors should update the page state, not fill the screen.
+  if (memoryState.toasts.some((current) => sameToast(current, toast))) return
+
   const id = Math.random().toString(36).slice(2)
   const newToast = { ...toast, id }
-  memoryState = { toasts: [...memoryState.toasts, newToast] }
+  memoryState = {
+    toasts: [...memoryState.toasts.slice(-(MAX_VISIBLE_TOASTS - 1)), newToast],
+  }
   listeners.forEach((l) => l(memoryState))
   // Auto-remove after 5s
   setTimeout(() => {
@@ -39,17 +51,20 @@ function useToast() {
     }
   }, [])
 
+  const toast = React.useCallback((props: Omit<Toast, "id">) => dispatch(props), [])
+  const dismiss = React.useCallback((toastId?: string) => {
+    memoryState = {
+      toasts: toastId
+        ? memoryState.toasts.filter((current) => current.id !== toastId)
+        : [],
+    }
+    listeners.forEach((listener) => listener(memoryState))
+  }, [])
+
   return {
     ...state,
-    toast: (props: Omit<Toast, "id">) => dispatch(props),
-    dismiss: (toastId?: string) => {
-      memoryState = {
-        toasts: toastId
-          ? memoryState.toasts.filter((t) => t.id !== toastId)
-          : [],
-      }
-      listeners.forEach((l) => l(memoryState))
-    },
+    toast,
+    dismiss,
   }
 }
 

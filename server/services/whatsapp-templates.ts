@@ -3,6 +3,28 @@ import { getWhatsAppConnection } from './whatsapp-connections.js'
 
 const GRAPH_VERSION = String(process.env.META_GRAPH_VERSION || 'v19.0').replace(/^v?/, 'v')
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`
+const META_REQUEST_TIMEOUT_MS = Math.max(5_000, Number(process.env.META_REQUEST_TIMEOUT_MS || 25_000))
+
+class MetaRequestTimeoutError extends Error {
+  constructor() {
+    super('A Meta demorou para responder. Aguarde alguns instantes, clique em Sincronizar e evite reenviar o mesmo template.')
+    this.name = 'MetaRequestTimeoutError'
+  }
+}
+
+async function fetchMeta(url: string | URL, options: RequestInit = {}) {
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(META_REQUEST_TIMEOUT_MS),
+    })
+  } catch (error: any) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      throw new MetaRequestTimeoutError()
+    }
+    throw error
+  }
+}
 
 type MetaTemplate = {
   id?: string
@@ -222,7 +244,7 @@ async function fetchMetaTemplates(wabaId: string, accessToken: string) {
     )
     url.searchParams.set('limit', '250')
 
-    const response = await fetch(url, {
+    const response = await fetchMeta(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     const body = await response.json().catch(() => ({}))
@@ -300,7 +322,31 @@ export async function syncMetaTemplates(companyId: number) {
 export async function createMetaTemplate(companyId: number, input: CreateWhatsAppTemplateInput) {
   const { accessToken, wabaId, connectionId } = await getMetaTemplateCredentials(companyId)
   const { endpoint, options, payload } = buildMetaTemplateCreateRequest(wabaId, accessToken, input)
-  const response = await fetch(endpoint, options)
+  const existing = await prisma.whatsAppTemplate.findUnique({
+    where: {
+      companyId_name_language: {
+        companyId,
+        name: payload.name,
+        language: payload.language,
+      },
+    },
+  })
+  if (existing?.externalId) return existing
+
+  let response: Response
+  try {
+    response = await fetchMeta(endpoint, options)
+  } catch (error) {
+    if (error instanceof MetaRequestTimeoutError) {
+      const recovered = await syncMetaTemplates(companyId)
+        .then((templates) => templates.find(
+          (template) => template.name === payload.name && template.language === payload.language,
+        ))
+        .catch(() => null)
+      if (recovered) return recovered
+    }
+    throw error
+  }
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
     throw new Error(body?.error?.error_user_msg || body?.error?.message || `Meta Graph API HTTP ${response.status}`)
@@ -350,7 +396,7 @@ export async function deleteMetaTemplate(companyId: number, templateId: number) 
   url.searchParams.set('name', template.name)
   if (template.externalId) url.searchParams.set('hsm_id', template.externalId)
 
-  const response = await fetch(url, {
+  const response = await fetchMeta(url, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   })
