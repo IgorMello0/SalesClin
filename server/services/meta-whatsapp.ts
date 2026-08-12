@@ -121,6 +121,49 @@ async function graphPost<T = any>(path: string, accessToken: string, body?: Reco
   return payload
 }
 
+function getMetaAppAccessToken() {
+  const explicitToken = cleanOptional(
+    process.env.META_SYSTEM_USER_ACCESS_TOKEN ||
+    process.env.META_APP_ACCESS_TOKEN ||
+    process.env.META_ACCESS_TOKEN,
+  )
+  if (explicitToken) return explicitToken
+
+  const { appId, appSecret } = requireMetaCredentials()
+  return `${appId}|${appSecret}`
+}
+
+function extractWabaIdsFromDebugToken(debugToken: any) {
+  const ids = new Set<string>()
+  const granularScopes = debugToken?.data?.granular_scopes || []
+
+  for (const scope of granularScopes) {
+    const scopeName = String(scope?.scope || '')
+    if (!scopeName.startsWith('whatsapp_business_')) continue
+
+    const targetIds = Array.isArray(scope?.target_ids) ? scope.target_ids : []
+    for (const targetId of targetIds) {
+      const cleaned = cleanOptional(targetId)
+      if (cleaned) ids.add(cleaned)
+    }
+  }
+
+  return [...ids]
+}
+
+async function getWabaIdsFromDebugToken(accessToken: string) {
+  const appAccessToken = getMetaAppAccessToken()
+  const debugToken = await graphGet('/debug_token', appAccessToken, {
+    input_token: accessToken,
+    fields: 'app_id,type,is_valid,granular_scopes',
+  }).catch((error) => {
+    console.warn('[Meta WhatsApp] Nao foi possivel ler debug_token:', error)
+    return null
+  })
+
+  return extractWabaIdsFromDebugToken(debugToken)
+}
+
 async function subscribeWhatsappApp(wabaId: string, accessToken: string) {
   try {
     await graphPost(`/${wabaId}/subscribed_apps`, accessToken)
@@ -207,10 +250,33 @@ async function resolveWabaFromEdge(
   return null
 }
 
+async function resolveWabaFromId(wabaId: string, accessToken: string) {
+  const waba = await graphGet<any>(`/${wabaId}`, accessToken, {
+    fields: 'id,name,phone_numbers{id,display_phone_number,verified_name}',
+  }).catch(() => null)
+
+  let phoneNumbers = waba?.phone_numbers?.data || []
+  if (!phoneNumbers.length) {
+    const phones = await getWabaPhoneNumbers(wabaId, accessToken)
+    phoneNumbers = phones.data || []
+  }
+
+  const phone = phoneNumbers[0]
+  if (!phone?.id) return null
+
+  return {
+    businessId: null,
+    wabaId: String(waba?.id || wabaId),
+    phoneNumberId: String(phone.id),
+    displayPhoneNumber: phone.display_phone_number || phone.verified_name || null,
+    edgeName: 'debug_token.granular_scopes',
+  }
+}
+
 async function resolveMetaWhatsappAccount(accessToken: string, officialMode: WhatsAppOfficialMode) {
   const businesses = await graphGet<{ data?: any[] }>('/me/businesses', accessToken, {
     fields: 'id,name',
-  })
+  }).catch(() => ({ data: [] }))
 
   const edgeNames = officialMode === 'coexistence'
     ? ['client_whatsapp_business_accounts', 'owned_whatsapp_business_accounts']
@@ -221,6 +287,12 @@ async function resolveMetaWhatsappAccount(accessToken: string, officialMode: Wha
       const account = await resolveWabaFromEdge(business, edgeName, accessToken)
       if (account) return account
     }
+  }
+
+  const targetWabaIds = await getWabaIdsFromDebugToken(accessToken)
+  for (const wabaId of targetWabaIds) {
+    const account = await resolveWabaFromId(wabaId, accessToken)
+    if (account) return account
   }
 
   throw new Error('Nenhum numero de WhatsApp Business foi retornado pela Meta para esta autorizacao. Confirme se o onboarding compartilhou o WABA e o numero com o app do SellClin.')
