@@ -90,24 +90,10 @@ const logoClass = 'h-7 w-7 object-contain';
 
 const integrationOptions: IntegrationOption[] = [
   {
-    id: 'whatsappOfficial',
-    title: 'API Oficial',
-    eyebrow: 'Cloud API',
-    description: 'Numero exclusivo conectado diretamente a plataforma oficial da Meta.',
-    status: 'Disponivel',
-    available: true,
-    logo: (
-      <span className="relative flex h-8 w-8 items-center justify-center">
-        <img src="/integrations/whatsapp.webp" alt="WhatsApp" className="h-7 w-7 object-contain" />
-        <img src="/integrations/meta-logo.png" alt="Meta" className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-white p-0.5 shadow-sm" />
-      </span>
-    ),
-  },
-  {
     id: 'whatsappCoexistence',
-    title: 'Coexistencia WhatsApp',
-    eyebrow: 'WhatsApp Business',
-    description: 'Mantenha o aplicativo no celular e conecte o mesmo numero ao SellClin.',
+    title: 'WhatsApp Oficial',
+    eyebrow: 'Coexistencia',
+    description: 'Mantenha o WhatsApp Business no celular e conecte o mesmo numero ao SellClin.',
     status: 'Disponivel',
     available: true,
     logo: (
@@ -119,9 +105,9 @@ const integrationOptions: IntegrationOption[] = [
   },
   {
     id: 'whatsappUazapi',
-    title: 'WhatsApp por QR Code',
-    eyebrow: 'Conexao rapida',
-    description: 'Escaneie o QR Code ou use um codigo de pareamento para conectar.',
+    title: 'WhatsApp Nao Oficial',
+    eyebrow: 'QR Code',
+    description: 'Conecte por QR Code ou codigo de pareamento quando nao usar Meta.',
     status: 'Disponivel',
     available: true,
     logo: (
@@ -220,7 +206,7 @@ const Integrations = () => {
     const params = new URLSearchParams(window.location.search);
     const channel = params.get('channel');
     const channelMap: Record<string, IntegrationKey> = {
-      'whatsapp-official': 'whatsappOfficial',
+      'whatsapp-official': 'whatsappCoexistence',
       'whatsapp-coexistence': 'whatsappCoexistence',
       'whatsapp-uazapi': 'whatsappUazapi',
       instagram: 'instagram',
@@ -487,7 +473,7 @@ const Integrations = () => {
                 <p className="text-xs font-medium text-slate-500">Escolha uma forma de conexão.</p>
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2">
               {integrationOptions.filter((option) => option.id.startsWith('whatsapp')).map(renderIntegrationCard)}
             </div>
           </section>

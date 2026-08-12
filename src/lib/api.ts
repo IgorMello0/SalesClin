@@ -902,7 +902,7 @@ export const googleCalendarApi = {
 
 export const whatsappMetaApi = {
   status: async () => apiRequest<any>('/whatsapp/meta/status'),
-  connect: async (mode: 'cloud_api' | 'coexistence' = 'cloud_api') =>
+  connect: async (mode: 'cloud_api' | 'coexistence' = 'coexistence') =>
     apiRequest<{ url: string }>(`/whatsapp/meta/connect?mode=${mode}`),
   configure: async (data: {
     phoneNumberId: string

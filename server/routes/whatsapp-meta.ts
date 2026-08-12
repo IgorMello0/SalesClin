@@ -66,7 +66,11 @@ router.get('/connect', ...ownerOnly, async (req, res) => {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
 
-    const officialMode: WhatsAppOfficialMode = req.query.mode === 'coexistence' ? 'coexistence' : 'cloud_api'
+    const cloudApiEnabled = String(process.env.WHATSAPP_CLOUD_API_ENABLED || '').toLowerCase() === 'true'
+    const requestedMode = req.query.mode === 'cloud_api' ? 'cloud_api' : 'coexistence'
+    const officialMode: WhatsAppOfficialMode = requestedMode === 'cloud_api' && cloudApiEnabled
+      ? 'cloud_api'
+      : 'coexistence'
     if (officialMode === 'coexistence') {
       const email = await getRequestEmail(req)
       if (!isCoexistenceAllowed(email)) {
