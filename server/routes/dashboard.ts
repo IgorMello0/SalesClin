@@ -106,10 +106,12 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
         include: { role: true }
       });
       if (dbUser?.role && !dbUser.role.isAdmin && !dbUser.role.isManager) {
-        // Se não for Admin nem Gestor Comercial, só vê leads atribuídos a si mesmo (como SDR ou Closer)
+        // Se não for Admin nem Gestor Comercial, só vê leads atribuídos a si mesmo (como SDR ou Closer) ou propostas vinculadas a si
         leadExtraFilters.OR = [
           { sdrId: req.user.id },
-          { closerId: req.user.id }
+          { closerId: req.user.id },
+          { proposals: { some: { sdrId: req.user.id } } },
+          { proposals: { some: { salespersonId: req.user.id } } }
         ];
 
         appointmentWhere.OR = [
@@ -130,7 +132,13 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
 
     if (sdrId && sdrId !== 'all') {
       const parsedSdrId = sdrId === 'none' ? null : parseInt(sdrId as string);
-      leadExtraFilters.sdrId = parsedSdrId;
+      leadExtraFilters.AND = leadExtraFilters.AND || [];
+      leadExtraFilters.AND.push({
+        OR: [
+          { sdrId: parsedSdrId },
+          { proposals: { some: { sdrId: parsedSdrId } } }
+        ]
+      });
       
       const sdrCondition = { 
         OR: [
@@ -157,7 +165,13 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
 
     if (closerId && closerId !== 'all') {
       const parsedCloserId = closerId === 'none' ? null : parseInt(closerId as string);
-      leadExtraFilters.closerId = parsedCloserId;
+      leadExtraFilters.AND = leadExtraFilters.AND || [];
+      leadExtraFilters.AND.push({
+        OR: [
+          { closerId: parsedCloserId },
+          { proposals: { some: { salespersonId: parsedCloserId } } }
+        ]
+      });
       
       const leadCloserCondition = { 
         OR: [
