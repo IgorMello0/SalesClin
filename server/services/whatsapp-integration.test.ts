@@ -5,7 +5,7 @@ import { handleMetaMessages, handleUazapiPayload } from './whatsapp-integration.
 
 type RecordData = Record<string, any>
 
-function createFakeDatabase() {
+function createFakeDatabase(options: { failFirstMessageCreate?: boolean } = {}) {
   const state = {
     leads: [] as RecordData[],
     conversations: [] as RecordData[],
@@ -18,6 +18,7 @@ function createFakeDatabase() {
   let nextConversationId = 1
   let nextMessageId = 1
   let nextActivityId = 1
+  let shouldFailMessageCreate = options.failFirstMessageCreate === true
 
   const db = {
     empresa: {
@@ -55,6 +56,10 @@ function createFakeDatabase() {
           && message.providerMessageId === where.providerMessageId,
       ) || null,
       create: async ({ data }: any) => {
+        if (shouldFailMessageCreate) {
+          shouldFailMessageCreate = false
+          throw new Error('Temporary database failure')
+        }
         const message = { id: nextMessageId++, ...data }
         state.messages.push(message)
         return message
@@ -68,6 +73,9 @@ function createFakeDatabase() {
       },
     },
     whatsAppWebhookEvent: {
+      findUnique: async ({ where }: any) => state.webhookEvents.find(
+        (event) => event.eventKey === where.eventKey,
+      ) || null,
       create: async ({ data }: any) => {
         if (state.webhookEvents.some((event) => event.eventKey === data.eventKey)) {
           throw Object.assign(new Error('Duplicate webhook event'), { code: 'P2002' })
@@ -78,7 +86,11 @@ function createFakeDatabase() {
       update: async ({ where, data }: any) => {
         const event = state.webhookEvents.find((item) => item.eventKey === where.eventKey)
         if (!event) throw new Error('Webhook event not found')
-        Object.assign(event, data)
+        const nextData = { ...data }
+        if (typeof data.attempts === 'object' && data.attempts?.increment) {
+          nextData.attempts = Number(event.attempts || 0) + Number(data.attempts.increment)
+        }
+        Object.assign(event, nextData)
         return event
       },
     },
@@ -174,6 +186,22 @@ test('Coexistencia usa configuracao dedicada e recebe pelo pipeline oficial', as
   assert.equal(state.leads.length, 1)
   assert.equal(state.leads[0].companyId, 8)
   assert.equal(state.messages[0].content, 'Mensagem pelo numero coexistente')
+})
+
+test('Coexistencia tenta novamente um webhook que falhou antes de salvar a mensagem', async () => {
+  const { db, state } = createFakeDatabase({ failFirstMessageCreate: true })
+  const payload = metaInboundPayload('wamid.coexistence-retry', 'Mensagem precisa chegar')
+  const company = { id: 8, ownerId: 21, name: 'Clinica Coexistencia' }
+
+  await assert.rejects(() => handleMetaMessages(payload, company, db), /Temporary database failure/)
+  assert.equal(state.webhookEvents[0].status, 'failed')
+
+  await handleMetaMessages(payload, company, db)
+
+  assert.equal(state.messages.length, 1)
+  assert.equal(state.messages[0].content, 'Mensagem precisa chegar')
+  assert.equal(state.webhookEvents[0].status, 'processed')
+  assert.equal(state.webhookEvents[0].attempts, 2)
 })
 
 test('Coexistencia habilitada libera conexao sem allowlist de teste', async () => {

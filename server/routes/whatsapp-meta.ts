@@ -7,6 +7,7 @@ import {
   connectMetaWhatsappFromCode,
   disconnectMetaWhatsapp,
   getMetaWhatsappStatus,
+  repairMetaWhatsappWebhook,
   saveManualMetaWhatsappConfig,
 } from '../services/meta-whatsapp.js'
 import { isCoexistenceAllowed, type WhatsAppOfficialMode } from '../services/whatsapp-connections.js'
@@ -161,5 +162,18 @@ router.post('/disconnect', ...ownerOnly, async (req, res) => {
   } catch (error: any) {
     console.error('[WhatsApp Meta Disconnect] Erro:', error)
     return res.status(500).json(createErrorResponse(error.message || 'Erro ao desconectar Meta', 500))
+  }
+})
+
+router.post('/webhook/repair', ...ownerOnly, async (req, res) => {
+  try {
+    const companyId = await getRequestCompanyId(req)
+    if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
+
+    const result = await repairMetaWhatsappWebhook(companyId)
+    return res.json(createSuccessResponse(result))
+  } catch (error: any) {
+    console.error('[WhatsApp Meta Webhook Repair] Erro:', error)
+    return res.status(400).json(createErrorResponse(error.message || 'Erro ao reparar recebimento da Meta', 400))
   }
 })

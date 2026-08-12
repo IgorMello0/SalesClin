@@ -808,10 +808,10 @@ async function handleMetaVerification(req: any, res: any, webhookToken?: string)
       where: { webhookToken },
       select: { metaWebhookVerifyToken: true, isActive: true },
     });
-    if (!empresa?.isActive || !empresa.metaWebhookVerifyToken) {
+    if (!empresa?.isActive) {
       return res.sendStatus(403);
     }
-    expectedToken = empresa.metaWebhookVerifyToken;
+    expectedToken = empresa.metaWebhookVerifyToken || expectedToken;
   }
 
   if (mode === 'subscribe' && token === expectedToken && challenge) {
@@ -902,11 +902,12 @@ router.post('/meta/:token', async (req, res) => {
     }
 
     console.log(`[Webhook/Meta] ✅ Recebido para clínica "${empresa.name}" (ID: ${empresa.id})`);
-    await handleWhatsappMetaMessages(req.body, empresa);
+    const result = await handleWhatsappMetaMessages(req.body, empresa);
+    console.log('[Webhook/Meta] Processamento concluido:', result);
     return res.sendStatus(200);
   } catch (error: any) {
     console.error('[Webhook/Meta] Erro:', error);
-    return res.sendStatus(200);
+    return res.sendStatus(500);
   }
 });
 
@@ -918,11 +919,12 @@ router.post('/meta', async (req, res) => {
       return res.sendStatus(403);
     }
 
-    await handleWhatsappMetaMessages(req.body);
+    const result = await handleWhatsappMetaMessages(req.body);
+    console.log('[Webhook/Meta] Processamento legado concluido:', result);
     return res.sendStatus(200);
   } catch (error: any) {
     console.error('[Webhook/Meta] Erro:', error);
-    return res.sendStatus(200);
+    return res.sendStatus(500);
   }
 });
 

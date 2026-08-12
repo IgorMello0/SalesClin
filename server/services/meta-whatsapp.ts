@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../prisma.js'
 import {
@@ -164,9 +165,45 @@ async function getWabaIdsFromDebugToken(accessToken: string) {
   return extractWabaIdsFromDebugToken(debugToken)
 }
 
-async function subscribeWhatsappApp(wabaId: string, accessToken: string) {
+type MetaWebhookSubscription = {
+  callbackUrl: string
+  overrideVerified: boolean
+}
+
+function createWebhookVerifyToken(current?: string | null) {
+  return cleanOptional(current) || randomBytes(32).toString('hex')
+}
+
+async function subscribeWhatsappApp(
+  wabaId: string,
+  accessToken: string,
+  webhook?: { callbackUrl: string; verifyToken: string },
+): Promise<MetaWebhookSubscription | null> {
   try {
     await graphPost(`/${wabaId}/subscribed_apps`, accessToken)
+
+    if (!webhook) return null
+
+    await graphPost(`/${wabaId}/subscribed_apps`, accessToken, {
+      override_callback_uri: webhook.callbackUrl,
+      verify_token: webhook.verifyToken,
+    })
+
+    const subscriptions = await graphGet<{ data?: Array<{ override_callback_uri?: string }> }>(
+      `/${wabaId}/subscribed_apps`,
+      accessToken,
+    ).catch(() => ({ data: [] }))
+    const reportedCallbacks = (subscriptions.data || [])
+      .map((item) => cleanOptional(item?.override_callback_uri))
+      .filter(Boolean)
+    const overrideVerified = reportedCallbacks.length === 0
+      || reportedCallbacks.includes(webhook.callbackUrl)
+
+    if (!overrideVerified) {
+      throw new Error('A Meta manteve outro callback configurado para esta conta do WhatsApp.')
+    }
+
+    return { callbackUrl: webhook.callbackUrl, overrideVerified }
   } catch (error: any) {
     throw new Error(
       `Nao foi possivel habilitar o recebimento de mensagens na Meta: ${error.message || 'verifique as permissoes do token.'}`
@@ -348,7 +385,25 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
   const payload = verifyMetaState(state)
   const accessToken = await exchangeCodeForToken(code)
   const account = await resolveMetaWhatsappAccount(accessToken, payload.officialMode)
-  await subscribeWhatsappApp(account.wabaId, accessToken)
+  const company = await prisma.empresa.findUnique({
+    where: { id: payload.companyId },
+    select: { webhookToken: true, metaWebhookVerifyToken: true },
+  })
+  if (!company?.webhookToken) throw new Error('Empresa nao encontrada para configurar o webhook.')
+
+  const webhookVerifyToken = createWebhookVerifyToken(company.metaWebhookVerifyToken)
+  const webhookUrl = buildMetaWebhookUrl(company.webhookToken)
+
+  // Meta validates the callback during subscribed_apps. Persist the token first
+  // so the verification request can be answered while this call is in flight.
+  await prisma.empresa.update({
+    where: { id: payload.companyId },
+    data: { metaWebhookVerifyToken: webhookVerifyToken },
+  })
+  const webhookSubscription = await subscribeWhatsappApp(account.wabaId, accessToken, {
+    callbackUrl: webhookUrl,
+    verifyToken: webhookVerifyToken,
+  })
 
   const updated = await prisma.empresa.update({
     where: { id: payload.companyId },
@@ -359,6 +414,7 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
       metaWabaId: account.wabaId,
       metaBusinessId: account.businessId,
       metaPhoneDisplayNumber: account.displayPhoneNumber,
+      metaWebhookVerifyToken: webhookVerifyToken,
       metaConnectedAt: new Date(),
       metaConnectionStatus: 'connected',
     },
@@ -383,8 +439,14 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
     businessId: account.businessId,
     displayPhoneNumber: account.displayPhoneNumber,
     accessToken,
+    webhookVerifyToken,
     connectedAt: updated.metaConnectedAt,
-    metadata: { onboarding: 'embedded_signup', edgeName: account.edgeName },
+    metadata: {
+      onboarding: 'embedded_signup',
+      edgeName: account.edgeName,
+      webhookCallbackUrl: webhookUrl,
+      webhookOverrideVerified: webhookSubscription?.overrideVerified === true,
+    },
   })
 
   return { ...updated, officialMode: payload.officialMode }
@@ -415,6 +477,23 @@ export async function getMetaWhatsappStatus(companyId: number) {
   const hasAccessToken = Boolean(company.metaToken)
   const connected = company.whatsappProvider === 'meta' && Boolean(company.metaPhoneNumberId && company.metaToken)
   const configured = serverSecretConfigured
+  const connectionMetadata = connection?.metadata && typeof connection.metadata === 'object'
+    ? connection.metadata as Record<string, unknown>
+    : {}
+  const expectedWebhookUrl = buildMetaWebhookUrl(company.webhookToken)
+  const webhookConfigured = connectionMetadata.webhookOverrideVerified === true
+    && connectionMetadata.webhookCallbackUrl === expectedWebhookUrl
+  const lastWebhookEvent = await prisma.whatsAppWebhookEvent.findFirst({
+    where: { companyId, provider: 'meta' },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      eventType: true,
+      status: true,
+      errorMessage: true,
+      createdAt: true,
+      processedAt: true,
+    },
+  })
 
   return {
     configured,
@@ -429,7 +508,9 @@ export async function getMetaWhatsappStatus(companyId: number) {
     webhookVerifyToken: company.metaWebhookVerifyToken,
     hasAccessToken,
     hasTwoStepPin: Boolean(company.metaTwoStepPin),
-    webhookUrl: buildMetaWebhookUrl(company.webhookToken),
+    webhookUrl: expectedWebhookUrl,
+    webhookConfigured,
+    lastWebhookEvent,
     connectedAt: company.metaConnectedAt,
     officialMode: connection?.provider === 'meta' ? (connection.officialMode || 'cloud_api') : 'cloud_api',
     coexistenceEnabled: isCoexistenceEnabled(),
@@ -464,7 +545,15 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
     throw new Error('Permanent Access Token e obrigatorio para habilitar o recebimento de mensagens.')
   }
 
-  await subscribeWhatsappApp(wabaId, effectiveAccessToken)
+  const webhookUrl = buildMetaWebhookUrl(current.webhookToken)
+  await prisma.empresa.update({
+    where: { id: companyId },
+    data: { metaWebhookVerifyToken: webhookVerifyToken },
+  })
+  const webhookSubscription = await subscribeWhatsappApp(wabaId, effectiveAccessToken, {
+    callbackUrl: webhookUrl,
+    verifyToken: webhookVerifyToken,
+  })
 
   const data: any = {
     whatsappProvider: 'meta',
@@ -510,13 +599,79 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
     accessToken: effectiveAccessToken,
     webhookVerifyToken,
     connectedAt: updated.metaConnectedAt,
-    metadata: { onboarding: 'manual' },
+    metadata: {
+      onboarding: 'manual',
+      webhookCallbackUrl: webhookUrl,
+      webhookOverrideVerified: webhookSubscription?.overrideVerified === true,
+    },
   })
 
   return {
     ...updated,
     webhookUrl: buildMetaWebhookUrl(updated.webhookToken),
     hasAccessToken: true,
+  }
+}
+
+export async function repairMetaWhatsappWebhook(companyId: number) {
+  const [company, connection] = await Promise.all([
+    prisma.empresa.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        webhookToken: true,
+        metaToken: true,
+        metaPhoneNumberId: true,
+        metaWabaId: true,
+        metaBusinessId: true,
+        metaPhoneDisplayNumber: true,
+        metaWebhookVerifyToken: true,
+        metaConnectedAt: true,
+      },
+    }),
+    getWhatsAppConnection(companyId),
+  ])
+
+  if (!company?.metaToken || !company.metaWabaId || !company.webhookToken) {
+    throw new Error('Conexao Meta incompleta. Conecte o WhatsApp novamente.')
+  }
+
+  const webhookVerifyToken = createWebhookVerifyToken(company.metaWebhookVerifyToken)
+  const webhookUrl = buildMetaWebhookUrl(company.webhookToken)
+  await prisma.empresa.update({
+    where: { id: companyId },
+    data: { metaWebhookVerifyToken: webhookVerifyToken },
+  })
+  const subscription = await subscribeWhatsappApp(company.metaWabaId, company.metaToken, {
+    callbackUrl: webhookUrl,
+    verifyToken: webhookVerifyToken,
+  })
+  const currentMetadata = connection?.metadata && typeof connection.metadata === 'object'
+    ? connection.metadata as Record<string, unknown>
+    : {}
+
+  await upsertMetaConnection({
+    companyId,
+    officialMode: connection?.officialMode === 'coexistence' ? 'coexistence' : 'cloud_api',
+    status: 'connected',
+    phoneNumberId: company.metaPhoneNumberId,
+    wabaId: company.metaWabaId,
+    businessId: company.metaBusinessId,
+    displayPhoneNumber: company.metaPhoneDisplayNumber,
+    accessToken: company.metaToken,
+    webhookVerifyToken,
+    connectedAt: company.metaConnectedAt,
+    metadata: {
+      ...currentMetadata,
+      webhookCallbackUrl: webhookUrl,
+      webhookOverrideVerified: subscription?.overrideVerified === true,
+      webhookRepairedAt: new Date().toISOString(),
+    },
+  })
+
+  return {
+    webhookUrl,
+    webhookConfigured: subscription?.overrideVerified === true,
   }
 }
 

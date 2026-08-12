@@ -913,6 +913,7 @@ export const whatsappMetaApi = {
     twoStepPin?: string
     displayPhoneNumber?: string
   }) => apiRequest<any>('/whatsapp/meta/configure', { method: 'POST', body: JSON.stringify(data) }),
+  repairWebhook: async () => apiRequest<any>('/whatsapp/meta/webhook/repair', { method: 'POST' }),
   disconnect: async () => apiRequest<any>('/whatsapp/meta/disconnect', { method: 'POST' }),
 }
 

@@ -1301,17 +1301,73 @@ export async function handleUazapiPayload(
   return { success: true, ...result }
 }
 
+async function beginMetaWebhookEvent(
+  db: WhatsAppPersistence,
+  data: {
+    companyId: number
+    eventKey: string
+    eventType: string
+    payload: any
+  },
+) {
+  try {
+    await db.whatsAppWebhookEvent.create({
+      data: {
+        ...data,
+        provider: 'meta',
+        status: 'processing',
+        attempts: 1,
+      },
+    })
+    return true
+  } catch (error: any) {
+    if (error?.code !== 'P2002') throw error
+  }
+
+  const existing = await db.whatsAppWebhookEvent.findUnique({
+    where: { eventKey: data.eventKey },
+    select: { status: true },
+  })
+  if (existing?.status === 'processed') return false
+
+  await db.whatsAppWebhookEvent.update({
+    where: { eventKey: data.eventKey },
+    data: {
+      status: 'processing',
+      attempts: { increment: 1 },
+      errorMessage: null,
+      processedAt: null,
+      payload: data.payload,
+    },
+  })
+  return true
+}
+
+async function failMetaWebhookEvent(db: WhatsAppPersistence, eventKey: string, error: unknown) {
+  await db.whatsAppWebhookEvent.update({
+    where: { eventKey },
+    data: {
+      status: 'failed',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    },
+  }).catch(() => undefined)
+}
+
 export async function handleMetaMessages(
   body: any,
   empresaOverride?: { id: number; ownerId: number | null; name: string },
   db: WhatsAppPersistence = prisma,
 ) {
-  if (!body.entry || !Array.isArray(body.entry)) return
+  const summary = { processed: 0, duplicates: 0, ignored: 0 }
+  if (!body.entry || !Array.isArray(body.entry)) return summary
 
   for (const entry of body.entry) {
     const changes = entry.changes || []
     for (const change of changes) {
-      if (change.field !== 'messages') continue
+      if (change.field !== 'messages') {
+        summary.ignored += 1
+        continue
+      }
 
       const value = change.value || {}
       const metadata = value.metadata || {}
@@ -1322,9 +1378,16 @@ export async function handleMetaMessages(
 
       let empresa = empresaOverride
       if (!empresa) {
-        if (!phoneNumberId) continue
+        if (!phoneNumberId) {
+          summary.ignored += 1
+          continue
+        }
         empresa = await findCompanyByMetaPhoneId(phoneNumberId, db)
-        if (!empresa) continue
+        if (!empresa) {
+          console.warn(`[Webhook/Meta] phone_number_id "${phoneNumberId}" nao pertence a uma clinica ativa.`)
+          summary.ignored += 1
+          continue
+        }
       }
 
       for (const statusEvent of statuses) {
@@ -1332,80 +1395,87 @@ export async function handleMetaMessages(
         if (!providerMessageId) continue
         const status = String(statusEvent?.status || '').toLowerCase()
         const eventKey = `meta:status:${providerMessageId}:${status}:${statusEvent?.timestamp || ''}`
-        try {
-          await db.whatsAppWebhookEvent.create({
-            data: {
-              companyId: empresa.id,
-              provider: 'meta',
-              eventKey,
-              eventType: `message.${status}`,
-              status: 'processing',
-              attempts: 1,
-              payload: statusEvent,
-            },
-          })
-        } catch (error: any) {
-          if (error?.code === 'P2002') continue
-          throw error
+        const shouldProcess = await beginMetaWebhookEvent(db, {
+          companyId: empresa.id,
+          eventKey,
+          eventType: `message.${status}`,
+          payload: statusEvent,
+        })
+        if (!shouldProcess) {
+          summary.duplicates += 1
+          continue
         }
 
-        const errorInfo = statusEvent?.errors?.[0]
-        await updateWhatsAppMessageStatus({
-          providerMessageId,
-          status,
-          errorCode: errorInfo?.code ? String(errorInfo.code) : null,
-          errorMessage: errorInfo?.title || errorInfo?.message || null,
-          occurredAt: statusEvent?.timestamp
-            ? new Date(Number(statusEvent.timestamp) * 1000)
-            : new Date(),
-        })
-        await db.whatsAppWebhookEvent.update({
-          where: { eventKey },
-          data: { status: 'processed', processedAt: new Date() },
-        })
+        try {
+          const errorInfo = statusEvent?.errors?.[0]
+          await updateWhatsAppMessageStatus({
+            providerMessageId,
+            status,
+            errorCode: errorInfo?.code ? String(errorInfo.code) : null,
+            errorMessage: errorInfo?.title || errorInfo?.message || null,
+            occurredAt: statusEvent?.timestamp
+              ? new Date(Number(statusEvent.timestamp) * 1000)
+              : new Date(),
+          })
+          await db.whatsAppWebhookEvent.update({
+            where: { eventKey },
+            data: { status: 'processed', processedAt: new Date(), errorMessage: null },
+          })
+          summary.processed += 1
+        } catch (error) {
+          await failMetaWebhookEvent(db, eventKey, error)
+          throw error
+        }
       }
 
       for (const msg of messages) {
         if (msg.type === 'status' || !msg.from) continue
 
         const eventKey = `meta:message:${msg.id || `${msg.from}:${msg.timestamp || ''}`}`
-        try {
-          await db.whatsAppWebhookEvent.create({
-            data: {
-              companyId: empresa.id,
-              provider: 'meta',
-              eventKey,
-              eventType: 'message.received',
-              status: 'processing',
-              attempts: 1,
-              payload: msg,
-            },
-          })
-        } catch (error: any) {
-          if (error?.code === 'P2002') continue
-          throw error
+        const shouldProcess = await beginMetaWebhookEvent(db, {
+          companyId: empresa.id,
+          eventKey,
+          eventType: 'message.received',
+          payload: msg,
+        })
+        if (!shouldProcess) {
+          summary.duplicates += 1
+          continue
         }
 
-        const phone = normalizePhone(msg.from)
-        const contactInfo = contacts.find((contact: any) => contact.wa_id === msg.from)
-        const pushName = contactInfo?.profile?.name || ''
-        const messageText = msg.text?.body || msg.image?.caption || msg.video?.caption || ''
+        try {
+          const phone = normalizePhone(msg.from)
+          if (!phone) throw new Error('Mensagem recebida sem telefone valido.')
+          const contactInfo = contacts.find((contact: any) => contact.wa_id === msg.from)
+          const pushName = contactInfo?.profile?.name || ''
+          const messageText = msg.text?.body || msg.image?.caption || msg.video?.caption || ''
 
-        await processIncomingMessage({
-          companyId: empresa.id,
-          ownerId: empresa.ownerId,
-          phone,
-          pushName,
-          messageText,
-          rawPayload: msg,
-          origin: 'WhatsApp Official',
-          providerMessageId: msg.id || null,
-        }, db)
-        await db.whatsAppWebhookEvent.update({
-          where: { eventKey },
-          data: { status: 'processed', processedAt: new Date() },
-        })
+          const result = await processIncomingMessage({
+            companyId: empresa.id,
+            ownerId: empresa.ownerId,
+            phone,
+            pushName,
+            messageText,
+            rawPayload: msg,
+            origin: 'WhatsApp Official',
+            providerMessageId: msg.id || null,
+          }, db)
+          if (result.action === 'ignored') {
+            throw new Error(`Mensagem ignorada: ${result.reason || 'motivo desconhecido'}.`)
+          }
+          await db.whatsAppWebhookEvent.update({
+            where: { eventKey },
+            data: { status: 'processed', processedAt: new Date(), errorMessage: null },
+          })
+          console.log(`[Webhook/Meta] Mensagem ${msg.id || eventKey} salva na clinica #${empresa.id}.`)
+          summary.processed += 1
+        } catch (error) {
+          await failMetaWebhookEvent(db, eventKey, error)
+          throw error
+        }
       }
     }
   }
+
+  return summary
 }

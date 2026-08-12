@@ -47,6 +47,14 @@ type MetaStatus = {
   coexistenceAllowed?: boolean;
   coexistenceEnabled?: boolean;
   coexistenceConfigured?: boolean;
+  webhookConfigured?: boolean;
+  lastWebhookEvent?: {
+    eventType?: string | null;
+    status?: string;
+    errorMessage?: string | null;
+    createdAt?: string;
+    processedAt?: string | null;
+  } | null;
 };
 
 type MetaForm = {
@@ -308,6 +316,20 @@ const Integrations = () => {
       await loadMetaStatus();
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } finally {
+      setWorkingKey(null);
+    }
+  };
+
+  const repairMetaWebhook = async () => {
+    setWorkingKey('meta-webhook-repair');
+    try {
+      const response = await whatsappMetaApi.repairWebhook();
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel reparar o recebimento.');
+      toast({ title: 'Recebimento configurado', description: 'O webhook desta clinica foi atualizado na Meta.' });
+      await loadMetaStatus();
+    } catch (error: any) {
+      toast({ title: 'Falha ao reparar recebimento', description: error.message, variant: 'destructive' });
     } finally {
       setWorkingKey(null);
     }
@@ -745,6 +767,23 @@ const Integrations = () => {
                     <Button variant="outline" onClick={() => loadMetaStatus()} disabled={!!workingKey} className="w-full font-bold">
                       <RefreshCcw size={16} className="mr-2" /> Atualizar status
                     </Button>
+                    {isIntegrationConnected('whatsappCoexistence') && !metaStatus?.webhookConfigured && (
+                      <Button
+                        onClick={() => void repairMetaWebhook()}
+                        disabled={workingKey === 'meta-webhook-repair'}
+                        className="w-full bg-emerald-600 font-bold hover:bg-emerald-700"
+                      >
+                        {workingKey === 'meta-webhook-repair' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <RefreshCcw size={16} className="mr-2" />}
+                        Reparar recebimento
+                      </Button>
+                    )}
+                    {isIntegrationConnected('whatsappCoexistence') && (
+                      <div className={`rounded-lg border p-3 text-xs font-semibold ${metaStatus?.webhookConfigured ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                        {metaStatus?.webhookConfigured
+                          ? 'Mensagens recebidas estao vinculadas a esta clinica.'
+                          : 'A conexao esta ativa, mas o recebimento precisa ser configurado.'}
+                      </div>
+                    )}
                     {isIntegrationConnected('whatsappCoexistence') && (
                       <Button variant="outline" onClick={disconnectMeta} disabled={workingKey === 'meta-disconnect'} className="w-full font-bold text-red-600 hover:text-red-700">
                         {workingKey === 'meta-disconnect' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Unplug size={16} className="mr-2" />}
