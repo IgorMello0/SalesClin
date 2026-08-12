@@ -841,12 +841,14 @@ router.post('/:id/confirm-payment', auth(), async (req, res) => {
       });
     }
 
-    // Atualiza status do Lead para pago e move para o funil pÃ³s-venda ou similar se quiser
+    // Atualiza status do Lead para pago e move para o funil pós-venda ou similar se quiser
     const updatedLead = await prisma.lead.update({
       where: { id },
       data: { 
         isPaid: true,
-        status: 'comercial_closed' // Garantir que nÃ£o volte pra trÃ¡s devido a race condition do drag and drop
+        status: 'comercial_closed', // Garantir que não volte pra trás devido a race condition do drag and drop
+        closedAt: lead.closedAt || new Date(),
+        subStatus: 'won'
       } 
     })
 
