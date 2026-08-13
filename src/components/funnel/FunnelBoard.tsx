@@ -118,7 +118,7 @@ export function FunnelBoard({
   };
 
   return (
-    <div className="relative group/board w-full">
+    <div className="relative group/board w-full h-full flex flex-col min-h-0">
       {/* Floating Left Arrow */}
       {showLeftArrow && (
         <button
@@ -134,7 +134,7 @@ export function FunnelBoard({
       <div 
         ref={boardRef}
         onScroll={checkScroll}
-        className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-4 sm:px-4 scrollbar-hide snap-x snap-mandatory sm:snap-none"
+        className="flex gap-3 sm:gap-4 flex-1 min-h-0 h-full overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-4 sm:px-4 scrollbar-hide snap-x snap-mandatory sm:snap-none"
       >
         {stages.map((stage) => (
           <FunnelColumn 

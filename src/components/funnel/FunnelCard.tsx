@@ -83,31 +83,7 @@ export function FunnelCard({
   contactCadence
 }: FunnelCardProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [localContactCount, setLocalContactCount] = useState(lead.contactCount || 0);
 
-  useEffect(() => {
-    setLocalContactCount(lead.contactCount || 0);
-  }, [lead.contactCount]);
-
-  const handleContactChange = async (e: React.MouseEvent, newCount: number) => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    if (newCount < 0 || (contactCadence && newCount > contactCadence)) return;
-
-    const previousCount = localContactCount;
-    setLocalContactCount(newCount);
-    
-    try {
-      const res = await leadsApi.update(lead.id, { contactCount: newCount });
-      if (!res.success) {
-        throw new Error('Falha ao atualizar');
-      }
-    } catch (err) {
-      console.error('Failed to update contact count', err);
-      setLocalContactCount(previousCount); // Revert on failure
-    }
-  };
 
   const pendingCadenceTask = lead.tasks?.[0];
   const isCadenceOverdue = pendingCadenceTask && new Date(pendingCadenceTask.dueDate) < new Date();
@@ -139,8 +115,8 @@ export function FunnelCard({
             {lead.avatar || lead.name.charAt(0)}
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors truncate flex items-center gap-1.5">
-              {lead.name}
+            <h4 className="text-[13px] font-bold text-primary group-hover:text-secondary transition-colors flex items-center gap-1.5 overflow-hidden">
+              <span className="truncate">{lead.name}</span>
               {lead.convertedToClientId && (
                 <div 
                   className="flex items-center justify-center bg-gradient-to-b from-amber-100 to-yellow-200 border border-yellow-400/40 rounded-full w-[16px] h-[16px] shadow-sm shadow-yellow-500/20 shrink-0 cursor-help transition-transform hover:scale-110" 
@@ -150,7 +126,7 @@ export function FunnelCard({
                 </div>
               )}
             </h4>
-            {lead.isProposal && lead.subtitle && (
+            {lead.subtitle && lead.subtitle !== 'Sem propostas' && (
               <div className="mt-1">
                 <span className="inline-block max-w-full truncate text-[9px] font-extrabold uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">
                   {lead.subtitle}
@@ -161,36 +137,23 @@ export function FunnelCard({
               <span className="material-symbols-outlined text-[12px] text-emerald-500 shrink-0">chat</span>
               <p className="text-[10px] text-slate-500 font-bold tracking-tight truncate">{lead.phone}</p>
             </div>
-            {contactCadence !== undefined && contactCadence > 0 && (
-              <div 
-                className="flex items-center gap-1.5 mt-2 mb-1 px-1.5 py-1 bg-slate-50 border border-slate-100 rounded-md w-fit" 
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  disabled={localContactCount <= 0}
-                  onClick={(e) => handleContactChange(e, localContactCount - 1)}
-                  className="w-4 h-4 flex items-center justify-center rounded-sm bg-slate-200 text-slate-500 hover:bg-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:hover:bg-slate-200 transition-colors"
-                  title="Diminuir"
-                >
-                  <span className="material-symbols-outlined text-[12px] font-bold">remove</span>
-                </button>
-                
-                <span className="text-[9px] font-bold text-slate-600 min-w-[24px] text-center tracking-widest">
-                  {localContactCount}/{contactCadence}
-                </span>
-
-                <button
-                  type="button"
-                  disabled={localContactCount >= contactCadence}
-                  onClick={(e) => handleContactChange(e, localContactCount + 1)}
-                  className="w-4 h-4 flex items-center justify-center rounded-sm bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary disabled:opacity-50 disabled:hover:bg-primary/10 transition-colors"
-                  title="Aumentar"
-                >
-                  <span className="material-symbols-outlined text-[12px] font-bold">add</span>
-                </button>
+            {(!lead.sdrId || !lead.closerId || !lead.especialistaId) && (
+              <div className="flex items-center gap-1.5 mt-2 mb-1 flex-wrap">
+                {!lead.sdrId && (
+                  <div title="Sem SDR atribuído" className="flex items-center justify-center bg-amber-50 border border-amber-200 px-1 py-[1px] rounded-md shrink-0 shadow-sm cursor-help">
+                    <span className="text-[8px] font-extrabold text-amber-600 uppercase tracking-wider">SDR</span>
+                  </div>
+                )}
+                {!lead.closerId && (
+                  <div title="Sem Closer atribuído" className="flex items-center justify-center bg-rose-50 border border-rose-200 px-1 py-[1px] rounded-md shrink-0 shadow-sm cursor-help">
+                    <span className="text-[8px] font-extrabold text-rose-600 uppercase tracking-wider">Closer</span>
+                  </div>
+                )}
+                {!lead.especialistaId && (
+                  <div title="Sem Especialista atribuído" className="flex items-center justify-center bg-indigo-50 border border-indigo-200 px-1 py-[1px] rounded-md shrink-0 shadow-sm cursor-help">
+                    <span className="text-[8px] font-extrabold text-indigo-600 uppercase tracking-wider">ESPECIALISTA</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -264,47 +264,27 @@ const SalesFunnel = () => {
 
   // Mapeamento de Leads e Orçamentos para os cartões do Funil Kanban
   const boardCards = useMemo(() => {
-    return leads.flatMap((lead: any) => {
+    return leads.map((lead: any) => {
       // Filtrar propostas ativas (ignorando aceitas e rejeitadas)
       const activeProposals = lead.proposals ? lead.proposals.filter((p: any) => p.status !== 'accepted' && p.status !== 'rejected') : [];
 
-      if (!activeProposals || activeProposals.length === 0) {
-        // Lead sem propostas ativas (cai no status original do lead, ex: comercial_closed)
-        return [{
-          ...lead,
-          cardId: `lead-${lead.id}`, // Identificador único do cartão
-          isProposal: false,
-          value: Number(lead.value) || 0,
-          displayName: lead.name,
-          subtitle: (!lead.proposals || lead.proposals.length === 0) ? 'Sem propostas' : 'Proposta aceita/rejeitada',
-          displayValue: 0
-        }];
-      } else {
-        // Lead com propostas ativas: cada proposta vira um cartão
-        return activeProposals.map((prop: any) => {
-          // Se o status da proposta não for um ID de fase válido (por exemplo, "pending"), cai no status do lead ou comercial_proposal
-          const isStageId = (status: string) => {
-            return status && status !== 'pending' && status !== 'accepted' && status !== 'rejected';
-          };
-          const stage = isStageId(prop.status) ? prop.status : 'comercial_proposal';
-          
-          return {
-            ...lead, // herda dados do lead (nome, telefone, etc.)
-            id: lead.id, // ID do lead (usado para cliques/seleções do lead)
-            cardId: `proposal-${prop.id}`, // Identificador único do cartão
-            isProposal: true,
-            proposalId: prop.id,
-            value: Number(prop.value) || 0,
-            originalValue: Number(prop.originalValue) || 0,
-            discountValue: Number(prop.discountValue) || 0,
-            status: stage, // Define a coluna da proposta!
-            displayName: lead.name,
-            subtitle: prop.title,
-            displayValue: Number(prop.value) || 0,
-            rawProposal: prop
-          };
-        });
-      }
+      // Calcular o valor total das propostas ativas
+      const totalProposalValue = activeProposals.reduce(
+        (sum: number, p: any) => sum + (Number(p.value) || 0), 0
+      );
+
+      return {
+        ...lead,
+        cardId: `lead-${lead.id}`, // Identificador único do cartão
+        isProposal: false,
+        value: totalProposalValue > 0 ? totalProposalValue : (Number(lead.value) || 0),
+        displayName: lead.name,
+        subtitle: activeProposals.length > 0
+          ? `${activeProposals.length} proposta${activeProposals.length > 1 ? 's' : ''}`
+          : 'Sem propostas',
+        displayValue: totalProposalValue > 0 ? totalProposalValue : (Number(lead.value) || 0),
+        activeProposalCount: activeProposals.length,
+      };
     });
   }, [leads]);
 
@@ -405,6 +385,19 @@ const SalesFunnel = () => {
 
     const filteredAndSortedLeads = useMemo(() => {
     let result = [...boardCards];
+
+    // AUTO-ARQUIVAMENTO: esconder leads fechados há mais de 15 dias
+    const ARCHIVE_DAYS = 15;
+    const archiveCutoff = new Date();
+    archiveCutoff.setDate(archiveCutoff.getDate() - ARCHIVE_DAYS);
+    
+    result = result.filter(card => {
+      if (card.status === 'comercial_closed') {
+        const closedDate = card.closedAt ? new Date(card.closedAt) : new Date(card.rawDate || card.updatedAt || card.createdAt || 0);
+        return closedDate > archiveCutoff; // só mostra se fechou nos últimos 15 dias
+      }
+      return true;
+    });
 
     // Filter by search term
     if (searchTerm.trim() !== '') {
@@ -747,19 +740,11 @@ const SalesFunnel = () => {
   };
 
     const moveCard = async (cardId: string, stageId: string) => {
-    const isProposal = cardId.startsWith('proposal-');
-    const dbId = Number(cardId.split('-')[1]);
-    const isClosingStage = stageId === 'comercial_closed' || stageId.startsWith('sales_');
-
-    // Buscar o lead correspondente
-    let targetLead: any = null;
-    if (isProposal) {
-      targetLead = leads.find(l => l.proposals && l.proposals.some((p: any) => p.id === dbId));
-    } else {
-      targetLead = leads.find(l => l.id == dbId.toString());
-    }
-
+    const leadId = Number(cardId.replace('lead-', '').replace('proposal-', ''));
+    const targetLead = leads.find(l => l.id == leadId.toString());
     if (!targetLead) return;
+
+    const isClosingStage = stageId === 'comercial_closed' || stageId.startsWith('sales_');
 
     // Filtrar propostas ativas (não fechadas nem rejeitadas)
     const activeProposals = targetLead.proposals ? targetLead.proposals.filter((p: any) => 
@@ -769,8 +754,8 @@ const SalesFunnel = () => {
       p.status !== 'sales_payment'
     ) : [];
 
-    // Se está movendo um LEAD para uma fase de fechamento e ele tem propostas ativas
-    if (!isProposal && isClosingStage && activeProposals.length > 0) {
+    // Se está movendo para uma fase de fechamento e ele tem propostas ativas
+    if (isClosingStage && activeProposals.length > 0) {
       setLeadForProposalSelection({ ...targetLead, proposals: activeProposals });
       setTargetStageForSelection(stageId);
       setDraggedCardIdForSelection(cardId);
@@ -778,79 +763,26 @@ const SalesFunnel = () => {
       return;
     }
 
-    if (isProposal) {
-      const finalStageId = stageId;
-
-      // Atualizar localmente
-      setLeads(prev => prev.map(lead => {
-        if (lead.proposals && lead.proposals.some((p: any) => p.id === dbId)) {
-          return {
-            ...lead,
-            proposals: lead.proposals.map((p: any) => {
-              if (p.id === dbId) {
-                return { ...p, status: finalStageId };
-              }
-              return p;
-            })
-          };
-        }
-        return lead;
-      }));
-
-      try {
-        const res = await leadsApi.updateProposal(Number(targetLead.id), dbId, { stage: finalStageId });
-
-        // Se a proposta foi movida para "Fechado"
-        if (finalStageId === 'comercial_closed') {
-          setPaymentLead({ id: targetLead.id, value: Number(res.data.value), proposalId: dbId } as any);
-          setIsConfirmingPayment(true);
-        }
-      } catch (error) {
-        toast({ title: "Erro ao mover proposta", variant: "destructive" });
-        loadLeads();
-      }
-    } else {
-      // Se for um lead puro sendo movido para fase de fechamento sem propostas
-      // Permitimos que o lead seja movido mesmo sem proposta, para poder cobrar direto
-      await moveLead(dbId.toString(), stageId);
-    }
+    // Se for um lead sendo movido, movemos ele normalmente
+    await moveLead(leadId.toString(), stageId);
   };
 
   const handleConfirmProposalSelection = async (proposalId: number) => {
     setProposalSelectionOpen(false);
     const stageId = targetStageForSelection;
-    const finalStageId = stageId;
-
-    // Atualizar localmente a proposta selecionada para a nova fase
-    setLeads(prev => prev.map(lead => {
-      if (lead.id === leadForProposalSelection.id) {
-        return {
-          ...lead,
-          proposals: lead.proposals.map((p: any) => {
-            if (p.id === proposalId) {
-              return { ...p, status: finalStageId };
-            }
-            return p;
-          })
-        };
-      }
-      return lead;
-    }));
 
     try {
-      const res = await leadsApi.updateProposal(Number(leadForProposalSelection.id), proposalId, { stage: finalStageId });
+      const res = await leadsApi.updateProposal(Number(leadForProposalSelection.id), proposalId, { stage: 'accepted' });
       
+      await moveLead(leadForProposalSelection.id.toString(), stageId);
+
       toast({ 
-        title: "Proposta Avançada!", 
-        description: `A proposta "${res.data.title}" foi movida para a fase selecionada.`,
+        title: "Proposta Fechada!", 
+        description: `A proposta foi aceita e o lead avançou para a fase de fechamento.`,
       });
 
-      if (finalStageId === 'comercial_closed') {
-        setPaymentLead({ id: leadForProposalSelection.id, value: Number(res.data.value), proposalId } as any);
-        setIsConfirmingPayment(true);
-      }
     } catch (error) {
-      toast({ title: "Erro ao mover proposta", variant: "destructive" });
+      toast({ title: "Erro ao fechar proposta", variant: "destructive" });
       loadLeads();
     }
   };

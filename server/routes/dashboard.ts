@@ -64,11 +64,16 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       startDate = fromZonedTime(nowZoned, timeZone);
     } else if (filter === 'custom' && req.query.startDate && req.query.endDate) {
       const customStart = new Date(req.query.startDate as string);
+      const customEnd = new Date(req.query.endDate as string);
+
+      if (isNaN(customStart.getTime()) || isNaN(customEnd.getTime())) {
+        throw new Error("Datas de filtro customizado inválidas.");
+      }
+
       const customStartZoned = toZonedTime(customStart, timeZone);
       customStartZoned.setHours(0, 0, 0, 0);
       startDate = fromZonedTime(customStartZoned, timeZone);
 
-      const customEnd = new Date(req.query.endDate as string);
       const customEndZoned = toZonedTime(customEnd, timeZone);
       customEndZoned.setHours(23, 59, 59, 999);
       endDate = fromZonedTime(customEndZoned, timeZone);
@@ -89,10 +94,12 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
     if (companyId) baseWhere.companyId = companyId;
 
     const appointmentWhere: any = {
-      createdAt: { gte: startDate, lte: endDate },
-      professionalId: { in: professionalIds }
+      startTime: { gte: startDate, lte: endDate },
+      professionalId: { in: professionalIds },
+      status: { in: ['agendado', 'confirmado', 'concluido'] }
     };
     if (companyId) appointmentWhere.companyId = companyId;
+    appointmentWhere.AND = [];
 
     // 2.5 Lógica de Filtros por SDR e Closer
     const leadExtraFilters: any = {};
@@ -111,20 +118,28 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
           { sdrId: req.user.id },
           { closerId: req.user.id },
           { proposals: { some: { sdrId: req.user.id } } },
-          { proposals: { some: { salespersonId: req.user.id } } }
+          { proposals: { some: { salespersonId: req.user.id } } },
+          { proposals: { some: { specialistId: req.user.id } } }
         ];
 
-        appointmentWhere.OR = [
-          { sdrId: req.user.id },
-          { lead: { closerId: req.user.id } }
-        ];
+        appointmentWhere.AND.push({
+          OR: [
+            { sdrId: req.user.id },
+            { especialistaId: req.user.id },
+            { lead: { closerId: req.user.id } }
+          ]
+        });
 
         paymentExtraConditions.push({
           OR: [
             { appointment: { sdrId: req.user.id } },
+            { appointment: { especialistaId: req.user.id } },
             { appointment: { lead: { closerId: req.user.id } } },
             { client: { originLead: { sdrId: req.user.id } } },
-            { client: { originLead: { closerId: req.user.id } } }
+            { client: { originLead: { closerId: req.user.id } } },
+            { client: { originLead: { proposals: { some: { sdrId: req.user.id } } } } },
+            { client: { originLead: { proposals: { some: { salespersonId: req.user.id } } } } },
+            { client: { originLead: { proposals: { some: { specialistId: req.user.id } } } } }
           ]
         });
       }
@@ -147,12 +162,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
         ]
       };
       
-      if (appointmentWhere.OR) {
-        appointmentWhere.AND = appointmentWhere.AND || [];
-        appointmentWhere.AND.push(sdrCondition);
-      } else {
-        Object.assign(appointmentWhere, sdrCondition);
-      }
+      appointmentWhere.AND.push(sdrCondition);
 
       paymentExtraConditions.push({
         OR: [
@@ -180,12 +190,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
         ]
       };
       
-      if (appointmentWhere.OR) {
-        appointmentWhere.AND = appointmentWhere.AND || [];
-        appointmentWhere.AND.push(leadCloserCondition);
-      } else {
-        Object.assign(appointmentWhere, leadCloserCondition);
-      }
+      appointmentWhere.AND.push(leadCloserCondition);
 
       paymentExtraConditions.push({
         OR: [
@@ -391,7 +396,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
           method: 'transferencia',
           professionalId: { in: professionalIds },
           ...(companyId && { companyId }),
-          createdAt: { gte: startDate, lte: endDate },
+          date: { gte: startDate, lte: endDate },
           ...paymentExtraFilters
         },
         _count: { id: true }
@@ -423,20 +428,17 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
     const totalLeadsGlobal = funilStatus.reduce((acc, curr) => acc + curr._count.id, 0);
 
     const funil = {
-      novos: totalLeadsGlobal, // Estado atual: todos os leads no topo do funil
-      contatados: funilStatus.filter(s => ![
-        'prospect_lead'
-      ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
-      agendamentos: funilStatus.filter(s => ![
-        'prospect_lead', 
-        'prospect_qualified'
-      ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
-      fechados: funilStatus.filter(s => [
-        'comercial_closed', 
-        'sales_payment', 
-        'sales_contract', 
-        'sales_post'
-      ].includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
+      novos: totalLeadsGlobal, 
+      contatados: funilStatus.filter(s => {
+        const topStage = finalProspectStages[0] || 'prospect_lead';
+        return s.status !== topStage;
+      }).reduce((acc, curr) => acc + curr._count.id, 0),
+      agendamentos: funilStatus.filter(s => {
+        const ignoredStages = finalProspectStages.slice(0, 2);
+        if (ignoredStages.length === 0) ignoredStages.push('prospect_lead', 'prospect_qualified');
+        return !ignoredStages.includes(s.status);
+      }).reduce((acc, curr) => acc + curr._count.id, 0),
+      fechados: funilStatus.filter(s => closedStages.includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
     };
 
     const origem = origemData.map(o => ({

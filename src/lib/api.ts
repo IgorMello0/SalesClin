@@ -748,9 +748,9 @@ export const leadsApi = {
   getProposals: async (id: number) => apiRequest<Array<any>>(`/leads/${id}/proposals`),
   updateProposal: async (id: number, proposalId: number, data: any) => apiRequest<any>(`/leads/${id}/proposals/${proposalId}`, { method: 'PUT', body: JSON.stringify(data) }),
   confirmPayment: async (id: number, data: any) => apiRequest<any>(`/leads/${id}/confirm-payment`, { method: 'POST', body: JSON.stringify(data) }),
-  updateAssignment: async (id: number, data: { sdrId?: number | null, closerId?: number | null }) => apiRequest<any>(`/leads/${id}/assignment`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateAssignment: async (id: number, data: { sdrId?: number | null, closerId?: number | null, especialistaId?: number | null }) => apiRequest<any>(`/leads/${id}/assignment`, { method: 'PATCH', body: JSON.stringify(data) }),
   bulkDelete: async (ids: number[]) => apiRequest<any>('/leads/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) }),
-  bulkAssignment: async (ids: number[], data: { sdrId?: number | null, closerId?: number | null }) => apiRequest<any>('/leads/bulk-assignment', { method: 'PATCH', body: JSON.stringify({ ids, ...data }) }),
+  bulkAssignment: async (ids: number[], data: { sdrId?: number | null, closerId?: number | null, especialistaId?: number | null }) => apiRequest<any>('/leads/bulk-assignment', { method: 'PATCH', body: JSON.stringify({ ids, ...data }) }),
 }
 
 

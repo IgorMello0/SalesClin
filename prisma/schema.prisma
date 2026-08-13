@@ -152,6 +152,7 @@ model Lead {
   companyId            Int?           @map("company_id")
   sdrId                Int?           @map("sdr_id")
   closerId             Int?           @map("closer_id")
+  especialistaId       Int?           @map("especialista_id")
   appointments         Appointment[]
   activities           LeadActivity[]
   company              Empresa?       @relation(fields: [companyId], references: [id])
@@ -159,6 +160,7 @@ model Lead {
   professional         Professional   @relation(fields: [professionalId], references: [id])
   sdr                  Usuario?       @relation("LeadSdr", fields: [sdrId], references: [id])
   closer               Usuario?       @relation("LeadCloser", fields: [closerId], references: [id])
+  especialista         Usuario?       @relation("LeadEspecialista", fields: [especialistaId], references: [id])
   proposals            Proposal[]
   tasks                Task[]
   conversas            Conversa[]
@@ -598,6 +600,7 @@ model Usuario {
   proposalsAsSdr         Proposal[]          @relation("SdrProposals")
   leadsAsSdr             Lead[]              @relation("LeadSdr")
   leadsAsCloser          Lead[]              @relation("LeadCloser")
+  leadsAsEspecialista    Lead[]              @relation("LeadEspecialista")
   appointmentsAsSDR      Appointment[]       @relation("AppointmentSDR")
   appointmentsAsEspec    Appointment[]       @relation("AppointmentEspecialista")
   assignedTasks          Task[]              @relation("AssignedUserTasks")

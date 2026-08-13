@@ -174,7 +174,7 @@ router.get('/:id', auth(), async (req, res) => {
 // Criar novo lead
 router.post('/', auth(), async (req, res) => {
   try {
-    let { name, value, origin, status, avatar, phone, email, notes, responsible, tags, sdrId: requestedSdrId } = req.body
+    let { name, value, origin, status, avatar, phone, email, notes, responsible, tags, sdrId: requestedSdrId, closerId: requestedCloserId, especialistaId: requestedEspecialistaId } = req.body
     
     if (!name) {
       return res.status(400).json(createErrorResponse('O nome Ã© obrigatÃ³rio', 400))
@@ -212,7 +212,8 @@ router.post('/', auth(), async (req, res) => {
     }
     
     let sdrId: number | undefined = undefined;
-    let closerId: number | undefined = undefined;
+    let closerId: number | undefined = requestedCloserId ? Number(requestedCloserId) : undefined;
+    let especialistaId: number | undefined = requestedEspecialistaId ? Number(requestedEspecialistaId) : undefined;
 
     // Se a interface enviar o SDR (pode ser um ID numÃ©rico, null para forÃ§ar nenhum, ou undefined/'random')
     if (requestedSdrId === 'random') {
@@ -301,6 +302,7 @@ router.post('/', auth(), async (req, res) => {
         companyId,
         sdrId,
         closerId,
+        especialistaId,
         name, 
         value: Number(value) || 0, 
         origin, 
@@ -555,6 +557,9 @@ router.put('/:id', auth(), async (req, res) => {
     if (data.professional_id) {
       prismaData.professionalId = Number(data.professional_id)
       delete prismaData.professional_id
+    }
+    if (data.especialistaId !== undefined) {
+      prismaData.especialistaId = data.especialistaId === null ? null : Number(data.especialistaId);
     }
     if (prismaData.phone) {
       prismaData.phone = String(prismaData.phone).replace(/\D/g, '');
@@ -885,10 +890,10 @@ router.delete('/bulk', auth(), async (req, res) => {
   }
 });
 
-// Atribuir mÃºltiplos leads a SDR ou Closer em massa
+// Atualizar atribuição em lote
 router.patch('/bulk-assignment', auth(), async (req, res) => {
   try {
-    const { ids, sdrId, closerId } = req.body;
+    const { ids, sdrId, closerId, especialistaId } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json(createErrorResponse('IDs invÃ¡lidos', 400));
     }
@@ -922,11 +927,20 @@ router.patch('/bulk-assignment', auth(), async (req, res) => {
       }
     }
 
+    // Se estÃ¡ atribuindo a Especialista, verificar que o Especialista pertence Ã  clÃ­nica
+    if (especialistaId !== undefined && especialistaId !== null) {
+      const especialista = await prisma.usuario.findUnique({ where: { id: parseInt(especialistaId) }, select: { companyId: true } });
+      if (!especialista || (companyId && especialista.companyId !== companyId)) {
+        return res.status(403).json(createErrorResponse('Especialista nÃ£o pertence a esta clÃ­nica', 403));
+      }
+    }
+
     await prisma.lead.updateMany({
       where: { id: { in: numericIds } },
       data: {
-        ...(sdrId !== undefined && { sdrId: sdrId === null ? null : parseInt(sdrId) }),
-        ...(closerId !== undefined && { closerId: closerId === null ? null : parseInt(closerId) }),
+        ...(sdrId !== undefined && { sdrId: sdrId === null ? null : Number(sdrId) }),
+        ...(closerId !== undefined && { closerId: closerId === null ? null : Number(closerId) }),
+        ...(especialistaId !== undefined && { especialistaId: especialistaId === null ? null : Number(especialistaId) })
       }
     });
 
@@ -968,7 +982,7 @@ router.delete('/:id', auth(), async (req, res) => {
 router.patch('/:id/assignment', auth(), async (req, res) => {
   try {
     const { id } = req.params;
-    const { sdrId, closerId } = req.body;
+    const { sdrId, closerId, especialistaId } = req.body;
     
     const leadId = parseInt(id);
     const access = await assertLeadAccess(leadId, req.user);
@@ -981,16 +995,21 @@ router.patch('/:id/assignment', auth(), async (req, res) => {
     if (closerId !== undefined && closerId !== null) {
       await assertUserBelongsToCompany(parseInt(closerId), req.user?.companyId)
     }
+    if (especialistaId !== undefined && especialistaId !== null) {
+      await assertUserBelongsToCompany(parseInt(especialistaId), req.user?.companyId)
+    }
 
     const updated = await prisma.lead.update({
       where: { id: leadId },
       data: {
         ...(sdrId !== undefined && { sdrId: sdrId === null ? null : Number(sdrId) }),
-        ...(closerId !== undefined && { closerId: closerId === null ? null : Number(closerId) })
+        ...(closerId !== undefined && { closerId: closerId === null ? null : Number(closerId) }),
+        ...(especialistaId !== undefined && { especialistaId: especialistaId === null ? null : Number(especialistaId) })
       },
       include: {
         sdr: { select: { name: true } },
-        closer: { select: { name: true } }
+        closer: { select: { name: true } },
+        especialista: { select: { name: true } }
       }
     });
 

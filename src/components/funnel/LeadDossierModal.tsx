@@ -166,7 +166,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
     }
   };
 
-  const handleUpdateAssignment = async (type: 'sdrId' | 'closerId', value: string | null) => {
+  const handleUpdateAssignment = async (type: 'sdrId' | 'closerId' | 'especialistaId', value: string | null) => {
     if (!selectedLead) return;
     const numericValue = value ? Number(value) : null;
     
@@ -174,6 +174,7 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
       const res = await leadsApi.updateAssignment(Number(selectedLead.id), {
         sdrId: type === 'sdrId' ? numericValue : selectedLead.sdrId,
         closerId: type === 'closerId' ? numericValue : selectedLead.closerId,
+        especialistaId: type === 'especialistaId' ? numericValue : selectedLead.especialistaId,
       });
       if (res.success) {
         toast({ title: "Atribuição atualizada!" });
@@ -590,6 +591,25 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                             <SelectContent className="z-[300]">
                               <SelectItem value="unassigned">Sem Closer</SelectItem>
                               {team.filter(u => u.role?.isCloser || u.role?.isManager || u.role?.isAdmin).map(u => (
+                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Especialista Padrão</p>
+                          <Select 
+                            value={selectedLead.especialistaId ? String(selectedLead.especialistaId) : "unassigned"}
+                            onValueChange={(val) => handleUpdateAssignment('especialistaId', val === "unassigned" ? null : val)}
+                          >
+                            <SelectTrigger className="h-8 py-0 px-2 text-xs border-slate-200 focus-visible:ring-secondary/20 bg-white">
+                              <SelectValue placeholder="Sem Especialista">
+                                {selectedLead.especialistaId ? team.find(u => u.id === selectedLead.especialistaId)?.name || 'Desconhecido' : 'Sem Especialista'}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="z-[300]">
+                              <SelectItem value="unassigned">Sem Especialista</SelectItem>
+                              {team.filter(u => u.role?.isSpecialist || u.role?.isManager || u.role?.isAdmin).map(u => (
                                 <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                               ))}
                             </SelectContent>

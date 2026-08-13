@@ -75,11 +75,11 @@ export function FunnelColumn({
 
   return (
     <div 
-      className="flex-shrink-0 w-[280px] sm:w-72 flex flex-col gap-3 snap-center"
+      className="flex-shrink-0 w-[280px] sm:w-72 flex flex-col gap-3 snap-center h-full max-h-full"
       onDragOver={(e) => onDragOver(e, stage.id)}
       onDrop={(e) => onDrop(e, stage.id)}
     >
-      <div className="flex items-center justify-between px-2">
+      <div className="flex items-center justify-between px-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className={cn("w-2 h-2 rounded-full", stage.color)}></div>
           <h3 className="font-bold text-primary text-sm uppercase tracking-wider">{stage.label}</h3>
@@ -96,7 +96,7 @@ export function FunnelColumn({
       </div>
 
       <div className={cn(
-        "flex-1 min-h-[500px] rounded-2xl p-2.5 space-y-2 transition-all duration-200",
+        "flex-1 min-h-[100px] overflow-y-auto scrollbar-hide rounded-2xl p-2.5 space-y-2 transition-all duration-200",
         "bg-slate-50/50 border border-slate-100/50",
         isOver && "bg-slate-100/80 border-secondary/30"
       )}>
