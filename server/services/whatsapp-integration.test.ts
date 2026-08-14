@@ -120,6 +120,27 @@ function metaInboundPayload(messageId: string, text: string) {
   }
 }
 
+function metaInboundImagePayload(messageId: string) {
+  return {
+    entry: [{
+      changes: [{
+        field: 'messages',
+        value: {
+          metadata: { phone_number_id: 'meta-phone-1' },
+          contacts: [{ wa_id: '5511999990001', profile: { name: 'Lead Meta' } }],
+          messages: [{
+            id: messageId,
+            from: '5511999990001',
+            timestamp: '1784246400',
+            type: 'image',
+            image: { id: 'meta-media-1', mime_type: 'image/jpeg', caption: 'Foto recebida' },
+          }],
+        },
+      }],
+    }],
+  }
+}
+
 test('WhatsApp Oficial cria lead, conversa e mensagem sem duplicar retry', async () => {
   process.env.META_APP_ID = 'meta-app-test'
   process.env.META_APP_SECRET = 'meta-secret-test'
@@ -186,6 +207,39 @@ test('Coexistencia usa configuracao dedicada e recebe pelo pipeline oficial', as
   assert.equal(state.leads.length, 1)
   assert.equal(state.leads[0].companyId, 8)
   assert.equal(state.messages[0].content, 'Mensagem pelo numero coexistente')
+})
+
+test('WhatsApp Oficial baixa e vincula a midia recebida a mensagem', async () => {
+  const { db, state } = createFakeDatabase()
+  const requestedMedia: RecordData[] = []
+
+  await handleMetaMessages(
+    metaInboundImagePayload('wamid.official-image-1'),
+    { id: 5, ownerId: 10, name: 'Clinica Oficial' },
+    db,
+    {
+      resolveMedia: async (input) => {
+        requestedMedia.push(input)
+        return {
+          mediaUrl: 'https://sellclin.test/uploads/media/5/image.jpg',
+          mediaType: 'image',
+          mimeType: 'image/jpeg',
+          size: 1024,
+        }
+      },
+    },
+  )
+
+  assert.deepEqual(requestedMedia, [{
+    companyId: 5,
+    mediaId: 'meta-media-1',
+    mediaType: 'image',
+    declaredMimeType: 'image/jpeg',
+  }])
+  assert.equal(state.messages.length, 1)
+  assert.equal(state.messages[0].content, 'Foto recebida')
+  assert.equal(state.messages[0].rawJson.mediaUrl, 'https://sellclin.test/uploads/media/5/image.jpg')
+  assert.equal(state.messages[0].rawJson.mediaType, 'image')
 })
 
 test('Coexistencia tenta novamente um webhook que falhou antes de salvar a mensagem', async () => {

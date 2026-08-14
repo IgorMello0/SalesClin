@@ -1,6 +1,9 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { prisma } from '../prisma.js'
 import { updateWhatsAppMessageStatus } from './whatsapp-messages.js'
+import { getWhatsAppConnection } from './whatsapp-connections.js'
 
 type CompanyRef = {
   id: number
@@ -225,6 +228,123 @@ type WhatsAppPersistence = Pick<
   typeof prisma,
   'empresa' | 'lead' | 'conversa' | 'mensagem' | 'leadActivity' | 'whatsAppWebhookEvent'
 >
+
+type IncomingMediaType = 'image' | 'video' | 'audio'
+
+type MetaMediaAttachment = {
+  mediaUrl: string
+  mediaType: IncomingMediaType
+  mimeType: string
+  size: number
+}
+
+type MetaMediaResolver = (input: {
+  companyId: number
+  mediaId: string
+  mediaType: IncomingMediaType
+  declaredMimeType?: string | null
+}) => Promise<MetaMediaAttachment>
+
+const META_GRAPH_VERSION = String(process.env.META_GRAPH_VERSION || 'v19.0').replace(/^v?/, 'v')
+const META_GRAPH_BASE_URL = `https://graph.facebook.com/${META_GRAPH_VERSION}`
+const META_MEDIA_TYPES = new Map<string, { extension: string; mediaType: IncomingMediaType; maxBytes: number }>([
+  ['image/jpeg', { extension: 'jpg', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['image/png', { extension: 'png', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['image/webp', { extension: 'webp', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['image/gif', { extension: 'gif', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['video/mp4', { extension: 'mp4', mediaType: 'video', maxBytes: 16 * 1024 * 1024 }],
+  ['video/3gpp', { extension: '3gp', mediaType: 'video', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/aac', { extension: 'aac', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/amr', { extension: 'amr', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/mpeg', { extension: 'mp3', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/mp4', { extension: 'm4a', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/ogg', { extension: 'ogg', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/opus', { extension: 'opus', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+])
+
+async function getMetaMediaAccessToken(companyId: number) {
+  const [connection, company] = await Promise.all([
+    getWhatsAppConnection(companyId),
+    prisma.empresa.findUnique({ where: { id: companyId }, select: { metaToken: true } }),
+  ])
+  const accessToken = connection?.provider === 'meta' ? connection.accessToken : company?.metaToken
+  if (!accessToken) throw new Error('Token da Meta indisponivel para baixar a midia recebida.')
+  return accessToken
+}
+
+async function resolveMetaMedia(input: Parameters<MetaMediaResolver>[0]): Promise<MetaMediaAttachment> {
+  const accessToken = await getMetaMediaAccessToken(input.companyId)
+  const metadataResponse = await fetch(`${META_GRAPH_BASE_URL}/${encodeURIComponent(input.mediaId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(15_000),
+  })
+  const metadataText = await metadataResponse.text()
+  let metadata: any = null
+  try { metadata = metadataText ? JSON.parse(metadataText) : null } catch { metadata = null }
+  if (!metadataResponse.ok || !metadata?.url) {
+    throw new Error(metadata?.error?.message || `Meta nao retornou a URL da midia (HTTP ${metadataResponse.status}).`)
+  }
+
+  const mediaResponse = await fetch(String(metadata.url), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!mediaResponse.ok) {
+    throw new Error(`Falha ao baixar a midia da Meta (HTTP ${mediaResponse.status}).`)
+  }
+
+  const mimeType = String(
+    mediaResponse.headers.get('content-type') || metadata?.mime_type || input.declaredMimeType || '',
+  ).split(';')[0].trim().toLowerCase()
+  const mediaConfig = META_MEDIA_TYPES.get(mimeType)
+  if (!mediaConfig || mediaConfig.mediaType !== input.mediaType) {
+    throw new Error(`Formato de midia recebido nao suportado: ${mimeType || input.mediaType}.`)
+  }
+
+  const declaredSize = Number(mediaResponse.headers.get('content-length') || metadata?.file_size || 0)
+  if (declaredSize > mediaConfig.maxBytes) {
+    throw new Error(`Midia recebida excede o limite de ${Math.floor(mediaConfig.maxBytes / 1024 / 1024)} MB.`)
+  }
+
+  const buffer = Buffer.from(await mediaResponse.arrayBuffer())
+  if (buffer.length > mediaConfig.maxBytes) {
+    throw new Error(`Midia recebida excede o limite de ${Math.floor(mediaConfig.maxBytes / 1024 / 1024)} MB.`)
+  }
+
+  const relativeDirectory = path.posix.join('media', String(input.companyId))
+  const uploadDirectory = path.join(process.cwd(), 'uploads', ...relativeDirectory.split('/'))
+  const storedFilename = `${randomUUID()}.${mediaConfig.extension}`
+  await fs.mkdir(uploadDirectory, { recursive: true })
+  await fs.writeFile(path.join(uploadDirectory, storedFilename), buffer, { flag: 'wx' })
+
+  const mediaUrl = `${getPublicAppUrl()}/uploads/${relativeDirectory}/${storedFilename}`
+  console.info('[Webhook/Meta] Midia recebida salva', {
+    companyId: input.companyId,
+    mediaType: mediaConfig.mediaType,
+    size: buffer.length,
+  })
+  return { mediaUrl, mediaType: mediaConfig.mediaType, mimeType, size: buffer.length }
+}
+
+function getMetaMediaDescriptor(message: any) {
+  const requestedType = String(message?.type || '').toLowerCase()
+  const mediaType: IncomingMediaType | null = requestedType === 'image'
+    ? 'image'
+    : requestedType === 'video'
+      ? 'video'
+      : requestedType === 'audio'
+        ? 'audio'
+        : null
+  if (!mediaType) return null
+
+  const media = message?.[mediaType]
+  if (!media?.id) return null
+  return {
+    mediaId: String(media.id),
+    mediaType,
+    declaredMimeType: media.mime_type ? String(media.mime_type) : null,
+  }
+}
 
 export async function findCompanyByInstance(instance: string) {
   const trimmed = instance.trim()
@@ -1095,8 +1215,12 @@ export async function processIncomingMessage(opts: {
   rawPayload: any
   origin: string
   providerMessageId?: string | null
+  mediaUrl?: string | null
+  mediaType?: IncomingMediaType | null
 }, db: WhatsAppPersistence = prisma) {
-  const { companyId, ownerId, phone, pushName, messageText, rawPayload, origin, providerMessageId } = opts
+  const {
+    companyId, ownerId, phone, pushName, messageText, rawPayload, origin, providerMessageId, mediaUrl, mediaType,
+  } = opts
 
   if (!ownerId) {
     console.warn(`[Webhook] Empresa #${companyId} sem ownerId. Ignorando.`)
@@ -1168,7 +1292,9 @@ export async function processIncomingMessage(opts: {
       sender: 'cliente',
       content: messageText || '(midia)',
       providerMessageId: providerMessageId || null,
-      rawJson: rawPayload,
+      rawJson: mediaUrl
+        ? { ...(rawPayload && typeof rawPayload === 'object' ? rawPayload : {}), mediaUrl, mediaType }
+        : rawPayload,
       origin,
     },
   })
@@ -1357,6 +1483,7 @@ export async function handleMetaMessages(
   body: any,
   empresaOverride?: { id: number; ownerId: number | null; name: string },
   db: WhatsAppPersistence = prisma,
+  dependencies: { resolveMedia?: MetaMediaResolver } = {},
 ) {
   const summary = { processed: 0, duplicates: 0, ignored: 0 }
   if (!body.entry || !Array.isArray(body.entry)) return summary
@@ -1449,6 +1576,13 @@ export async function handleMetaMessages(
           const contactInfo = contacts.find((contact: any) => contact.wa_id === msg.from)
           const pushName = contactInfo?.profile?.name || ''
           const messageText = msg.text?.body || msg.image?.caption || msg.video?.caption || ''
+          const mediaDescriptor = getMetaMediaDescriptor(msg)
+          const attachment = mediaDescriptor
+            ? await (dependencies.resolveMedia || resolveMetaMedia)({
+              companyId: empresa.id,
+              ...mediaDescriptor,
+            })
+            : null
 
           const result = await processIncomingMessage({
             companyId: empresa.id,
@@ -1459,6 +1593,8 @@ export async function handleMetaMessages(
             rawPayload: msg,
             origin: 'WhatsApp Official',
             providerMessageId: msg.id || null,
+            mediaUrl: attachment?.mediaUrl || null,
+            mediaType: attachment?.mediaType || null,
           }, db)
           if (result.action === 'ignored') {
             throw new Error(`Mensagem ignorada: ${result.reason || 'motivo desconhecido'}.`)
