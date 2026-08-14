@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Bot, Clock3, Image as ImageIcon, Inbox, Loader2, MessageCircle, Paperclip,
+  Bot, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Paperclip,
   Phone, Plus, RefreshCcw, Search, Send, Smile, User, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ type Conversation = {
 
 type AiAgent = { id: number; name: string; isActive: boolean };
 type PendingMedia = { file: File; previewUrl: string; type: 'image' | 'video' | 'audio' };
+type PreviewImage = { url: string; alt: string };
 
 const EMOJIS = ['😀', '😊', '😂', '😍', '🙏', '👍', '👏', '🎉', '❤️', '✅', '📅', '🦷', '💬', '✨', '🚀', '😉'];
 
@@ -66,6 +67,25 @@ function messageDate(message: Message) {
   return new Date(message.createdAt);
 }
 
+function imageFileName(url: string) {
+  try {
+    const pathname = new URL(url, window.location.origin).pathname;
+    return decodeURIComponent(pathname.split('/').filter(Boolean).pop() || 'imagem-whatsapp');
+  } catch {
+    return 'imagem-whatsapp';
+  }
+}
+
+function downloadImage(url: string) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = imageFileName(url);
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 const Conversations = () => {
   const { toast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -79,6 +99,7 @@ const Conversations = () => {
   const [uploading, setUploading] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [showAgentDialog, setShowAgentDialog] = useState(false);
@@ -381,7 +402,23 @@ const Conversations = () => {
                   <div key={message.id}>
                     {showDate && <div className="my-4 flex justify-center"><span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold text-slate-500">{format(messageDate(message), "dd 'de' MMMM", { locale: ptBR })}</span></div>}
                     <div className={`mb-3 flex ${incoming ? 'justify-start' : 'justify-end'}`}><div className="max-w-[78%] sm:max-w-[62%]"><div className={`overflow-hidden rounded-2xl text-sm leading-relaxed shadow-sm ${incoming ? 'rounded-bl-sm border border-slate-200 bg-white text-slate-800' : 'rounded-br-sm bg-slate-950 text-white'}`}>
-                      {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'image' && <img src={message.rawJson.mediaUrl} alt="Midia enviada" className="max-h-72 w-full object-cover" />}
+                      {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'image' && (
+                        <button
+                          type="button"
+                          className="group block w-full cursor-zoom-in overflow-hidden text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+                          onClick={() => setPreviewImage({
+                            url: message.rawJson!.mediaUrl!,
+                            alt: message.content && !/^\[image\]$/.test(message.content) ? message.content : 'Imagem da conversa',
+                          })}
+                          aria-label="Ampliar imagem"
+                        >
+                          <img
+                            src={message.rawJson.mediaUrl}
+                            alt={message.content && !/^\[image\]$/.test(message.content) ? message.content : 'Imagem da conversa'}
+                            className="max-h-72 w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                          />
+                        </button>
+                      )}
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'video' && <video src={message.rawJson.mediaUrl} controls className="max-h-72 w-full" />}
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'audio' && <audio src={message.rawJson.mediaUrl} controls className="m-2 max-w-[260px]" />}
                       {message.content && !/^\[(image|video|audio)\]$/.test(message.content) && <p className="px-4 py-2.5">{message.content}</p>}
@@ -408,6 +445,37 @@ const Conversations = () => {
           </section>
         ) : <section className="flex flex-1 flex-col items-center justify-center bg-slate-50 p-8 text-center"><MessageCircle className="h-14 w-14 text-slate-300" /><p className="mt-4 font-bold text-slate-600">Selecione uma conversa</p><p className="mt-1 max-w-sm text-sm text-slate-400">As mensagens recebidas pelo WhatsApp conectado aparecerao nesta central.</p></section>}
       </main>
+
+      <Dialog open={Boolean(previewImage)} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
+        <DialogContent className="h-full w-full max-w-none grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-slate-950 p-0 sm:h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)] sm:max-w-[1500px] [&>button]:border-white/15 [&>button]:bg-slate-900 [&>button]:text-white [&>button]:hover:bg-slate-800">
+          <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-white/10 px-5 pr-20">
+            <DialogTitle className="truncate text-sm font-semibold text-white">
+              {previewImage ? imageFileName(previewImage.url) : 'Imagem da conversa'}
+            </DialogTitle>
+            {previewImage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+                onClick={() => downloadImage(previewImage.url)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Baixar
+              </Button>
+            )}
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4 sm:p-8">
+            {previewImage && (
+              <img
+                src={previewImage.url}
+                alt={previewImage.alt}
+                className="max-h-full max-w-full object-contain shadow-2xl"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAgentDialog} onOpenChange={setShowAgentDialog}>
         <DialogContent className="sm:max-w-lg">
