@@ -44,7 +44,8 @@ WORKDIR /app
 # Nginx + su-exec (para rodar Node como user node)
 RUN apk add --no-cache nginx su-exec && \
     mkdir -p /run/nginx /app/uploads && \
-    chown -R node:node /run/nginx /var/lib/nginx /var/log/nginx /app/uploads
+    chown -R nginx:nginx /run/nginx /var/lib/nginx /var/log/nginx && \
+    chown -R node:node /app/uploads
 
 # Dependências de produção (com Prisma client)
 COPY --from=deps /app/node_modules ./node_modules
