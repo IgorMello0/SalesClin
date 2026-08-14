@@ -87,6 +87,14 @@ const getTemplateVariableTokens = (template?: WhatsAppTemplate) => {
   return uniqueTokens.sort((left, right) => Number(left) - Number(right));
 };
 
+const getTemplateHeaderMediaType = (template?: WhatsAppTemplate): 'image' | 'video' | null => {
+  const header = template?.components?.find(component => String(component.type).toUpperCase() === 'HEADER');
+  const format = String((header as any)?.format || '').toUpperCase();
+  if (format === 'IMAGE') return 'image';
+  if (format === 'VIDEO') return 'video';
+  return null;
+};
+
 const renderPreviewMessage = (value: string) => value
   .replace(/\{\{nome\}\}/gi, 'Mariana Oliveira')
   .replace(/\{\{primeiro_nome\}\}/gi, 'Mariana')
@@ -455,6 +463,40 @@ export default function Campaigns() {
     toast({ title: 'Planilha importada', description: `${contacts.length} contatos validos. ${stats.duplicateRows} duplicados e ${stats.invalidRows} invalidos ignorados.` });
   };
 
+  const uploadCampaignMedia = async (
+    file: File,
+    options: { replace?: boolean; expectedType?: 'image' | 'video' } = {},
+  ) => {
+    const localType: 'image' | 'video' | 'audio' = file.type.startsWith('video/')
+      ? 'video'
+      : file.type.startsWith('audio/')
+        ? 'audio'
+        : 'image';
+
+    if (options.expectedType && localType !== options.expectedType) {
+      toast({
+        title: options.expectedType === 'image' ? 'Selecione uma imagem' : 'Selecione um video',
+        description: 'O arquivo precisa corresponder ao cabecalho aprovado no template da Meta.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    try {
+      const response = await campaignsApi.uploadMedia(file);
+      if (!response.success || !response.data) throw new Error(response.error?.message || 'Falha no upload do arquivo');
+
+      const attachment = { url: response.data.url, type: response.data.mediaType };
+      setAttachments(previous => options.replace ? [attachment] : [...previous, attachment]);
+      toast({ title: 'Midia pronta para envio' });
+    } catch (error: any) {
+      toast({ title: 'Erro no upload', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!name.trim() || !audienceType || !campaignProvider) {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' }); return;
@@ -471,6 +513,15 @@ export default function Campaigns() {
     if (campaignProvider === 'meta' && metaTemplateMappings.some(mapping => !mapping)) {
       toast({ title: 'Vincule todas as variaveis', description: 'Escolha o dado usado em cada variavel do template.', variant: 'destructive' }); return;
     }
+    const requiredHeaderMediaType = getTemplateHeaderMediaType(selectedMetaTemplate);
+    if (campaignProvider === 'meta' && requiredHeaderMediaType && attachments[0]?.type !== requiredHeaderMediaType) {
+      toast({
+        title: requiredHeaderMediaType === 'image' ? 'Adicione a imagem do template' : 'Adicione o video do template',
+        description: 'O cabecalho aprovado pela Meta exige esta midia antes de criar a campanha.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (campaignProvider === 'uazapi' && !message.trim()) {
       toast({ title: 'Escreva a mensagem', variant: 'destructive' }); return;
     }
@@ -486,7 +537,10 @@ export default function Campaigns() {
       let finalMediaUrl = null;
       let finalMediaType = null;
 
-      if (campaignProvider === 'uazapi' && attachments.length > 0) {
+      if (campaignProvider === 'meta' && requiredHeaderMediaType && attachments[0]) {
+        finalMediaUrl = attachments[0].url;
+        finalMediaType = attachments[0].type;
+      } else if (campaignProvider === 'uazapi' && attachments.length > 0) {
         if (attachments.length === 1) {
           finalMediaUrl = attachments[0].url;
           finalMediaType = attachments[0].type;
@@ -567,6 +621,7 @@ export default function Campaigns() {
   const availableMessageVariables = getAvailableVariables(audienceType);
   const selectedMetaTemplate = approvedTemplates.find(template => String(template.id) === metaTemplateId);
   const selectedTemplateTokens = getTemplateVariableTokens(selectedMetaTemplate);
+  const selectedTemplateHeaderMediaType = getTemplateHeaderMediaType(selectedMetaTemplate);
   const metaParameterValues = metaTemplateMappings;
   const messagePreview = campaignProvider === 'meta'
     ? renderTemplatePreview(selectedMetaTemplate, metaTemplateMappings)
@@ -582,6 +637,7 @@ export default function Campaigns() {
 
   const selectApprovedTemplate = (value: string) => {
     setMetaTemplateId(value);
+    setAttachments([]);
     const selected = approvedTemplates.find(template => String(template.id) === value);
     if (!selected) return;
 
@@ -623,6 +679,14 @@ export default function Campaigns() {
       }
       if (metaTemplateMappings.length !== selectedTemplateTokens.length || metaTemplateMappings.some(mapping => !mapping)) {
         toast({ title: 'Vincule todas as variaveis do template', variant: 'destructive' });
+        return;
+      }
+      if (selectedTemplateHeaderMediaType && attachments[0]?.type !== selectedTemplateHeaderMediaType) {
+        toast({
+          title: selectedTemplateHeaderMediaType === 'image' ? 'Adicione a imagem do template' : 'Adicione o video do template',
+          description: 'O cabecalho aprovado pela Meta exige esta midia.',
+          variant: 'destructive',
+        });
         return;
       }
     } else if (!message.trim()) {
@@ -1135,6 +1199,52 @@ export default function Campaigns() {
                           <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Este template não possui variáveis.</p>
                         )}
                         <p className="mt-2 text-[11px] leading-5 text-blue-700">Cada posição do template recebe o campo escolhido do contato ou da planilha.</p>
+
+                        {selectedTemplateHeaderMediaType && (
+                          <div className="mt-4 border-t border-blue-100 pt-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">
+                                  {selectedTemplateHeaderMediaType === 'image' ? 'Imagem do cabeçalho' : 'Vídeo do cabeçalho'}
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-500">Obrigatório para este template aprovado.</p>
+                              </div>
+                              <input
+                                id="meta-template-header-media"
+                                type="file"
+                                className="hidden"
+                                accept={selectedTemplateHeaderMediaType === 'image' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/3gpp'}
+                                disabled={isUploadingMedia}
+                                onChange={event => {
+                                  const file = event.target.files?.[0];
+                                  event.currentTarget.value = '';
+                                  if (file) void uploadCampaignMedia(file, { replace: true, expectedType: selectedTemplateHeaderMediaType });
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={isUploadingMedia}
+                                onClick={() => document.getElementById('meta-template-header-media')?.click()}
+                              >
+                                <Upload className="mr-2 h-4 w-4" />
+                                {isUploadingMedia ? 'Enviando...' : attachments[0] ? 'Trocar arquivo' : 'Selecionar arquivo'}
+                              </Button>
+                            </div>
+                            {attachments[0] && (
+                              <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+                                  {attachments[0].type === 'image' ? <ImageIcon className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+                                  Arquivo pronto para o cabeçalho
+                                </div>
+                                <button type="button" className="rounded p-1 text-red-500 hover:bg-red-50" onClick={() => setAttachments([])} aria-label="Remover arquivo">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       )}
                   </div>
@@ -1189,25 +1299,9 @@ export default function Campaigns() {
                           accept="image/*,audio/*,video/*"
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
+                            e.currentTarget.value = '';
                             if (!file) return;
-                            setIsUploadingMedia(true);
-                            try {
-                              const res = await campaignsApi.uploadMedia(file);
-                              if (res.success && res.data) {
-                                let detectedType: 'image' | 'video' | 'audio' = 'image';
-                                if (file.type.startsWith('audio/')) {
-                                  detectedType = 'audio';
-                                } else if (file.type.startsWith('video/')) {
-                                  detectedType = 'video';
-                                }
-                                setAttachments(prev => [...prev, { url: res.data.url, type: detectedType }]);
-                                toast({ title: 'Upload concluído com sucesso!' });
-                              }
-                            } catch (err: any) {
-                              toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
-                            } finally {
-                              setIsUploadingMedia(false);
-                            }
+                            await uploadCampaignMedia(file);
                           }}
                           className="hidden"
                           disabled={isUploadingMedia}
@@ -1453,7 +1547,7 @@ export default function Campaigns() {
                   </div>
                   <div className="min-h-[420px] rounded-xl bg-[#efeae2] p-4 shadow-inner">
                     <div className="ml-auto max-w-[92%] rounded-lg rounded-tr-sm bg-[#d9fdd3] p-3 shadow-sm">
-                      {campaignProvider === 'uazapi' && attachments.length > 0 && (
+                      {attachments.length > 0 && (
                         <div className="mb-3 flex h-28 items-center justify-center rounded-md bg-white/70 text-emerald-700">
                           {attachments[0].type === 'image' ? <ImageIcon className="h-7 w-7" /> : attachments[0].type === 'video' ? <Video className="h-7 w-7" /> : <Volume2 className="h-7 w-7" />}
                         </div>
@@ -1504,7 +1598,7 @@ export default function Campaigns() {
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Destinatários</span><span className="font-bold text-primary">{previewRecipients} contatos</span></div>
                   
                   {/* Media confirmation */}
-                  {campaignProvider === 'uazapi' && attachments.length > 0 ? (
+                  {attachments.length > 0 ? (
                     <div className="space-y-1.5">
                       <span className="text-[10px] text-muted-foreground font-bold uppercase block">Mídias Anexadas ({attachments.length}):</span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 bg-white p-2.5 rounded-xl border border-slate-100">

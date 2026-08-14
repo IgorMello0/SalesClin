@@ -1,127 +1,143 @@
+import { randomUUID } from 'node:crypto'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { Router } from 'express'
-import { auth, requireModule } from '../middleware/auth.js'
-import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 import multer from 'multer'
-import path from 'path'
-import fs from 'fs'
+import { auth } from '../middleware/auth.js'
+import { createErrorResponse, createSuccessResponse } from '../utils/response.js'
 
 export const router = Router()
 
-// Configurar storage na memória do multer (essencial para ambientes serverless como Vercel que são Read-Only)
 const storage = multer.memoryStorage()
 
-// Filtro para aceitar apenas imagens
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true)
-  } else {
-    cb(new Error('Apenas arquivos de imagem são permitidos'))
-  }
-}
-
-const upload = multer({
+const imageUpload = multer({
   storage,
-  fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // Limitar a 10MB para Base64 eficiente
-  }
+  fileFilter: (_req, file, cb) => {
+    const allowed = file.mimetype.startsWith('image/')
+    if (allowed) cb(null, true)
+    else cb(new Error('Apenas arquivos de imagem sao permitidos'))
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
 })
 
-router.post('/', auth(), upload.single('image'), (req, res) => {
+router.post('/', auth(), imageUpload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json(createErrorResponse('Nenhuma imagem foi enviada', 400))
     }
 
-    // Converter buffer da imagem para Base64 Data URL
     const b64 = req.file.buffer.toString('base64')
-    const mimeType = req.file.mimetype
-    const imageUrl = `data:${mimeType};base64,${b64}`
-    
+    const imageUrl = `data:${req.file.mimetype};base64,${b64}`
+
     res.json(createSuccessResponse({
       url: imageUrl,
       filename: req.file.originalname,
       originalName: req.file.originalname,
-      size: req.file.size
+      size: req.file.size,
     }))
   } catch (error) {
     res.status(500).json(createErrorResponse(
       error instanceof Error ? error.message : 'Erro ao fazer upload da imagem',
-      500
+      500,
     ))
   }
 })
 
-// --- Upload de Mídias para Campanhas (Em memória, suportando Base64 para Vercel) ---
-const campaignUpload = multer({
-  storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/', 'audio/', 'video/']
-    if (allowedTypes.some(type => file.mimetype.startsWith(type))) {
-      cb(null, true)
-    } else {
-      cb(new Error('Apenas imagens, áudios e vídeos são permitidos'))
-    }
+const ALLOWED_MEDIA_TYPES = new Map<string, { extension: string; mediaType: 'image' | 'video' | 'audio'; maxBytes: number }>([
+  ['image/jpeg', { extension: 'jpg', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['image/png', { extension: 'png', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['image/webp', { extension: 'webp', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['image/gif', { extension: 'gif', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
+  ['video/mp4', { extension: 'mp4', mediaType: 'video', maxBytes: 16 * 1024 * 1024 }],
+  ['video/3gpp', { extension: '3gp', mediaType: 'video', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/mpeg', { extension: 'mp3', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/mp4', { extension: 'm4a', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/ogg', { extension: 'ogg', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/opus', { extension: 'opus', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+])
+
+const mediaUpload = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    const allowed = ALLOWED_MEDIA_TYPES.has(file.mimetype)
+    if (allowed) cb(null, true)
+    else cb(new Error('Formato nao suportado. Envie JPG, PNG, WEBP, GIF, MP4, MP3, M4A, OGG ou OPUS.'))
   },
-  limits: {
-    fileSize: 15 * 1024 * 1024 // 15MB
-  }
+  limits: { fileSize: 16 * 1024 * 1024 },
 })
 
-async function uploadToCatbox(buffer: Buffer, originalName: string): Promise<string> {
-  const url = 'https://catbox.moe/user/api.php'
-  const formData = new FormData()
-  formData.append('reqtype', 'fileupload')
-  
-  const blob = new globalThis.Blob([buffer])
-  formData.append('fileToUpload', blob, originalName)
+function runMediaUpload(req: any, res: any, next: any) {
+  mediaUpload.single('file')(req, res, (error: unknown) => {
+    if (!error) return next()
 
-  const response = await fetch(url, {
-    method: 'POST',
-    body: formData
+    const isSizeError = error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE'
+    const message = isSizeError
+      ? 'O arquivo excede o limite de 16 MB.'
+      : error instanceof Error ? error.message : 'Nao foi possivel ler o arquivo enviado.'
+    return res.status(isSizeError ? 413 : 400).json(createErrorResponse(message, isSizeError ? 413 : 400))
   })
-
-  if (!response.ok) {
-    throw new Error(`Catbox upload failed with status ${response.status}`)
-  }
-
-  const fileUrl = await response.text()
-  if (!fileUrl.startsWith('http')) {
-    throw new Error(`Catbox upload returned invalid response: ${fileUrl}`)
-  }
-
-  return fileUrl.trim()
 }
 
-router.post('/campaign-media', auth(), requireModule('campanhas'), campaignUpload.single('file'), async (req, res) => {
+function getPublicAppUrl(req: any) {
+  const configuredUrl = String(process.env.PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
+  return configuredUrl || `${req.protocol}://${req.get('host')}`
+}
+
+async function persistMedia(req: any, res: any) {
   try {
     if (!req.file) {
-      return res.status(400).json(createErrorResponse('Nenhum arquivo enviado', 400))
+      return res.status(400).json(createErrorResponse('Nenhum arquivo foi enviado', 400))
     }
 
-    let fileUrl = ''
-    try {
-      console.log(`[upload-campaign-media] Enviando arquivo (${req.file.size} bytes, ${req.file.mimetype}) para o Catbox...`)
-      fileUrl = await uploadToCatbox(req.file.buffer, req.file.originalname)
-      console.log(`[upload-campaign-media] Enviado para Catbox com sucesso: ${fileUrl}`)
-    } catch (err: any) {
-      console.error('[upload-campaign-media] Erro ao enviar para Catbox, usando fallback Base64:', err)
-      const b64 = req.file.buffer.toString('base64')
-      const mimeType = req.file.mimetype
-      fileUrl = `data:${mimeType};base64,${b64}`
+    const companyId = Number(req.user?.companyId)
+    if (!Number.isInteger(companyId) || companyId <= 0) {
+      return res.status(400).json(createErrorResponse('Selecione uma clinica antes de enviar a midia', 400))
     }
-    
-    res.json(createSuccessResponse({
-      url: fileUrl,
-      filename: req.file.originalname,
+
+    const mediaConfig = ALLOWED_MEDIA_TYPES.get(req.file.mimetype)
+    if (!mediaConfig) {
+      return res.status(400).json(createErrorResponse('Formato de arquivo nao suportado', 400))
+    }
+    if (req.file.size > mediaConfig.maxBytes) {
+      const maxMb = Math.floor(mediaConfig.maxBytes / 1024 / 1024)
+      return res.status(413).json(createErrorResponse(`Arquivos do tipo ${mediaConfig.mediaType} devem ter no maximo ${maxMb} MB.`, 413))
+    }
+
+    const relativeDirectory = path.posix.join('media', String(companyId))
+    const uploadDirectory = path.join(process.cwd(), 'uploads', ...relativeDirectory.split('/'))
+    const storedFilename = `${randomUUID()}.${mediaConfig.extension}`
+    await fs.mkdir(uploadDirectory, { recursive: true })
+    await fs.writeFile(path.join(uploadDirectory, storedFilename), req.file.buffer, { flag: 'wx' })
+
+    const publicPath = `/uploads/${relativeDirectory}/${storedFilename}`
+    const publicUrl = `${getPublicAppUrl(req)}${publicPath}`
+    console.info('[upload-media] Arquivo salvo', {
+      companyId,
+      mediaType: mediaConfig.mediaType,
+      size: req.file.size,
+      publicPath,
+    })
+
+    return res.json(createSuccessResponse({
+      url: publicUrl,
+      publicPath,
+      filename: storedFilename,
       originalName: req.file.originalname,
       size: req.file.size,
-      mimetype: req.file.mimetype
+      mimetype: req.file.mimetype,
+      mediaType: mediaConfig.mediaType,
     }))
-  } catch (error: any) {
-    res.status(500).json(createErrorResponse(
-      error instanceof Error ? error.message : 'Erro ao fazer upload do arquivo',
-      500
+  } catch (error) {
+    console.error('[upload-media] Falha ao persistir arquivo:', error)
+    return res.status(500).json(createErrorResponse(
+      error instanceof Error ? `Falha ao salvar a midia: ${error.message}` : 'Falha ao salvar a midia',
+      500,
     ))
   }
-})
+}
+
+// Shared by conversations and campaigns. The sending routes enforce their own module permissions.
+router.post('/media', auth(), runMediaUpload, persistMedia)
+
+// Backward-compatible alias for clients deployed before the shared endpoint.
+router.post('/campaign-media', auth(), runMediaUpload, persistMedia)

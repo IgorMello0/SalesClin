@@ -35,6 +35,17 @@ function getTemplateBodyDescriptor(template: { components: unknown; parameterFor
   return { text, tokens, parameterFormat }
 }
 
+function getTemplateHeaderMediaType(template: { components: unknown } | null | undefined): 'image' | 'video' | null {
+  const components = Array.isArray(template?.components)
+    ? template.components as Array<Record<string, unknown>>
+    : []
+  const header = components.find(component => String(component.type || '').toUpperCase() === 'HEADER')
+  const format = String(header?.format || '').toUpperCase()
+  if (format === 'IMAGE') return 'image'
+  if (format === 'VIDEO') return 'video'
+  return null
+}
+
 function normalizeTemplateMappings(value: unknown) {
   if (!Array.isArray(value)) return []
   return value.map(item => String(item || '').trim()).filter(Boolean)
@@ -279,10 +290,23 @@ router.post('/', auth(), async (req, res) => {
     }
 
     const templateDescriptor = selectedTemplate ? getTemplateBodyDescriptor(selectedTemplate) : null
+    const templateHeaderMediaType = getTemplateHeaderMediaType(selectedTemplate)
     const mappings = normalizeTemplateMappings(templateParameterMappings)
     if (templateDescriptor) {
       const mappingError = validateTemplateMappings(mappings, templateDescriptor.tokens.length)
       if (mappingError) return res.status(400).json(createErrorResponse(mappingError))
+    }
+    if (provider === 'meta' && templateHeaderMediaType) {
+      if (!mediaUrl) {
+        return res.status(400).json(createErrorResponse(
+          `O template selecionado exige ${templateHeaderMediaType === 'image' ? 'uma imagem' : 'um video'} no cabecalho`,
+        ))
+      }
+      if (String(mediaType || '').toLowerCase() !== templateHeaderMediaType) {
+        return res.status(400).json(createErrorResponse(
+          `Envie ${templateHeaderMediaType === 'image' ? 'uma imagem' : 'um video'} compativel com o cabecalho do template`,
+        ))
+      }
     }
 
     const campaignMessage = templateDescriptor?.text || String(message || '').trim()
@@ -372,6 +396,7 @@ router.post('/', auth(), async (req, res) => {
           parameterFormat: templateDescriptor?.parameterFormat,
           parameterTokens: templateDescriptor?.tokens,
           parameterMappings: mappings,
+          headerMediaType: templateHeaderMediaType,
         } : undefined,
         providerSnapshot: provider,
         connectionMode,
@@ -381,8 +406,8 @@ router.post('/', auth(), async (req, res) => {
         audienceFilter: audienceResolution.audienceFilter || undefined,
         status: 'draft',
         totalRecipients: recipients.length,
-        mediaUrl: provider === 'meta' ? null : (mediaUrl || null),
-        mediaType: provider === 'meta' ? null : (mediaType || null),
+        mediaUrl: provider === 'meta' && !templateHeaderMediaType ? null : (mediaUrl || null),
+        mediaType: provider === 'meta' && !templateHeaderMediaType ? null : (mediaType || null),
         minDelay: provider === 'meta' ? 0 : (minDelay !== undefined ? Number(minDelay) : 180),
         maxDelay: provider === 'meta' ? 0 : (maxDelay !== undefined ? Number(maxDelay) : 200),
         randomize: provider === 'meta' ? false : (randomize !== undefined ? !!randomize : false),
@@ -534,7 +559,7 @@ router.post('/:id/send', auth(), async (req, res) => {
       uazapiToken: empresa!.uazapiToken!,
       metaToken: empresa!.metaToken!,
       metaPhoneId: empresa!.metaPhoneNumberId!,
-      metaTemplate: getMetaTemplateFromCampaign(campaign),
+      metaTemplate: getMetaTemplateFromCampaign(campaign, absoluteMediaUrl),
       mediaUrl: absoluteMediaUrl,
       mediaType: campaign.mediaType,
       minDelay: campaign.minDelay,
@@ -1000,6 +1025,8 @@ interface WhatsAppConfig {
     parameters: string[]
     parameterNames?: string[]
     parameterFormat?: 'POSITIONAL' | 'NAMED'
+    headerMediaType?: 'image' | 'video'
+    headerMediaUrl?: string
   } | null
   mediaUrl?: string | null
   mediaType?: string | null
@@ -1081,7 +1108,7 @@ function getMetaTemplateFromAudienceFilter(audienceFilter: any): WhatsAppConfig[
   }
 }
 
-function getMetaTemplateFromCampaign(campaign: any): WhatsAppConfig['metaTemplate'] {
+function getMetaTemplateFromCampaign(campaign: any, mediaUrl?: string | null): WhatsAppConfig['metaTemplate'] {
   if (!campaign?.template) return getMetaTemplateFromAudienceFilter(campaign?.audienceFilter)
 
   const snapshot = campaign.templateSnapshot && typeof campaign.templateSnapshot === 'object'
@@ -1094,6 +1121,10 @@ function getMetaTemplateFromCampaign(campaign: any): WhatsAppConfig['metaTemplat
   const parameterNames = Array.isArray(snapshot.parameterTokens)
     ? snapshot.parameterTokens.map(item => String(item || '').trim()).filter(Boolean)
     : []
+  const snapshotHeaderMediaType = String(snapshot.headerMediaType || '').toLowerCase()
+  const headerMediaType = snapshotHeaderMediaType === 'image' || snapshotHeaderMediaType === 'video'
+    ? snapshotHeaderMediaType
+    : getTemplateHeaderMediaType(campaign.template)
 
   return {
     enabled: true,
@@ -1102,6 +1133,8 @@ function getMetaTemplateFromCampaign(campaign: any): WhatsAppConfig['metaTemplat
     parameters,
     parameterNames,
     parameterFormat: String(snapshot.parameterFormat || '').toUpperCase() === 'NAMED' ? 'NAMED' : 'POSITIONAL',
+    headerMediaType: headerMediaType || undefined,
+    headerMediaUrl: headerMediaType && mediaUrl ? mediaUrl : undefined,
   }
 }
 
@@ -1392,14 +1425,18 @@ function buildMetaTemplatePayload(config: WhatsAppConfig, formattedPhone: string
     },
   }
 
-  if (parameters.length > 0) {
-    payload.template.components = [
-      {
-        type: 'body',
-        parameters,
-      },
-    ]
+  const components: any[] = []
+  if (template.headerMediaType && template.headerMediaUrl) {
+    components.push({
+      type: 'header',
+      parameters: [{
+        type: template.headerMediaType,
+        [template.headerMediaType]: { link: template.headerMediaUrl },
+      }],
+    })
   }
+  if (parameters.length > 0) components.push({ type: 'body', parameters })
+  if (components.length > 0) payload.template.components = components
 
   return payload
 }
@@ -1634,7 +1671,7 @@ export async function resumeInterruptedCampaigns() {
       uazapiToken: campaign.company.uazapiToken || '',
       metaToken: campaign.company.metaToken || '',
       metaPhoneId: campaign.company.metaPhoneNumberId || '',
-      metaTemplate: getMetaTemplateFromCampaign(campaign),
+      metaTemplate: getMetaTemplateFromCampaign(campaign, mediaUrl),
       mediaUrl,
       mediaType: campaign.mediaType,
       minDelay: campaign.minDelay,

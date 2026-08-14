@@ -1106,13 +1106,13 @@ export const campaignsApi = {
     apiRequest<any>(`/campaigns/${id}/send`, { method: 'POST' }),
   getProgress: async (id: number) =>
     apiRequest<any>(`/campaigns/${id}/progress`),
-  uploadMedia: async (file: File): Promise<ApiResponse<{ url: string; filename: string }>> => {
+  uploadMedia: async (file: File): Promise<ApiResponse<{ url: string; filename: string; mediaType: 'image' | 'video' | 'audio' }>> => {
     const token = localStorage.getItem('token')
     const activeCompanyId = localStorage.getItem('activeCompanyId')
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch(`${API_BASE_URL}/upload/campaign-media`, {
+    const response = await fetch(`${API_BASE_URL}/upload/media`, {
       method: 'POST',
       headers: {
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -1121,11 +1121,12 @@ export const campaignsApi = {
       body: formData
     })
 
+    const payload = await response.json().catch(() => null)
     if (!response.ok) {
-      throw new Error('Falha no upload do arquivo')
+      throw new Error(payload?.error?.message || payload?.message || 'Falha no upload do arquivo')
     }
 
-    return response.json()
+    return payload
   }
 }
 

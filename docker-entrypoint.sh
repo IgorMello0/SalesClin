@@ -5,6 +5,11 @@ echo "=============================================="
 echo "  SalesClin - Starting Production Server"
 echo "=============================================="
 
+# The bind mount hides image-time ownership. Ensure the backend can persist public media.
+mkdir -p /app/uploads/media
+chown -R node:node /app/uploads
+chmod 750 /app/uploads
+
 # Sync Prisma schema before the backend bootstrap runs.
 # The VPS deployment uses db push, so new tables must exist before startup seeds.
 if [ "${RUN_PRISMA_DB_PUSH:-false}" = "true" ]; then
