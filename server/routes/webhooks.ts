@@ -6,6 +6,7 @@ import { ensureCompanyDefaults } from '../bootstrap/defaults.js';
 import {
   activateBillingAddon,
   addDays,
+  getBillingCycleFromAbacateFrequency,
   getPeriodEndForCycle,
   getProductIdForAddon,
   getProductIdForPlan,
@@ -298,25 +299,53 @@ router.post('/abacate-pay', async (req, res) => {
       ? parsedBillingAddonId
       : billingAddonIdFromExternalId(checkout.externalId || payment.externalId || subscription.externalId || body.externalId);
     const parsedCompanyId = Number(metadata.companyId);
-    const companyId = Number.isFinite(parsedCompanyId) && parsedCompanyId > 0
+    const payloadCompanyId = Number.isFinite(parsedCompanyId) && parsedCompanyId > 0
       ? parsedCompanyId
       : companyIdFromExternalId(checkout.externalId || payment.externalId || subscription.externalId || body.externalId);
     const productMatch = planAndCycleFromProductId(itemProductId);
-    const planCode = productMatch?.planCode || metadata.planCode;
-    const billingCycle = productMatch?.billingCycle || metadata.billingCycle;
+    const subscriptionId = subscription.id || data.subscriptionId || body.subscriptionId || null;
+    const checkoutId = checkout.id || data.checkoutId || body.checkoutId || null;
+    const linkedSubscription = subscriptionId
+      ? await prisma.companySubscription.findUnique({
+          where: { abacateSubscriptionId: subscriptionId },
+        })
+      : null;
+
+    if (payloadCompanyId && linkedSubscription && payloadCompanyId !== linkedSubscription.companyId) {
+      return res.status(409).json(createErrorResponse('Assinatura vinculada a outra clinica', 409));
+    }
+
+    const companyId = payloadCompanyId || linkedSubscription?.companyId || null;
+    const providerBillingCycle = getBillingCycleFromAbacateFrequency(
+      subscription.frequency || data.frequency
+    );
+    const planCode = productMatch?.planCode
+      || metadata.planCode
+      || linkedSubscription?.pendingPlanCode
+      || linkedSubscription?.planCode;
+    const billingCycle = productMatch?.billingCycle
+      || metadata.billingCycle
+      || providerBillingCycle
+      || linkedSubscription?.pendingBillingCycle
+      || linkedSubscription?.billingCycle;
 
     const normalizedStatus = normalizeAbacateStatus(eventName, subscription.status || checkout.status || payment.status);
     const resolvedPlanCode = isPlanCode(planCode) ? planCode : undefined;
     const resolvedBillingCycle = isBillingCycle(billingCycle) ? billingCycle : undefined;
-    const subscriptionId = subscription.id || data.subscriptionId || body.subscriptionId || null;
-    const checkoutId = checkout.id || data.checkoutId || body.checkoutId || null;
     const isOperationalEvent = ['trialing', 'active'].includes(normalizedStatus);
 
     if (isOperationalEvent && !subscriptionId) {
       return res.status(400).json(createErrorResponse('Evento operacional sem assinatura recorrente', 400));
     }
 
-    if (isOperationalEvent && !billingAddonId && !productMatch) {
+    // Renewals may contain only the provider subscription ID. Initial activations
+    // still require an exact product match so metadata cannot grant another plan.
+    if (
+      isOperationalEvent
+      && !billingAddonId
+      && !productMatch
+      && (!linkedSubscription || Boolean(itemProductId))
+    ) {
       return res.status(400).json(createErrorResponse('Produto do pagamento nao reconhecido', 400));
     }
 
@@ -411,7 +440,7 @@ router.post('/abacate-pay', async (req, res) => {
       return res.status(400).json(createErrorResponse('Evento sem clinica vinculada', 400));
     }
 
-    const currentSubscription = await prisma.companySubscription.findUnique({
+    const currentSubscription = linkedSubscription || await prisma.companySubscription.findUnique({
       where: { companyId },
     });
     if (!currentSubscription) {
@@ -458,6 +487,16 @@ router.post('/abacate-pay', async (req, res) => {
         data: { plan: resolvedPlanCode },
       });
     }
+
+    console.info('[Webhook/AbacatePay] Assinatura reconciliada.', {
+      eventName,
+      companyId,
+      subscriptionId,
+      status: normalizedStatus,
+      planCode: resolvedPlanCode,
+      billingCycle: resolvedBillingCycle,
+      renewalBySubscriptionId: Boolean(linkedSubscription && !itemProductId),
+    });
 
     await markWebhookEventProcessed(eventId, eventName, body);
 

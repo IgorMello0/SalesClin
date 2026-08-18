@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import { afterEach, describe, it } from 'node:test'
 import {
   buildActiveUsersForCompanyWhere,
+  getBillingCycleFromAbacateFrequency,
   getEffectiveSubscriptionStatus,
   verifyAbacateWebhookSignature,
 } from './billing.js'
@@ -67,6 +68,20 @@ describe('billing entitlement status', () => {
       currentPeriodEndsAt: future,
       abacateSubscriptionId: 'subs_test',
     }), 'active')
+
+    assert.equal(getEffectiveSubscriptionStatus({
+      status: 'active',
+      accessSource: 'abacatepay',
+      trialEndsAt: past,
+      currentPeriodEndsAt: past,
+      abacateSubscriptionId: 'subs_test',
+    }), 'payment_pending')
+  })
+
+  it('maps the provider frequency to the SellClin billing cycle', () => {
+    assert.equal(getBillingCycleFromAbacateFrequency('MONTHLY'), 'monthly')
+    assert.equal(getBillingCycleFromAbacateFrequency('YEARLY'), 'yearly')
+    assert.equal(getBillingCycleFromAbacateFrequency('unknown'), undefined)
   })
 
   it('requires an explicit future deadline for manual access', () => {

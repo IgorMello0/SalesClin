@@ -48,6 +48,16 @@ export function isBillingCycle(value: unknown): value is BillingCycle {
   return typeof value === 'string' && BILLING_CYCLES.includes(value as BillingCycle)
 }
 
+export function getBillingCycleFromAbacateFrequency(value: unknown): BillingCycle | undefined {
+  if (typeof value !== 'string') return undefined
+
+  const frequency = value.trim().toLowerCase()
+  if (frequency.includes('year') || frequency.includes('annual')) return 'yearly'
+  if (frequency.includes('month') || frequency.includes('mensal')) return 'monthly'
+
+  return undefined
+}
+
 export function isAddonCode(value: unknown): value is AddonCode {
   return typeof value === 'string' && ADDON_CODES.includes(value as AddonCode)
 }
