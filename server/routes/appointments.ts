@@ -132,9 +132,14 @@ router.get('/check-availability', auth(), requireModule('agendamentos'), async (
 // Horários disponíveis para um dia específico
 router.get('/available-slots', auth(), requireModule('agendamentos'), async (req, res) => {
   try {
-    const { professionalId, date, durationMinutes, isUsuario } = req.query as any
+    let { professionalId, date, durationMinutes, isUsuario } = req.query as any
     if (!professionalId || !date) {
       return res.status(400).json(createErrorResponse('Parâmetros incompletos', 400))
+    }
+
+    if (date.includes('/')) {
+      const [day, month, year] = date.split('/');
+      date = `${year}-${month}-${day}`;
     }
 
     const duration = Number(durationMinutes) || 60
