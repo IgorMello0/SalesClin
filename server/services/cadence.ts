@@ -30,47 +30,66 @@ export async function triggerCadenceForLead(
 
     if (!config || !config.isActive) return;
 
-    const steps = config.steps as any[];
-    if (!Array.isArray(steps) || steps.length === 0) return;
+    let steps: any[] = [];
+    let skipWeekends = true;
 
-    // 3. Pegar o primeiro passo (index 0)
-    const firstStep = steps[0];
-    const waitValue = firstStep.waitValue !== undefined ? Number(firstStep.waitValue) : (Number(firstStep.waitMinutes) || 0);
-    const waitUnit = firstStep.waitUnit || 'minutes';
-    let waitMinutes = 0;
-    if (waitUnit === 'days') waitMinutes = waitValue * 24 * 60;
-    else if (waitUnit === 'hours') waitMinutes = waitValue * 60;
-    else waitMinutes = waitValue;
+    if (Array.isArray(config.steps)) {
+      steps = config.steps;
+    } else if (config.steps && typeof config.steps === 'object') {
+      steps = (config.steps as any).items || [];
+      skipWeekends = (config.steps as any).skipWeekends ?? true;
+    }
 
-    const dueDate = new Date(Date.now() + waitMinutes * 60000);
+    if (steps.length === 0) return;
 
-    // 4. Criar a tarefa
-    await prisma.task.create({
-      data: {
-        companyId,
-        leadId,
-        title: firstStep.title || 'Cadência de Contato',
-        description: firstStep.template || `Contato via ${firstStep.method}`,
-        status: 'pending',
-        priority: 'high',
-        dueDate,
-        assignedToUserId: assignedUserId,
-        assignedToId: assignedProfId,
-        cadenceStageCode: newStageCode,
-        cadenceStepIndex: 0
+    // 3. Criar todas as tarefas baseadas no dia configurado
+    const taskPromises = steps.map((step, index) => {
+      const day = step.day !== undefined ? Number(step.day) : 1; // Padrão: Dia 1
+
+      // Calcular a data de vencimento com base no dia (Dia 1 = hoje, Dia 2 = amanhã, etc)
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + (day > 0 ? day - 1 : 0));
+      
+      if (skipWeekends) {
+        const dayOfWeek = dueDate.getDay(); // 0 = Domingo, 6 = Sábado
+        if (dayOfWeek === 6) {
+          dueDate.setDate(dueDate.getDate() + 2); // De Sábado para Segunda
+        } else if (dayOfWeek === 0) {
+          dueDate.setDate(dueDate.getDate() + 1); // De Domingo para Segunda
+        }
       }
+
+      dueDate.setHours(23, 59, 59, 999); // Vence no final do dia
+
+      return prisma.task.create({
+        data: {
+          companyId,
+          leadId,
+          title: step.title || 'Cadência de Contato',
+          description: step.template || `Contato via ${step.method}`,
+          status: 'pending',
+          priority: 'high',
+          dueDate,
+          assignedToUserId: assignedUserId,
+          assignedToId: assignedProfId,
+          cadenceStageCode: newStageCode,
+          cadenceStepIndex: index
+        }
+      });
     });
+
+    await Promise.all(taskPromises);
 
     await prisma.leadActivity.create({
       data: {
         leadId,
         type: 'system',
-        content: `🤖 Cadência iniciada. Passo 1 agendado: ${firstStep.title || 'Contato'}`,
+        content: `🤖 Cadência iniciada. ${steps.length} tarefa(s) agendada(s) automaticamente.`,
         createdBy: 'Cadência Automática'
       }
     });
     
-    console.log(`[Cadence] Cadência iniciada para Lead #${leadId} no estágio ${newStageCode}`);
+    console.log(`[Cadence] Cadência iniciada para Lead #${leadId} no estágio ${newStageCode} com ${steps.length} tarefas.`);
   } catch (err) {
     console.error(`[Cadence] Erro ao iniciar cadência para lead ${leadId}:`, err);
   }
@@ -91,59 +110,18 @@ export async function processCadenceTaskCompletion(taskId: number) {
       return;
     }
 
-    const config = await prisma.cadenceConfig.findUnique({
-      where: { companyId_stageCode: { companyId: task.companyId, stageCode: task.cadenceStageCode } }
-    });
-
-    if (!config || !config.isActive) return;
-
-    const steps = config.steps as any[];
-    if (!Array.isArray(steps)) return;
-
-    const nextIndex = task.cadenceStepIndex + 1;
-    if (nextIndex >= steps.length) {
-      // Fim da cadência!
-      console.log(`[Cadence] Cadência finalizada para Lead #${task.leadId} no estágio ${task.cadenceStageCode}`);
-      return;
-    }
-
-    // Agendar próximo passo
-    const nextStep = steps[nextIndex];
-    const waitValue = nextStep.waitValue !== undefined ? Number(nextStep.waitValue) : (Number(nextStep.waitMinutes) || 0);
-    const waitUnit = nextStep.waitUnit || 'minutes';
-    let waitMinutes = 0;
-    if (waitUnit === 'days') waitMinutes = waitValue * 24 * 60;
-    else if (waitUnit === 'hours') waitMinutes = waitValue * 60;
-    else waitMinutes = waitValue;
-
-    const dueDate = new Date(Date.now() + waitMinutes * 60000);
-
-    await prisma.task.create({
-      data: {
-        companyId: task.companyId,
-        leadId: task.leadId,
-        title: nextStep.title || 'Cadência de Contato',
-        description: nextStep.template || `Contato via ${nextStep.method}`,
-        status: 'pending',
-        priority: 'high',
-        dueDate,
-        assignedToUserId: task.assignedToUserId, // Mantém o mesmo responsável (Usuário)
-        assignedToId: task.assignedToId, // Mantém o mesmo responsável (Profissional)
-        cadenceStageCode: task.cadenceStageCode,
-        cadenceStepIndex: nextIndex
-      }
-    });
-
+    // Apenas loga a atividade de conclusão, já que todos os próximos passos 
+    // já foram criados na entrada da etapa (Modelo de Dias)
     await prisma.leadActivity.create({
       data: {
         leadId: task.leadId!,
         type: 'system',
-        content: `✅ Passo concluído: ${task.title}. Próximo passo agendado: ${nextStep.title || 'Contato'}`,
+        content: `✅ Tarefa de cadência concluída: ${task.title}.`,
         createdBy: 'Cadência Automática'
       }
     });
 
-    console.log(`[Cadence] Próximo passo (${nextIndex}) agendado para Lead #${task.leadId}`);
+    console.log(`[Cadence] Tarefa (${task.cadenceStepIndex}) concluída para Lead #${task.leadId}`);
   } catch (err) {
     console.error(`[Cadence] Erro ao processar conclusão da task ${taskId}:`, err);
   }

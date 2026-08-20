@@ -354,6 +354,78 @@ router.post('/', auth(), async (req, res) => {
   }
 })
 
+// Importar Leads (Batch)
+router.post('/import', auth(), async (req, res) => {
+  try {
+    const { leads, defaultSdrId, defaultCloserId, defaultStage } = req.body;
+    if (!Array.isArray(leads)) {
+      return res.status(400).json(createErrorResponse('Formato inválido. Esperado um array de leads.', 400));
+    }
+    
+    let currentCompanyId = req.user?.companyId;
+    if (req.user?.type === 'profissional') {
+      const p = await prisma.professional.findUnique({ where: { id: req.user.id }});
+      currentCompanyId = p?.companyId;
+    }
+
+    if (!currentCompanyId) {
+       return res.status(403).json(createErrorResponse('CompanyId não encontrado.', 403));
+    }
+
+    let createdCount = 0;
+    let updatedCount = 0;
+    
+    for (const leadData of leads) {
+      if (!leadData.name) continue;
+
+      const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : null;
+
+      let existingLead = null;
+      if (cleanPhone) {
+        existingLead = await prisma.lead.findFirst({
+          where: { phone: cleanPhone, companyId: currentCompanyId }
+        });
+      }
+
+      if (existingLead) {
+        const extraNote = leadData.notes ? `\n[Importação]: ${leadData.notes}` : '\n[Importação]: Atualizado via importação de planilha.';
+        await prisma.lead.update({
+          where: { id: existingLead.id },
+          data: {
+             notes: existingLead.notes ? existingLead.notes + extraNote : extraNote.trim(),
+             activities: {
+                create: { type: 'sistema', content: 'Lead atualizado via importação de planilha.', createdBy: 'Sistema' }
+             }
+          }
+        });
+        updatedCount++;
+      } else {
+        await prisma.lead.create({
+          data: {
+            name: leadData.name,
+            phone: cleanPhone,
+            email: leadData.email || null,
+            value: leadData.value ? Number(leadData.value) : 0,
+            origin: leadData.origin || 'Importação Manual',
+            notes: leadData.notes || null,
+            status: defaultStage || 'prospect_lead',
+            sdrId: defaultSdrId ? Number(defaultSdrId) : null,
+            closerId: defaultCloserId ? Number(defaultCloserId) : null,
+            companyId: currentCompanyId,
+            professionalId: req.user.id
+          }
+        });
+        createdCount++;
+      }
+    }
+
+    res.status(200).json(createSuccessResponse({ createdCount, updatedCount }));
+  } catch (error: any) {
+    console.error('[Leads] Erro ao importar leads:', error);
+    res.status(500).json(createErrorResponse(error.message || 'Erro ao importar leads', 500));
+  }
+});
+
 // Adicionar Atividade ao Lead
 router.post('/:id/activities', auth(), async (req, res) => {
   try {
@@ -590,6 +662,29 @@ router.put('/:id', auth(), async (req, res) => {
     // Regra de Negócio: Cancelamento/Rollback automático ao voltar estágio
     if (prismaData.status && prismaData.status !== currentLead.status) {
       const newStatus = prismaData.status;
+
+      let userName = 'Sistema';
+      if (req.user?.type === 'usuario') {
+        const u = await prisma.usuario.findUnique({ where: { id: req.user.id }, select: { name: true }});
+        if (u) userName = u.name;
+      } else if (req.user?.type === 'profissional') {
+        const p = await prisma.professional.findUnique({ where: { id: req.user.id }, select: { name: true }});
+        if (p) userName = p.name;
+      }
+
+      const getStageLabel = (s: string) => {
+        const map: any = { 'prospect_lead': 'Novos Leads', 'prospect_qualified': 'Qualificados', 'prospect_scheduled': 'Agendados', 'prospect_attended': 'Consulta Feita', 'comercial_lead': 'Novos Leads', 'comercial_consult': 'Avaliação', 'comercial_proposal': 'Proposta', 'comercial_follow': 'Follow-up', 'comercial_negotiation': 'Negociação', 'comercial_closed': 'Fechado', 'comercial_lost': 'Perdido', 'sales_payment': 'Pagamento Pendente', 'sales_contract': 'Contrato Assinado', 'sales_post': 'Pós-Venda' };
+        return map[s] || s;
+      };
+
+      await prisma.leadActivity.create({
+        data: {
+          leadId: id,
+          type: 'system',
+          content: `Estágio alterado de "${getStageLabel(currentLead.status)}" para "${getStageLabel(newStatus)}" por ${userName}.`,
+          createdBy: userName
+        }
+      });
 
       // TIMESTAMP LOGIC & SUB-STATUS AUTOMATION
       if (['prospect_attended', 'comercial_consult', 'comercial_proposal', 'comercial_follow', 'comercial_closed', 'sales_payment', 'sales_contract', 'sales_post'].includes(newStatus)) {

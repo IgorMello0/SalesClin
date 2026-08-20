@@ -391,7 +391,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       // Cálculo do Parcelamento Médio de Boleto:
       // Dividir o número de boletos gerados (método 'transferencia') pelo número de contratos fechados que têm boleto
       const boletosGrouped = await prisma.payment.groupBy({
-        by: ['clientId'],
+        by: ['clientId', 'appointmentId'],
         where: {
           method: 'transferencia',
           professionalId: { in: professionalIds },

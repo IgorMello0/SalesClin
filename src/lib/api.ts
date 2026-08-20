@@ -751,6 +751,7 @@ export const leadsApi = {
   updateAssignment: async (id: number, data: { sdrId?: number | null, closerId?: number | null, especialistaId?: number | null }) => apiRequest<any>(`/leads/${id}/assignment`, { method: 'PATCH', body: JSON.stringify(data) }),
   bulkDelete: async (ids: number[]) => apiRequest<any>('/leads/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) }),
   bulkAssignment: async (ids: number[], data: { sdrId?: number | null, closerId?: number | null, especialistaId?: number | null }) => apiRequest<any>('/leads/bulk-assignment', { method: 'PATCH', body: JSON.stringify({ ids, ...data }) }),
+  importLeads: async (data: { leads: any[], defaultSdrId?: number, defaultCloserId?: number, defaultStage?: string }) => apiRequest<any>('/leads/import', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 

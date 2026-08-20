@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { funnelConfigApi, cadenceApi } from '@/lib/api';
 import { Save, Plus, Trash, Clock, Phone, MessageCircle, Mail, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 
 const METHOD_ICONS: Record<string, React.ReactNode> = {
   call: <Phone className="h-4 w-4" />,
@@ -21,7 +22,7 @@ export default function CadenceSettingsView() {
   const [funnels, setFunnels] = useState<any[]>([]);
   const [selectedFunnel, setSelectedFunnel] = useState<string>('');
   const [selectedStage, setSelectedStage] = useState<string>('');
-  const [config, setConfig] = useState<{ isActive: boolean; steps: any[] }>({ isActive: true, steps: [] });
+  const [config, setConfig] = useState<{ isActive: boolean; skipWeekends: boolean; steps: any[] }>({ isActive: true, skipWeekends: true, steps: [] });
   const [isLoading, setIsLoading] = useState(false);
   const [isBannerOpen, setIsBannerOpen] = useState(false);
 
@@ -48,9 +49,20 @@ export default function CadenceSettingsView() {
     try {
       const res = await cadenceApi.getByStage(stageCode);
       if (res.data) {
+        const stepsData = res.data.steps;
+        let parsedSteps = [];
+        let parsedSkipWeekends = true;
+        if (Array.isArray(stepsData)) {
+          parsedSteps = stepsData;
+        } else if (stepsData && typeof stepsData === 'object') {
+          parsedSteps = stepsData.items || [];
+          parsedSkipWeekends = stepsData.skipWeekends ?? true;
+        }
+
         setConfig({
           isActive: res.data.isActive,
-          steps: res.data.steps || []
+          skipWeekends: parsedSkipWeekends,
+          steps: parsedSteps
         });
       }
     } catch (e) {
@@ -66,7 +78,10 @@ export default function CadenceSettingsView() {
       setIsLoading(true);
       await cadenceApi.update(selectedStage, {
         isActive: config.isActive,
-        steps: config.steps
+        steps: {
+          skipWeekends: config.skipWeekends,
+          items: config.steps
+        }
       });
       toast({ title: 'Configuração salva com sucesso!' });
     } catch (e) {
@@ -77,16 +92,20 @@ export default function CadenceSettingsView() {
     }
   };
 
-  const addStep = () => {
-    setConfig(prev => ({
-      ...prev,
-      steps: [...prev.steps, { id: Date.now().toString(), method: 'call', waitMinutes: 0, title: 'Nova Ação', template: '' }]
-    }));
+  const addStep = (day: number = 1) => {
+    setConfig(prev => {
+      const newSteps = [...prev.steps, { id: Date.now().toString(), method: 'call', day, title: 'Nova Ação', template: '' }];
+      newSteps.sort((a, b) => (a.day || 1) - (b.day || 1));
+      return { ...prev, steps: newSteps };
+    });
   };
 
   const updateStep = (index: number, field: string, value: any) => {
-    const newSteps = [...config.steps];
+    let newSteps = [...config.steps];
     newSteps[index][field] = value;
+    if (field === 'day') {
+      newSteps.sort((a, b) => (a.day || 1) - (b.day || 1));
+    }
     setConfig({ ...config, steps: newSteps });
   };
 
@@ -95,6 +114,15 @@ export default function CadenceSettingsView() {
     newSteps.splice(index, 1);
     setConfig({ ...config, steps: newSteps });
   };
+
+  const groupedSteps = config.steps.reduce((acc, step, index) => {
+    const day = step.day !== undefined ? step.day : 1;
+    if (!acc[day]) acc[day] = [];
+    acc[day].push({ ...step, originalIndex: index });
+    return acc;
+  }, {} as Record<number, any[]>);
+
+  const sortedDays = Object.keys(groupedSteps).map(Number).sort((a, b) => a - b);
 
   const currentFunnelObj = funnels.find(f => f.code === selectedFunnel || f.id === selectedFunnel);
   const stages = currentFunnelObj ? currentFunnelObj.stages || [] : [];
@@ -128,9 +156,9 @@ export default function CadenceSettingsView() {
                 siga o roteiro ideal de abordagem. Ao mover um lead para a etapa configurada, o SellClin criará <b>automaticamente</b> as tarefas para os consultores executarem.
               </p>
               <ul className="text-sm text-blue-800/80 space-y-2 list-disc list-inside">
-                <li><b>1º Passo:</b> Será agendado logo após o lead entrar na etapa (ou com o atraso configurado).</li>
-                <li><b>Passos seguintes:</b> Quando o atendente clica em "Concluir Tarefa" no card do lead, o sistema lê esta configuração e agenda automaticamente o <b>próximo passo</b> respeitando o tempo de espera.</li>
-                <li>Use o campo de "Template/Roteiro" para escrever instruções ou a mensagem exata que o SDR deve copiar e enviar no WhatsApp!</li>
+                <li><b>Dia 1:</b> As tarefas do Dia 1 serão criadas imediatamente quando o lead entrar na etapa.</li>
+                <li><b>Dias seguintes:</b> Tarefas do Dia 2 serão criadas para vencer amanhã, Dia 3 para depois de amanhã, e assim por diante.</li>
+                <li>O vendedor verá sua lista exata de afazeres agrupada por dia. Se ele se atrasar, as tarefas acumulam para não perder tração!</li>
               </ul>
             </div>
           )}
@@ -185,99 +213,102 @@ export default function CadenceSettingsView() {
               <CardTitle>Passos da Cadência</CardTitle>
               <CardDescription>Configure os passos automáticos quando o lead entrar nesta etapa.</CardDescription>
             </div>
-            <Button onClick={saveConfig} disabled={isLoading}>
-              <Save className="h-4 w-4 mr-2" />
-              Salvar
-            </Button>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="skip-weekends" 
+                  checked={config.skipWeekends} 
+                  onCheckedChange={(checked) => setConfig({ ...config, skipWeekends: checked })}
+                />
+                <Label htmlFor="skip-weekends" className="cursor-pointer">Ignorar Finais de Semana</Label>
+              </div>
+              <Button onClick={saveConfig} disabled={isLoading}>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {config.steps.length === 0 ? (
               <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-md border border-dashed">
                 <Clock className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p>Nenhum passo de cadência configurado.</p>
-                <Button variant="outline" className="mt-4" onClick={addStep}>
-                  <Plus className="h-4 w-4 mr-2" /> Adicionar Primeiro Passo
+                <p>Nenhuma ação configurada.</p>
+                <Button variant="outline" className="mt-4" onClick={() => addStep(1)}>
+                  <Plus className="h-4 w-4 mr-2" /> Adicionar Ação no Dia 1
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {config.steps.map((step, idx) => (
-                  <div key={step.id || idx} className="border rounded-md p-4 bg-white shadow-sm flex flex-col gap-4 relative">
-                    <div className="absolute top-4 right-4">
-                      <Button variant="ghost" size="icon" onClick={() => removeStep(idx)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
-                        <Trash className="h-4 w-4" />
+              <div className="space-y-8">
+                {sortedDays.map((day) => (
+                  <div key={day} className="border-l-4 border-blue-500 pl-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-lg text-slate-800">Dia {day}</h3>
+                      <Button variant="ghost" size="sm" onClick={() => addStep(day)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                        <Plus className="h-4 w-4 mr-2" /> Adicionar Ação ao Dia {day}
                       </Button>
                     </div>
 
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline" className="bg-slate-100">Passo {idx + 1}</Badge>
-                    </div>
+                    {groupedSteps[day].map((step, idx) => (
+                      <div key={step.id || step.originalIndex} className="border rounded-md p-4 bg-white shadow-sm flex flex-col gap-4">
+                        <div className="flex justify-between items-center mb-[-8px]">
+                          <Badge variant="outline" className="bg-slate-100 text-slate-500">Ação {idx + 1}</Badge>
+                          <Button variant="ghost" size="icon" onClick={() => removeStep(step.originalIndex)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Título da Tarefa</Label>
-                        <Input 
-                          value={step.title} 
-                          onChange={e => updateStep(idx, 'title', e.target.value)} 
-                          placeholder="Ex: Primeira Ligação"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Canal de Contato</Label>
-                        <Select value={step.method} onValueChange={v => updateStep(idx, 'method', v)}>
-                          <SelectTrigger>
-                            <SelectValue>
-                              {step.method === 'call' ? 'Ligação' : step.method === 'whatsapp' ? 'WhatsApp' : step.method === 'email' ? 'E-mail' : 'Outro'}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="call"><div className="flex items-center gap-2"><Phone className="h-4 w-4"/> Ligação</div></SelectItem>
-                            <SelectItem value="whatsapp"><div className="flex items-center gap-2"><MessageCircle className="h-4 w-4"/> WhatsApp</div></SelectItem>
-                            <SelectItem value="email"><div className="flex items-center gap-2"><Mail className="h-4 w-4"/> E-mail</div></SelectItem>
-                            <SelectItem value="other"><div className="flex items-center gap-2">Outro</div></SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Espera (após entrar ou passo ant.)</Label>
-                        <div className="flex gap-2">
-                          <Input 
-                            type="number" 
-                            min="0"
-                            value={step.waitValue !== undefined ? step.waitValue : (step.waitMinutes || 0)} 
-                            onChange={e => updateStep(idx, 'waitValue', Number(e.target.value))} 
-                            className="w-24"
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label>Dia de Execução</Label>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              value={step.day !== undefined ? step.day : 1} 
+                              onChange={e => updateStep(step.originalIndex, 'day', Number(e.target.value))} 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Título da Tarefa</Label>
+                            <Input 
+                              value={step.title} 
+                              onChange={e => updateStep(step.originalIndex, 'title', e.target.value)} 
+                              placeholder="Ex: Primeira Ligação"
+                            />
+                          </div>
+                          <div className="space-y-2 md:col-span-2">
+                            <Label>Canal de Contato</Label>
+                            <Select value={step.method} onValueChange={v => updateStep(step.originalIndex, 'method', v)}>
+                              <SelectTrigger>
+                                <SelectValue>
+                                  {step.method === 'call' ? 'Ligação' : step.method === 'whatsapp' ? 'WhatsApp' : step.method === 'email' ? 'E-mail' : 'Outro'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="call"><div className="flex items-center gap-2"><Phone className="h-4 w-4"/> Ligação</div></SelectItem>
+                                <SelectItem value="whatsapp"><div className="flex items-center gap-2"><MessageCircle className="h-4 w-4"/> WhatsApp</div></SelectItem>
+                                <SelectItem value="email"><div className="flex items-center gap-2"><Mail className="h-4 w-4"/> E-mail</div></SelectItem>
+                                <SelectItem value="other"><div className="flex items-center gap-2">Outro</div></SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Template de Mensagem / Roteiro</Label>
+                          <Textarea 
+                            value={step.template} 
+                            onChange={e => updateStep(step.originalIndex, 'template', e.target.value)}
+                            placeholder="Escreva o script ou mensagem sugerida para o vendedor..."
+                            rows={3}
                           />
-                          <Select value={step.waitUnit || "minutes"} onValueChange={v => updateStep(idx, 'waitUnit', v)}>
-                            <SelectTrigger className="flex-1">
-                              <SelectValue>
-                                {step.waitUnit === 'days' ? 'Dias' : step.waitUnit === 'hours' ? 'Horas' : 'Minutos'}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="minutes">Minutos</SelectItem>
-                              <SelectItem value="hours">Horas</SelectItem>
-                              <SelectItem value="days">Dias</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Template de Mensagem / Roteiro</Label>
-                      <Textarea 
-                        value={step.template} 
-                        onChange={e => updateStep(idx, 'template', e.target.value)}
-                        placeholder="Escreva o script ou mensagem sugerida para o vendedor..."
-                        rows={3}
-                      />
-                    </div>
+                    ))}
                   </div>
                 ))}
 
-                <Button variant="outline" className="w-full mt-4" onClick={addStep}>
-                  <Plus className="h-4 w-4 mr-2" /> Adicionar Próximo Passo
+                <Button variant="outline" className="w-full mt-8 border-dashed" onClick={() => addStep((sortedDays[sortedDays.length - 1] || 0) + 1)}>
+                  <Plus className="h-4 w-4 mr-2" /> Adicionar Novo Dia de Cadência
                 </Button>
               </div>
             )}

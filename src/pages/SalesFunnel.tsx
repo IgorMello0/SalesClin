@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Sheet,
@@ -47,6 +48,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect } from 'react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { ExportModal } from "@/components/ExportModal";
+import { ImportModal } from "@/components/ImportModal";
 import { ProposalViewer } from "@/components/ProposalViewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, History, FileDown, Edit2, Check, X, Eye, Plus, Trash2, CheckSquare, Calendar } from "lucide-react";
@@ -148,6 +150,8 @@ const SalesFunnel = () => {
   // Multi-select & Export State
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isConfirmingBulkDelete, setIsConfirmingBulkDelete] = useState(false);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -1041,10 +1045,7 @@ const SalesFunnel = () => {
 
   const handleDeleteSelectedLeads = async () => {
     if (selectedLeadIds.length === 0) return;
-    const count = selectedLeadIds.length;
-    const confirmed = window.confirm(`Tem certeza que deseja excluir ${count} lead${count > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`);
-    if (!confirmed) return;
-
+    
     try {
       let successCount = 0;
       for (const leadId of selectedLeadIds) {
@@ -1054,10 +1055,12 @@ const SalesFunnel = () => {
       toast({ title: `${successCount} lead${successCount > 1 ? 's' : ''} excluído${successCount > 1 ? 's' : ''}!` });
       setSelectedLeadIds([]);
       setIsMultiSelectMode(false);
+      setIsConfirmingBulkDelete(false);
       loadLeads();
     } catch (error) {
       console.error('Error deleting leads:', error);
       toast({ title: 'Erro ao excluir leads', variant: 'destructive' });
+      setIsConfirmingBulkDelete(false);
     }
   };
 
@@ -1504,6 +1507,25 @@ const SalesFunnel = () => {
 
                     {/* Actions List */}
                     <div className="space-y-3">
+                      {/* Action 0: Importar Dados */}
+                      <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-orange-50/30 hover:border-orange-100 transition-all duration-300 flex items-start gap-4 group active:scale-[0.99]"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 group-hover:bg-orange-100 group-hover:text-secondary flex items-center justify-center shrink-0 transition-colors">
+                          <span className="material-symbols-outlined text-xl">upload</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-primary group-hover:text-secondary transition-colors">Importar Leads</h4>
+                            <span className="material-symbols-outlined text-slate-400 group-hover:text-secondary transition-colors font-bold">chevron_right</span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium mt-1">
+                            Traga sua planilha de clientes de outro CRM ou Excel.
+                          </p>
+                        </div>
+                      </button>
+
                       {/* Action 1: Exportar Dados */}
                       <button
                         onClick={() => setIsExportModalOpen(true)}
@@ -1583,7 +1605,7 @@ const SalesFunnel = () => {
                 </Button>
 
                 <Button
-                  onClick={handleDeleteSelectedLeads}
+                  onClick={() => setIsConfirmingBulkDelete(true)}
                   disabled={selectedLeadIds.length === 0}
                   variant="ghost"
                   className={cn(
@@ -1907,6 +1929,39 @@ const SalesFunnel = () => {
         onExport={handleExport}
         selectedCount={selectedLeadIds.length}
       />
+
+      <ImportModal 
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        team={sdrs}
+        funnelList={dynamicFunnels}
+        onSuccess={() => {
+          loadLeads();
+        }}
+      />
+
+      <Dialog open={isConfirmingBulkDelete} onOpenChange={setIsConfirmingBulkDelete}>
+        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-white rounded-3xl border-slate-100 shadow-2xl">
+          <div className="p-6 border-b border-slate-100 bg-red-50/50">
+            <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-500" />
+              Confirmar Exclusão
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500 mt-2">
+              Tem certeza que deseja excluir {selectedLeadIds.length} lead{selectedLeadIds.length > 1 ? 's' : ''}? 
+              Esta ação não pode ser desfeita. Todos os dados, arquivos e históricos serão apagados.
+            </DialogDescription>
+          </div>
+          <div className="p-4 bg-slate-50 flex items-center justify-end gap-2">
+            <Button variant="ghost" onClick={() => setIsConfirmingBulkDelete(false)} className="rounded-xl">
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSelectedLeads} className="rounded-xl bg-red-500 hover:bg-red-600">
+              Sim, Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmPaymentModal
         open={isConfirmingPayment}
