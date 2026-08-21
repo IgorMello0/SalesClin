@@ -1,9 +1,9 @@
 import crypto from 'node:crypto'
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../prisma.js'
 
-type PrismaExecutor = PrismaClient | Parameters<Parameters<PrismaClient['$transaction']>[0]>[0]
+type PrismaExecutor = PrismaClient | Prisma.TransactionClient
 
 export const TRIAL_DAYS = 15
 export const PLAN_CODES = ['start', 'pro', 'enterprise'] as const

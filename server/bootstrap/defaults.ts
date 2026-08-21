@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { ensureCompanySubscription } from '../services/billing.js'
 
-type PrismaExecutor = PrismaClient | Parameters<Parameters<PrismaClient['$transaction']>[0]>[0]
+type PrismaExecutor = PrismaClient | Prisma.TransactionClient
 
 export const DEFAULT_MODULES = [
   {
