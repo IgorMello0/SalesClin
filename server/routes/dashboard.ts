@@ -63,20 +63,17 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       nowZoned.setHours(0, 0, 0, 0);
       startDate = fromZonedTime(nowZoned, timeZone);
     } else if (filter === 'custom' && req.query.startDate && req.query.endDate) {
-      const customStart = new Date(req.query.startDate as string);
-      const customEnd = new Date(req.query.endDate as string);
+      const startStr = (req.query.startDate as string).split('T')[0];
+      const endStr = (req.query.endDate as string).split('T')[0];
 
-      if (isNaN(customStart.getTime()) || isNaN(customEnd.getTime())) {
+      // Garante que a data seja interpretada no fuso horário do Brasil (UTC-03:00) 
+      // desde o momento do parse, evitando o recuo de 1 dia do Date nativo.
+      startDate = new Date(`${startStr}T00:00:00-03:00`);
+      endDate = new Date(`${endStr}T23:59:59-03:00`);
+
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         throw new Error("Datas de filtro customizado inválidas.");
       }
-
-      const customStartZoned = toZonedTime(customStart, timeZone);
-      customStartZoned.setHours(0, 0, 0, 0);
-      startDate = fromZonedTime(customStartZoned, timeZone);
-
-      const customEndZoned = toZonedTime(customEnd, timeZone);
-      customEndZoned.setHours(23, 59, 59, 999);
-      endDate = fromZonedTime(customEndZoned, timeZone);
     } else {
       // 'this_month' ou fallback
       const startOfMonth = new Date(nowZoned.getFullYear(), nowZoned.getMonth(), 1, 0, 0, 0, 0);
