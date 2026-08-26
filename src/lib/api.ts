@@ -70,6 +70,13 @@ export interface BillingUsage {
   }
 }
 
+export interface MessageCreditSummary {
+  balanceCents: number
+  currency: string
+  unitCostCents: number
+  availableMessages: number
+}
+
 export interface SignupCheckoutPayload {
   name: string
   email: string
@@ -805,6 +812,7 @@ export const billingApi = {
   getUsage: async (companyId?: number) => apiRequest<BillingUsage>(
     `/billing/usage${companyId ? `?companyId=${companyId}` : ''}`,
   ),
+  getMessageCredits: async () => apiRequest<MessageCreditSummary>('/billing/message-credits'),
   selectPlan: async (planCode: string, billingCycle: BillingCycle = 'monthly') =>
     apiRequest<{ planCode: string; billingCycle: string; status: string }>('/billing/select-plan', {
       method: 'POST',

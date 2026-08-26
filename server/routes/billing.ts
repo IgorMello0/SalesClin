@@ -14,6 +14,7 @@ import {
   isBillingCycle,
   isPlanCode,
 } from '../services/billing.js'
+import { getMessageCreditSummary } from '../services/message-credits.js'
 
 export const router = Router()
 
@@ -86,6 +87,17 @@ router.get('/usage', auth(), requireCompany, requireCompanyOwner(), async (req, 
     console.error('[Billing] Erro ao buscar uso:', error)
     const status = error.message?.includes('nao pertence') ? 403 : 500
     return res.status(status).json(createErrorResponse(error.message || 'Erro ao buscar limites', status))
+  }
+})
+
+router.get('/message-credits', auth(), requireCompany, async (req, res) => {
+  try {
+    const companyId = req.user!.companyId!
+    const summary = await getMessageCreditSummary(companyId)
+    return res.json(createSuccessResponse(summary))
+  } catch (error: any) {
+    console.error('[Billing] Erro ao buscar creditos de disparo:', error)
+    return res.status(500).json(createErrorResponse(error.message || 'Erro ao buscar creditos de disparo', 500))
   }
 })
 

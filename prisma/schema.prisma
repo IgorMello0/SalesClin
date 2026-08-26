@@ -453,6 +453,8 @@ model Empresa {
   payments                 Payment[]
   funnelConfigs            FunnelConfig[]
   messageCampaigns         MessageCampaign[]
+  messageCreditWallet      MessageCreditWallet?
+  messageCreditTransactions MessageCreditTransaction[]
   tasks                    Task[]
   notifications            Notification[]
   subscription             CompanySubscription?
@@ -907,6 +909,44 @@ model BillingAddon {
   @@map("billing_addons")
 }
 
+model MessageCreditWallet {
+  id           Int      @id @default(autoincrement())
+  companyId    Int      @unique @map("company_id")
+  balanceCents Int      @default(0) @map("balance_cents")
+  currency     String   @default("BRL")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  company      Empresa                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions MessageCreditTransaction[]
+
+  @@map("message_credit_wallets")
+}
+
+model MessageCreditTransaction {
+  id                  Int      @id @default(autoincrement())
+  companyId           Int      @map("company_id")
+  walletId            Int      @map("wallet_id")
+  campaignId          Int?     @map("campaign_id")
+  campaignRecipientId Int?     @map("campaign_recipient_id")
+  type                String
+  amountCents         Int      @map("amount_cents")
+  balanceAfterCents   Int      @map("balance_after_cents")
+  description         String?
+  metadata            Json?
+  idempotencyKey      String?  @unique @map("idempotency_key")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  company             Empresa             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  wallet              MessageCreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  campaign            MessageCampaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignRecipient   CampaignRecipient?  @relation(fields: [campaignRecipientId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([campaignId])
+  @@map("message_credit_transactions")
+}
+
 model ProfessionalPermission {
   id             Int          @id @default(autoincrement())
   professionalId Int          @map("professional_id")
@@ -1246,6 +1286,10 @@ model MessageCampaign {
   providerSnapshot  String?        @map("provider_snapshot")
   connectionMode    String?        @map("connection_mode")
   workerHeartbeatAt DateTime?      @map("worker_heartbeat_at")
+  messageUnitCostCents Int         @default(5) @map("message_unit_cost_cents")
+  creditReservedCents  Int         @default(0) @map("credit_reserved_cents")
+  creditSpentCents     Int         @default(0) @map("credit_spent_cents")
+  creditRefundedCents  Int         @default(0) @map("credit_refunded_cents")
   scheduledAt       DateTime?      @map("scheduled_at") // Data de agendamento (se agendada)
   startedAt         DateTime?      @map("started_at") // Quando começou a enviar
   completedAt       DateTime?      @map("completed_at") // Quando finalizou
@@ -1257,6 +1301,7 @@ model MessageCampaign {
   professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   template     WhatsAppTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
   recipients   CampaignRecipient[]
+  creditTransactions MessageCreditTransaction[]
 
   @@map("message_campaigns")
 }
@@ -1287,6 +1332,7 @@ model CampaignRecipient {
 
   // Relacionamentos
   campaign MessageCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creditTransactions MessageCreditTransaction[]
 
   @@index([status, nextAttemptAt])
   @@index([providerMessageId])
