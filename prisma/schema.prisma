@@ -39,6 +39,9 @@ model Professional {
   clients             Client[]
   contracts           Contract[]
   conversas           Conversa[]
+  conversasAtribuidas Conversa[]               @relation("ConversationAssignedProfessional")
+  conversationNotes   ConversationNote[]       @relation("ConversationNoteProfessional")
+  conversationEvents  ConversationEvent[]      @relation("ConversationEventProfessional")
   ownedCompanies      Empresa[]                @relation("CompanyOwner")
   fichaTemplates      FichaTemplate[]
   fichas              Ficha[]
@@ -182,26 +185,26 @@ model LeadActivity {
 }
 
 model Proposal {
-  id              Int      @id @default(autoincrement())
-  leadId          Int      @map("lead_id")
-  title           String
-  value           Decimal  @db.Decimal(10, 2)
-  validUntil      DateTime @map("valid_until")
-  salespersonId   Int?     @map("salesperson_id")
-  specialistId    Int?     @map("specialist_id")
-  sdrId           Int?     @map("sdr_id")
-  tags            String[] @default([])
-  status          String   @default("pending")
+  id                 Int      @id @default(autoincrement())
+  leadId             Int      @map("lead_id")
+  title              String
+  value              Decimal  @db.Decimal(10, 2)
+  validUntil         DateTime @map("valid_until")
+  salespersonId      Int?     @map("salesperson_id")
+  specialistId       Int?     @map("specialist_id")
+  sdrId              Int?     @map("sdr_id")
+  tags               String[] @default([])
+  status             String   @default("pending")
   justification      String?
   discountApplied    Boolean  @default(false) @map("discount_applied")
   discountValue      Decimal? @map("discount_value")
   discountPercentage Decimal? @map("discount_percentage")
   createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  salesperson     Usuario? @relation("SalespersonProposals", fields: [salespersonId], references: [id])
-  specialist      Usuario? @relation("SpecialistProposals", fields: [specialistId], references: [id])
-  sdr             Usuario? @relation("SdrProposals", fields: [sdrId], references: [id])
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  lead               Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  salesperson        Usuario? @relation("SalespersonProposals", fields: [salespersonId], references: [id])
+  specialist         Usuario? @relation("SpecialistProposals", fields: [specialistId], references: [id])
+  sdr                Usuario? @relation("SdrProposals", fields: [sdrId], references: [id])
 
   @@map("proposals")
 }
@@ -440,6 +443,7 @@ model Empresa {
   userCompanyPermissions   UserCompanyPermission[]
   agentesIa                AgenteIa[]
   conversas                Conversa[]
+  conversationLabels       ConversationLabel[]
   roles                    Role[]
   clients                  Client[]
   leads                    Lead[]
@@ -590,22 +594,25 @@ model Usuario {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  company                Empresa?            @relation(fields: [companyId], references: [id])
+  company                Empresa?                @relation(fields: [companyId], references: [id])
   companyAccess          UserCompanyAccess[]
-  role                   Role?               @relation(fields: [roleId], references: [id])
+  role                   Role?                   @relation(fields: [roleId], references: [id])
   permissions            UserPermission[]
   companyPermissions     UserCompanyPermission[]
-  proposalsAsSalesperson Proposal[]          @relation("SalespersonProposals")
-  proposalsAsSpecialist  Proposal[]          @relation("SpecialistProposals")
-  proposalsAsSdr         Proposal[]          @relation("SdrProposals")
-  leadsAsSdr             Lead[]              @relation("LeadSdr")
-  leadsAsCloser          Lead[]              @relation("LeadCloser")
-  leadsAsEspecialista    Lead[]              @relation("LeadEspecialista")
-  appointmentsAsSDR      Appointment[]       @relation("AppointmentSDR")
-  appointmentsAsEspec    Appointment[]       @relation("AppointmentEspecialista")
-  assignedTasks          Task[]              @relation("AssignedUserTasks")
-  createdTasks           Task[]              @relation("CreatedUserTasks")
-  notifications          Notification[]      @relation("UserNotifications")
+  proposalsAsSalesperson Proposal[]              @relation("SalespersonProposals")
+  proposalsAsSpecialist  Proposal[]              @relation("SpecialistProposals")
+  proposalsAsSdr         Proposal[]              @relation("SdrProposals")
+  leadsAsSdr             Lead[]                  @relation("LeadSdr")
+  leadsAsCloser          Lead[]                  @relation("LeadCloser")
+  leadsAsEspecialista    Lead[]                  @relation("LeadEspecialista")
+  appointmentsAsSDR      Appointment[]           @relation("AppointmentSDR")
+  appointmentsAsEspec    Appointment[]           @relation("AppointmentEspecialista")
+  assignedTasks          Task[]                  @relation("AssignedUserTasks")
+  createdTasks           Task[]                  @relation("CreatedUserTasks")
+  notifications          Notification[]          @relation("UserNotifications")
+  conversasAtribuidas    Conversa[]              @relation("ConversationAssignedUser")
+  conversationNotes      ConversationNote[]      @relation("ConversationNoteUser")
+  conversationEvents     ConversationEvent[]     @relation("ConversationEventUser")
 
   @@map("usuarios")
 }
@@ -643,27 +650,101 @@ model AgenteIa {
 }
 
 model Conversa {
-  id             Int           @id @default(autoincrement())
-  companyId      Int           @map("company_id")
-  agentId        Int?          @map("agent_id")
-  clientId       Int?          @map("client_id")
-  leadId         Int?          @map("lead_id")
-  professionalId Int?          @map("professional_id")
-  phone          String? // Telefone do contato (para lookup rápido)
-  app            String?
-  channel        String?
-  startedAt      DateTime      @map("started_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  agent          AgenteIa?     @relation(fields: [agentId], references: [id])
-  client         Client?       @relation(fields: [clientId], references: [id])
-  lead           Lead?         @relation(fields: [leadId], references: [id])
-  company        Empresa       @relation(fields: [companyId], references: [id])
-  professional   Professional? @relation(fields: [professionalId], references: [id])
-  mensagens      Mensagem[]
+  id                     Int                     @id @default(autoincrement())
+  companyId              Int                     @map("company_id")
+  agentId                Int?                    @map("agent_id")
+  clientId               Int?                    @map("client_id")
+  leadId                 Int?                    @map("lead_id")
+  professionalId         Int?                    @map("professional_id")
+  assignedProfessionalId Int?                    @map("assigned_professional_id")
+  assignedUserId         Int?                    @map("assigned_user_id")
+  phone                  String? // Telefone do contato (para lookup rápido)
+  app                    String?
+  channel                String?
+  status                 ConversationStatus      @default(OPEN)
+  unreadCount            Int                     @default(0) @map("unread_count")
+  lastMessageAt          DateTime?               @map("last_message_at")
+  lastInboundAt          DateTime?               @map("last_inbound_at")
+  resolvedAt             DateTime?               @map("resolved_at")
+  startedAt              DateTime                @map("started_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  agent                  AgenteIa?               @relation(fields: [agentId], references: [id])
+  client                 Client?                 @relation(fields: [clientId], references: [id])
+  lead                   Lead?                   @relation(fields: [leadId], references: [id])
+  company                Empresa                 @relation(fields: [companyId], references: [id])
+  professional           Professional?           @relation(fields: [professionalId], references: [id])
+  assignedProfessional   Professional?           @relation("ConversationAssignedProfessional", fields: [assignedProfessionalId], references: [id], onDelete: SetNull)
+  assignedUser           Usuario?                @relation("ConversationAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  mensagens              Mensagem[]
+  labels                 ConversationLabelLink[]
+  notes                  ConversationNote[]
+  events                 ConversationEvent[]
 
   @@unique([phone, companyId])
+  @@index([companyId, status, updatedAt])
+  @@index([assignedProfessionalId])
+  @@index([assignedUserId])
   @@map("conversas")
+}
+
+model ConversationLabel {
+  id            Int                     @id @default(autoincrement())
+  companyId     Int                     @map("company_id")
+  name          String
+  color         String                  @default("#64748b")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  company       Empresa                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversations ConversationLabelLink[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("conversation_labels")
+}
+
+model ConversationLabelLink {
+  conversationId Int               @map("conversation_id")
+  labelId        Int               @map("label_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  conversation   Conversa          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  label          ConversationLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, labelId])
+  @@index([labelId])
+  @@map("conversation_label_links")
+}
+
+model ConversationNote {
+  id                   Int           @id @default(autoincrement())
+  conversationId       Int           @map("conversation_id")
+  authorProfessionalId Int?          @map("author_professional_id")
+  authorUserId         Int?          @map("author_user_id")
+  content              String        @db.Text
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  conversation         Conversa      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorProfessional   Professional? @relation("ConversationNoteProfessional", fields: [authorProfessionalId], references: [id], onDelete: SetNull)
+  authorUser           Usuario?      @relation("ConversationNoteUser", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_notes")
+}
+
+model ConversationEvent {
+  id                  Int           @id @default(autoincrement())
+  conversationId      Int           @map("conversation_id")
+  actorProfessionalId Int?          @map("actor_professional_id")
+  actorUserId         Int?          @map("actor_user_id")
+  type                String
+  metadata            Json?
+  createdAt           DateTime      @default(now()) @map("created_at")
+  conversation        Conversa      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actorProfessional   Professional? @relation("ConversationEventProfessional", fields: [actorProfessionalId], references: [id], onDelete: SetNull)
+  actorUser           Usuario?      @relation("ConversationEventUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_events")
 }
 
 model Mensagem {
@@ -1024,6 +1105,12 @@ enum ChatSender {
   profissional
 }
 
+enum ConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
+}
+
 enum ThemeType {
   light
   dark
@@ -1099,15 +1186,15 @@ model Notification {
 
 // ==================== CADÊNCIA DE CONTATO ====================
 model CadenceConfig {
-  id          Int      @id @default(autoincrement())
-  companyId   Int      @map("company_id")
-  stageCode   String   @map("stage_code") // Relacionado ao lead.status
-  isActive    Boolean  @default(true) @map("is_active")
-  steps       Json     // Array de objetos JSON: [{ id, method, waitMinutes, title, template }]
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        Int      @id @default(autoincrement())
+  companyId Int      @map("company_id")
+  stageCode String   @map("stage_code") // Relacionado ao lead.status
+  isActive  Boolean  @default(true) @map("is_active")
+  steps     Json // Array de objetos JSON: [{ id, method, waitMinutes, title, template }]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  company     Empresa  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Empresa @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, stageCode])
   @@map("cadence_configs")

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Bot, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Paperclip,
-  Phone, Plus, RefreshCcw, Search, Send, Smile, User, X,
+  Bot, Check, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Mic,
+  PanelRightOpen, Paperclip, Phone, Plus, RefreshCcw, Search, Send, Smile, Square,
+  StickyNote, Tag, User, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { aiAgentsApi, campaignsApi, conversationsApi, whatsappTemplatesApi } from '@/lib/api';
 import type { WhatsAppTemplate } from '@/components/whatsapp/TemplateCatalog';
@@ -37,11 +39,33 @@ type Conversation = {
   client?: { id: number; name: string; phone?: string | null } | null;
   agent?: { id: number; name: string } | null;
   whatsappProvider?: string | null;
+  status?: ConversationStatus;
+  unreadCount?: number;
+  lastMessageAt?: string | null;
+  lastInboundAt?: string | null;
+  assignedProfessional?: TeamMember | null;
+  assignedUser?: TeamMember | null;
+  labels?: ConversationLabel[];
   serviceWindow?: { isOfficial: boolean; isOpen: boolean; expiresAt?: string | null; remainingSeconds?: number | null };
   mensagens: Message[];
 };
 
 type AiAgent = { id: number; name: string; isActive: boolean };
+type ConversationStatus = 'OPEN' | 'PENDING' | 'RESOLVED';
+type ConversationLabel = { id: number; name: string; color: string };
+type TeamMember = { id: number; name: string; email?: string | null };
+type ConversationNote = {
+  id: number;
+  content: string;
+  createdAt: string;
+  authorProfessional?: TeamMember | null;
+  authorUser?: TeamMember | null;
+};
+type ConversationWorkspace = {
+  labels: ConversationLabel[];
+  professionals: TeamMember[];
+  users: TeamMember[];
+};
 type PendingMedia = { file: File; previewUrl: string; type: 'image' | 'video' | 'audio' };
 type PreviewImage = { url: string; alt: string };
 
@@ -91,6 +115,8 @@ const Conversations = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [filter, setFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [labelFilter, setLabelFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -113,16 +139,34 @@ const Conversations = () => {
   const [agentPrompt, setAgentPrompt] = useState('');
   const [, setClock] = useState(Date.now());
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<ConversationWorkspace>({ labels: [], professionals: [], users: [] });
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [notes, setNotes] = useState<ConversationNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#f97316');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const conversationsRequestInFlight = useRef(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
+  const cancelRecordingRef = useRef(false);
 
   const loadConversations = async (silent = false) => {
     if (conversationsRequestInFlight.current) return;
     conversationsRequestInFlight.current = true;
     if (silent) setRefreshing(true); else setLoading(true);
     try {
-      const response = await conversationsApi.list();
+      const response = await conversationsApi.list({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        labelId: labelFilter === 'all' ? undefined : Number(labelFilter),
+      });
       if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel carregar as conversas.');
       const items = (response.data || []).map((conversation: Conversation) => ({
         ...conversation,
@@ -146,6 +190,11 @@ const Conversations = () => {
     }
   };
 
+  const loadWorkspace = async () => {
+    const response = await conversationsApi.workspace();
+    if (response.success && response.data) setWorkspace(response.data);
+  };
+
   useEffect(() => {
     void loadConversations();
     void aiAgentsApi.list().then((response) => {
@@ -154,18 +203,43 @@ const Conversations = () => {
     void whatsappTemplatesApi.list('APPROVED').then((response) => {
       if (response.success) setTemplates(response.data || []);
     });
+    void loadWorkspace();
     const refreshTimer = window.setInterval(() => {
       if (!document.hidden) void loadConversations(true);
     }, 10000);
     const clockTimer = window.setInterval(() => setClock(Date.now()), 1000);
-    return () => { window.clearInterval(refreshTimer); window.clearInterval(clockTimer); };
+    return () => {
+      window.clearInterval(refreshTimer);
+      window.clearInterval(clockTimer);
+      if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
   }, []);
+
+  useEffect(() => {
+    void loadConversations(true);
+  }, [statusFilter, labelFilter]);
 
   const selected = conversations.find((conversation) => conversation.id === selectedId) || null;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedId, selected?.mensagens.length]);
+
+  useEffect(() => {
+    if (!selectedId || !selected?.unreadCount) return;
+    void conversationsApi.markRead(selectedId).then((response) => {
+      if (response.success) setConversations((current) => current.map((item) => item.id === selectedId ? { ...item, unreadCount: 0 } : item));
+    });
+  }, [selectedId, selected?.unreadCount]);
+
+  useEffect(() => {
+    if (!detailsOpen || !selectedId) return;
+    setNotesLoading(true);
+    void conversationsApi.listNotes(selectedId).then((response) => {
+      if (response.success) setNotes(response.data || []);
+    }).finally(() => setNotesLoading(false));
+  }, [detailsOpen, selectedId]);
 
   const filtered = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -214,6 +288,133 @@ const Conversations = () => {
     }
     clearPendingMedia();
     setPendingMedia({ file, type, previewUrl: URL.createObjectURL(file) });
+  };
+
+  const finishRecording = (cancel = false) => {
+    cancelRecordingRef.current = cancel;
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+  };
+
+  const startRecording = async () => {
+    if (isRecording || sending) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      toast({ title: 'Gravacao indisponivel', description: 'Este navegador nao permite gravar audio.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+      const recorder = new MediaRecorder(stream, { mimeType: preferredType });
+      recordingStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+      cancelRecordingRef.current = false;
+      recorder.ondataavailable = (event) => { if (event.data.size) audioChunksRef.current.push(event.data); };
+      recorder.onstop = () => {
+        if (!cancelRecordingRef.current && audioChunksRef.current.length) {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          selectMedia(new File([blob], `audio-${Date.now()}.webm`, { type: 'audio/webm' }));
+        }
+        stream.getTracks().forEach((track) => track.stop());
+        if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+        recordingStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        audioChunksRef.current = [];
+        setIsRecording(false);
+        setRecordingSeconds(0);
+      };
+      recorder.start(250);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = window.setInterval(() => setRecordingSeconds((value) => value + 1), 1000);
+    } catch (error) {
+      toast({ title: 'Microfone nao liberado', description: 'Autorize o uso do microfone para gravar uma mensagem.', variant: 'destructive' });
+    }
+  };
+
+  const formatRecordingTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+
+  const updateConversationStatus = async (status: ConversationStatus) => {
+    if (!selected || savingDetails) return;
+    setSavingDetails(true);
+    try {
+      const response = await conversationsApi.setStatus(selected.id, status);
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel alterar o status.');
+      await loadConversations(true);
+    } catch (error: any) {
+      toast({ title: 'Status nao alterado', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  const assignConversation = async (value: string) => {
+    if (!selected || savingDetails) return;
+    const [type, rawId] = value.split(':');
+    setSavingDetails(true);
+    try {
+      const response = await conversationsApi.assign(selected.id, type === 'none' ? { assigneeType: null } : {
+        assigneeType: type as 'professional' | 'user',
+        assigneeId: Number(rawId),
+      });
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel atribuir a conversa.');
+      await loadConversations(true);
+    } catch (error: any) {
+      toast({ title: 'Responsavel nao alterado', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  const toggleConversationLabel = async (label: ConversationLabel) => {
+    if (!selected || savingDetails) return;
+    const attached = Boolean(selected.labels?.some((item) => item.id === label.id));
+    setSavingDetails(true);
+    try {
+      const response = attached
+        ? await conversationsApi.removeLabel(selected.id, label.id)
+        : await conversationsApi.addLabel(selected.id, label.id);
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel alterar a etiqueta.');
+      await loadConversations(true);
+    } catch (error: any) {
+      toast({ title: 'Etiqueta nao alterada', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  const createConversationLabel = async () => {
+    if (!newLabelName.trim() || savingDetails) return;
+    setSavingDetails(true);
+    try {
+      const response = await conversationsApi.createLabel({ name: newLabelName.trim(), color: newLabelColor });
+      if (!response.success || !response.data) throw new Error(response.error?.message || 'Nao foi possivel criar a etiqueta.');
+      setWorkspace((current) => ({ ...current, labels: [...current.labels, response.data] }));
+      setNewLabelName('');
+      if (selected) await conversationsApi.addLabel(selected.id, response.data.id);
+      await loadConversations(true);
+    } catch (error: any) {
+      toast({ title: 'Etiqueta nao criada', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  const addConversationNote = async () => {
+    if (!selected || !newNote.trim() || savingDetails) return;
+    setSavingDetails(true);
+    try {
+      const response = await conversationsApi.addNote(selected.id, newNote.trim());
+      if (!response.success || !response.data) throw new Error(response.error?.message || 'Nao foi possivel salvar a nota.');
+      setNotes((current) => [response.data, ...current]);
+      setNewNote('');
+    } catch (error: any) {
+      toast({ title: 'Nota nao salva', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingDetails(false);
+    }
   };
 
   const sendMessage = async () => {
@@ -355,6 +556,16 @@ const Conversations = () => {
                 </SelectValue>
               </SelectTrigger>
               <SelectContent><SelectItem value="all">Todas as conversas</SelectItem><SelectItem value="in_progress">Em andamento</SelectItem><SelectItem value="converted">Convertidas</SelectItem></SelectContent></Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 bg-white text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="OPEN">Abertas</SelectItem><SelectItem value="PENDING">Pendentes</SelectItem><SelectItem value="RESOLVED">Resolvidas</SelectItem></SelectContent>
+              </Select>
+              <Select value={labelFilter} onValueChange={setLabelFilter}>
+                <SelectTrigger className="h-9 bg-white text-xs"><SelectValue placeholder="Etiqueta" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">Todas etiquetas</SelectItem>{workspace.labels.map((label) => <SelectItem key={label.id} value={String(label.id)}>{label.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="border-b border-slate-100 px-4 py-2 text-[10px] font-bold uppercase text-slate-400">{filtered.length} conversa{filtered.length === 1 ? '' : 's'}</div>
           <div className="flex-1 overflow-y-auto">
@@ -367,7 +578,7 @@ const Conversations = () => {
               const converted = isConverted(conversation);
               return (
                 <button type="button" key={conversation.id} onClick={() => setSelectedId(conversation.id)} className={`w-full border-b border-slate-100 px-4 py-3 text-left transition-colors ${active ? 'bg-slate-100' : 'hover:bg-slate-50'}`}>
-                  <div className="flex gap-3"><div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-xs font-black ${active ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-700'}`}>{initials(name)}</div><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-bold text-slate-900">{name}</p><span className="flex-shrink-0 text-[10px] text-slate-400">{formatRelativeTime(lastMessage?.createdAt || conversation.updatedAt || conversation.startedAt)}</span></div><p className="mt-0.5 truncate text-xs text-slate-500">{lastMessage?.content || 'Conversa iniciada'}</p><div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold"><span className={`h-1.5 w-1.5 rounded-full ${converted ? 'bg-emerald-500' : 'bg-sky-500'}`} /><span className={converted ? 'text-emerald-600' : 'text-sky-600'}>{converted ? 'Convertida' : 'Em andamento'}</span></div></div></div>
+                  <div className="flex gap-3"><div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-xs font-black ${active ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-700'}`}>{initials(name)}</div><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-bold text-slate-900">{name}</p><div className="flex items-center gap-1.5"><span className="flex-shrink-0 text-[10px] text-slate-400">{formatRelativeTime(lastMessage?.createdAt || conversation.updatedAt || conversation.startedAt)}</span>{Boolean(conversation.unreadCount) && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white">{conversation.unreadCount}</span>}</div></div><p className="mt-0.5 truncate text-xs text-slate-500">{lastMessage?.content || 'Conversa iniciada'}</p><div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold"><span className={`h-1.5 w-1.5 rounded-full ${conversation.status === 'RESOLVED' ? 'bg-slate-400' : conversation.status === 'PENDING' ? 'bg-amber-500' : converted ? 'bg-emerald-500' : 'bg-sky-500'}`} /><span className={conversation.status === 'RESOLVED' ? 'text-slate-500' : conversation.status === 'PENDING' ? 'text-amber-600' : converted ? 'text-emerald-600' : 'text-sky-600'}>{conversation.status === 'RESOLVED' ? 'Resolvida' : conversation.status === 'PENDING' ? 'Pendente' : converted ? 'Convertida' : 'Em andamento'}</span>{conversation.labels?.slice(0, 2).map((label) => <span key={label.id} className="rounded-full border px-1.5 py-0.5 font-semibold text-slate-600" style={{ borderColor: label.color, backgroundColor: `${label.color}18` }}>{label.name}</span>)}</div></div></div>
                 </button>
               );
             })}
@@ -390,6 +601,7 @@ const Conversations = () => {
                     </div>
                   </SelectTrigger>
                   <SelectContent><SelectItem value="manual">Atendimento manual</SelectItem>{agents.map((agent) => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}<SelectItem value="new"><span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" />Novo agente</span></SelectItem></SelectContent></Select>
+                <Button variant="outline" size="icon" onClick={() => setDetailsOpen(true)} aria-label="Abrir detalhes da conversa" title="Detalhes da conversa"><PanelRightOpen className="h-4 w-4" /></Button>
               </div>
             </div>
 
@@ -430,21 +642,155 @@ const Conversations = () => {
             </div>
 
             <div className="flex-shrink-0 border-t border-slate-200 bg-white p-4">
-              {pendingMedia && <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2">{pendingMedia.type === 'image' ? <img src={pendingMedia.previewUrl} alt="Previa" className="h-14 w-14 rounded object-cover" /> : <ImageIcon className="h-8 w-8 text-slate-500" />}<div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{pendingMedia.file.name}</p><p className="text-[10px] text-slate-500">{pendingMedia.type}</p></div><Button variant="ghost" size="icon" onClick={clearPendingMedia} aria-label="Remover anexo"><X className="h-4 w-4" /></Button></div>}
+              {pendingMedia && <div className="mx-auto mb-2 flex max-w-5xl items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2">{pendingMedia.type === 'image' ? <img src={pendingMedia.previewUrl} alt="Previa" className="h-14 w-14 rounded object-cover" /> : pendingMedia.type === 'audio' ? <audio src={pendingMedia.previewUrl} controls className="h-10 max-w-[260px]" /> : <ImageIcon className="h-8 w-8 text-slate-500" />}<div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{pendingMedia.file.name}</p><p className="text-[10px] text-slate-500">{pendingMedia.type === 'audio' ? 'Mensagem de voz pronta' : pendingMedia.type}</p></div><Button variant="ghost" size="icon" onClick={clearPendingMedia} aria-label="Remover anexo"><X className="h-4 w-4" /></Button></div>}
               {officialWindowClosed && <div className="mx-auto mb-2 flex max-w-5xl items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"><span>A janela de atendimento da Meta terminou. Para retomar, envie um template aprovado.</span><Button size="sm" onClick={() => setShowTemplateDialog(true)} disabled={templates.length === 0}>Usar template</Button></div>}
               <div className="relative mx-auto flex max-w-5xl items-center gap-2">
                 <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={(event) => { selectMedia(event.target.files?.[0]); event.currentTarget.value = ''; }} />
                 <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={sending || officialWindowClosed} aria-label="Anexar midia"><Paperclip className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => setShowEmojis((open) => !open)} disabled={sending || officialWindowClosed} aria-label="Adicionar emoji"><Smile className="h-4 w-4" /></Button>
-                {showEmojis && <div className="absolute bottom-14 left-10 z-20 grid w-56 grid-cols-8 gap-1 rounded-md border border-slate-200 bg-white p-2 shadow-xl">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => { setNewMessage((value) => value + emoji); setShowEmojis(false); }} className="h-7 rounded text-lg hover:bg-slate-100">{emoji}</button>)}</div>}
-                <Input value={newMessage} onChange={(event) => setNewMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder="Digite uma mensagem" disabled={sending || officialWindowClosed} className="h-11" />
-                <Button size="icon" onClick={() => void sendMessage()} disabled={sending || (!newMessage.trim() && !pendingMedia) || officialWindowClosed} aria-label="Enviar mensagem">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
+                {isRecording ? (
+                  <div className="flex h-11 flex-1 items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3">
+                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+                    <span className="font-mono text-sm font-bold text-red-700">{formatRecordingTime(recordingSeconds)}</span>
+                    <span className="flex-1 text-xs font-medium text-red-700">Gravando mensagem de voz</span>
+                    <Button variant="ghost" size="sm" className="text-red-700 hover:bg-red-100" onClick={() => finishRecording(true)}>Cancelar</Button>
+                    <Button size="icon" className="bg-red-600 hover:bg-red-700" onClick={() => finishRecording(false)} aria-label="Parar gravacao"><Square className="h-4 w-4 fill-current" /></Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button variant="ghost" size="icon" onClick={() => setShowEmojis((open) => !open)} disabled={sending || officialWindowClosed} aria-label="Adicionar emoji"><Smile className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => void startRecording()} disabled={sending || officialWindowClosed || Boolean(pendingMedia)} aria-label="Gravar mensagem de voz" title="Gravar mensagem de voz"><Mic className="h-4 w-4" /></Button>
+                    {showEmojis && <div className="absolute bottom-14 left-10 z-20 grid w-56 grid-cols-8 gap-1 rounded-md border border-slate-200 bg-white p-2 shadow-xl">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => { setNewMessage((value) => value + emoji); setShowEmojis(false); }} className="h-7 rounded text-lg hover:bg-slate-100">{emoji}</button>)}</div>}
+                    <Input value={newMessage} onChange={(event) => setNewMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder="Digite uma mensagem" disabled={sending || officialWindowClosed} className="h-11" />
+                    <Button size="icon" onClick={() => void sendMessage()} disabled={sending || (!newMessage.trim() && !pendingMedia) || officialWindowClosed} aria-label="Enviar mensagem">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
+                  </>
+                )}
               </div>
               <p className="mt-2 text-center text-[10px] text-slate-400">{uploading ? 'Enviando midia...' : 'A mensagem sera enviada pelo WhatsApp conectado a clinica.'}</p>
             </div>
           </section>
         ) : <section className="flex flex-1 flex-col items-center justify-center bg-slate-50 p-8 text-center"><MessageCircle className="h-14 w-14 text-slate-300" /><p className="mt-4 font-bold text-slate-600">Selecione uma conversa</p><p className="mt-1 max-w-sm text-sm text-slate-400">As mensagens recebidas pelo WhatsApp conectado aparecerao nesta central.</p></section>}
       </main>
+
+      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-md">
+          <SheetHeader className="border-b border-slate-200 px-6 py-5 text-left">
+            <SheetTitle>Detalhes da conversa</SheetTitle>
+            <SheetDescription>
+              {selected ? `${contactName(selected)} · ${contactPhone(selected)}` : 'Organize o atendimento desta conversa.'}
+            </SheetDescription>
+          </SheetHeader>
+
+          {selected && (
+            <div className="space-y-7 px-6 py-6">
+              <section aria-labelledby="conversation-status-title">
+                <div className="mb-3 flex items-center gap-2">
+                  <Check className="h-4 w-4 text-orange-500" />
+                  <h3 id="conversation-status-title" className="text-sm font-bold text-slate-900">Status do atendimento</h3>
+                </div>
+                <div className="grid grid-cols-3 rounded-md border border-slate-200 bg-slate-50 p-1">
+                  {([
+                    ['OPEN', 'Aberta'],
+                    ['PENDING', 'Pendente'],
+                    ['RESOLVED', 'Resolvida'],
+                  ] as Array<[ConversationStatus, string]>).map(([status, label]) => (
+                    <button
+                      key={status}
+                      type="button"
+                      disabled={savingDetails}
+                      onClick={() => void updateConversationStatus(status)}
+                      className={`h-9 rounded px-2 text-xs font-bold transition-colors ${selected.status === status ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section aria-labelledby="conversation-owner-title">
+                <div className="mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4 text-orange-500" />
+                  <h3 id="conversation-owner-title" className="text-sm font-bold text-slate-900">Responsavel</h3>
+                </div>
+                <Select
+                  value={selected.assignedProfessional ? `professional:${selected.assignedProfessional.id}` : selected.assignedUser ? `user:${selected.assignedUser.id}` : 'none:'}
+                  onValueChange={(value) => void assignConversation(value)}
+                  disabled={savingDetails}
+                >
+                  <SelectTrigger className="bg-white"><SelectValue placeholder="Sem responsavel" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none:">Sem responsavel</SelectItem>
+                    {workspace.professionals.map((member) => <SelectItem key={`professional-${member.id}`} value={`professional:${member.id}`}>{member.name} · Profissional</SelectItem>)}
+                    {workspace.users.map((member) => <SelectItem key={`user-${member.id}`} value={`user:${member.id}`}>{member.name} · Equipe</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </section>
+
+              <section aria-labelledby="conversation-labels-title">
+                <div className="mb-3 flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-orange-500" />
+                  <h3 id="conversation-labels-title" className="text-sm font-bold text-slate-900">Etiquetas</h3>
+                </div>
+                {workspace.labels.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {workspace.labels.map((label) => {
+                      const attached = Boolean(selected.labels?.some((item) => item.id === label.id));
+                      return (
+                        <button
+                          key={label.id}
+                          type="button"
+                          disabled={savingDetails}
+                          onClick={() => void toggleConversationLabel(label)}
+                          className={`flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-bold transition-opacity ${attached ? 'text-slate-900' : 'bg-white text-slate-500 opacity-65 hover:opacity-100'}`}
+                          style={{ borderColor: label.color, backgroundColor: attached ? `${label.color}20` : undefined }}
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: label.color }} />
+                          {label.name}
+                          {attached && <Check className="h-3.5 w-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : <p className="text-xs text-slate-500">Nenhuma etiqueta criada nesta clinica.</p>}
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="color"
+                    value={newLabelColor}
+                    onChange={(event) => setNewLabelColor(event.target.value)}
+                    className="h-10 w-11 cursor-pointer rounded-md border border-slate-200 bg-white p-1"
+                    aria-label="Cor da nova etiqueta"
+                  />
+                  <Input value={newLabelName} onChange={(event) => setNewLabelName(event.target.value)} placeholder="Nova etiqueta" maxLength={40} />
+                  <Button size="icon" variant="outline" onClick={() => void createConversationLabel()} disabled={!newLabelName.trim() || savingDetails} aria-label="Criar etiqueta"><Plus className="h-4 w-4" /></Button>
+                </div>
+              </section>
+
+              <section aria-labelledby="conversation-notes-title">
+                <div className="mb-3 flex items-center gap-2">
+                  <StickyNote className="h-4 w-4 text-orange-500" />
+                  <div>
+                    <h3 id="conversation-notes-title" className="text-sm font-bold text-slate-900">Notas internas</h3>
+                    <p className="text-xs text-slate-500">Visiveis apenas para a equipe.</p>
+                  </div>
+                </div>
+                <Textarea value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Ex.: lead desqualificado, pediu retorno em setembro..." rows={4} maxLength={2000} />
+                <div className="mt-2 flex justify-end">
+                  <Button size="sm" onClick={() => void addConversationNote()} disabled={!newNote.trim() || savingDetails}>{savingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Adicionar nota</Button>
+                </div>
+                <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+                  {notesLoading ? <div className="flex justify-center py-5"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : notes.length === 0 ? <p className="py-4 text-center text-xs text-slate-500">Nenhuma nota nesta conversa.</p> : notes.map((note) => (
+                    <article key={note.id} className="border-l-2 border-orange-400 pl-3">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{note.content}</p>
+                      <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
+                        {note.authorProfessional?.name || note.authorUser?.name || 'Equipe'} · {format(new Date(note.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={Boolean(previewImage)} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
         <DialogContent className="h-full w-full max-w-none grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-slate-950 p-0 sm:h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)] sm:max-w-[1500px] [&>button]:border-white/15 [&>button]:bg-slate-900 [&>button]:text-white [&>button]:hover:bg-slate-800">

@@ -1266,6 +1266,9 @@ export async function processIncomingMessage(opts: {
         app: 'whatsapp',
         channel: origin,
         startedAt: new Date(),
+        lastMessageAt: new Date(),
+        lastInboundAt: new Date(),
+        unreadCount: 0,
       },
     })
   } else if (!conversa.leadId) {
@@ -1301,7 +1304,14 @@ export async function processIncomingMessage(opts: {
 
   await db.conversa.update({
     where: { id: conversa.id },
-    data: { updatedAt: new Date() },
+    data: {
+      updatedAt: new Date(),
+      lastMessageAt: new Date(),
+      lastInboundAt: new Date(),
+      unreadCount: { increment: 1 },
+      status: 'OPEN',
+      resolvedAt: null,
+    },
   })
 
   await db.leadActivity.create({

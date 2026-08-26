@@ -625,7 +625,10 @@ async function processIncomingMessage(opts: {
         phone,
         app: 'whatsapp',
         channel: origin,
-        startedAt: new Date()
+        startedAt: new Date(),
+        lastMessageAt: new Date(),
+        lastInboundAt: new Date(),
+        unreadCount: 0
       }
     });
   }
@@ -638,6 +641,18 @@ async function processIncomingMessage(opts: {
       content: messageText || '(mídia)',
       rawJson: rawPayload,
       origin
+    }
+  });
+
+  await prisma.conversa.update({
+    where: { id: conversa.id },
+    data: {
+      updatedAt: new Date(),
+      lastMessageAt: new Date(),
+      lastInboundAt: new Date(),
+      unreadCount: { increment: 1 },
+      status: 'OPEN',
+      resolvedAt: null
     }
   });
 

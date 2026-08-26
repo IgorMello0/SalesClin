@@ -42,7 +42,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Nginx + su-exec (para rodar Node como user node)
-RUN apk add --no-cache nginx su-exec && \
+RUN apk add --no-cache nginx su-exec ffmpeg && \
     mkdir -p /run/nginx /app/uploads && \
     chown -R nginx:nginx /run/nginx /var/lib/nginx /var/log/nginx && \
     chown -R node:node /app/uploads

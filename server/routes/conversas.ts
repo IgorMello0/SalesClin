@@ -11,6 +11,24 @@ function getCompanyId(req: any) {
   return Number(req.user?.companyId) || null
 }
 
+function getActor(req: any) {
+  return req.user?.type === 'profissional'
+    ? { actorProfessionalId: Number(req.user.id), actorUserId: null }
+    : { actorProfessionalId: null, actorUserId: Number(req.user?.id) || null }
+}
+
+const conversationInclude = {
+  agent: true,
+  client: true,
+  lead: true,
+  professional: true,
+  assignedProfessional: { select: { id: true, name: true, email: true } },
+  assignedUser: { select: { id: true, name: true, email: true } },
+  labels: { include: { label: true } },
+  mensagens: { orderBy: { createdAt: 'asc' as const } },
+  company: { select: { whatsappProvider: true } },
+}
+
 function normalizePhone(value?: string | null) {
   return String(value || '').replace(/\D/g, '')
 }
@@ -29,6 +47,7 @@ function getMetaWindow(messages: Array<{ sender: string; createdAt: Date }>, pro
 function withConversationState(item: any) {
   return {
     ...item,
+    labels: Array.isArray(item.labels) ? item.labels.map((entry: any) => entry.label) : [],
     whatsappProvider: item.company?.whatsappProvider || null,
     serviceWindow: getMetaWindow(item.mensagens || [], item.company?.whatsappProvider),
     company: undefined,
@@ -37,7 +56,7 @@ function withConversationState(item: any) {
 
 router.get('/', auth(), requireModule('conversas'), async (req, res) => {
   const { skip, take, page, pageSize } = parsePagination(req.query)
-  const { agentId, clientId, leadId } = req.query as any
+  const { agentId, clientId, leadId, status, assignment, labelId } = req.query as any
   
   const companyId = getCompanyId(req)
 
@@ -49,25 +68,230 @@ router.get('/', auth(), requireModule('conversas'), async (req, res) => {
   if (agentId) where.agentId = Number(agentId)
   if (clientId) where.clientId = Number(clientId)
   if (leadId) where.leadId = Number(leadId)
+  if (status && ['OPEN', 'PENDING', 'RESOLVED'].includes(String(status).toUpperCase())) {
+    where.status = String(status).toUpperCase()
+  }
+  if (labelId) where.labels = { some: { labelId: Number(labelId) } }
+  if (assignment === 'unassigned') {
+    where.assignedProfessionalId = null
+    where.assignedUserId = null
+  } else if (assignment === 'mine') {
+    if (req.user?.type === 'profissional') where.assignedProfessionalId = Number(req.user.id)
+    if (req.user?.type === 'usuario') where.assignedUserId = Number(req.user.id)
+  }
 
   const [items, total] = await Promise.all([
     prisma.conversa.findMany({
       where,
       skip,
       take,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        agent: true,
-        client: true,
-        lead: true,
-        professional: true,
-        mensagens: { orderBy: { createdAt: 'asc' } },
-        company: { select: { whatsappProvider: true } },
-      }
+      orderBy: [{ lastMessageAt: 'desc' }, { updatedAt: 'desc' }],
+      include: conversationInclude,
     }),
     prisma.conversa.count({ where })
   ])
   res.json(createSuccessResponse(items.map(withConversationState), { page, pageSize, total }))
+})
+
+router.get('/workspace', auth(), requireModule('conversas'), async (req, res) => {
+  const companyId = getCompanyId(req)
+  if (!companyId) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))
+
+  const [company, labels, users] = await Promise.all([
+    prisma.empresa.findUnique({
+      where: { id: companyId },
+      select: {
+        owner: { select: { id: true, name: true, email: true } },
+        professionals: { select: { id: true, name: true, email: true } },
+      },
+    }),
+    prisma.conversationLabel.findMany({ where: { companyId }, orderBy: { name: 'asc' } }),
+    prisma.usuario.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { companyId },
+          { companyAccess: { some: { companyId, isActive: true } } },
+        ],
+      },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: 'asc' },
+    }),
+  ])
+
+  const professionals = [company?.owner, ...(company?.professionals || [])]
+    .filter(Boolean)
+    .filter((item, index, all) => all.findIndex((candidate) => candidate?.id === item?.id) === index)
+
+  return res.json(createSuccessResponse({ labels, professionals, users }))
+})
+
+router.post('/labels', auth(), requireModule('conversas'), async (req, res) => {
+  const companyId = getCompanyId(req)
+  const name = String(req.body?.name || '').trim()
+  const color = String(req.body?.color || '#64748b').trim()
+  if (!companyId) return res.status(404).json(createErrorResponse('Clinica nao encontrada', 404))
+  if (!name || name.length > 40) return res.status(400).json(createErrorResponse('Informe um nome de ate 40 caracteres', 400))
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return res.status(400).json(createErrorResponse('Cor invalida', 400))
+
+  const label = await prisma.conversationLabel.upsert({
+    where: { companyId_name: { companyId, name } },
+    create: { companyId, name, color },
+    update: { color },
+  })
+  return res.status(201).json(createSuccessResponse(label))
+})
+
+router.post('/:id/labels', auth(), requireModule('conversas'), async (req, res) => {
+  const conversationId = Number(req.params.id)
+  const labelId = Number(req.body?.labelId)
+  const companyId = getCompanyId(req)
+  const [conversation, label] = await Promise.all([
+    prisma.conversa.findFirst({ where: { id: conversationId, companyId: companyId || -1 }, select: { id: true } }),
+    prisma.conversationLabel.findFirst({ where: { id: labelId, companyId: companyId || -1 } }),
+  ])
+  if (!conversation || !label) return res.status(404).json(createErrorResponse('Conversa ou etiqueta nao encontrada', 404))
+
+  await prisma.$transaction([
+    prisma.conversationLabelLink.upsert({
+      where: { conversationId_labelId: { conversationId, labelId } },
+      create: { conversationId, labelId },
+      update: {},
+    }),
+    prisma.conversationEvent.create({
+      data: { conversationId, type: 'label_added', metadata: { labelId, name: label.name }, ...getActor(req) },
+    }),
+  ])
+  return res.status(201).json(createSuccessResponse(label))
+})
+
+router.delete('/:id/labels/:labelId', auth(), requireModule('conversas'), async (req, res) => {
+  const conversationId = Number(req.params.id)
+  const labelId = Number(req.params.labelId)
+  const companyId = getCompanyId(req)
+  const conversation = await prisma.conversa.findFirst({ where: { id: conversationId, companyId: companyId || -1 }, select: { id: true } })
+  if (!conversation) return res.status(404).json(createErrorResponse('Conversa nao encontrada', 404))
+
+  await prisma.$transaction([
+    prisma.conversationLabelLink.deleteMany({ where: { conversationId, labelId } }),
+    prisma.conversationEvent.create({ data: { conversationId, type: 'label_removed', metadata: { labelId }, ...getActor(req) } }),
+  ])
+  return res.json(createSuccessResponse({ conversationId, labelId }))
+})
+
+router.get('/:id/notes', auth(), requireModule('conversas'), async (req, res) => {
+  const conversationId = Number(req.params.id)
+  const companyId = getCompanyId(req)
+  const conversation = await prisma.conversa.findFirst({ where: { id: conversationId, companyId: companyId || -1 }, select: { id: true } })
+  if (!conversation) return res.status(404).json(createErrorResponse('Conversa nao encontrada', 404))
+  const notes = await prisma.conversationNote.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      authorProfessional: { select: { id: true, name: true } },
+      authorUser: { select: { id: true, name: true } },
+    },
+  })
+  return res.json(createSuccessResponse(notes))
+})
+
+router.post('/:id/notes', auth(), requireModule('conversas'), async (req, res) => {
+  const conversationId = Number(req.params.id)
+  const companyId = getCompanyId(req)
+  const content = String(req.body?.content || '').trim()
+  if (!content || content.length > 2000) return res.status(400).json(createErrorResponse('A nota deve ter entre 1 e 2000 caracteres', 400))
+  const conversation = await prisma.conversa.findFirst({ where: { id: conversationId, companyId: companyId || -1 }, select: { id: true } })
+  if (!conversation) return res.status(404).json(createErrorResponse('Conversa nao encontrada', 404))
+
+  const actor = getActor(req)
+  const note = await prisma.$transaction(async (tx) => {
+    const created = await tx.conversationNote.create({
+      data: {
+        conversationId,
+        content,
+        authorProfessionalId: actor.actorProfessionalId,
+        authorUserId: actor.actorUserId,
+      },
+      include: {
+        authorProfessional: { select: { id: true, name: true } },
+        authorUser: { select: { id: true, name: true } },
+      },
+    })
+    await tx.conversationEvent.create({ data: { conversationId, type: 'note_added', metadata: { noteId: created.id }, ...actor } })
+    return created
+  })
+  return res.status(201).json(createSuccessResponse(note))
+})
+
+router.post('/:id/assign', auth(), requireModule('conversas'), async (req, res) => {
+  const conversationId = Number(req.params.id)
+  const companyId = getCompanyId(req)
+  const assigneeType = req.body?.assigneeType ? String(req.body.assigneeType) : null
+  const assigneeId = Number(req.body?.assigneeId) || null
+  const conversation = await prisma.conversa.findFirst({ where: { id: conversationId, companyId: companyId || -1 }, select: { id: true } })
+  if (!conversation) return res.status(404).json(createErrorResponse('Conversa nao encontrada', 404))
+
+  let assignedProfessionalId: number | null = null
+  let assignedUserId: number | null = null
+  if (assigneeType === 'professional' && assigneeId) {
+    const professional = await prisma.professional.findFirst({
+      where: { id: assigneeId, OR: [{ companyId }, { ownedCompanies: { some: { id: companyId || -1 } } }] },
+      select: { id: true },
+    })
+    if (!professional) return res.status(400).json(createErrorResponse('Profissional nao pertence a esta clinica', 400))
+    assignedProfessionalId = professional.id
+  } else if (assigneeType === 'user' && assigneeId) {
+    const user = await prisma.usuario.findFirst({
+      where: { id: assigneeId, isActive: true, OR: [{ companyId }, { companyAccess: { some: { companyId: companyId || -1, isActive: true } } }] },
+      select: { id: true },
+    })
+    if (!user) return res.status(400).json(createErrorResponse('Usuario nao pertence a esta clinica', 400))
+    assignedUserId = user.id
+  } else if (assigneeType !== null) {
+    return res.status(400).json(createErrorResponse('Responsavel invalido', 400))
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const item = await tx.conversa.update({
+      where: { id: conversationId },
+      data: { assignedProfessionalId, assignedUserId },
+      include: conversationInclude,
+    })
+    await tx.conversationEvent.create({
+      data: { conversationId, type: 'assignment_changed', metadata: { assigneeType, assigneeId }, ...getActor(req) },
+    })
+    return item
+  })
+  return res.json(createSuccessResponse(withConversationState(updated)))
+})
+
+router.post('/:id/status', auth(), requireModule('conversas'), async (req, res) => {
+  const conversationId = Number(req.params.id)
+  const companyId = getCompanyId(req)
+  const status = String(req.body?.status || '').toUpperCase()
+  if (!['OPEN', 'PENDING', 'RESOLVED'].includes(status)) return res.status(400).json(createErrorResponse('Status invalido', 400))
+  const conversation = await prisma.conversa.findFirst({ where: { id: conversationId, companyId: companyId || -1 }, select: { id: true } })
+  if (!conversation) return res.status(404).json(createErrorResponse('Conversa nao encontrada', 404))
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const item = await tx.conversa.update({
+      where: { id: conversationId },
+      data: { status: status as any, resolvedAt: status === 'RESOLVED' ? new Date() : null },
+      include: conversationInclude,
+    })
+    await tx.conversationEvent.create({ data: { conversationId, type: 'status_changed', metadata: { status }, ...getActor(req) } })
+    return item
+  })
+  return res.json(createSuccessResponse(withConversationState(updated)))
+})
+
+router.post('/:id/read', auth(), requireModule('conversas'), async (req, res) => {
+  const conversationId = Number(req.params.id)
+  const companyId = getCompanyId(req)
+  const conversation = await prisma.conversa.findFirst({ where: { id: conversationId, companyId: companyId || -1 }, select: { id: true } })
+  if (!conversation) return res.status(404).json(createErrorResponse('Conversa nao encontrada', 404))
+  await prisma.conversa.update({ where: { id: conversationId }, data: { unreadCount: 0 } })
+  return res.json(createSuccessResponse({ id: conversationId, unreadCount: 0 }))
 })
 
 router.get('/:id', auth(), requireModule('conversas'), async (req, res) => {
@@ -77,14 +301,7 @@ router.get('/:id', auth(), requireModule('conversas'), async (req, res) => {
 
   const item = await prisma.conversa.findFirst({
     where: { id, companyId },
-    include: {
-      agent: true,
-      client: true,
-      lead: true,
-      professional: true,
-      mensagens: { orderBy: { createdAt: 'asc' } },
-      company: { select: { whatsappProvider: true } },
-    }
+    include: conversationInclude,
   })
   if (!item) return res.status(404).json(createErrorResponse('Conversa não encontrada', 404))
   res.json(createSuccessResponse(withConversationState(item)))
@@ -204,7 +421,10 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
           rawJson: mediaUrl ? { mediaUrl, mediaType } : undefined,
         },
       })
-      await tx.conversa.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
+      await tx.conversa.update({
+        where: { id: conversation.id },
+        data: { updatedAt: new Date(), lastMessageAt: new Date() },
+      })
       return created
     })
 
@@ -259,7 +479,10 @@ router.post('/:id/templates', auth(), requireModule('conversas'), async (req, re
           rawJson: { templateId, templateName: sent.template.name, parameterValues },
         },
       })
-      await tx.conversa.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
+      await tx.conversa.update({
+        where: { id: conversation.id },
+        data: { updatedAt: new Date(), lastMessageAt: new Date() },
+      })
       return created
     })
 

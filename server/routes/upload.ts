@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Router } from 'express'
@@ -54,6 +55,7 @@ const ALLOWED_MEDIA_TYPES = new Map<string, { extension: string; mediaType: 'ima
   ['audio/mp4', { extension: 'm4a', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
   ['audio/ogg', { extension: 'ogg', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
   ['audio/opus', { extension: 'opus', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+  ['audio/webm', { extension: 'webm', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
 ])
 
 const mediaUpload = multer({
@@ -61,7 +63,7 @@ const mediaUpload = multer({
   fileFilter: (_req, file, cb) => {
     const allowed = ALLOWED_MEDIA_TYPES.has(file.mimetype)
     if (allowed) cb(null, true)
-    else cb(new Error('Formato nao suportado. Envie JPG, PNG, WEBP, GIF, MP4, MP3, M4A, OGG ou OPUS.'))
+    else cb(new Error('Formato nao suportado. Envie imagem, video ou audio compativel.'))
   },
   limits: { fileSize: 16 * 1024 * 1024 },
 })
@@ -81,6 +83,24 @@ function runMediaUpload(req: any, res: any, next: any) {
 function getPublicAppUrl(req: any) {
   const configuredUrl = String(process.env.PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
   return configuredUrl || `${req.protocol}://${req.get('host')}`
+}
+
+function convertRecordedAudio(inputPath: string, outputPath: string) {
+  return new Promise<void>((resolve, reject) => {
+    const process = spawn('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error', '-y',
+      '-i', inputPath,
+      '-vn', '-c:a', 'libopus', '-b:a', '32k',
+      outputPath,
+    ])
+    let errorOutput = ''
+    process.stderr.on('data', (chunk) => { errorOutput += String(chunk) })
+    process.on('error', reject)
+    process.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(errorOutput.trim() || `ffmpeg encerrou com codigo ${code}`))
+    })
+  })
 }
 
 async function persistMedia(req: any, res: any) {
@@ -105,16 +125,37 @@ async function persistMedia(req: any, res: any) {
 
     const relativeDirectory = path.posix.join('media', String(companyId))
     const uploadDirectory = path.join(process.cwd(), 'uploads', ...relativeDirectory.split('/'))
-    const storedFilename = `${randomUUID()}.${mediaConfig.extension}`
+    const mediaId = randomUUID()
+    let storedFilename = `${mediaId}.${mediaConfig.extension}`
+    let storedMimetype = req.file.mimetype
+    let storedSize = req.file.size
     await fs.mkdir(uploadDirectory, { recursive: true })
-    await fs.writeFile(path.join(uploadDirectory, storedFilename), req.file.buffer, { flag: 'wx' })
+    const initialPath = path.join(uploadDirectory, storedFilename)
+    await fs.writeFile(initialPath, req.file.buffer, { flag: 'wx' })
+
+    if (req.file.mimetype === 'audio/webm') {
+      const convertedFilename = `${mediaId}.ogg`
+      const convertedPath = path.join(uploadDirectory, convertedFilename)
+      try {
+        await convertRecordedAudio(initialPath, convertedPath)
+        const converted = await fs.stat(convertedPath)
+        await fs.unlink(initialPath)
+        storedFilename = convertedFilename
+        storedMimetype = 'audio/ogg'
+        storedSize = converted.size
+      } catch (error) {
+        await fs.unlink(initialPath).catch(() => undefined)
+        await fs.unlink(convertedPath).catch(() => undefined)
+        throw new Error(`Nao foi possivel preparar o audio gravado: ${error instanceof Error ? error.message : 'falha na conversao'}`)
+      }
+    }
 
     const publicPath = `/uploads/${relativeDirectory}/${storedFilename}`
     const publicUrl = `${getPublicAppUrl(req)}${publicPath}`
     console.info('[upload-media] Arquivo salvo', {
       companyId,
       mediaType: mediaConfig.mediaType,
-      size: req.file.size,
+      size: storedSize,
       publicPath,
     })
 
@@ -123,8 +164,8 @@ async function persistMedia(req: any, res: any) {
       publicPath,
       filename: storedFilename,
       originalName: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
+      size: storedSize,
+      mimetype: storedMimetype,
       mediaType: mediaConfig.mediaType,
     }))
   } catch (error) {

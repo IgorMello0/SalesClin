@@ -940,7 +940,14 @@ export const whatsappUazapiApi = {
 }
 
 export const conversationsApi = {
-  list: async () => apiRequest<any[]>('/conversas?page=1&pageSize=100'),
+  list: async (filters?: { status?: string; assignment?: string; labelId?: number }) => {
+    const query = new URLSearchParams({ page: '1', pageSize: '100' })
+    if (filters?.status) query.set('status', filters.status)
+    if (filters?.assignment) query.set('assignment', filters.assignment)
+    if (filters?.labelId) query.set('labelId', String(filters.labelId))
+    return apiRequest<any[]>(`/conversas?${query.toString()}`)
+  },
+  workspace: async () => apiRequest<any>('/conversas/workspace'),
   getById: async (id: number) => apiRequest<any>(`/conversas/${id}`),
   sendMessage: async (id: number, content: string, media?: { url: string; type: 'image' | 'video' | 'audio' }) => apiRequest<any>(`/conversas/${id}/messages`, {
     method: 'POST',
@@ -952,6 +959,20 @@ export const conversationsApi = {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
+  markRead: async (id: number) => apiRequest<any>(`/conversas/${id}/read`, { method: 'POST' }),
+  setStatus: async (id: number, status: 'OPEN' | 'PENDING' | 'RESOLVED') =>
+    apiRequest<any>(`/conversas/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+  assign: async (id: number, data: { assigneeType: 'professional' | 'user' | null; assigneeId?: number | null }) =>
+    apiRequest<any>(`/conversas/${id}/assign`, { method: 'POST', body: JSON.stringify(data) }),
+  listNotes: async (id: number) => apiRequest<any[]>(`/conversas/${id}/notes`),
+  addNote: async (id: number, content: string) =>
+    apiRequest<any>(`/conversas/${id}/notes`, { method: 'POST', body: JSON.stringify({ content }) }),
+  createLabel: async (data: { name: string; color: string }) =>
+    apiRequest<any>('/conversas/labels', { method: 'POST', body: JSON.stringify(data) }),
+  addLabel: async (id: number, labelId: number) =>
+    apiRequest<any>(`/conversas/${id}/labels`, { method: 'POST', body: JSON.stringify({ labelId }) }),
+  removeLabel: async (id: number, labelId: number) =>
+    apiRequest<any>(`/conversas/${id}/labels/${labelId}`, { method: 'DELETE' }),
 }
 
 export const aiAgentsApi = {
