@@ -75,9 +75,15 @@ export async function triggerCadenceForLead(
         }
       }
 
-      // Adiciona o intervalo configurado (em minutos)
-      const intervalMinutes = step.intervalMinutes ? Number(step.intervalMinutes) : 0;
-      dueDate.setMinutes(dueDate.getMinutes() + intervalMinutes);
+      // Adiciona o intervalo configurado (em minutos ou horas)
+      const intervalType = step.intervalType || 'minutes';
+      const intervalValue = step.intervalValue ?? step.intervalMinutes ?? 0;
+      
+      if (intervalType === 'hours') {
+        dueDate.setHours(dueDate.getHours() + Number(intervalValue));
+      } else {
+        dueDate.setMinutes(dueDate.getMinutes() + Number(intervalValue));
+      }
 
       // Salva a data base para a próxima tarefa do mesmo dia
       baseDatePerDay.set(day, new Date(dueDate.getTime()));

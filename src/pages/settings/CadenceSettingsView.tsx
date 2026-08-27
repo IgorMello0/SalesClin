@@ -94,7 +94,7 @@ export default function CadenceSettingsView() {
 
   const addStep = (day: number = 1) => {
     setConfig(prev => {
-      const newSteps = [...prev.steps, { id: Date.now().toString(), method: 'call', day, intervalMinutes: 0, title: 'Nova Ação', template: '' }];
+      const newSteps = [...prev.steps, { id: Date.now().toString(), method: 'call', day, intervalValue: 0, intervalType: 'minutes', title: 'Nova Ação', template: '' }];
       newSteps.sort((a, b) => (a.day || 1) - (b.day || 1));
       return { ...prev, steps: newSteps };
     });
@@ -175,9 +175,7 @@ export default function CadenceSettingsView() {
             <Label>Funil de Vendas</Label>
             <Select value={selectedFunnel} onValueChange={setSelectedFunnel}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o funil...">
-                  {funnels.find(f => (f.code || f.id.toString()) === selectedFunnel)?.label}
-                </SelectValue>
+                <SelectValue placeholder="Selecione o funil..." />
               </SelectTrigger>
               <SelectContent>
                 {funnels.map(f => (
@@ -191,9 +189,7 @@ export default function CadenceSettingsView() {
             <Label>Etapa do Funil</Label>
             <Select value={selectedStage} onValueChange={setSelectedStage} disabled={!selectedFunnel}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione a etapa...">
-                  {stages.find((s: any) => s.code === selectedStage)?.label}
-                </SelectValue>
+                <SelectValue placeholder="Selecione a etapa..." />
               </SelectTrigger>
               <SelectContent>
                 {stages.map((s: any) => (
@@ -267,14 +263,29 @@ export default function CadenceSettingsView() {
                               onChange={e => updateStep(step.originalIndex, 'day', Number(e.target.value))} 
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Espera (minutos)</Label>
-                            <Input 
-                              type="number" 
-                              min="0"
-                              value={step.intervalMinutes || 0} 
-                              onChange={e => updateStep(step.originalIndex, 'intervalMinutes', Number(e.target.value))} 
-                            />
+                          <div className="space-y-2 md:col-span-2">
+                            <Label>Espera (após ação anterior)</Label>
+                            <div className="flex gap-2">
+                              <Input 
+                                type="number" 
+                                min="0"
+                                className="w-24"
+                                value={step.intervalValue ?? (step.intervalMinutes || 0)} 
+                                onChange={e => updateStep(step.originalIndex, 'intervalValue', Number(e.target.value))} 
+                              />
+                              <Select 
+                                value={step.intervalType || 'minutes'} 
+                                onValueChange={v => updateStep(step.originalIndex, 'intervalType', v)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="minutes">Minutos</SelectItem>
+                                  <SelectItem value="hours">Horas</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                           <div className="space-y-2">
                             <Label>Título da Tarefa</Label>
@@ -284,13 +295,11 @@ export default function CadenceSettingsView() {
                               placeholder="Ex: Primeira Ligação"
                             />
                           </div>
-                          <div className="space-y-2 md:col-span-2">
+                          <div className="space-y-2">
                             <Label>Canal de Contato</Label>
                             <Select value={step.method} onValueChange={v => updateStep(step.originalIndex, 'method', v)}>
                               <SelectTrigger>
-                                <SelectValue>
-                                  {step.method === 'call' ? 'Ligação' : step.method === 'whatsapp' ? 'WhatsApp' : step.method === 'email' ? 'E-mail' : 'Outro'}
-                                </SelectValue>
+                                <SelectValue placeholder="Selecione o canal..." />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="call"><div className="flex items-center gap-2"><Phone className="h-4 w-4"/> Ligação</div></SelectItem>
