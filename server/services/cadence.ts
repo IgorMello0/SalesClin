@@ -43,23 +43,44 @@ export async function triggerCadenceForLead(
     if (steps.length === 0) return;
 
     // 3. Criar todas as tarefas baseadas no dia configurado
-    const taskPromises = steps.map((step, index) => {
-      const day = step.day !== undefined ? Number(step.day) : 1; // Padrão: Dia 1
+    // Primeiro ordenamos os steps por dia
+    const sortedSteps = [...steps].sort((a, b) => (a.day || 1) - (b.day || 1));
+    const baseDatePerDay = new Map<number, Date>();
 
-      // Calcular a data de vencimento com base no dia (Dia 1 = hoje, Dia 2 = amanhã, etc)
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + (day > 0 ? day - 1 : 0));
-      
-      if (skipWeekends) {
-        const dayOfWeek = dueDate.getDay(); // 0 = Domingo, 6 = Sábado
-        if (dayOfWeek === 6) {
-          dueDate.setDate(dueDate.getDate() + 2); // De Sábado para Segunda
-        } else if (dayOfWeek === 0) {
-          dueDate.setDate(dueDate.getDate() + 1); // De Domingo para Segunda
+    const taskPromises = sortedSteps.map((step, index) => {
+      const day = step.day !== undefined ? Number(step.day) : 1; 
+
+      let dueDate: Date;
+
+      if (baseDatePerDay.has(day)) {
+        // Já existe uma tarefa neste dia, usa a data dela como base
+        dueDate = new Date(baseDatePerDay.get(day)!.getTime());
+      } else {
+        // Primeira tarefa do dia
+        dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + (day > 0 ? day - 1 : 0));
+        
+        if (skipWeekends) {
+          const dayOfWeek = dueDate.getDay(); // 0 = Domingo, 6 = Sábado
+          if (dayOfWeek === 6) {
+            dueDate.setDate(dueDate.getDate() + 2); // De Sábado para Segunda
+          } else if (dayOfWeek === 0) {
+            dueDate.setDate(dueDate.getDate() + 1); // De Domingo para Segunda
+          }
+        }
+
+        // Se for um dia futuro, começa às 08:00
+        if (day > 1) {
+          dueDate.setHours(8, 0, 0, 0);
         }
       }
 
-      dueDate.setHours(23, 59, 59, 999); // Vence no final do dia
+      // Adiciona o intervalo configurado (em minutos)
+      const intervalMinutes = step.intervalMinutes ? Number(step.intervalMinutes) : 0;
+      dueDate.setMinutes(dueDate.getMinutes() + intervalMinutes);
+
+      // Salva a data base para a próxima tarefa do mesmo dia
+      baseDatePerDay.set(day, new Date(dueDate.getTime()));
 
       return prisma.task.create({
         data: {

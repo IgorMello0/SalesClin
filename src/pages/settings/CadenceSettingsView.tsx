@@ -94,7 +94,7 @@ export default function CadenceSettingsView() {
 
   const addStep = (day: number = 1) => {
     setConfig(prev => {
-      const newSteps = [...prev.steps, { id: Date.now().toString(), method: 'call', day, title: 'Nova Ação', template: '' }];
+      const newSteps = [...prev.steps, { id: Date.now().toString(), method: 'call', day, intervalMinutes: 0, title: 'Nova Ação', template: '' }];
       newSteps.sort((a, b) => (a.day || 1) - (b.day || 1));
       return { ...prev, steps: newSteps };
     });
@@ -250,14 +250,14 @@ export default function CadenceSettingsView() {
 
                     {groupedSteps[day].map((step, idx) => (
                       <div key={step.id || step.originalIndex} className="border rounded-md p-4 bg-white shadow-sm flex flex-col gap-4">
-                        <div className="flex justify-between items-center mb-[-8px]">
+                        <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
                           <Badge variant="outline" className="bg-slate-100 text-slate-500">Ação {idx + 1}</Badge>
                           <Button variant="ghost" size="icon" onClick={() => removeStep(step.originalIndex)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
                             <Trash className="h-4 w-4" />
                           </Button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                           <div className="space-y-2">
                             <Label>Dia de Execução</Label>
                             <Input 
@@ -265,6 +265,15 @@ export default function CadenceSettingsView() {
                               min="1"
                               value={step.day !== undefined ? step.day : 1} 
                               onChange={e => updateStep(step.originalIndex, 'day', Number(e.target.value))} 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Espera (minutos)</Label>
+                            <Input 
+                              type="number" 
+                              min="0"
+                              value={step.intervalMinutes || 0} 
+                              onChange={e => updateStep(step.originalIndex, 'intervalMinutes', Number(e.target.value))} 
                             />
                           </div>
                           <div className="space-y-2">
