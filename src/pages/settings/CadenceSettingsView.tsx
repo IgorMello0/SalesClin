@@ -278,7 +278,9 @@ export default function CadenceSettingsView() {
                                 onValueChange={v => updateStep(step.originalIndex, 'intervalType', v)}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Tipo" />
+                                  <SelectValue placeholder="Tipo">
+                                    {step.intervalType === 'hours' ? 'Horas' : 'Minutos'}
+                                  </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="minutes">Minutos</SelectItem>
