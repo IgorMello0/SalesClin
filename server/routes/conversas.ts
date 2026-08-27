@@ -351,14 +351,34 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
         return res.status(409).json(createErrorResponse('WhatsApp nao conectado nesta clinica', 409))
       }
 
-      const result = await sendUazapiRequest({
-        baseUrl,
-        token: conversation.company.uazapiToken,
-        path: mediaUrl ? '/send/media' : '/send/text',
-        body: mediaUrl
-          ? { number: phone, type: mediaType, file: mediaUrl, text: content }
-          : { number: phone, text: content, linkPreview: false },
-      })
+      let result
+      if (mediaUrl) {
+        const mediaAttempts = mediaType === 'audio'
+          ? [
+              { number: phone, type: 'audio', file: mediaUrl, mimetype: 'audio/ogg' },
+              { number: phone, type: 'audio', audio: mediaUrl, mimetype: 'audio/ogg' },
+              { number: phone, mediatype: 'audio', media: mediaUrl, mimetype: 'audio/ogg' },
+            ]
+          : [{ number: phone, type: mediaType, file: mediaUrl, text: content }]
+
+        for (const body of mediaAttempts) {
+          result = await sendUazapiRequest({
+            baseUrl,
+            token: conversation.company.uazapiToken,
+            path: '/send/media',
+            body,
+          })
+          if (result.response.ok) break
+        }
+      } else {
+        result = await sendUazapiRequest({
+          baseUrl,
+          token: conversation.company.uazapiToken,
+          path: '/send/text',
+          body: { number: phone, text: content, linkPreview: false },
+        })
+      }
+
       if (!result.response.ok) {
         const message = result.data?.message || result.data?.error || result.text || `HTTP ${result.response.status}`
         return res.status(502).json(createErrorResponse(`Falha ao enviar pelo WhatsApp: ${String(message).replace(/UAZAPI/gi, 'servico')}`, 502))

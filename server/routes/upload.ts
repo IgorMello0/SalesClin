@@ -90,7 +90,7 @@ function convertRecordedAudio(inputPath: string, outputPath: string) {
     const process = spawn('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y',
       '-i', inputPath,
-      '-vn', '-c:a', 'libopus', '-b:a', '32k',
+      '-vn', '-c:a', 'libopus', '-b:a', '32k', '-ac', '1', '-ar', '16000', '-application', 'voip',
       outputPath,
     ])
     let errorOutput = ''

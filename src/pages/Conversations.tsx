@@ -71,6 +71,19 @@ type PreviewImage = { url: string; alt: string };
 
 const EMOJIS = ['😀', '😊', '😂', '😍', '🙏', '👍', '👏', '🎉', '❤️', '✅', '📅', '🦷', '💬', '✨', '🚀', '😉'];
 
+const CONVERSATION_FILTER_LABELS: Record<string, string> = {
+  all: 'Todas as conversas',
+  in_progress: 'Em andamento',
+  converted: 'Convertidas',
+};
+
+const STATUS_FILTER_LABELS: Record<string, string> = {
+  all: 'Todos os status',
+  OPEN: 'Abertas',
+  PENDING: 'Pendentes',
+  RESOLVED: 'Resolvidas',
+};
+
 function contactName(conversation: Conversation) {
   return conversation.client?.name || conversation.lead?.name || conversation.phone || 'Contato WhatsApp';
 }
@@ -551,18 +564,20 @@ const Conversations = () => {
             <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input placeholder="Buscar por nome ou telefone" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} className="h-9 bg-white pl-9" /></div>
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="h-9 bg-white text-xs font-semibold">
-                <SelectValue>
-                  {filter === 'all' ? 'Todas as conversas' : filter === 'in_progress' ? 'Em andamento' : 'Convertidas'}
-                </SelectValue>
+                <span className="truncate">{CONVERSATION_FILTER_LABELS[filter] || 'Todas as conversas'}</span>
               </SelectTrigger>
               <SelectContent><SelectItem value="all">Todas as conversas</SelectItem><SelectItem value="in_progress">Em andamento</SelectItem><SelectItem value="converted">Convertidas</SelectItem></SelectContent></Select>
             <div className="grid grid-cols-2 gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 bg-white text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="h-9 bg-white text-xs">
+                  <span className="truncate">{STATUS_FILTER_LABELS[statusFilter] || 'Status'}</span>
+                </SelectTrigger>
                 <SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="OPEN">Abertas</SelectItem><SelectItem value="PENDING">Pendentes</SelectItem><SelectItem value="RESOLVED">Resolvidas</SelectItem></SelectContent>
               </Select>
               <Select value={labelFilter} onValueChange={setLabelFilter}>
-                <SelectTrigger className="h-9 bg-white text-xs"><SelectValue placeholder="Etiqueta" /></SelectTrigger>
+                <SelectTrigger className="h-9 bg-white text-xs">
+                  <span className="truncate">{labelFilter === 'all' ? 'Todas etiquetas' : workspace.labels.find(label => String(label.id) === labelFilter)?.name || 'Etiqueta'}</span>
+                </SelectTrigger>
                 <SelectContent><SelectItem value="all">Todas etiquetas</SelectItem>{workspace.labels.map((label) => <SelectItem key={label.id} value={String(label.id)}>{label.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
