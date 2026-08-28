@@ -35,6 +35,66 @@ function normalizePhone(value?: string | null) {
 
 const META_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000
 
+function getMimeTypeFromUrl(url: string, mediaType: string) {
+  const cleanUrl = url.split('?')[0]?.toLowerCase() || ''
+  if (cleanUrl.endsWith('.ogg')) return 'audio/ogg'
+  if (cleanUrl.endsWith('.opus')) return 'audio/ogg'
+  if (cleanUrl.endsWith('.mp3')) return 'audio/mpeg'
+  if (cleanUrl.endsWith('.m4a')) return 'audio/mp4'
+  if (cleanUrl.endsWith('.mp4')) return mediaType === 'audio' ? 'audio/mp4' : 'video/mp4'
+  if (cleanUrl.endsWith('.3gp')) return 'video/3gpp'
+  if (cleanUrl.endsWith('.webp')) return 'image/webp'
+  if (cleanUrl.endsWith('.png')) return 'image/png'
+  if (cleanUrl.endsWith('.gif')) return 'image/gif'
+  if (cleanUrl.endsWith('.jpg') || cleanUrl.endsWith('.jpeg')) return 'image/jpeg'
+  if (mediaType === 'audio') return 'audio/ogg'
+  if (mediaType === 'video') return 'video/mp4'
+  return 'image/jpeg'
+}
+
+function getFileNameFromUrl(url: string, mediaType: string) {
+  const pathname = new URL(url).pathname
+  const filename = pathname.split('/').filter(Boolean).pop()
+  if (filename && filename.includes('.')) return filename
+  if (mediaType === 'audio') return 'audio.ogg'
+  if (mediaType === 'video') return 'video.mp4'
+  return 'imagem.jpg'
+}
+
+async function uploadMetaMediaFromUrl(input: {
+  phoneNumberId: string
+  token: string
+  mediaUrl: string
+  mediaType: string
+}) {
+  const source = await fetch(input.mediaUrl)
+  if (!source.ok) {
+    throw new Error(`Nao foi possivel ler a midia publica (${source.status}).`)
+  }
+
+  const contentType = input.mediaType === 'audio'
+    ? 'audio/ogg'
+    : source.headers.get('content-type')?.split(';')[0]?.trim()
+      || getMimeTypeFromUrl(input.mediaUrl, input.mediaType)
+  const buffer = await source.arrayBuffer()
+  const form = new FormData()
+  form.set('messaging_product', 'whatsapp')
+  form.set('type', contentType)
+  form.set('file', new Blob([Buffer.from(buffer) as any], { type: contentType }), getFileNameFromUrl(input.mediaUrl, input.mediaType))
+
+  const response = await fetch(`https://graph.facebook.com/v19.0/${input.phoneNumberId}/media`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${input.token}` },
+    body: form,
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload?.id) {
+    throw new Error(payload?.error?.message || `Meta media upload HTTP ${response.status}`)
+  }
+
+  return String(payload.id)
+}
+
 function getMetaWindow(messages: Array<{ sender: string; createdAt: Date }>, provider?: string | null) {
   if (provider !== 'meta') return { isOfficial: false, isOpen: true, expiresAt: null, remainingSeconds: null }
   const lastIncoming = [...messages].reverse().find((message) => message.sender === 'cliente')
@@ -403,16 +463,40 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
         ))
       }
 
+      let uploadedMediaId: string | null = null
+      if (mediaUrl) {
+        try {
+          uploadedMediaId = await uploadMetaMediaFromUrl({
+            phoneNumberId: conversation.company.metaPhoneNumberId,
+            token: conversation.company.metaToken,
+            mediaUrl,
+            mediaType,
+          })
+        } catch (uploadError) {
+          console.warn('[Conversas] Meta media upload falhou, usando link direto:', uploadError)
+        }
+      }
+
+      const mediaPayload = mediaUrl
+        ? {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: phone,
+            type: mediaType,
+            [mediaType]: {
+              ...(uploadedMediaId ? { id: uploadedMediaId } : { link: mediaUrl }),
+              ...(content && mediaType !== 'audio' ? { caption: content } : {}),
+            },
+          }
+        : null
+
       const response = await fetch(`https://graph.facebook.com/v19.0/${conversation.company.metaPhoneNumberId}/messages`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${conversation.company.metaToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(mediaUrl ? {
-          messaging_product: 'whatsapp', recipient_type: 'individual', to: phone, type: mediaType,
-          [mediaType]: { link: mediaUrl, ...(content && mediaType !== 'audio' ? { caption: content } : {}) },
-        } : {
+        body: JSON.stringify(mediaPayload || {
           messaging_product: 'whatsapp', recipient_type: 'individual', to: phone, type: 'text',
           text: { preview_url: false, body: content },
         }),

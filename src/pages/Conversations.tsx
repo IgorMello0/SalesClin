@@ -649,7 +649,25 @@ const Conversations = () => {
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'video' && <video src={message.rawJson.mediaUrl} controls className="max-h-72 w-full" />}
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'audio' && <audio src={message.rawJson.mediaUrl} controls className="m-2 max-w-[260px]" />}
                       {message.content && !/^\[(image|video|audio)\]$/.test(message.content) && <p className="px-4 py-2.5">{message.content}</p>}
-                    </div><p className={`mt-1 text-[10px] text-slate-400 ${incoming ? 'text-left' : 'text-right'}`}>{!incoming && <span className={`mr-1 font-bold ${message.deliveryStatus === 'failed' ? 'text-red-600' : 'text-sky-600'}`}>{message.sender === 'bot' ? 'IA' : 'Voce'}{message.deliveryStatus ? ` · ${message.deliveryStatus === 'read' ? 'lida' : message.deliveryStatus === 'delivered' ? 'entregue' : message.deliveryStatus === 'failed' ? 'falhou' : 'enviada'}` : ''}</span>}{format(messageDate(message), 'HH:mm')}</p></div></div>
+                    </div>
+                      <p className={`mt-1 text-[10px] text-slate-400 ${incoming ? 'text-left' : 'text-right'}`}>
+                        {!incoming && (
+                          <span
+                            title={message.deliveryStatus === 'failed' ? message.errorMessage || undefined : undefined}
+                            className={`mr-1 font-bold ${message.deliveryStatus === 'failed' ? 'text-red-600' : 'text-sky-600'}`}
+                          >
+                            {message.sender === 'bot' ? 'IA' : 'Voce'}
+                            {message.deliveryStatus ? ` · ${message.deliveryStatus === 'read' ? 'lida' : message.deliveryStatus === 'delivered' ? 'entregue' : message.deliveryStatus === 'failed' ? 'falhou' : 'enviada'}` : ''}
+                          </span>
+                        )}
+                        {format(messageDate(message), 'HH:mm')}
+                      </p>
+                      {!incoming && message.deliveryStatus === 'failed' && message.errorMessage && (
+                        <p className="mt-1 max-w-[260px] truncate text-right text-[10px] font-semibold text-red-600" title={message.errorMessage}>
+                          {message.errorMessage}
+                        </p>
+                      )}
+                    </div></div>
                   </div>
                 );
               })}
