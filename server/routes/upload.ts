@@ -83,7 +83,7 @@ const mediaUpload = multer({
     if (allowed) cb(null, true)
     else cb(new Error('Formato nao suportado. Envie imagem, video ou audio compativel.'))
   },
-  // Audio from the browser can be large before FFmpeg converts it to WhatsApp-friendly Opus.
+  // Audio from the browser can be large before FFmpeg converts it to WhatsApp-friendly AAC.
   limits: { fileSize: MAX_MEDIA_SOURCE_BYTES },
 })
 
@@ -109,7 +109,8 @@ function convertAudioForWhatsApp(inputPath: string, outputPath: string) {
     const process = spawn('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y',
       '-i', inputPath,
-      '-vn', '-c:a', 'libopus', '-b:a', '32k', '-ac', '1', '-ar', '16000', '-application', 'voip',
+      '-vn', '-c:a', 'aac', '-b:a', '96k', '-ac', '1', '-ar', '44100',
+      '-movflags', '+faststart', '-f', 'mp4',
       outputPath,
     ])
     let errorOutput = ''
@@ -180,7 +181,7 @@ async function persistMedia(req: any, res: any) {
     await fs.writeFile(initialPath, req.file.buffer, { flag: 'wx' })
 
     if (needsAudioConversion) {
-      const convertedFilename = `${mediaId}.ogg`
+      const convertedFilename = `${mediaId}.m4a`
       const convertedPath = path.join(uploadDirectory, convertedFilename)
       try {
         await convertAudioForWhatsApp(initialPath, convertedPath)
@@ -192,7 +193,7 @@ async function persistMedia(req: any, res: any) {
           return res.status(413).json(createErrorResponse(`O audio compactado excede o limite final de ${maxMb} MB. Grave uma mensagem menor.`, 413))
         }
         storedFilename = convertedFilename
-        storedMimetype = 'audio/ogg; codecs=opus'
+        storedMimetype = 'audio/mp4'
         storedSize = converted.size
       } catch (error) {
         await fs.unlink(initialPath).catch(() => undefined)

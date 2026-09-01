@@ -49,7 +49,7 @@ function getMimeTypeFromUrl(url: string, mediaType: string) {
   if (cleanUrl.endsWith('.png')) return 'image/png'
   if (cleanUrl.endsWith('.gif')) return 'image/gif'
   if (cleanUrl.endsWith('.jpg') || cleanUrl.endsWith('.jpeg')) return 'image/jpeg'
-  if (mediaType === 'audio') return 'audio/ogg; codecs=opus'
+  if (mediaType === 'audio') return 'audio/mp4'
   if (mediaType === 'video') return 'video/mp4'
   return 'image/jpeg'
 }
@@ -58,7 +58,7 @@ function getFileNameFromUrl(url: string, mediaType: string) {
   const pathname = new URL(url).pathname
   const filename = pathname.split('/').filter(Boolean).pop()
   if (filename && filename.includes('.')) return filename
-  if (mediaType === 'audio') return 'audio.ogg'
+  if (mediaType === 'audio') return 'audio.m4a'
   if (mediaType === 'video') return 'video.mp4'
   return 'imagem.jpg'
 }
@@ -110,9 +110,7 @@ async function uploadMetaMediaFromUrl(input: {
   mediaType: string
 }) {
   const media = await readMediaForProvider(input.mediaUrl, input.mediaType)
-  const contentType = input.mediaType === 'audio'
-    ? 'audio/ogg; codecs=opus'
-    : media.contentType
+  const contentType = media.contentType
   const form = new FormData()
   form.set('messaging_product', 'whatsapp')
   form.set('type', contentType)
