@@ -128,7 +128,7 @@ function convertVideoForWhatsApp(inputPath: string, outputPath: string) {
     const process = spawn('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y',
       '-i', inputPath,
-      '-vf', 'scale=trunc(min(1280,iw)/2)*2:trunc(min(1280,ih)/2)*2:force_original_aspect_ratio=decrease',
+      '-vf', 'scale=w=1280:h=1280:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1',
       '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.1', '-pix_fmt', 'yuv420p',
       '-preset', 'veryfast', '-crf', '28',
       '-c:a', 'aac', '-b:a', '96k', '-ac', '2',
