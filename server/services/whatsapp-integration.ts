@@ -1221,6 +1221,8 @@ type PersistWhatsAppMessageOptions = {
   mediaUrl?: string | null
   mediaType?: IncomingMediaType | null
   providerMediaType?: string | null
+  messageAt?: Date | null
+  avatarUrl?: string | null
 }
 
 async function persistWhatsAppMessage(
@@ -1230,9 +1232,10 @@ async function persistWhatsAppMessage(
 ) {
   const {
     companyId, ownerId, phone, pushName, messageText, rawPayload, origin, providerMessageId, mediaUrl, mediaType,
-    providerMediaType,
+    providerMediaType, messageAt, avatarUrl,
   } = opts
   const isIncoming = sender === 'cliente'
+  const occurredAt = messageAt || new Date()
 
   if (!ownerId) {
     console.warn(`[Webhook] Empresa #${companyId} sem ownerId. Ignorando.`)
@@ -1252,6 +1255,7 @@ async function persistWhatsAppMessage(
         companyId,
         name: pushName || 'Contato WhatsApp',
         phone,
+        avatar: avatarUrl || null,
         status: 'prospect_lead',
         origin,
         notes: messageText ? `Primeira mensagem: ${messageText}` : null,
@@ -1277,9 +1281,9 @@ async function persistWhatsAppMessage(
         phone,
         app: 'whatsapp',
         channel: origin,
-        startedAt: new Date(),
-        lastMessageAt: new Date(),
-        lastInboundAt: isIncoming ? new Date() : null,
+        startedAt: occurredAt,
+        lastMessageAt: occurredAt,
+        lastInboundAt: isIncoming ? occurredAt : null,
         unreadCount: 0,
       },
     })
@@ -1317,6 +1321,8 @@ async function persistWhatsAppMessage(
         }
         : rawPayload,
       origin,
+      ...(sender === 'profissional' ? { deliveryStatus: 'sent', sentAt: occurredAt } : {}),
+      ...(messageAt ? { createdAt: occurredAt } : {}),
     },
   })
 
@@ -1324,9 +1330,9 @@ async function persistWhatsAppMessage(
     where: { id: conversa.id },
     data: {
       updatedAt: new Date(),
-      lastMessageAt: new Date(),
+      lastMessageAt: occurredAt,
       ...(isIncoming ? {
-        lastInboundAt: new Date(),
+        lastInboundAt: occurredAt,
         unreadCount: { increment: 1 },
       } : {}),
       status: 'OPEN',
@@ -1362,6 +1368,62 @@ export async function processOutgoingMessage(
   db: WhatsAppPersistence = prisma,
 ) {
   return persistWhatsAppMessage(opts, 'profissional', db)
+}
+
+function getMetaTimestamp(value: any) {
+  const timestamp = Number(value?.timestamp || 0)
+  return timestamp > 0 ? new Date(timestamp * 1000) : null
+}
+
+function getMetaText(value: any) {
+  return value?.text?.body
+    || value?.image?.caption
+    || value?.video?.caption
+    || value?.document?.caption
+    || value?.sticker?.caption
+    || value?.button?.text
+    || value?.interactive?.button_reply?.title
+    || value?.interactive?.list_reply?.title
+    || ''
+}
+
+function getMetaEchoPhone(msg: any, contacts: any[]) {
+  const candidates = [
+    msg?.to,
+    msg?.recipient,
+    msg?.recipient_id,
+    msg?.customer?.wa_id,
+    msg?.customer?.phone,
+    msg?.contact?.wa_id,
+    msg?.contact?.phone,
+    msg?.context?.to,
+    msg?.context?.recipient,
+    msg?.context?.recipient_id,
+    contacts?.[0]?.wa_id,
+  ]
+
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    if (typeof candidate === 'object') {
+      const phone = normalizePhone(candidate.wa_id || candidate.phone || candidate.id || '')
+      if (phone) return phone
+      continue
+    }
+    const phone = normalizePhone(candidate)
+    if (phone) return phone
+  }
+
+  return ''
+}
+
+function getMetaContactAvatar(contactInfo: any, msg: any) {
+  return contactInfo?.profile?.picture
+    || contactInfo?.profile?.profile_picture_url
+    || contactInfo?.profile_pic_url
+    || contactInfo?.picture
+    || msg?.profile?.picture
+    || msg?.profile_pic_url
+    || null
 }
 
 export async function handleEvolutionPayload(
@@ -1546,10 +1608,17 @@ export async function handleMetaMessages(
       const metadata = value.metadata || {}
       const phoneNumberId = metadata.phone_number_id || ''
       const messages = isMessageEchoField
-        ? (value.message_echoes || value.smb_message_echoes || value.messages || [])
+        ? (value.message_echoes || value.smb_message_echoes || value.messages || value.echoes || [])
         : (value.messages || [])
       const statuses = isMessageField ? (value.statuses || []) : []
       const contacts = value.contacts || []
+      if (isMessageEchoField) {
+        console.info('[Webhook/Meta] Echo recebido', {
+          phoneNumberId,
+          count: Array.isArray(messages) ? messages.length : 0,
+          keys: Object.keys(value),
+        })
+      }
 
       let empresa = empresaOverride
       if (!empresa) {
@@ -1610,21 +1679,15 @@ export async function handleMetaMessages(
       for (const msg of messages) {
         if (msg.type === 'status') continue
 
-        const outgoingPhone = normalizePhone(
-          msg.to
-          || msg.recipient
-          || msg.recipient_id
-          || msg.context?.to
-          || msg.context?.recipient
-          || contacts[0]?.wa_id
-          || '',
-        )
+        const outgoingPhone = getMetaEchoPhone(msg, contacts)
         const incomingPhone = normalizePhone(msg.from || '')
         const phone = isMessageEchoField ? outgoingPhone : incomingPhone
         if (!phone) {
           console.warn('[Webhook/Meta] Mensagem sem telefone de contato.', {
             field: change.field,
             messageId: msg.id || null,
+            messageKeys: Object.keys(msg || {}),
+            contacts,
           })
           summary.ignored += 1
           continue
@@ -1646,11 +1709,8 @@ export async function handleMetaMessages(
         try {
           const contactInfo = contacts.find((contact: any) => normalizePhone(contact.wa_id) === phone)
           const pushName = contactInfo?.profile?.name || ''
-          const messageText = msg.text?.body
-            || msg.image?.caption
-            || msg.video?.caption
-            || msg.sticker?.caption
-            || ''
+          const avatarUrl = getMetaContactAvatar(contactInfo, msg)
+          const messageText = getMetaText(msg)
           const mediaDescriptor = getMetaMediaDescriptor(msg)
           const attachment = mediaDescriptor
             ? await (dependencies.resolveMedia || resolveMetaMedia)({
@@ -1672,6 +1732,8 @@ export async function handleMetaMessages(
             mediaUrl: attachment?.mediaUrl || null,
             mediaType: attachment?.mediaType || null,
             providerMediaType: mediaDescriptor?.providerMediaType || null,
+            messageAt: getMetaTimestamp(msg),
+            avatarUrl,
           }, db)
           if (result.action === 'ignored') {
             throw new Error(`Mensagem ignorada: ${result.reason || 'motivo desconhecido'}.`)

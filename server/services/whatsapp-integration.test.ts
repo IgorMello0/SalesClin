@@ -120,6 +120,30 @@ function metaInboundPayload(messageId: string, text: string) {
   }
 }
 
+function metaInboundPayloadWithAvatar(messageId: string, text: string) {
+  return {
+    entry: [{
+      changes: [{
+        field: 'messages',
+        value: {
+          metadata: { phone_number_id: 'meta-phone-1' },
+          contacts: [{
+            wa_id: '5511999990001',
+            profile: { name: 'Lead Meta', picture: 'https://cdn.test/avatar.jpg' },
+          }],
+          messages: [{
+            id: messageId,
+            from: '5511999990001',
+            timestamp: '1784246400',
+            type: 'text',
+            text: { body: text },
+          }],
+        },
+      }],
+    }],
+  }
+}
+
 function metaInboundImagePayload(messageId: string) {
   return {
     entry: [{
@@ -176,6 +200,26 @@ function metaMessageEchoPayload(messageId: string) {
             timestamp: '1784246400',
             type: 'text',
             text: { body: 'Mensagem enviada pelo celular' },
+          }],
+        },
+      }],
+    }],
+  }
+}
+
+function metaMessageEchoRecipientPayload(messageId: string) {
+  return {
+    entry: [{
+      changes: [{
+        field: 'smb_message_echoes',
+        value: {
+          metadata: { phone_number_id: 'meta-phone-1' },
+          message_echoes: [{
+            id: messageId,
+            recipient_id: '5511999990001',
+            timestamp: '1784246400',
+            type: 'text',
+            text: { body: 'Mensagem enviada pelo celular via recipient_id' },
           }],
         },
       }],
@@ -319,7 +363,37 @@ test('Coexistencia salva mensagem enviada pelo celular apenas uma vez', async ()
   assert.equal(state.messages.length, 1)
   assert.equal(state.messages[0].sender, 'profissional')
   assert.equal(state.messages[0].content, 'Mensagem enviada pelo celular')
+  assert.equal(state.messages[0].deliveryStatus, 'sent')
+  assert.ok(state.messages[0].sentAt instanceof Date)
   assert.equal(state.activities.length, 0)
+})
+
+test('Coexistencia salva mensagem enviada pelo celular com recipient_id', async () => {
+  const { db, state } = createFakeDatabase()
+  const payload = metaMessageEchoRecipientPayload('wamid.coexistence-echo-recipient-1')
+  const company = { id: 8, ownerId: 21, name: 'Clinica Coexistencia' }
+
+  await handleMetaMessages(payload, company, db)
+
+  assert.equal(state.leads.length, 1)
+  assert.equal(state.leads[0].phone, '5511999990001')
+  assert.equal(state.messages.length, 1)
+  assert.equal(state.messages[0].sender, 'profissional')
+  assert.equal(state.messages[0].content, 'Mensagem enviada pelo celular via recipient_id')
+  assert.equal(state.messages[0].deliveryStatus, 'sent')
+})
+
+test('WhatsApp Oficial salva avatar quando o payload do contato traz foto', async () => {
+  const { db, state } = createFakeDatabase()
+
+  await handleMetaMessages(
+    metaInboundPayloadWithAvatar('wamid.official-avatar-1', 'Oi'),
+    { id: 5, ownerId: 10, name: 'Clinica Oficial' },
+    db,
+  )
+
+  assert.equal(state.leads.length, 1)
+  assert.equal(state.leads[0].avatar, 'https://cdn.test/avatar.jpg')
 })
 
 test('Coexistencia tenta novamente um webhook que falhou antes de salvar a mensagem', async () => {
