@@ -49,7 +49,7 @@ function getMimeTypeFromUrl(url: string, mediaType: string) {
   if (cleanUrl.endsWith('.png')) return 'image/png'
   if (cleanUrl.endsWith('.gif')) return 'image/gif'
   if (cleanUrl.endsWith('.jpg') || cleanUrl.endsWith('.jpeg')) return 'image/jpeg'
-  if (mediaType === 'audio') return 'audio/mp4'
+  if (mediaType === 'audio') return 'audio/mpeg'
   if (mediaType === 'video') return 'video/mp4'
   return 'image/jpeg'
 }
@@ -58,7 +58,7 @@ function getFileNameFromUrl(url: string, mediaType: string) {
   const pathname = new URL(url).pathname
   const filename = pathname.split('/').filter(Boolean).pop()
   if (filename && filename.includes('.')) return filename
-  if (mediaType === 'audio') return 'audio.m4a'
+  if (mediaType === 'audio') return 'audio.mp3'
   if (mediaType === 'video') return 'video.mp4'
   return 'imagem.jpg'
 }
@@ -108,7 +108,7 @@ async function uploadMetaMediaFromUrl(input: {
   token: string
   mediaUrl: string
   mediaType: string
-}) {
+}): Promise<{ id: string; contentType: string; filename: string; size: number; source: string }> {
   const media = await readMediaForProvider(input.mediaUrl, input.mediaType)
   const contentType = media.contentType
   const form = new FormData()
@@ -141,7 +141,13 @@ async function uploadMetaMediaFromUrl(input: {
     throw new Error(payload?.error?.message || `Meta media upload HTTP ${response.status}`)
   }
 
-  return String(payload.id)
+  return {
+    id: String(payload.id),
+    contentType,
+    filename: media.filename,
+    size: media.buffer.length,
+    source: media.source,
+  }
 }
 
 function getMetaWindow(messages: Array<{ sender: string; createdAt: Date }>, provider?: string | null) {
@@ -453,6 +459,7 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
     const provider = conversation.company.whatsappProvider
     let providerMessageId: string | null = null
     let origin = 'WhatsApp'
+    let metaUpload: Awaited<ReturnType<typeof uploadMetaMediaFromUrl>> | null = null
 
     if (provider === 'uazapi') {
       const baseUrl = process.env.UAZAPI_API_URL || process.env.UAZAPI_BASE_URL
@@ -527,10 +534,9 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
         ))
       }
 
-      let uploadedMediaId: string | null = null
       if (mediaUrl) {
         try {
-          uploadedMediaId = await uploadMetaMediaFromUrl({
+          metaUpload = await uploadMetaMediaFromUrl({
             phoneNumberId: conversation.company.metaPhoneNumberId,
             token: conversation.company.metaToken,
             mediaUrl,
@@ -552,7 +558,7 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
             to: phone,
             type: mediaType,
             [mediaType]: {
-              ...(uploadedMediaId ? { id: uploadedMediaId } : { link: mediaUrl }),
+              ...(metaUpload ? { id: metaUpload.id } : { link: mediaUrl }),
               ...(content && mediaType !== 'audio' ? { caption: content } : {}),
             },
           }
@@ -575,13 +581,14 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
         console.error('[Conversas] Meta envio falhou', {
           status: response.status,
           mediaType: mediaUrl ? mediaType : 'text',
-          hasUploadedMediaId: Boolean(uploadedMediaId),
+          metaUpload,
           response: payload,
         })
         return res.status(502).json(createErrorResponse(`Meta: ${message}`, 502))
       }
       console.info('[Conversas] Meta envio aceito', {
         mediaType: mediaUrl ? mediaType : 'text',
+        metaUpload,
         providerMessageId: payload?.messages?.[0]?.id || null,
       })
       providerMessageId = payload?.messages?.[0]?.id || null
@@ -600,7 +607,7 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
           origin,
           deliveryStatus: 'sent',
           sentAt: new Date(),
-          rawJson: mediaUrl ? { mediaUrl, mediaType } : undefined,
+          rawJson: mediaUrl ? { mediaUrl, mediaType, metaUpload: metaUpload || undefined } : undefined,
         },
       })
       await tx.conversa.update({

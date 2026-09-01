@@ -1583,11 +1583,15 @@ export async function handleMetaMessages(
 
         try {
           const errorInfo = statusEvent?.errors?.[0]
+          const errorDetails = errorInfo?.error_data?.details || errorInfo?.details || null
+          const errorMessage = [errorInfo?.title || errorInfo?.message || null, errorDetails]
+            .filter(Boolean)
+            .join(': ')
           await updateWhatsAppMessageStatus({
             providerMessageId,
             status,
             errorCode: errorInfo?.code ? String(errorInfo.code) : null,
-            errorMessage: errorInfo?.title || errorInfo?.message || null,
+            errorMessage: errorMessage || null,
             occurredAt: statusEvent?.timestamp
               ? new Date(Number(statusEvent.timestamp) * 1000)
               : new Date(),
