@@ -9,6 +9,15 @@ import { sendMetaTemplateMessage } from '../services/whatsapp-messages.js'
 
 export const router = Router()
 
+type MetaUploadedMedia = {
+  id: string
+  contentType: string
+  filename: string
+  size: number
+  source: string
+  metaInfo?: Record<string, any>
+}
+
 function getCompanyId(req: any) {
   return Number(req.user?.companyId) || null
 }
@@ -103,17 +112,32 @@ async function readMediaForProvider(mediaUrl: string, mediaType: string) {
   }
 }
 
+async function fetchMetaMediaInfo(mediaId: string, token: string) {
+  const response = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    console.warn('[Conversas] Meta media info falhou', {
+      mediaId,
+      status: response.status,
+      response: payload,
+    })
+    return null
+  }
+  return payload
+}
+
 async function uploadMetaMediaFromUrl(input: {
   phoneNumberId: string
   token: string
   mediaUrl: string
   mediaType: string
-}): Promise<{ id: string; contentType: string; filename: string; size: number; source: string }> {
+}): Promise<MetaUploadedMedia> {
   const media = await readMediaForProvider(input.mediaUrl, input.mediaType)
   const contentType = media.contentType
   const form = new FormData()
   form.set('messaging_product', 'whatsapp')
-  form.set('type', contentType)
   form.set('file', new Blob([media.buffer as any], { type: contentType }), media.filename)
 
   console.info('[Conversas] Upload de midia para Meta', {
@@ -131,6 +155,10 @@ async function uploadMetaMediaFromUrl(input: {
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok || !payload?.id) {
+    const errorDetails = payload?.error?.error_data?.details || payload?.error?.details || null
+    const errorMessage = [payload?.error?.message || `Meta media upload HTTP ${response.status}`, errorDetails]
+      .filter(Boolean)
+      .join(': ')
     console.error('[Conversas] Meta media upload falhou', {
       status: response.status,
       mediaType: input.mediaType,
@@ -138,8 +166,15 @@ async function uploadMetaMediaFromUrl(input: {
       filename: media.filename,
       response: payload,
     })
-    throw new Error(payload?.error?.message || `Meta media upload HTTP ${response.status}`)
+    throw new Error(errorMessage)
   }
+
+  const metaInfo = await fetchMetaMediaInfo(String(payload.id), input.token)
+  console.info('[Conversas] Meta media upload confirmado', {
+    mediaId: payload.id,
+    mediaType: input.mediaType,
+    metaInfo,
+  })
 
   return {
     id: String(payload.id),
@@ -147,6 +182,7 @@ async function uploadMetaMediaFromUrl(input: {
     filename: media.filename,
     size: media.buffer.length,
     source: media.source,
+    metaInfo: metaInfo || undefined,
   }
 }
 
@@ -459,7 +495,7 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
     const provider = conversation.company.whatsappProvider
     let providerMessageId: string | null = null
     let origin = 'WhatsApp'
-    let metaUpload: Awaited<ReturnType<typeof uploadMetaMediaFromUrl>> | null = null
+    let metaUpload: MetaUploadedMedia | null = null
 
     if (provider === 'uazapi') {
       const baseUrl = process.env.UAZAPI_API_URL || process.env.UAZAPI_BASE_URL
@@ -558,7 +594,7 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
             to: phone,
             type: mediaType,
             [mediaType]: {
-              ...(metaUpload ? { id: metaUpload.id } : { link: mediaUrl }),
+              id: metaUpload?.id,
               ...(content && mediaType !== 'audio' ? { caption: content } : {}),
             },
           }
