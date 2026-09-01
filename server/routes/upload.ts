@@ -192,7 +192,7 @@ async function persistMedia(req: any, res: any) {
           return res.status(413).json(createErrorResponse(`O audio compactado excede o limite final de ${maxMb} MB. Grave uma mensagem menor.`, 413))
         }
         storedFilename = convertedFilename
-        storedMimetype = 'audio/ogg'
+        storedMimetype = 'audio/ogg; codecs=opus'
         storedSize = converted.size
       } catch (error) {
         await fs.unlink(initialPath).catch(() => undefined)

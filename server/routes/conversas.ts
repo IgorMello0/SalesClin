@@ -39,8 +39,8 @@ const META_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000
 
 function getMimeTypeFromUrl(url: string, mediaType: string) {
   const cleanUrl = url.split('?')[0]?.toLowerCase() || ''
-  if (cleanUrl.endsWith('.ogg')) return 'audio/ogg'
-  if (cleanUrl.endsWith('.opus')) return 'audio/ogg'
+  if (cleanUrl.endsWith('.ogg')) return 'audio/ogg; codecs=opus'
+  if (cleanUrl.endsWith('.opus')) return 'audio/ogg; codecs=opus'
   if (cleanUrl.endsWith('.mp3')) return 'audio/mpeg'
   if (cleanUrl.endsWith('.m4a')) return 'audio/mp4'
   if (cleanUrl.endsWith('.mp4')) return mediaType === 'audio' ? 'audio/mp4' : 'video/mp4'
@@ -49,7 +49,7 @@ function getMimeTypeFromUrl(url: string, mediaType: string) {
   if (cleanUrl.endsWith('.png')) return 'image/png'
   if (cleanUrl.endsWith('.gif')) return 'image/gif'
   if (cleanUrl.endsWith('.jpg') || cleanUrl.endsWith('.jpeg')) return 'image/jpeg'
-  if (mediaType === 'audio') return 'audio/ogg'
+  if (mediaType === 'audio') return 'audio/ogg; codecs=opus'
   if (mediaType === 'video') return 'video/mp4'
   return 'image/jpeg'
 }
@@ -111,7 +111,7 @@ async function uploadMetaMediaFromUrl(input: {
 }) {
   const media = await readMediaForProvider(input.mediaUrl, input.mediaType)
   const contentType = input.mediaType === 'audio'
-    ? 'audio/ogg'
+    ? 'audio/ogg; codecs=opus'
     : media.contentType
   const form = new FormData()
   form.set('messaging_product', 'whatsapp')
