@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { aiAgentsApi, campaignsApi, conversationsApi, whatsappTemplatesApi } from '@/lib/api';
+import { validateMediaUpload } from '@/lib/media-upload';
 import type { WhatsAppTemplate } from '@/components/whatsapp/TemplateCatalog';
 
 type Message = {
@@ -303,13 +304,13 @@ const Conversations = () => {
 
   const selectMedia = (file?: File) => {
     if (!file) return;
-    const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : null;
-    if (!type) {
-      toast({ title: 'Arquivo nao suportado', description: 'Selecione uma imagem, video ou audio.', variant: 'destructive' });
+    const validation = validateMediaUpload(file);
+    if (!validation.type) {
+      toast({ title: 'Arquivo nao suportado', description: validation.error, variant: 'destructive' });
       return;
     }
     clearPendingMedia();
-    setPendingMedia({ file, type, previewUrl: URL.createObjectURL(file) });
+    setPendingMedia({ file, type: validation.type, previewUrl: URL.createObjectURL(file) });
   };
 
   const finishRecording = (cancel = false) => {
@@ -327,7 +328,7 @@ const Conversations = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const preferredType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-      const recorder = new MediaRecorder(stream, { mimeType: preferredType });
+      const recorder = new MediaRecorder(stream, { mimeType: preferredType, audioBitsPerSecond: 32000 });
       recordingStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];

@@ -15,6 +15,7 @@ import {
   whatsappUazapiApi,
 } from '@/lib/api';
 import type { MessageCreditSummary } from '@/lib/api';
+import { validateMediaUpload } from '@/lib/media-upload';
 import type { WhatsAppTemplate } from '@/components/whatsapp/TemplateCatalog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
@@ -492,11 +493,12 @@ export default function Campaigns() {
     file: File,
     options: { replace?: boolean; expectedType?: 'image' | 'video' } = {},
   ) => {
-    const localType: 'image' | 'video' | 'audio' = file.type.startsWith('video/')
-      ? 'video'
-      : file.type.startsWith('audio/')
-        ? 'audio'
-        : 'image';
+    const validation = validateMediaUpload(file);
+    if (!validation.type) {
+      toast({ title: 'Arquivo nao suportado', description: validation.error, variant: 'destructive' });
+      return;
+    }
+    const localType = validation.type;
 
     if (options.expectedType && localType !== options.expectedType) {
       toast({

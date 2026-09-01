@@ -44,28 +44,47 @@ router.post('/', auth(), imageUpload.single('image'), (req, res) => {
   }
 })
 
-const ALLOWED_MEDIA_TYPES = new Map<string, { extension: string; mediaType: 'image' | 'video' | 'audio'; maxBytes: number }>([
-  ['image/jpeg', { extension: 'jpg', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
-  ['image/png', { extension: 'png', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
-  ['image/webp', { extension: 'webp', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
-  ['image/gif', { extension: 'gif', mediaType: 'image', maxBytes: 5 * 1024 * 1024 }],
-  ['video/mp4', { extension: 'mp4', mediaType: 'video', maxBytes: 16 * 1024 * 1024 }],
-  ['video/3gpp', { extension: '3gp', mediaType: 'video', maxBytes: 16 * 1024 * 1024 }],
-  ['audio/mpeg', { extension: 'mp3', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
-  ['audio/mp4', { extension: 'm4a', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
-  ['audio/ogg', { extension: 'ogg', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
-  ['audio/opus', { extension: 'opus', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
-  ['audio/webm', { extension: 'webm', mediaType: 'audio', maxBytes: 16 * 1024 * 1024 }],
+type MediaConfig = {
+  extension: string
+  mediaType: 'image' | 'video' | 'audio'
+  maxBytes: number
+  maxSourceBytes?: number
+}
+
+const MB = 1024 * 1024
+const MAX_MEDIA_SOURCE_BYTES = 32 * MB
+
+const ALLOWED_MEDIA_TYPES = new Map<string, MediaConfig>([
+  ['image/jpeg', { extension: 'jpg', mediaType: 'image', maxBytes: 5 * MB }],
+  ['image/png', { extension: 'png', mediaType: 'image', maxBytes: 5 * MB }],
+  ['image/webp', { extension: 'webp', mediaType: 'image', maxBytes: 5 * MB }],
+  ['image/gif', { extension: 'gif', mediaType: 'image', maxBytes: 5 * MB }],
+  ['video/mp4', { extension: 'mp4', mediaType: 'video', maxBytes: 16 * MB }],
+  ['video/3gpp', { extension: '3gp', mediaType: 'video', maxBytes: 16 * MB }],
+  ['audio/mpeg', { extension: 'mp3', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/mp4', { extension: 'm4a', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/x-m4a', { extension: 'm4a', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/aac', { extension: 'aac', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/ogg', { extension: 'ogg', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/opus', { extension: 'opus', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/webm', { extension: 'webm', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/wav', { extension: 'wav', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
+  ['audio/x-wav', { extension: 'wav', mediaType: 'audio', maxBytes: 16 * MB, maxSourceBytes: 32 * MB }],
 ])
+
+function normalizeMimeType(mimetype: string) {
+  return mimetype.toLowerCase().split(';', 1)[0].trim()
+}
 
 const mediaUpload = multer({
   storage,
   fileFilter: (_req, file, cb) => {
-    const allowed = ALLOWED_MEDIA_TYPES.has(file.mimetype)
+    const allowed = ALLOWED_MEDIA_TYPES.has(normalizeMimeType(file.mimetype))
     if (allowed) cb(null, true)
     else cb(new Error('Formato nao suportado. Envie imagem, video ou audio compativel.'))
   },
-  limits: { fileSize: 16 * 1024 * 1024 },
+  // Audio from the browser can be large before FFmpeg converts it to WhatsApp-friendly Opus.
+  limits: { fileSize: MAX_MEDIA_SOURCE_BYTES },
 })
 
 function runMediaUpload(req: any, res: any, next: any) {
@@ -74,7 +93,7 @@ function runMediaUpload(req: any, res: any, next: any) {
 
     const isSizeError = error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE'
     const message = isSizeError
-      ? 'O arquivo excede o limite de 16 MB.'
+      ? 'O arquivo de origem excede o limite de 32 MB.'
       : error instanceof Error ? error.message : 'Nao foi possivel ler o arquivo enviado.'
     return res.status(isSizeError ? 413 : 400).json(createErrorResponse(message, isSizeError ? 413 : 400))
   })
@@ -85,7 +104,7 @@ function getPublicAppUrl(req: any) {
   return configuredUrl || `${req.protocol}://${req.get('host')}`
 }
 
-function convertRecordedAudio(inputPath: string, outputPath: string) {
+function convertAudioForWhatsApp(inputPath: string, outputPath: string) {
   return new Promise<void>((resolve, reject) => {
     const process = spawn('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y',
@@ -114,39 +133,48 @@ async function persistMedia(req: any, res: any) {
       return res.status(400).json(createErrorResponse('Selecione uma clinica antes de enviar a midia', 400))
     }
 
-    const mediaConfig = ALLOWED_MEDIA_TYPES.get(req.file.mimetype)
+    const mediaConfig = ALLOWED_MEDIA_TYPES.get(normalizeMimeType(req.file.mimetype))
     if (!mediaConfig) {
       return res.status(400).json(createErrorResponse('Formato de arquivo nao suportado', 400))
     }
-    if (req.file.size > mediaConfig.maxBytes) {
-      const maxMb = Math.floor(mediaConfig.maxBytes / 1024 / 1024)
+    const maxSourceBytes = mediaConfig.maxSourceBytes || mediaConfig.maxBytes
+    if (req.file.size > maxSourceBytes) {
+      const maxMb = Math.floor(maxSourceBytes / MB)
       return res.status(413).json(createErrorResponse(`Arquivos do tipo ${mediaConfig.mediaType} devem ter no maximo ${maxMb} MB.`, 413))
     }
 
     const relativeDirectory = path.posix.join('media', String(companyId))
     const uploadDirectory = path.join(process.cwd(), 'uploads', ...relativeDirectory.split('/'))
     const mediaId = randomUUID()
-    let storedFilename = `${mediaId}.${mediaConfig.extension}`
+    const needsAudioConversion = mediaConfig.mediaType === 'audio'
+    let storedFilename = needsAudioConversion
+      ? `${mediaId}.source.${mediaConfig.extension}`
+      : `${mediaId}.${mediaConfig.extension}`
     let storedMimetype = req.file.mimetype
     let storedSize = req.file.size
     await fs.mkdir(uploadDirectory, { recursive: true })
     const initialPath = path.join(uploadDirectory, storedFilename)
     await fs.writeFile(initialPath, req.file.buffer, { flag: 'wx' })
 
-    if (req.file.mimetype === 'audio/webm') {
+    if (needsAudioConversion) {
       const convertedFilename = `${mediaId}.ogg`
       const convertedPath = path.join(uploadDirectory, convertedFilename)
       try {
-        await convertRecordedAudio(initialPath, convertedPath)
+        await convertAudioForWhatsApp(initialPath, convertedPath)
         const converted = await fs.stat(convertedPath)
         await fs.unlink(initialPath)
+        if (converted.size > mediaConfig.maxBytes) {
+          await fs.unlink(convertedPath).catch(() => undefined)
+          const maxMb = Math.floor(mediaConfig.maxBytes / MB)
+          return res.status(413).json(createErrorResponse(`O audio compactado excede o limite final de ${maxMb} MB. Grave uma mensagem menor.`, 413))
+        }
         storedFilename = convertedFilename
         storedMimetype = 'audio/ogg'
         storedSize = converted.size
       } catch (error) {
         await fs.unlink(initialPath).catch(() => undefined)
         await fs.unlink(convertedPath).catch(() => undefined)
-        throw new Error(`Nao foi possivel preparar o audio gravado: ${error instanceof Error ? error.message : 'falha na conversao'}`)
+        throw new Error(`Nao foi possivel preparar o audio: ${error instanceof Error ? error.message : 'falha na conversao'}`)
       }
     }
 
