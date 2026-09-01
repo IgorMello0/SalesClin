@@ -58,6 +58,13 @@ type MetaStatus = {
     createdAt?: string;
     processedAt?: string | null;
   } | null;
+  lastPhoneEchoEvent?: {
+    eventType?: string | null;
+    status?: string;
+    errorMessage?: string | null;
+    createdAt?: string;
+    processedAt?: string | null;
+  } | null;
 };
 
 type MetaForm = {
@@ -785,6 +792,13 @@ const Integrations = () => {
                         {metaStatus?.webhookConfigured
                           ? 'Mensagens recebidas estao vinculadas a esta clinica.'
                           : (metaStatus?.webhookDiagnostic || 'A conexao esta ativa, mas o recebimento precisa ser configurado.')}
+                      </div>
+                    )}
+                    {isIntegrationConnected('whatsappCoexistence') && metaStatus?.webhookConfigured && (
+                      <div className={`rounded-lg border p-3 text-xs font-semibold ${metaStatus?.lastPhoneEchoEvent ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                        {metaStatus.lastPhoneEchoEvent
+                          ? `Ultimo envio pelo celular recebido em ${new Date(metaStatus.lastPhoneEchoEvent.createdAt || '').toLocaleString('pt-BR')}.`
+                          : 'Ainda nao recebemos envios feitos pelo celular. Na Meta, assine os campos history, smb_app_state_sync e smb_message_echoes no webhook do WhatsApp Business Account.'}
                       </div>
                     )}
                     {isIntegrationConnected('whatsappCoexistence') && (

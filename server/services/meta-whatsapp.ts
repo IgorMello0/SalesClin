@@ -561,6 +561,17 @@ export async function getMetaWhatsappStatus(companyId: number) {
       processedAt: true,
     },
   })
+  const lastPhoneEchoEvent = await prisma.whatsAppWebhookEvent.findFirst({
+    where: { companyId, provider: 'meta', eventType: 'message.sent_from_phone' },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      eventType: true,
+      status: true,
+      errorMessage: true,
+      createdAt: true,
+      processedAt: true,
+    },
+  })
 
   return {
     configured,
@@ -581,6 +592,7 @@ export async function getMetaWhatsappStatus(companyId: number) {
     subscribedAppId,
     reportedCallbackUrl,
     lastWebhookEvent,
+    lastPhoneEchoEvent,
     connectedAt: company.metaConnectedAt,
     officialMode: connection?.provider === 'meta' ? (connection.officialMode || 'cloud_api') : 'cloud_api',
     coexistenceEnabled: isCoexistenceEnabled(),
