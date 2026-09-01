@@ -141,6 +141,48 @@ function metaInboundImagePayload(messageId: string) {
   }
 }
 
+function metaStickerPayload(messageId: string) {
+  return {
+    entry: [{
+      changes: [{
+        field: 'messages',
+        value: {
+          metadata: { phone_number_id: 'meta-phone-1' },
+          contacts: [{ wa_id: '5511999990001', profile: { name: 'Lead Meta' } }],
+          messages: [{
+            id: messageId,
+            from: '5511999990001',
+            timestamp: '1784246400',
+            type: 'sticker',
+            sticker: { id: 'meta-sticker-1', mime_type: 'image/webp', animated: false },
+          }],
+        },
+      }],
+    }],
+  }
+}
+
+function metaMessageEchoPayload(messageId: string) {
+  return {
+    entry: [{
+      changes: [{
+        field: 'smb_message_echoes',
+        value: {
+          metadata: { phone_number_id: 'meta-phone-1' },
+          contacts: [{ wa_id: '5511999990001', profile: { name: 'Lead Meta' } }],
+          message_echoes: [{
+            id: messageId,
+            to: '5511999990001',
+            timestamp: '1784246400',
+            type: 'text',
+            text: { body: 'Mensagem enviada pelo celular' },
+          }],
+        },
+      }],
+    }],
+  }
+}
+
 test('WhatsApp Oficial cria lead, conversa e mensagem sem duplicar retry', async () => {
   process.env.META_APP_ID = 'meta-app-test'
   process.env.META_APP_SECRET = 'meta-secret-test'
@@ -235,11 +277,49 @@ test('WhatsApp Oficial baixa e vincula a midia recebida a mensagem', async () =>
     mediaId: 'meta-media-1',
     mediaType: 'image',
     declaredMimeType: 'image/jpeg',
+    providerMediaType: 'image',
   }])
   assert.equal(state.messages.length, 1)
   assert.equal(state.messages[0].content, 'Foto recebida')
   assert.equal(state.messages[0].rawJson.mediaUrl, 'https://sellclin.test/uploads/media/5/image.jpg')
   assert.equal(state.messages[0].rawJson.mediaType, 'image')
+})
+
+test('WhatsApp Oficial salva figurinha como imagem sem perder o tipo original', async () => {
+  const { db, state } = createFakeDatabase()
+
+  await handleMetaMessages(
+    metaStickerPayload('wamid.official-sticker-1'),
+    { id: 5, ownerId: 10, name: 'Clinica Oficial' },
+    db,
+    {
+      resolveMedia: async () => ({
+        mediaUrl: 'https://sellclin.test/uploads/media/5/sticker.webp',
+        mediaType: 'image',
+        mimeType: 'image/webp',
+        size: 512,
+      }),
+    },
+  )
+
+  assert.equal(state.messages.length, 1)
+  assert.equal(state.messages[0].rawJson.providerMediaType, 'sticker')
+  assert.equal(state.messages[0].rawJson.isSticker, true)
+})
+
+test('Coexistencia salva mensagem enviada pelo celular apenas uma vez', async () => {
+  const { db, state } = createFakeDatabase()
+  const payload = metaMessageEchoPayload('wamid.coexistence-echo-1')
+  const company = { id: 8, ownerId: 21, name: 'Clinica Coexistencia' }
+
+  await handleMetaMessages(payload, company, db)
+  await handleMetaMessages(payload, company, db)
+
+  assert.equal(state.leads.length, 1)
+  assert.equal(state.messages.length, 1)
+  assert.equal(state.messages[0].sender, 'profissional')
+  assert.equal(state.messages[0].content, 'Mensagem enviada pelo celular')
+  assert.equal(state.activities.length, 0)
 })
 
 test('Coexistencia tenta novamente um webhook que falhou antes de salvar a mensagem', async () => {
@@ -300,4 +380,31 @@ test('WhatsApp Nao Oficial cria lead e ignora mensagem repetida', async () => {
   assert.equal(state.conversations.length, 1)
   assert.equal(state.messages.length, 1)
   assert.equal(state.activities.length, 1)
+})
+
+test('WhatsApp Nao Oficial salva mensagem enviada pelo celular e ignora eco da API', async () => {
+  const { db, state } = createFakeDatabase()
+  const company = { id: 9, ownerId: 30, name: 'Clinica Nao Oficial' }
+  const sentFromPhone = {
+    event: 'message',
+    message: {
+      id: 'unofficial-phone-message-1',
+      chatid: '5511988880002@s.whatsapp.net',
+      senderName: 'Lead Nao Oficial',
+      text: 'Mensagem enviada no aparelho',
+      fromMe: true,
+      isGroup: false,
+    },
+  }
+  const sentByApi = {
+    ...sentFromPhone,
+    message: { ...sentFromPhone.message, id: 'unofficial-api-message-1', wasSentByApi: true },
+  }
+
+  await handleUazapiPayload(sentFromPhone, company, db)
+  const apiResult = await handleUazapiPayload(sentByApi, company, db)
+
+  assert.equal(state.messages.length, 1)
+  assert.equal(state.messages[0].sender, 'profissional')
+  assert.equal(apiResult.reason, 'sent_by_api')
 })

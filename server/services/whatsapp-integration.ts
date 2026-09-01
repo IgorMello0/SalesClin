@@ -330,6 +330,8 @@ function getMetaMediaDescriptor(message: any) {
   const requestedType = String(message?.type || '').toLowerCase()
   const mediaType: IncomingMediaType | null = requestedType === 'image'
     ? 'image'
+    : requestedType === 'sticker'
+      ? 'image'
     : requestedType === 'video'
       ? 'video'
       : requestedType === 'audio'
@@ -337,12 +339,13 @@ function getMetaMediaDescriptor(message: any) {
         : null
   if (!mediaType) return null
 
-  const media = message?.[mediaType]
+  const media = requestedType === 'sticker' ? message?.sticker : message?.[mediaType]
   if (!media?.id) return null
   return {
     mediaId: String(media.id),
     mediaType,
     declaredMimeType: media.mime_type ? String(media.mime_type) : null,
+    providerMediaType: requestedType,
   }
 }
 
@@ -1206,7 +1209,7 @@ export async function disconnectCentralWhatsapp(companyId: number) {
   throw new Error(lastError)
 }
 
-export async function processIncomingMessage(opts: {
+type PersistWhatsAppMessageOptions = {
   companyId: number
   ownerId: number | null
   phone: string
@@ -1217,10 +1220,19 @@ export async function processIncomingMessage(opts: {
   providerMessageId?: string | null
   mediaUrl?: string | null
   mediaType?: IncomingMediaType | null
-}, db: WhatsAppPersistence = prisma) {
+  providerMediaType?: string | null
+}
+
+async function persistWhatsAppMessage(
+  opts: PersistWhatsAppMessageOptions,
+  sender: 'cliente' | 'profissional',
+  db: WhatsAppPersistence = prisma,
+) {
   const {
     companyId, ownerId, phone, pushName, messageText, rawPayload, origin, providerMessageId, mediaUrl, mediaType,
+    providerMediaType,
   } = opts
+  const isIncoming = sender === 'cliente'
 
   if (!ownerId) {
     console.warn(`[Webhook] Empresa #${companyId} sem ownerId. Ignorando.`)
@@ -1267,7 +1279,7 @@ export async function processIncomingMessage(opts: {
         channel: origin,
         startedAt: new Date(),
         lastMessageAt: new Date(),
-        lastInboundAt: new Date(),
+        lastInboundAt: isIncoming ? new Date() : null,
         unreadCount: 0,
       },
     })
@@ -1292,11 +1304,17 @@ export async function processIncomingMessage(opts: {
   const mensagem = await db.mensagem.create({
     data: {
       conversationId: conversa.id,
-      sender: 'cliente',
+      sender,
       content: messageText || '(midia)',
       providerMessageId: providerMessageId || null,
       rawJson: mediaUrl
-        ? { ...(rawPayload && typeof rawPayload === 'object' ? rawPayload : {}), mediaUrl, mediaType }
+        ? {
+          ...(rawPayload && typeof rawPayload === 'object' ? rawPayload : {}),
+          mediaUrl,
+          mediaType,
+          providerMediaType: providerMediaType || mediaType,
+          isSticker: providerMediaType === 'sticker',
+        }
         : rawPayload,
       origin,
     },
@@ -1307,25 +1325,43 @@ export async function processIncomingMessage(opts: {
     data: {
       updatedAt: new Date(),
       lastMessageAt: new Date(),
-      lastInboundAt: new Date(),
-      unreadCount: { increment: 1 },
+      ...(isIncoming ? {
+        lastInboundAt: new Date(),
+        unreadCount: { increment: 1 },
+      } : {}),
       status: 'OPEN',
       resolvedAt: null,
     },
   })
 
-  await db.leadActivity.create({
-    data: {
-      leadId: lead.id,
-      type: 'sistema',
-      content: action === 'created'
-        ? `Lead criado automaticamente via ${origin}. Nome: "${pushName || 'Contato WhatsApp'}".`
-        : `Novo contato recebido via ${origin}: "${messageText?.substring(0, 120) || '(midia)'}"`,
-      createdBy: 'Sistema',
-    },
-  })
+  if (isIncoming) {
+    await db.leadActivity.create({
+      data: {
+        leadId: lead.id,
+        type: 'sistema',
+        content: action === 'created'
+          ? `Lead criado automaticamente via ${origin}. Nome: "${pushName || 'Contato WhatsApp'}".`
+          : `Novo contato recebido via ${origin}: "${messageText?.substring(0, 120) || '(midia)'}"`,
+        createdBy: 'Sistema',
+      },
+    })
+  }
 
   return { action, leadId: lead.id, conversaId: conversa.id, messageId: mensagem.id }
+}
+
+export async function processIncomingMessage(
+  opts: PersistWhatsAppMessageOptions,
+  db: WhatsAppPersistence = prisma,
+) {
+  return persistWhatsAppMessage(opts, 'cliente', db)
+}
+
+export async function processOutgoingMessage(
+  opts: PersistWhatsAppMessageOptions,
+  db: WhatsAppPersistence = prisma,
+) {
+  return persistWhatsAppMessage(opts, 'profissional', db)
 }
 
 export async function handleEvolutionPayload(
@@ -1340,10 +1376,6 @@ export async function handleEvolutionPayload(
 
   const data = body.data || body
   const key = data.key || {}
-
-  if (key.fromMe === true) {
-    return { received: true, ignored: true, reason: 'fromMe' }
-  }
 
   const remoteJid = key.remoteJid || data.remoteJid || ''
   if (remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) {
@@ -1364,7 +1396,8 @@ export async function handleEvolutionPayload(
     return { received: true, ignored: true, reason: 'no_phone' }
   }
 
-  const result = await processIncomingMessage({
+  const processMessage = key.fromMe === true ? processOutgoingMessage : processIncomingMessage
+  const result = await processMessage({
     companyId: empresa.id,
     ownerId: empresa.ownerId,
     phone,
@@ -1393,8 +1426,8 @@ export async function handleUazapiPayload(
     return { received: true, ignored: true, reason: 'no_message' }
   }
 
-  if (message.fromMe === true || message.wasSentByApi === true) {
-    return { received: true, ignored: true, reason: 'fromMe' }
+  if (message.wasSentByApi === true) {
+    return { received: true, ignored: true, reason: 'sent_by_api' }
   }
 
   const chatId = String(message.chatid || message.chatId || message.remoteJid || '')
@@ -1423,7 +1456,8 @@ export async function handleUazapiPayload(
     || ''
   const providerMessageId = message.messageid || message.messageId || message.id || body?.id || null
 
-  const result = await processIncomingMessage({
+  const processMessage = message.fromMe === true ? processOutgoingMessage : processIncomingMessage
+  const result = await processMessage({
     companyId: empresa.id,
     ownerId: empresa.ownerId,
     phone,
@@ -1501,7 +1535,9 @@ export async function handleMetaMessages(
   for (const entry of body.entry) {
     const changes = entry.changes || []
     for (const change of changes) {
-      if (change.field !== 'messages') {
+      const isMessageField = change.field === 'messages'
+      const isMessageEchoField = change.field === 'smb_message_echoes'
+      if (!isMessageField && !isMessageEchoField) {
         summary.ignored += 1
         continue
       }
@@ -1509,8 +1545,10 @@ export async function handleMetaMessages(
       const value = change.value || {}
       const metadata = value.metadata || {}
       const phoneNumberId = metadata.phone_number_id || ''
-      const messages = value.messages || []
-      const statuses = value.statuses || []
+      const messages = isMessageEchoField
+        ? (value.message_echoes || value.smb_message_echoes || value.messages || [])
+        : (value.messages || [])
+      const statuses = isMessageField ? (value.statuses || []) : []
       const contacts = value.contacts || []
 
       let empresa = empresaOverride
@@ -1566,13 +1604,34 @@ export async function handleMetaMessages(
       }
 
       for (const msg of messages) {
-        if (msg.type === 'status' || !msg.from) continue
+        if (msg.type === 'status') continue
 
-        const eventKey = `meta:message:${msg.id || `${msg.from}:${msg.timestamp || ''}`}`
+        const outgoingPhone = normalizePhone(
+          msg.to
+          || msg.recipient
+          || msg.recipient_id
+          || msg.context?.to
+          || msg.context?.recipient
+          || contacts[0]?.wa_id
+          || '',
+        )
+        const incomingPhone = normalizePhone(msg.from || '')
+        const phone = isMessageEchoField ? outgoingPhone : incomingPhone
+        if (!phone) {
+          console.warn('[Webhook/Meta] Mensagem sem telefone de contato.', {
+            field: change.field,
+            messageId: msg.id || null,
+          })
+          summary.ignored += 1
+          continue
+        }
+
+        const eventDirection = isMessageEchoField ? 'echo' : 'message'
+        const eventKey = `meta:${eventDirection}:${msg.id || `${phone}:${msg.timestamp || ''}`}`
         const shouldProcess = await beginMetaWebhookEvent(db, {
           companyId: empresa.id,
           eventKey,
-          eventType: 'message.received',
+          eventType: isMessageEchoField ? 'message.sent_from_phone' : 'message.received',
           payload: msg,
         })
         if (!shouldProcess) {
@@ -1581,11 +1640,13 @@ export async function handleMetaMessages(
         }
 
         try {
-          const phone = normalizePhone(msg.from)
-          if (!phone) throw new Error('Mensagem recebida sem telefone valido.')
-          const contactInfo = contacts.find((contact: any) => contact.wa_id === msg.from)
+          const contactInfo = contacts.find((contact: any) => normalizePhone(contact.wa_id) === phone)
           const pushName = contactInfo?.profile?.name || ''
-          const messageText = msg.text?.body || msg.image?.caption || msg.video?.caption || ''
+          const messageText = msg.text?.body
+            || msg.image?.caption
+            || msg.video?.caption
+            || msg.sticker?.caption
+            || ''
           const mediaDescriptor = getMetaMediaDescriptor(msg)
           const attachment = mediaDescriptor
             ? await (dependencies.resolveMedia || resolveMetaMedia)({
@@ -1594,7 +1655,8 @@ export async function handleMetaMessages(
             })
             : null
 
-          const result = await processIncomingMessage({
+          const processMessage = isMessageEchoField ? processOutgoingMessage : processIncomingMessage
+          const result = await processMessage({
             companyId: empresa.id,
             ownerId: empresa.ownerId,
             phone,
@@ -1605,6 +1667,7 @@ export async function handleMetaMessages(
             providerMessageId: msg.id || null,
             mediaUrl: attachment?.mediaUrl || null,
             mediaType: attachment?.mediaType || null,
+            providerMediaType: mediaDescriptor?.providerMediaType || null,
           }, db)
           if (result.action === 'ignored') {
             throw new Error(`Mensagem ignorada: ${result.reason || 'motivo desconhecido'}.`)

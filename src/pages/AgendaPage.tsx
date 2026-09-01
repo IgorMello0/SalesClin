@@ -26,7 +26,7 @@ const AgendaPage = () => {
   ];
 
   const faqs = [
-    { q: "A agenda se integra com Google Calendar?", a: "A integração com Google Calendar está no nosso roadmap. Atualmente, a agenda do SellClin é autocontida e gerenciada dentro da plataforma para garantir máxima segurança e controle dos dados da clínica." },
+    { q: "A agenda se integra com Google Calendar?", a: "Sim. Conecte o Google Calendar em Integrações para sincronizar os agendamentos da clínica e acompanhar eventuais falhas de sincronização." },
     { q: "Posso filtrar a agenda por profissional?", a: "Sim! A agenda tem um filtro rápido por profissional, perfeito para clínicas com múltiplos doutores ou especialidades." },
     { q: "O sistema avisa quando um paciente não confirmou?", a: "Isso é gerenciado pelo status do Card. A recepção pode visualizar todos os pacientes com status 'Agendado' que ainda não foram atualizados para 'Confirmado', facilitando o acompanhamento." },
   ];

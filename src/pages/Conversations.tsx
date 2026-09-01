@@ -3,7 +3,7 @@ import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Bot, Check, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Mic,
-  PanelRightOpen, Paperclip, Phone, Plus, RefreshCcw, Search, Send, Smile, Square,
+  Maximize2, Paperclip, Phone, Plus, RefreshCcw, Search, Send, Smile, Square,
   StickyNote, Tag, User, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,12 @@ type Message = {
   sender: 'bot' | 'cliente' | 'profissional';
   content: string;
   origin?: string | null;
-  rawJson?: { mediaUrl?: string; mediaType?: 'image' | 'video' | 'audio' } | null;
+  rawJson?: {
+    mediaUrl?: string;
+    mediaType?: 'image' | 'video' | 'audio';
+    providerMediaType?: string;
+    isSticker?: boolean;
+  } | null;
   createdAt: string;
   deliveryStatus?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null;
   errorMessage?: string | null;
@@ -35,8 +40,8 @@ type Conversation = {
   channel?: string | null;
   startedAt: string;
   updatedAt: string;
-  lead?: { id: number; name: string; phone?: string | null; convertedAt?: string | null; convertedToClientId?: number | null } | null;
-  client?: { id: number; name: string; phone?: string | null } | null;
+  lead?: { id: number; name: string; phone?: string | null; avatar?: string | null; convertedAt?: string | null; convertedToClientId?: number | null } | null;
+  client?: { id: number; name: string; phone?: string | null; avatar?: string | null } | null;
   agent?: { id: number; name: string } | null;
   whatsappProvider?: string | null;
   status?: ConversationStatus;
@@ -67,7 +72,7 @@ type ConversationWorkspace = {
   users: TeamMember[];
 };
 type PendingMedia = { file: File; previewUrl: string; type: 'image' | 'video' | 'audio' };
-type PreviewImage = { url: string; alt: string };
+type PreviewMedia = { url: string; alt: string; type: 'image' | 'video' };
 
 const EMOJIS = ['😀', '😊', '😂', '😍', '🙏', '👍', '👏', '🎉', '❤️', '✅', '📅', '🦷', '💬', '✨', '🚀', '😉'];
 
@@ -92,6 +97,10 @@ function contactPhone(conversation: Conversation) {
   return conversation.phone || conversation.client?.phone || conversation.lead?.phone || '';
 }
 
+function contactAvatar(conversation: Conversation) {
+  return conversation.client?.avatar || conversation.lead?.avatar || null;
+}
+
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'WA';
 }
@@ -104,19 +113,19 @@ function messageDate(message: Message) {
   return new Date(message.createdAt);
 }
 
-function imageFileName(url: string) {
+function mediaFileName(url: string) {
   try {
     const pathname = new URL(url, window.location.origin).pathname;
-    return decodeURIComponent(pathname.split('/').filter(Boolean).pop() || 'imagem-whatsapp');
+    return decodeURIComponent(pathname.split('/').filter(Boolean).pop() || 'midia-whatsapp');
   } catch {
-    return 'imagem-whatsapp';
+    return 'midia-whatsapp';
   }
 }
 
-function downloadImage(url: string) {
+function downloadMedia(url: string) {
   const link = document.createElement('a');
   link.href = url;
-  link.download = imageFileName(url);
+  link.download = mediaFileName(url);
   link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
@@ -138,7 +147,7 @@ const Conversations = () => {
   const [uploading, setUploading] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
-  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<PreviewMedia | null>(null);
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [showAgentDialog, setShowAgentDialog] = useState(false);
@@ -355,7 +364,11 @@ const Conversations = () => {
     try {
       const response = await conversationsApi.setStatus(selected.id, status);
       if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel alterar o status.');
-      await loadConversations(true);
+      setConversations((current) => current.map((conversation) => (
+        conversation.id === selected.id
+          ? { ...conversation, ...(response.data || {}), status }
+          : conversation
+      )));
     } catch (error: any) {
       toast({ title: 'Status nao alterado', description: error.message, variant: 'destructive' });
     } finally {
@@ -593,7 +606,12 @@ const Conversations = () => {
               const converted = isConverted(conversation);
               return (
                 <button type="button" key={conversation.id} onClick={() => setSelectedId(conversation.id)} className={`w-full border-b border-slate-100 px-4 py-3 text-left transition-colors ${active ? 'bg-slate-100' : 'hover:bg-slate-50'}`}>
-                  <div className="flex gap-3"><div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-xs font-black ${active ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-700'}`}>{initials(name)}</div><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-bold text-slate-900">{name}</p><div className="flex items-center gap-1.5"><span className="flex-shrink-0 text-[10px] text-slate-400">{formatRelativeTime(lastMessage?.createdAt || conversation.updatedAt || conversation.startedAt)}</span>{Boolean(conversation.unreadCount) && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white">{conversation.unreadCount}</span>}</div></div><p className="mt-0.5 truncate text-xs text-slate-500">{lastMessage?.content || 'Conversa iniciada'}</p><div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold"><span className={`h-1.5 w-1.5 rounded-full ${conversation.status === 'RESOLVED' ? 'bg-slate-400' : conversation.status === 'PENDING' ? 'bg-amber-500' : converted ? 'bg-emerald-500' : 'bg-sky-500'}`} /><span className={conversation.status === 'RESOLVED' ? 'text-slate-500' : conversation.status === 'PENDING' ? 'text-amber-600' : converted ? 'text-emerald-600' : 'text-sky-600'}>{conversation.status === 'RESOLVED' ? 'Resolvida' : conversation.status === 'PENDING' ? 'Pendente' : converted ? 'Convertida' : 'Em andamento'}</span>{conversation.labels?.slice(0, 2).map((label) => <span key={label.id} className="rounded-full border px-1.5 py-0.5 font-semibold text-slate-600" style={{ borderColor: label.color, backgroundColor: `${label.color}18` }}>{label.name}</span>)}</div></div></div>
+                  <div className="flex gap-3">
+                    <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-black ${active ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                      {contactAvatar(conversation) ? <img src={contactAvatar(conversation)!} alt="" className="h-full w-full object-cover" /> : initials(name)}
+                    </div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-bold text-slate-900">{name}</p><div className="flex items-center gap-1.5"><span className="flex-shrink-0 text-[10px] text-slate-400">{formatRelativeTime(lastMessage?.createdAt || conversation.updatedAt || conversation.startedAt)}</span>{Boolean(conversation.unreadCount) && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white">{conversation.unreadCount}</span>}</div></div><p className="mt-0.5 truncate text-xs text-slate-500">{lastMessage?.content || 'Conversa iniciada'}</p><div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold"><span className={`h-1.5 w-1.5 rounded-full ${conversation.status === 'RESOLVED' ? 'bg-slate-400' : conversation.status === 'PENDING' ? 'bg-amber-500' : converted ? 'bg-emerald-500' : 'bg-sky-500'}`} /><span className={conversation.status === 'RESOLVED' ? 'text-slate-500' : conversation.status === 'PENDING' ? 'text-amber-600' : converted ? 'text-emerald-600' : 'text-sky-600'}>{conversation.status === 'RESOLVED' ? 'Resolvida' : conversation.status === 'PENDING' ? 'Pendente' : converted ? 'Convertida' : 'Em andamento'}</span>{conversation.labels?.slice(0, 2).map((label) => <span key={label.id} className="rounded-full border px-1.5 py-0.5 font-semibold text-slate-600" style={{ borderColor: label.color, backgroundColor: `${label.color}18` }}>{label.name}</span>)}</div></div>
+                  </div>
                 </button>
               );
             })}
@@ -602,10 +620,28 @@ const Conversations = () => {
 
         {selected ? (
           <section className="flex min-w-0 flex-1 flex-col bg-slate-50">
-            <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
-              <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-xs font-black text-white">{initials(contactName(selected))}</div><div><p className="text-sm font-black text-slate-950">{contactName(selected)}</p><p className="flex items-center gap-1 text-xs text-slate-500"><Phone className="h-3 w-3" />{contactPhone(selected)}</p></div></div>
+            <div className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-950 text-xs font-black text-white">
+                  {contactAvatar(selected) ? <img src={contactAvatar(selected)!} alt="" className="h-full w-full object-cover" /> : initials(contactName(selected))}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-950">{contactName(selected)}</p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="flex items-center gap-1 text-xs text-slate-500"><Phone className="h-3 w-3" />{contactPhone(selected)}</p>
+                    {selected.labels?.map((label) => (
+                      <button key={label.id} type="button" onClick={() => setDetailsOpen(true)} className="rounded-full border px-2 py-0.5 text-[10px] font-bold text-slate-700" style={{ borderColor: label.color, backgroundColor: `${label.color}18` }} title="Gerenciar etiquetas">{label.name}</button>
+                    ))}
+                    <button type="button" onClick={() => setDetailsOpen(true)} className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-orange-600"><Plus className="h-3 w-3" />Etiqueta</button>
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 {selected.serviceWindow?.isOfficial && <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${!officialWindowClosed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}><Clock3 className="h-3.5 w-3.5" />{formatWindowRemaining(windowRemaining || 0)}</span>}
+                <Select value={selected.status || 'OPEN'} onValueChange={(value) => void updateConversationStatus(value as ConversationStatus)}>
+                  <SelectTrigger disabled={savingDetails} className="h-9 w-[125px] bg-white text-xs font-bold"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="OPEN">Aberta</SelectItem><SelectItem value="PENDING">Pendente</SelectItem><SelectItem value="RESOLVED">Resolvida</SelectItem></SelectContent>
+                </Select>
                 <Select value={selected.agentId ? String(selected.agentId) : 'manual'} onValueChange={assignAgent}>
                   <SelectTrigger disabled={assigningAgent} className="h-9 w-[190px] bg-white text-xs font-bold">
                     <div className="flex items-center gap-1.5">
@@ -616,7 +652,7 @@ const Conversations = () => {
                     </div>
                   </SelectTrigger>
                   <SelectContent><SelectItem value="manual">Atendimento manual</SelectItem>{agents.map((agent) => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}<SelectItem value="new"><span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" />Novo agente</span></SelectItem></SelectContent></Select>
-                <Button variant="outline" size="icon" onClick={() => setDetailsOpen(true)} aria-label="Abrir detalhes da conversa" title="Detalhes da conversa"><PanelRightOpen className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setDetailsOpen(true)} aria-label="Abrir notas e organizacao" title="Notas e organizacao"><StickyNote className="h-4 w-4" /></Button>
               </div>
             </div>
 
@@ -628,27 +664,39 @@ const Conversations = () => {
                 return (
                   <div key={message.id}>
                     {showDate && <div className="my-4 flex justify-center"><span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold text-slate-500">{format(messageDate(message), "dd 'de' MMMM", { locale: ptBR })}</span></div>}
-                    <div className={`mb-3 flex ${incoming ? 'justify-start' : 'justify-end'}`}><div className="max-w-[78%] sm:max-w-[62%]"><div className={`overflow-hidden rounded-2xl text-sm leading-relaxed shadow-sm ${incoming ? 'rounded-bl-sm border border-slate-200 bg-white text-slate-800' : 'rounded-br-sm bg-slate-950 text-white'}`}>
+                    <div className={`mb-3 flex ${incoming ? 'justify-start' : 'justify-end'}`}><div className="max-w-[88%] sm:max-w-[72%]"><div className={`overflow-hidden rounded-2xl text-sm leading-relaxed shadow-sm ${message.rawJson?.isSticker ? 'bg-transparent shadow-none' : incoming ? 'rounded-bl-sm border border-slate-200 bg-white text-slate-800' : 'rounded-br-sm bg-slate-950 text-white'}`}>
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'image' && (
                         <button
                           type="button"
-                          className="group block w-full cursor-zoom-in overflow-hidden text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                          onClick={() => setPreviewImage({
+                          className={`group relative block cursor-zoom-in overflow-hidden text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 ${message.rawJson.isSticker ? 'w-auto' : 'w-full'}`}
+                          onClick={() => setPreviewMedia({
                             url: message.rawJson!.mediaUrl!,
                             alt: message.content && !/^\[image\]$/.test(message.content) ? message.content : 'Imagem da conversa',
+                            type: 'image',
                           })}
                           aria-label="Ampliar imagem"
                         >
                           <img
                             src={message.rawJson.mediaUrl}
                             alt={message.content && !/^\[image\]$/.test(message.content) ? message.content : 'Imagem da conversa'}
-                            className="max-h-72 w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                            className={message.rawJson.isSticker ? 'h-44 w-44 object-contain transition-transform duration-200 group-hover:scale-[1.03]' : 'max-h-[28rem] w-full max-w-[36rem] object-contain transition-transform duration-200 group-hover:scale-[1.01]'}
                           />
+                          <span className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/70 text-white opacity-0 transition-opacity group-hover:opacity-100"><Maximize2 className="h-4 w-4" /></span>
                         </button>
                       )}
-                      {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'video' && <video src={message.rawJson.mediaUrl} controls className="max-h-72 w-full" />}
-                      {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'audio' && <audio src={message.rawJson.mediaUrl} controls className="m-2 max-w-[260px]" />}
-                      {message.content && !/^\[(image|video|audio)\]$/.test(message.content) && <p className="px-4 py-2.5">{message.content}</p>}
+                      {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'video' && (
+                        <div className="relative max-w-[38rem]">
+                          <video src={message.rawJson.mediaUrl} controls className="max-h-[32rem] w-full bg-black" />
+                          <Button type="button" size="icon" variant="secondary" className="absolute right-2 top-2 h-8 w-8 bg-white/90" onClick={() => setPreviewMedia({ url: message.rawJson!.mediaUrl!, alt: message.content || 'Video da conversa', type: 'video' })} title="Ampliar video"><Maximize2 className="h-4 w-4" /></Button>
+                        </div>
+                      )}
+                      {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'audio' && (
+                        <div className={`flex items-center gap-1 p-2 ${incoming ? 'bg-white' : 'bg-slate-950'}`}>
+                          <audio src={message.rawJson.mediaUrl} controls className="h-10 w-[280px] max-w-[calc(100vw-9rem)]" />
+                          <Button type="button" variant="ghost" size="icon" className={incoming ? 'text-slate-600' : 'text-white hover:bg-white/10 hover:text-white'} onClick={() => downloadMedia(message.rawJson!.mediaUrl!)} title="Baixar audio" aria-label="Baixar audio"><Download className="h-4 w-4" /></Button>
+                        </div>
+                      )}
+                      {message.content && !/^\[(image|video|audio|sticker)\]$/.test(message.content) && <p className={`px-4 py-2.5 ${message.rawJson?.isSticker ? (incoming ? 'rounded-2xl bg-white text-slate-800' : 'rounded-2xl bg-slate-950 text-white') : ''}`}>{message.content}</p>}
                     </div>
                       <p className={`mt-1 text-[10px] text-slate-400 ${incoming ? 'text-left' : 'text-right'}`}>
                         {!incoming && (
@@ -680,6 +728,7 @@ const Conversations = () => {
               <div className="relative mx-auto flex max-w-5xl items-center gap-2">
                 <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={(event) => { selectMedia(event.target.files?.[0]); event.currentTarget.value = ''; }} />
                 <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={sending || officialWindowClosed} aria-label="Anexar midia"><Paperclip className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => setDetailsOpen(true)} aria-label="Abrir notas da conversa" title="Notas e organizacao"><StickyNote className="h-4 w-4" /></Button>
                 {isRecording ? (
                   <div className="flex h-11 flex-1 items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3">
                     <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
@@ -707,38 +756,14 @@ const Conversations = () => {
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-md">
           <SheetHeader className="border-b border-slate-200 px-6 py-5 text-left">
-            <SheetTitle>Detalhes da conversa</SheetTitle>
+            <SheetTitle>Notas e organizacao</SheetTitle>
             <SheetDescription>
-              {selected ? `${contactName(selected)} · ${contactPhone(selected)}` : 'Organize o atendimento desta conversa.'}
+              {selected ? `${contactName(selected)} · ${contactPhone(selected)}` : 'Organize etiquetas, responsavel e notas internas.'}
             </SheetDescription>
           </SheetHeader>
 
           {selected && (
             <div className="space-y-7 px-6 py-6">
-              <section aria-labelledby="conversation-status-title">
-                <div className="mb-3 flex items-center gap-2">
-                  <Check className="h-4 w-4 text-orange-500" />
-                  <h3 id="conversation-status-title" className="text-sm font-bold text-slate-900">Status do atendimento</h3>
-                </div>
-                <div className="grid grid-cols-3 rounded-md border border-slate-200 bg-slate-50 p-1">
-                  {([
-                    ['OPEN', 'Aberta'],
-                    ['PENDING', 'Pendente'],
-                    ['RESOLVED', 'Resolvida'],
-                  ] as Array<[ConversationStatus, string]>).map(([status, label]) => (
-                    <button
-                      key={status}
-                      type="button"
-                      disabled={savingDetails}
-                      onClick={() => void updateConversationStatus(status)}
-                      className={`h-9 rounded px-2 text-xs font-bold transition-colors ${selected.status === status ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
               <section aria-labelledby="conversation-owner-title">
                 <div className="mb-3 flex items-center gap-2">
                   <User className="h-4 w-4 text-orange-500" />
@@ -825,19 +850,19 @@ const Conversations = () => {
         </SheetContent>
       </Sheet>
 
-      <Dialog open={Boolean(previewImage)} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
+      <Dialog open={Boolean(previewMedia)} onOpenChange={(open) => { if (!open) setPreviewMedia(null); }}>
         <DialogContent className="h-full w-full max-w-none grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-slate-950 p-0 sm:h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)] sm:max-w-[1500px] [&>button]:border-white/15 [&>button]:bg-slate-900 [&>button]:text-white [&>button]:hover:bg-slate-800">
           <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-white/10 px-5 pr-20">
             <DialogTitle className="truncate text-sm font-semibold text-white">
-              {previewImage ? imageFileName(previewImage.url) : 'Imagem da conversa'}
+              {previewMedia ? mediaFileName(previewMedia.url) : 'Midia da conversa'}
             </DialogTitle>
-            {previewImage && (
+            {previewMedia && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
-                onClick={() => downloadImage(previewImage.url)}
+                onClick={() => downloadMedia(previewMedia.url)}
               >
                 <Download className="mr-2 h-4 w-4" />
                 Baixar
@@ -845,11 +870,20 @@ const Conversations = () => {
             )}
           </div>
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4 sm:p-8">
-            {previewImage && (
+            {previewMedia?.type === 'image' && (
               <img
-                src={previewImage.url}
-                alt={previewImage.alt}
+                src={previewMedia.url}
+                alt={previewMedia.alt}
                 className="max-h-full max-w-full object-contain shadow-2xl"
+              />
+            )}
+            {previewMedia?.type === 'video' && (
+              <video
+                src={previewMedia.url}
+                aria-label={previewMedia.alt}
+                controls
+                autoPlay
+                className="max-h-full max-w-full bg-black shadow-2xl"
               />
             )}
           </div>
