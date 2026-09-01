@@ -122,6 +122,28 @@ function convertAudioForWhatsApp(inputPath: string, outputPath: string) {
   })
 }
 
+function convertVideoForWhatsApp(inputPath: string, outputPath: string) {
+  return new Promise<void>((resolve, reject) => {
+    const process = spawn('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error', '-y',
+      '-i', inputPath,
+      '-vf', 'scale=trunc(min(1280,iw)/2)*2:trunc(min(1280,ih)/2)*2:force_original_aspect_ratio=decrease',
+      '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.1', '-pix_fmt', 'yuv420p',
+      '-preset', 'veryfast', '-crf', '28',
+      '-c:a', 'aac', '-b:a', '96k', '-ac', '2',
+      '-movflags', '+faststart',
+      outputPath,
+    ])
+    let errorOutput = ''
+    process.stderr.on('data', (chunk) => { errorOutput += String(chunk) })
+    process.on('error', reject)
+    process.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(errorOutput.trim() || `ffmpeg encerrou com codigo ${code}`))
+    })
+  })
+}
+
 async function persistMedia(req: any, res: any) {
   try {
     if (!req.file) {
@@ -147,7 +169,8 @@ async function persistMedia(req: any, res: any) {
     const uploadDirectory = path.join(process.cwd(), 'uploads', ...relativeDirectory.split('/'))
     const mediaId = randomUUID()
     const needsAudioConversion = mediaConfig.mediaType === 'audio'
-    let storedFilename = needsAudioConversion
+    const needsVideoConversion = mediaConfig.mediaType === 'video'
+    let storedFilename = needsAudioConversion || needsVideoConversion
       ? `${mediaId}.source.${mediaConfig.extension}`
       : `${mediaId}.${mediaConfig.extension}`
     let storedMimetype = req.file.mimetype
@@ -175,6 +198,28 @@ async function persistMedia(req: any, res: any) {
         await fs.unlink(initialPath).catch(() => undefined)
         await fs.unlink(convertedPath).catch(() => undefined)
         throw new Error(`Nao foi possivel preparar o audio: ${error instanceof Error ? error.message : 'falha na conversao'}`)
+      }
+    }
+
+    if (needsVideoConversion) {
+      const convertedFilename = `${mediaId}.mp4`
+      const convertedPath = path.join(uploadDirectory, convertedFilename)
+      try {
+        await convertVideoForWhatsApp(initialPath, convertedPath)
+        const converted = await fs.stat(convertedPath)
+        await fs.unlink(initialPath)
+        if (converted.size > mediaConfig.maxBytes) {
+          await fs.unlink(convertedPath).catch(() => undefined)
+          const maxMb = Math.floor(mediaConfig.maxBytes / MB)
+          return res.status(413).json(createErrorResponse(`O video compactado excede o limite final de ${maxMb} MB. Envie um video menor.`, 413))
+        }
+        storedFilename = convertedFilename
+        storedMimetype = 'video/mp4'
+        storedSize = converted.size
+      } catch (error) {
+        await fs.unlink(initialPath).catch(() => undefined)
+        await fs.unlink(convertedPath).catch(() => undefined)
+        throw new Error(`Nao foi possivel preparar o video: ${error instanceof Error ? error.message : 'falha na conversao'}`)
       }
     }
 

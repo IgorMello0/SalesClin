@@ -1,4 +1,6 @@
 import { Router } from 'express'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { prisma } from '../prisma.js'
 import { auth, requireModule } from '../middleware/auth.js'
 import { createErrorResponse, createSuccessResponse, parsePagination } from '../utils/response.js'
@@ -61,26 +63,68 @@ function getFileNameFromUrl(url: string, mediaType: string) {
   return 'imagem.jpg'
 }
 
+function getLocalUploadPath(mediaUrl: string) {
+  try {
+    const parsed = new URL(mediaUrl)
+    if (!parsed.pathname.startsWith('/uploads/')) return null
+    const relative = parsed.pathname.replace(/^\/uploads\/+/, '')
+    if (!relative || relative.includes('..')) return null
+    return path.join(process.cwd(), 'uploads', ...relative.split('/'))
+  } catch {
+    if (!mediaUrl.startsWith('/uploads/')) return null
+    const relative = mediaUrl.replace(/^\/uploads\/+/, '')
+    if (!relative || relative.includes('..')) return null
+    return path.join(process.cwd(), 'uploads', ...relative.split('/'))
+  }
+}
+
+async function readMediaForProvider(mediaUrl: string, mediaType: string) {
+  const localPath = getLocalUploadPath(mediaUrl)
+  if (localPath) {
+    const buffer = await fs.readFile(localPath)
+    return {
+      buffer,
+      contentType: getMimeTypeFromUrl(mediaUrl, mediaType),
+      filename: path.basename(localPath),
+      source: 'local',
+    }
+  }
+
+  const source = await fetch(mediaUrl)
+  if (!source.ok) {
+    throw new Error(`Nao foi possivel ler a midia publica (${source.status}).`)
+  }
+
+  return {
+    buffer: Buffer.from(await source.arrayBuffer()),
+    contentType: source.headers.get('content-type')?.split(';')[0]?.trim() || getMimeTypeFromUrl(mediaUrl, mediaType),
+    filename: getFileNameFromUrl(mediaUrl, mediaType),
+    source: 'public-url',
+  }
+}
+
 async function uploadMetaMediaFromUrl(input: {
   phoneNumberId: string
   token: string
   mediaUrl: string
   mediaType: string
 }) {
-  const source = await fetch(input.mediaUrl)
-  if (!source.ok) {
-    throw new Error(`Nao foi possivel ler a midia publica (${source.status}).`)
-  }
-
+  const media = await readMediaForProvider(input.mediaUrl, input.mediaType)
   const contentType = input.mediaType === 'audio'
     ? 'audio/ogg'
-    : source.headers.get('content-type')?.split(';')[0]?.trim()
-      || getMimeTypeFromUrl(input.mediaUrl, input.mediaType)
-  const buffer = await source.arrayBuffer()
+    : media.contentType
   const form = new FormData()
   form.set('messaging_product', 'whatsapp')
   form.set('type', contentType)
-  form.set('file', new Blob([Buffer.from(buffer) as any], { type: contentType }), getFileNameFromUrl(input.mediaUrl, input.mediaType))
+  form.set('file', new Blob([media.buffer as any], { type: contentType }), media.filename)
+
+  console.info('[Conversas] Upload de midia para Meta', {
+    mediaType: input.mediaType,
+    contentType,
+    filename: media.filename,
+    size: media.buffer.length,
+    source: media.source,
+  })
 
   const response = await fetch(`https://graph.facebook.com/v19.0/${input.phoneNumberId}/media`, {
     method: 'POST',
@@ -89,6 +133,13 @@ async function uploadMetaMediaFromUrl(input: {
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok || !payload?.id) {
+    console.error('[Conversas] Meta media upload falhou', {
+      status: response.status,
+      mediaType: input.mediaType,
+      contentType,
+      filename: media.filename,
+      response: payload,
+    })
     throw new Error(payload?.error?.message || `Meta media upload HTTP ${response.status}`)
   }
 
@@ -428,6 +479,12 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
             path: '/send/media',
             body,
           })
+          console.info('[Conversas] UAZAPI envio de midia tentativa', {
+            mediaType,
+            status: result.response.status,
+            ok: result.response.ok,
+            payloadKeys: Object.keys(body),
+          })
           if (result.response.ok) break
         }
       } else {
@@ -441,8 +498,17 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
 
       if (!result.response.ok) {
         const message = result.data?.message || result.data?.error || result.text || `HTTP ${result.response.status}`
+        console.error('[Conversas] UAZAPI envio falhou', {
+          status: result.response.status,
+          mediaType: mediaUrl ? mediaType : 'text',
+          response: result.data || result.text,
+        })
         return res.status(502).json(createErrorResponse(`Falha ao enviar pelo WhatsApp: ${String(message).replace(/UAZAPI/gi, 'servico')}`, 502))
       }
+      console.info('[Conversas] UAZAPI envio aceito', {
+        mediaType: mediaUrl ? mediaType : 'text',
+        providerMessageId: result.data?.messageid || result.data?.messageId || result.data?.id || null,
+      })
       providerMessageId = result.data?.messageid || result.data?.messageId || result.data?.id || null
       origin = 'WhatsApp'
     } else if (provider === 'meta') {
@@ -473,7 +539,11 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
             mediaType,
           })
         } catch (uploadError) {
-          console.warn('[Conversas] Meta media upload falhou, usando link direto:', uploadError)
+          console.error('[Conversas] Meta media upload abortou envio:', uploadError)
+          return res.status(502).json(createErrorResponse(
+            `Meta: ${uploadError instanceof Error ? uploadError.message : 'Falha ao preparar midia para envio'}`,
+            502,
+          ))
         }
       }
 
@@ -504,8 +574,18 @@ router.post('/:id/messages', auth(), requireModule('conversas'), async (req, res
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) {
         const message = payload?.error?.message || `HTTP ${response.status}`
+        console.error('[Conversas] Meta envio falhou', {
+          status: response.status,
+          mediaType: mediaUrl ? mediaType : 'text',
+          hasUploadedMediaId: Boolean(uploadedMediaId),
+          response: payload,
+        })
         return res.status(502).json(createErrorResponse(`Meta: ${message}`, 502))
       }
+      console.info('[Conversas] Meta envio aceito', {
+        mediaType: mediaUrl ? mediaType : 'text',
+        providerMessageId: payload?.messages?.[0]?.id || null,
+      })
       providerMessageId = payload?.messages?.[0]?.id || null
       origin = 'WhatsApp Meta'
     } else {

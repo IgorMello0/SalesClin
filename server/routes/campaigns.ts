@@ -27,6 +27,40 @@ function normalizeCampaignProvider(value: unknown): CampaignProvider | null {
   return provider === 'meta' || provider === 'uazapi' || provider === 'evolution' ? provider : null
 }
 
+function getPublicAppUrlFromRequest(req?: any) {
+  const configured = String(process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.FRONTEND_URL || '')
+    .trim()
+    .replace(/\/+$/, '')
+  if (configured) return configured
+  if (!req) return ''
+  return `${req.protocol}://${req.get('host')}`.replace(/\/+$/, '')
+}
+
+function toPublicMediaUrl(url: string, req?: any) {
+  if (!url || url.startsWith('data:') || /^https?:\/\//i.test(url)) return url
+  if (url.startsWith('/uploads/')) {
+    const publicUrl = getPublicAppUrlFromRequest(req)
+    return publicUrl ? `${publicUrl}${url}` : url
+  }
+  return url
+}
+
+function normalizeMediaUrlPayload(value?: string | null, req?: any) {
+  if (!value) return value
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) {
+      return JSON.stringify(parsed.map((item: any) => ({
+        ...item,
+        url: item?.url ? toPublicMediaUrl(String(item.url), req) : item?.url,
+      })))
+    }
+  } catch {
+    // Plain URL, handled below.
+  }
+  return toPublicMediaUrl(value, req)
+}
+
 function getTemplateBodyDescriptor(template: { components: unknown; parameterFormat?: string | null }) {
   const components = Array.isArray(template.components) ? template.components as Array<Record<string, unknown>> : []
   const body = components.find(component => String(component.type || '').toUpperCase() === 'BODY')
@@ -532,19 +566,17 @@ router.post('/:id/send', auth(), async (req, res) => {
       try {
         const parsed = JSON.parse(absoluteMediaUrl)
         if (Array.isArray(parsed)) {
-          const requestHost = req.get('host')
-          const protocol = req.protocol
           const mapped = parsed.map((item: any, idx: number) => {
             if (item.url) {
               if (item.url.startsWith('data:')) {
                 return {
                   ...item,
-                  url: `${protocol}://${requestHost}${getCampaignMediaPath(id, String(idx))}`
+                  url: `${getPublicAppUrlFromRequest(req)}${getCampaignMediaPath(id, String(idx))}`
                 }
               } else if (item.url.startsWith('/uploads/')) {
                 return {
                   ...item,
-                  url: `${protocol}://${requestHost}${item.url}`
+                  url: toPublicMediaUrl(item.url, req)
                 }
               }
             }
@@ -552,25 +584,26 @@ router.post('/:id/send', auth(), async (req, res) => {
           })
           absoluteMediaUrl = JSON.stringify(mapped)
         } else if (absoluteMediaUrl.startsWith('data:')) {
-          const requestHost = req.get('host')
-          const protocol = req.protocol
-          absoluteMediaUrl = `${protocol}://${requestHost}${getCampaignMediaPath(id, 'single')}`
+          absoluteMediaUrl = `${getPublicAppUrlFromRequest(req)}${getCampaignMediaPath(id, 'single')}`
         } else if (absoluteMediaUrl.startsWith('/uploads/')) {
-          const requestHost = req.get('host')
-          const protocol = req.protocol
-          absoluteMediaUrl = `${protocol}://${requestHost}${absoluteMediaUrl}`
+          absoluteMediaUrl = toPublicMediaUrl(absoluteMediaUrl, req)
         }
       } catch {
         if (absoluteMediaUrl.startsWith('data:')) {
-          const requestHost = req.get('host')
-          const protocol = req.protocol
-          absoluteMediaUrl = `${protocol}://${requestHost}${getCampaignMediaPath(id, 'single')}`
+          absoluteMediaUrl = `${getPublicAppUrlFromRequest(req)}${getCampaignMediaPath(id, 'single')}`
         } else if (absoluteMediaUrl.startsWith('/uploads/')) {
-          const requestHost = req.get('host')
-          const protocol = req.protocol
-          absoluteMediaUrl = `${protocol}://${requestHost}${absoluteMediaUrl}`
+          absoluteMediaUrl = toPublicMediaUrl(absoluteMediaUrl, req)
         }
       }
+    }
+
+    if (absoluteMediaUrl) {
+      console.info('[campaigns] media url preparada para envio', {
+        campaignId: id,
+        provider,
+        mediaType: campaign.mediaType,
+        mediaUrl: absoluteMediaUrl.slice(0, 240),
+      })
     }
 
     // Processar envios em background
@@ -1683,10 +1716,7 @@ export async function resumeInterruptedCampaigns() {
       where: { campaignId: campaign.id, status: 'pending', attempts: { lt: 4 } },
     })
     const provider = normalizeCampaignProvider(campaign.providerSnapshot || campaign.company.whatsappProvider) || 'evolution'
-    const publicUrl = String(process.env.PUBLIC_APP_URL || '').replace(/\/$/, '')
-    const mediaUrl = campaign.mediaUrl?.startsWith('/uploads/') && publicUrl
-      ? `${publicUrl}${campaign.mediaUrl}`
-      : campaign.mediaUrl
+    const mediaUrl = normalizeMediaUrlPayload(campaign.mediaUrl)
 
     void processCampaignSend(campaign.id, recipients, {
       provider,
