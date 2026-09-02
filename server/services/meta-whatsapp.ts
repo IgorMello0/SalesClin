@@ -181,6 +181,14 @@ type MetaSubscribedApp = {
   }
 }
 
+const META_WABA_WEBHOOK_FIELDS = [
+  'messages',
+  'message_echoes',
+  'smb_message_echoes',
+  'smb_app_state_sync',
+  'history',
+]
+
 export function inspectMetaWebhookSubscriptions(
   subscriptions: MetaSubscribedApp[],
   expectedAppId: string,
@@ -213,13 +221,25 @@ async function subscribeWhatsappApp(
 ): Promise<MetaWebhookSubscription | null> {
   try {
     const { appId } = requireMetaCredentials()
-    await graphPost(`/${wabaId}/subscribed_apps`, accessToken)
+    await graphPost(`/${wabaId}/subscribed_apps`, accessToken).catch(async (error) => {
+      console.warn('[Meta WhatsApp] Assinatura basica sem campos falhou, tentando com campos:', error)
+      await graphPost(`/${wabaId}/subscribed_apps`, accessToken, {
+        subscribed_fields: META_WABA_WEBHOOK_FIELDS,
+      })
+    })
 
     if (!webhook) return null
 
-    await graphPost(`/${wabaId}/subscribed_apps`, accessToken, {
+    const webhookPayload = {
       override_callback_uri: webhook.callbackUrl,
       verify_token: webhook.verifyToken,
+    }
+    await graphPost(`/${wabaId}/subscribed_apps`, accessToken, {
+      ...webhookPayload,
+      subscribed_fields: META_WABA_WEBHOOK_FIELDS,
+    }).catch(async (error) => {
+      console.warn('[Meta WhatsApp] Assinatura com campos de coexistencia falhou, mantendo callback padrao:', error)
+      await graphPost(`/${wabaId}/subscribed_apps`, accessToken, webhookPayload)
     })
 
     const subscriptions = await graphGet<{ data?: MetaSubscribedApp[] }>(
