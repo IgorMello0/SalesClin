@@ -99,6 +99,16 @@ type UazapiStatus = {
   message?: string;
 };
 
+type GoogleCalendarStatus = {
+  connected?: boolean;
+  status?: 'connected' | 'disconnected' | 'error' | string;
+  googleEmail?: string | null;
+  calendarId?: string | null;
+  lastSyncAt?: string | null;
+  lastError?: string | null;
+  pendingCount?: number;
+};
+
 type IntegrationOption = {
   id: IntegrationKey;
   title: string;
@@ -185,10 +195,11 @@ const Integrations = () => {
   const navigate = useNavigate();
   const canManageIntegrations = professional?.role === 'admin' || professional?.role === 'profissional';
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationKey | null>(null);
-  const [workingKey, setWorkingKey] = useState<IntegrationKey | 'meta-save' | 'meta-disconnect' | 'uazapi-qr' | 'uazapi-pair' | 'uazapi-disconnect' | null>(null);
+  const [workingKey, setWorkingKey] = useState<IntegrationKey | 'meta-save' | 'meta-disconnect' | 'uazapi-qr' | 'uazapi-pair' | 'uazapi-disconnect' | 'google-resync' | 'google-disconnect' | null>(null);
   const [metaStatus, setMetaStatus] = useState<MetaStatus | null>(null);
   const [metaForm, setMetaForm] = useState<MetaForm>(emptyMetaForm);
   const [uazapiStatus, setUazapiStatus] = useState<UazapiStatus | null>(null);
+  const [googleCalendarStatus, setGoogleCalendarStatus] = useState<GoogleCalendarStatus | null>(null);
   const [uazapiPhone, setUazapiPhone] = useState('');
   const [uazapiPolling, setUazapiPolling] = useState(false);
   const [uazapiMethod, setUazapiMethod] = useState<'qr' | 'pairing'>('qr');
@@ -223,6 +234,14 @@ const Integrations = () => {
     setUazapiStatus((current) => ({ ...current, ...(response.data || {}) }));
   };
 
+  const loadGoogleCalendarStatus = async () => {
+    const response = await googleCalendarApi.status();
+    if (!response.success) {
+      throw new Error(response.error?.message || 'Nao foi possivel consultar o Google Calendar.');
+    }
+    setGoogleCalendarStatus(response.data || {});
+  };
+
   useEffect(() => {
     if (!canManageIntegrations) return;
 
@@ -241,10 +260,17 @@ const Integrations = () => {
       setSelectedIntegration(channelMap[channel]);
     }
 
-    Promise.allSettled([loadMetaStatus(), loadUazapiStatus()]).then((results) => {
+    Promise.allSettled([loadMetaStatus(), loadUazapiStatus(), loadGoogleCalendarStatus()]).then((results) => {
       const failed = results.find((result) => result.status === 'rejected');
       if (failed?.status === 'rejected') {
         toast({ title: 'Erro ao carregar integracoes', description: failed.reason?.message, variant: 'destructive' });
+      }
+
+      const googleCalendarResult = params.get('googleCalendar');
+      if (googleCalendarResult === 'connected') {
+        toast({ title: 'Google Calendar conectado', description: 'O status e os agendamentos foram atualizados.' });
+      } else if (googleCalendarResult === 'error' || googleCalendarResult === 'missing') {
+        toast({ title: 'Google Calendar nao conectado', description: 'A autorizacao nao foi concluida. Tente novamente.', variant: 'destructive' });
       }
     });
   }, [canManageIntegrations]);
@@ -419,6 +445,41 @@ const Integrations = () => {
     }
   };
 
+  const resyncGoogleCalendar = async () => {
+    setWorkingKey('google-resync');
+    try {
+      const response = await googleCalendarApi.resync();
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel sincronizar a agenda.');
+      const result = response.data || {};
+      toast({
+        title: 'Agenda sincronizada',
+        description: `${result.synced || 0} agendamento(s) sincronizado(s)${result.failed ? `; ${result.failed} falharam.` : '.'}`,
+        variant: result.failed ? 'destructive' : 'default',
+      });
+      await loadGoogleCalendarStatus();
+    } catch (error: any) {
+      toast({ title: 'Erro ao sincronizar agenda', description: error.message, variant: 'destructive' });
+      await loadGoogleCalendarStatus().catch(() => undefined);
+    } finally {
+      setWorkingKey(null);
+    }
+  };
+
+  const disconnectGoogleCalendar = async () => {
+    if (!confirm('Desconectar o Google Calendar desta clinica?')) return;
+    setWorkingKey('google-disconnect');
+    try {
+      const response = await googleCalendarApi.disconnect();
+      if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel desconectar o Google Calendar.');
+      setGoogleCalendarStatus({ connected: false, status: 'disconnected', pendingCount: 0 });
+      toast({ title: 'Google Calendar desconectado' });
+    } catch (error: any) {
+      toast({ title: 'Erro ao desconectar Google Calendar', description: error.message, variant: 'destructive' });
+    } finally {
+      setWorkingKey(null);
+    }
+  };
+
   const showComingSoon = (name: string) => {
     toast({
       title: `${name} em breve`,
@@ -434,12 +495,14 @@ const Integrations = () => {
       return !!metaStatus?.connected && metaStatus.officialMode === 'coexistence';
     }
     if (key === 'whatsappUazapi') return !!uazapiStatus?.connected;
+    if (key === 'googleCalendar') return googleCalendarStatus?.status === 'connected';
     return false;
   };
 
   const renderIntegrationCard = (option: IntegrationOption) => {
     const connected = isIntegrationConnected(option.id);
     const isWhatsApp = option.id.startsWith('whatsapp');
+    const hasGoogleError = option.id === 'googleCalendar' && googleCalendarStatus?.status === 'error';
 
     return (
       <button
@@ -453,14 +516,16 @@ const Integrations = () => {
             {option.logo}
           </div>
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
-            connected
+            hasGoogleError
+              ? 'bg-red-50 text-red-700'
+              : connected
               ? 'bg-emerald-50 text-emerald-700'
               : option.available
                 ? isWhatsApp ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
                 : 'bg-slate-100 text-slate-400'
           }`}>
             {connected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-            {connected ? 'Conectado' : option.status}
+            {hasGoogleError ? 'Atenção' : connected ? 'Conectado' : option.status}
           </span>
         </div>
         <div className="mt-5 w-full">
@@ -991,19 +1056,62 @@ const Integrations = () => {
             )}
 
             {selectedIntegration === 'googleCalendar' && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-start gap-3">
-                  <CalendarDays className="mt-0.5 text-blue-600" size={22} />
-                  <div>
-                    <p className="font-black text-slate-950">Sincronizar agenda</p>
-                    <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-                      Conecte a conta Google da clinica para manter compromissos e agenda sincronizados.
-                    </p>
-                    <Button onClick={connectGoogleCalendar} disabled={workingKey === 'googleCalendar'} className="mt-4 bg-slate-950 font-bold hover:bg-slate-800">
-                      {workingKey === 'googleCalendar' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
-                      Conectar Google Calendar
-                    </Button>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_250px]">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-start gap-3">
+                    <CalendarDays className="mt-0.5 text-blue-600" size={22} />
+                    <div className="min-w-0">
+                      <p className="font-black text-slate-950">Google Calendar</p>
+                      {googleCalendarStatus?.status === 'connected' ? (
+                        <>
+                          <p className="mt-2 text-sm font-medium text-emerald-700">Conta conectada</p>
+                          <p className="mt-1 break-all text-sm text-slate-600">{googleCalendarStatus.googleEmail || 'Conta Google autorizada'}</p>
+                        </>
+                      ) : googleCalendarStatus?.status === 'error' ? (
+                        <>
+                          <p className="mt-2 text-sm font-medium text-red-700">Conexao precisa de atencao</p>
+                          <p className="mt-1 text-sm leading-relaxed text-red-700">{googleCalendarStatus.lastError || 'O Google recusou a ultima sincronizacao.'}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">Conecte a conta Google da clinica para sincronizar os agendamentos.</p>
+                          <Button onClick={connectGoogleCalendar} disabled={workingKey === 'googleCalendar'} className="mt-4 bg-slate-950 font-bold hover:bg-slate-800">
+                            {workingKey === 'googleCalendar' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
+                            Conectar Google Calendar
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Ultima sincronizacao</p>
+                    <p className="mt-2 text-sm font-black text-slate-950">
+                      {googleCalendarStatus?.lastSyncAt ? new Date(googleCalendarStatus.lastSyncAt).toLocaleString('pt-BR') : 'Ainda nao realizada'}
+                    </p>
+                    <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-slate-400">Pendentes</p>
+                    <p className="mt-1 text-sm font-black text-slate-950">{googleCalendarStatus?.pendingCount || 0}</p>
+                  </div>
+
+                  <Button variant="outline" onClick={() => void loadGoogleCalendarStatus()} disabled={!!workingKey} className="w-full font-bold">
+                    <RefreshCcw size={16} className="mr-2" /> Atualizar status
+                  </Button>
+
+                  {googleCalendarStatus?.status === 'connected' && (
+                    <Button onClick={resyncGoogleCalendar} disabled={!!workingKey} className="w-full bg-slate-950 font-bold hover:bg-slate-800">
+                      {workingKey === 'google-resync' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <RefreshCcw size={16} className="mr-2" />}
+                      Sincronizar agenda
+                    </Button>
+                  )}
+
+                  {googleCalendarStatus?.connected && (
+                    <Button variant="outline" onClick={disconnectGoogleCalendar} disabled={!!workingKey} className="w-full font-bold text-red-600 hover:text-red-700">
+                      {workingKey === 'google-disconnect' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Unplug size={16} className="mr-2" />}
+                      Desconectar
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

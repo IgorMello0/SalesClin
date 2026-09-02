@@ -106,7 +106,13 @@ export async function handleGoogleCalendarCallback(code: string, stateToken: str
     },
   })
 
-  return { companyId: state.companyId, googleEmail }
+  const initialSync = await resyncCompanyAppointments(state.companyId)
+  console.info('[GoogleCalendar] Sincronizacao inicial concluida', {
+    companyId: state.companyId,
+    ...initialSync,
+  })
+
+  return { companyId: state.companyId, googleEmail, initialSync }
 }
 
 async function getConnection(companyId?: number | null) {
