@@ -171,6 +171,7 @@ type MetaWebhookSubscription = {
   appSubscribed: boolean
   subscribedAppId: string | null
   reportedCallbackUrl: string | null
+  requestedFields: string[]
 }
 
 type MetaSubscribedApp = {
@@ -181,7 +182,9 @@ type MetaSubscribedApp = {
   }
 }
 
-const META_WABA_WEBHOOK_FIELDS = [
+const META_STANDARD_WEBHOOK_FIELDS = ['messages']
+
+export const META_COEXISTENCE_WEBHOOK_FIELDS = [
   'messages',
   'message_echoes',
   'smb_message_echoes',
@@ -189,10 +192,17 @@ const META_WABA_WEBHOOK_FIELDS = [
   'history',
 ]
 
+export function getMetaWebhookFields(officialMode: WhatsAppOfficialMode = 'cloud_api') {
+  return officialMode === 'coexistence'
+    ? [...META_COEXISTENCE_WEBHOOK_FIELDS]
+    : [...META_STANDARD_WEBHOOK_FIELDS]
+}
+
 export function inspectMetaWebhookSubscriptions(
   subscriptions: MetaSubscribedApp[],
   expectedAppId: string,
   expectedCallbackUrl: string,
+  requestedFields: string[] = [],
 ): MetaWebhookSubscription {
   const expectedId = cleanRequired(expectedAppId, 'META_APP_ID')
   const expectedCallback = cleanRequired(expectedCallbackUrl, 'URL do webhook')
@@ -207,6 +217,7 @@ export function inspectMetaWebhookSubscriptions(
     subscribedAppId: cleanOptional(app?.whatsapp_business_api_data?.id),
     reportedCallbackUrl,
     overrideVerified: Boolean(app && reportedCallbackUrl === expectedCallback),
+    requestedFields,
   }
 }
 
@@ -218,29 +229,27 @@ async function subscribeWhatsappApp(
   wabaId: string,
   accessToken: string,
   webhook?: { callbackUrl: string; verifyToken: string },
+  requestedFields: string[] = META_STANDARD_WEBHOOK_FIELDS,
 ): Promise<MetaWebhookSubscription | null> {
   try {
     const { appId } = requireMetaCredentials()
-    await graphPost(`/${wabaId}/subscribed_apps`, accessToken).catch(async (error) => {
-      console.warn('[Meta WhatsApp] Assinatura basica sem campos falhou, tentando com campos:', error)
-      await graphPost(`/${wabaId}/subscribed_apps`, accessToken, {
-        subscribed_fields: META_WABA_WEBHOOK_FIELDS,
-      })
+    const subscriptionPayload = {
+      ...(webhook
+        ? {
+          override_callback_uri: webhook.callbackUrl,
+          verify_token: webhook.verifyToken,
+        }
+        : {}),
+      subscribed_fields: requestedFields,
+    }
+    console.info('[Meta WhatsApp] Solicitando assinatura do webhook', {
+      wabaId,
+      requestedFields,
+      hasCallbackOverride: Boolean(webhook),
     })
+    await graphPost(`/${wabaId}/subscribed_apps`, accessToken, subscriptionPayload)
 
     if (!webhook) return null
-
-    const webhookPayload = {
-      override_callback_uri: webhook.callbackUrl,
-      verify_token: webhook.verifyToken,
-    }
-    await graphPost(`/${wabaId}/subscribed_apps`, accessToken, {
-      ...webhookPayload,
-      subscribed_fields: META_WABA_WEBHOOK_FIELDS,
-    }).catch(async (error) => {
-      console.warn('[Meta WhatsApp] Assinatura com campos de coexistencia falhou, mantendo callback padrao:', error)
-      await graphPost(`/${wabaId}/subscribed_apps`, accessToken, webhookPayload)
-    })
 
     const subscriptions = await graphGet<{ data?: MetaSubscribedApp[] }>(
       `/${wabaId}/subscribed_apps`,
@@ -250,6 +259,7 @@ async function subscribeWhatsappApp(
       subscriptions.data || [],
       appId,
       webhook.callbackUrl,
+      requestedFields,
     )
 
     if (!verification.appSubscribed) {
@@ -262,7 +272,7 @@ async function subscribeWhatsappApp(
     return verification
   } catch (error: any) {
     throw new Error(
-      `Nao foi possivel habilitar o recebimento de mensagens na Meta: ${error.message || 'verifique as permissoes do token.'}`
+      `A Meta recusou a assinatura do webhook com os campos solicitados: ${error.message || 'verifique as permissoes do token e a configuracao de coexistencia.'}`
     )
   }
 }
@@ -456,10 +466,16 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
     where: { id: payload.companyId },
     data: { metaWebhookVerifyToken: webhookVerifyToken },
   })
-  const webhookSubscription = await subscribeWhatsappApp(account.wabaId, accessToken, {
-    callbackUrl: webhookUrl,
-    verifyToken: webhookVerifyToken,
-  })
+  const requestedWebhookFields = getMetaWebhookFields(payload.officialMode)
+  const webhookSubscription = await subscribeWhatsappApp(
+    account.wabaId,
+    accessToken,
+    {
+      callbackUrl: webhookUrl,
+      verifyToken: webhookVerifyToken,
+    },
+    requestedWebhookFields,
+  )
 
   const updated = await prisma.empresa.update({
     where: { id: payload.companyId },
@@ -502,6 +518,8 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
       edgeName: account.edgeName,
       webhookCallbackUrl: webhookUrl,
       webhookOverrideVerified: webhookSubscription?.overrideVerified === true,
+      webhookSubscribedFields: webhookSubscription?.requestedFields || [],
+      webhookFieldsRequestedAt: new Date().toISOString(),
     },
   })
 
@@ -538,6 +556,18 @@ export async function getMetaWhatsappStatus(companyId: number) {
   const connectionMetadata = connection?.metadata && typeof connection.metadata === 'object'
     ? connection.metadata as Record<string, unknown>
     : {}
+  const officialMode = connection?.provider === 'meta' ? (connection.officialMode || 'cloud_api') : 'cloud_api'
+  const requestedWebhookFields = Array.isArray(connectionMetadata.webhookSubscribedFields)
+    ? connectionMetadata.webhookSubscribedFields.filter((field): field is string => typeof field === 'string')
+    : []
+  const coexistenceWebhookFieldsRequested = officialMode === 'coexistence'
+    && META_COEXISTENCE_WEBHOOK_FIELDS.every((field) => requestedWebhookFields.includes(field))
+  const missingCoexistenceWebhookFields = officialMode === 'coexistence'
+    ? META_COEXISTENCE_WEBHOOK_FIELDS.filter((field) => !requestedWebhookFields.includes(field))
+    : []
+  const coexistenceWebhookFieldsRequestedAt = typeof connectionMetadata.webhookFieldsRequestedAt === 'string'
+    ? connectionMetadata.webhookFieldsRequestedAt
+    : null
   const expectedWebhookUrl = buildMetaWebhookUrl(company.webhookToken)
   let webhookConfigured = false
   let webhookDiagnostic: string | null = null
@@ -569,6 +599,9 @@ export async function getMetaWhatsappStatus(companyId: number) {
     }
   } else if (connected) {
     webhookDiagnostic = 'A conexao nao possui WABA ID ou token para validar o recebimento.'
+  }
+  if (officialMode === 'coexistence' && webhookConfigured && !coexistenceWebhookFieldsRequested) {
+    webhookDiagnostic = 'A URL do webhook esta correta, mas a sincronizacao de mensagens enviadas pelo celular ainda nao foi solicitada com sucesso.'
   }
   const lastWebhookEvent = await prisma.whatsAppWebhookEvent.findFirst({
     where: { companyId, provider: 'meta' },
@@ -614,7 +647,11 @@ export async function getMetaWhatsappStatus(companyId: number) {
     lastWebhookEvent,
     lastPhoneEchoEvent,
     connectedAt: company.metaConnectedAt,
-    officialMode: connection?.provider === 'meta' ? (connection.officialMode || 'cloud_api') : 'cloud_api',
+    officialMode,
+    requestedWebhookFields,
+    coexistenceWebhookFieldsRequested,
+    coexistenceWebhookFieldsRequestedAt,
+    missingCoexistenceWebhookFields,
     coexistenceEnabled: isCoexistenceEnabled(),
     coexistenceConfigured: Boolean(process.env.META_WHATSAPP_COEXISTENCE_CONFIG_ID),
     graphVersion: GRAPH_VERSION,
@@ -652,10 +689,16 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
     where: { id: companyId },
     data: { metaWebhookVerifyToken: webhookVerifyToken },
   })
-  const webhookSubscription = await subscribeWhatsappApp(wabaId, effectiveAccessToken, {
-    callbackUrl: webhookUrl,
-    verifyToken: webhookVerifyToken,
-  })
+  const requestedWebhookFields = getMetaWebhookFields('cloud_api')
+  const webhookSubscription = await subscribeWhatsappApp(
+    wabaId,
+    effectiveAccessToken,
+    {
+      callbackUrl: webhookUrl,
+      verifyToken: webhookVerifyToken,
+    },
+    requestedWebhookFields,
+  )
 
   const data: any = {
     whatsappProvider: 'meta',
@@ -705,6 +748,8 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
       onboarding: 'manual',
       webhookCallbackUrl: webhookUrl,
       webhookOverrideVerified: webhookSubscription?.overrideVerified === true,
+      webhookSubscribedFields: webhookSubscription?.requestedFields || [],
+      webhookFieldsRequestedAt: new Date().toISOString(),
     },
   })
 
@@ -744,17 +789,24 @@ export async function repairMetaWhatsappWebhook(companyId: number) {
     where: { id: companyId },
     data: { metaWebhookVerifyToken: webhookVerifyToken },
   })
-  const subscription = await subscribeWhatsappApp(company.metaWabaId, company.metaToken, {
-    callbackUrl: webhookUrl,
-    verifyToken: webhookVerifyToken,
-  })
+  const officialMode = connection?.officialMode === 'coexistence' ? 'coexistence' : 'cloud_api'
+  const requestedWebhookFields = getMetaWebhookFields(officialMode)
+  const subscription = await subscribeWhatsappApp(
+    company.metaWabaId,
+    company.metaToken,
+    {
+      callbackUrl: webhookUrl,
+      verifyToken: webhookVerifyToken,
+    },
+    requestedWebhookFields,
+  )
   const currentMetadata = connection?.metadata && typeof connection.metadata === 'object'
     ? connection.metadata as Record<string, unknown>
     : {}
 
   await upsertMetaConnection({
     companyId,
-    officialMode: connection?.officialMode === 'coexistence' ? 'coexistence' : 'cloud_api',
+    officialMode,
     status: 'connected',
     phoneNumberId: company.metaPhoneNumberId,
     wabaId: company.metaWabaId,
@@ -768,12 +820,16 @@ export async function repairMetaWhatsappWebhook(companyId: number) {
       webhookCallbackUrl: webhookUrl,
       webhookOverrideVerified: subscription?.overrideVerified === true,
       webhookRepairedAt: new Date().toISOString(),
+      webhookSubscribedFields: subscription?.requestedFields || [],
+      webhookFieldsRequestedAt: new Date().toISOString(),
     },
   })
 
   return {
     webhookUrl,
     webhookConfigured: subscription?.overrideVerified === true,
+    requestedWebhookFields: subscription?.requestedFields || [],
+    awaitingPhoneEcho: officialMode === 'coexistence',
   }
 }
 

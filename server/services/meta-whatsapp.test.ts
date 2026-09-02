@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { inspectMetaWebhookSubscriptions } from './meta-whatsapp.js'
+import {
+  getMetaWebhookFields,
+  inspectMetaWebhookSubscriptions,
+  META_COEXISTENCE_WEBHOOK_FIELDS,
+} from './meta-whatsapp.js'
 
 const APP_ID = '893193497129440'
 const CALLBACK_URL = 'https://sellclin.com/api/webhooks/meta/company-token'
@@ -35,4 +39,9 @@ test('rejeita callback diferente mesmo quando o app esta assinado', () => {
 
   assert.equal(result.appSubscribed, true)
   assert.equal(result.overrideVerified, false)
+})
+
+test('coexistencia solicita todos os campos necessarios para ecos do celular', () => {
+  assert.deepEqual(getMetaWebhookFields('coexistence'), META_COEXISTENCE_WEBHOOK_FIELDS)
+  assert.deepEqual(getMetaWebhookFields('cloud_api'), ['messages'])
 })

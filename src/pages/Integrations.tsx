@@ -51,6 +51,10 @@ type MetaStatus = {
   webhookDiagnostic?: string | null;
   subscribedAppId?: string | null;
   reportedCallbackUrl?: string | null;
+  requestedWebhookFields?: string[];
+  coexistenceWebhookFieldsRequested?: boolean;
+  coexistenceWebhookFieldsRequestedAt?: string | null;
+  missingCoexistenceWebhookFields?: string[];
   lastWebhookEvent?: {
     eventType?: string | null;
     status?: string;
@@ -336,7 +340,13 @@ const Integrations = () => {
     try {
       const response = await whatsappMetaApi.repairWebhook();
       if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel reparar o recebimento.');
-      toast({ title: 'Recebimento configurado', description: 'O webhook desta clinica foi atualizado na Meta.' });
+      const awaitingPhoneEcho = response.data?.awaitingPhoneEcho;
+      toast({
+        title: awaitingPhoneEcho ? 'Sincronizacao solicitada' : 'Recebimento configurado',
+        description: awaitingPhoneEcho
+          ? 'Agora envie uma mensagem pelo WhatsApp Business no celular para confirmar que ela chega ao SellClin.'
+          : 'O webhook desta clinica foi atualizado na Meta.',
+      });
       await loadMetaStatus();
     } catch (error: any) {
       toast({ title: 'Falha ao reparar recebimento', description: error.message, variant: 'destructive' });
@@ -777,7 +787,7 @@ const Integrations = () => {
                     <Button variant="outline" onClick={() => loadMetaStatus()} disabled={!!workingKey} className="w-full font-bold">
                       <RefreshCcw size={16} className="mr-2" /> Atualizar status
                     </Button>
-                    {isIntegrationConnected('whatsappCoexistence') && (!metaStatus?.webhookConfigured || !metaStatus?.lastPhoneEchoEvent) && (
+                    {isIntegrationConnected('whatsappCoexistence') && (!metaStatus?.webhookConfigured || !metaStatus?.coexistenceWebhookFieldsRequested || !metaStatus?.lastPhoneEchoEvent) && (
                       <Button
                         onClick={() => void repairMetaWebhook()}
                         disabled={workingKey === 'meta-webhook-repair'}
@@ -796,9 +806,19 @@ const Integrations = () => {
                     )}
                     {isIntegrationConnected('whatsappCoexistence') && metaStatus?.webhookConfigured && (
                       <div className={`rounded-lg border p-3 text-xs font-semibold ${metaStatus?.lastPhoneEchoEvent ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-                        {metaStatus.lastPhoneEchoEvent
-                          ? `Ultimo envio pelo celular recebido em ${new Date(metaStatus.lastPhoneEchoEvent.createdAt || '').toLocaleString('pt-BR')}.`
-                          : 'Ainda nao recebemos envios feitos pelo celular. Na Meta, assine os campos history, smb_app_state_sync e smb_message_echoes no webhook do WhatsApp Business Account.'}
+                        {metaStatus.lastPhoneEchoEvent ? (
+                          `Ultimo envio pelo celular recebido em ${new Date(metaStatus.lastPhoneEchoEvent.createdAt || '').toLocaleString('pt-BR')}.`
+                        ) : metaStatus.coexistenceWebhookFieldsRequested ? (
+                          <div className="space-y-1">
+                            <p className="font-black">Aguardando uma mensagem de teste do celular</p>
+                            <p className="leading-relaxed">Envie uma mensagem pelo WhatsApp Business. Quando ela chegar ao SellClin, este aviso confirmara a sincronizacao.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="font-black">Sincronizacao do celular pendente</p>
+                            <p className="leading-relaxed">Clique em Reparar recebimento para solicitar a sincronizacao das mensagens enviadas pelo WhatsApp Business.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                     {isIntegrationConnected('whatsappCoexistence') && (
