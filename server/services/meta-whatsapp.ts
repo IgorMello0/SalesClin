@@ -760,7 +760,10 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
   }
 }
 
-export async function repairMetaWhatsappWebhook(companyId: number) {
+export async function repairMetaWhatsappWebhook(
+  companyId: number,
+  requestedMode?: WhatsAppOfficialMode,
+) {
   const [company, connection] = await Promise.all([
     prisma.empresa.findUnique({
       where: { id: companyId },
@@ -789,7 +792,9 @@ export async function repairMetaWhatsappWebhook(companyId: number) {
     where: { id: companyId },
     data: { metaWebhookVerifyToken: webhookVerifyToken },
   })
-  const officialMode = connection?.officialMode === 'coexistence' ? 'coexistence' : 'cloud_api'
+  const officialMode = requestedMode === 'coexistence' || connection?.officialMode === 'coexistence'
+    ? 'coexistence'
+    : 'cloud_api'
   const requestedWebhookFields = getMetaWebhookFields(officialMode)
   const subscription = await subscribeWhatsappApp(
     company.metaWabaId,
@@ -820,6 +825,7 @@ export async function repairMetaWhatsappWebhook(companyId: number) {
       webhookCallbackUrl: webhookUrl,
       webhookOverrideVerified: subscription?.overrideVerified === true,
       webhookRepairedAt: new Date().toISOString(),
+      webhookRepairMode: officialMode,
       webhookSubscribedFields: subscription?.requestedFields || [],
       webhookFieldsRequestedAt: new Date().toISOString(),
     },

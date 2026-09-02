@@ -338,7 +338,7 @@ const Integrations = () => {
   const repairMetaWebhook = async () => {
     setWorkingKey('meta-webhook-repair');
     try {
-      const response = await whatsappMetaApi.repairWebhook();
+      const response = await whatsappMetaApi.repairWebhook('coexistence');
       if (!response.success) throw new Error(response.error?.message || 'Nao foi possivel reparar o recebimento.');
       const awaitingPhoneEcho = response.data?.awaitingPhoneEcho;
       toast({
@@ -776,8 +776,8 @@ const Integrations = () => {
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Conexão</p>
                       <div className="mt-3 flex items-center gap-2">
-                        <span className={`h-2.5 w-2.5 rounded-full ${isIntegrationConnected('whatsappCoexistence') ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        <p className="text-sm font-black text-slate-900">{isIntegrationConnected('whatsappCoexistence') ? 'Ativa' : 'Pendente'}</p>
+                        <span className={`h-2.5 w-2.5 rounded-full ${metaStatus?.connected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        <p className="text-sm font-black text-slate-900">{metaStatus?.connected ? 'Ativa' : 'Pendente'}</p>
                       </div>
                       <div className="mt-4 border-t border-slate-200 pt-4">
                         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Número</p>
@@ -787,7 +787,7 @@ const Integrations = () => {
                     <Button variant="outline" onClick={() => loadMetaStatus()} disabled={!!workingKey} className="w-full font-bold">
                       <RefreshCcw size={16} className="mr-2" /> Atualizar status
                     </Button>
-                    {isIntegrationConnected('whatsappCoexistence') && (!metaStatus?.webhookConfigured || !metaStatus?.coexistenceWebhookFieldsRequested || !metaStatus?.lastPhoneEchoEvent) && (
+                    {metaStatus?.connected && (!metaStatus?.webhookConfigured || !metaStatus?.coexistenceWebhookFieldsRequested || !metaStatus?.lastPhoneEchoEvent) && (
                       <Button
                         onClick={() => void repairMetaWebhook()}
                         disabled={workingKey === 'meta-webhook-repair'}
@@ -797,14 +797,14 @@ const Integrations = () => {
                         Reparar recebimento
                       </Button>
                     )}
-                    {isIntegrationConnected('whatsappCoexistence') && (
+                    {metaStatus?.connected && (
                       <div className={`rounded-lg border p-3 text-xs font-semibold ${metaStatus?.webhookConfigured ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                         {metaStatus?.webhookConfigured
                           ? 'Mensagens recebidas estao vinculadas a esta clinica.'
                           : (metaStatus?.webhookDiagnostic || 'A conexao esta ativa, mas o recebimento precisa ser configurado.')}
                       </div>
                     )}
-                    {isIntegrationConnected('whatsappCoexistence') && metaStatus?.webhookConfigured && (
+                    {metaStatus?.connected && metaStatus?.webhookConfigured && (
                       <div className={`rounded-lg border p-3 text-xs font-semibold ${metaStatus?.lastPhoneEchoEvent ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                         {metaStatus.lastPhoneEchoEvent ? (
                           `Ultimo envio pelo celular recebido em ${new Date(metaStatus.lastPhoneEchoEvent.createdAt || '').toLocaleString('pt-BR')}.`
@@ -821,7 +821,7 @@ const Integrations = () => {
                         )}
                       </div>
                     )}
-                    {isIntegrationConnected('whatsappCoexistence') && (
+                    {metaStatus?.connected && (
                       <Button variant="outline" onClick={disconnectMeta} disabled={workingKey === 'meta-disconnect'} className="w-full font-bold text-red-600 hover:text-red-700">
                         {workingKey === 'meta-disconnect' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Unplug size={16} className="mr-2" />}
                         Desconectar

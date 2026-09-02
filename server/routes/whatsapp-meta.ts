@@ -170,7 +170,10 @@ router.post('/webhook/repair', ...ownerOnly, async (req, res) => {
     const companyId = await getRequestCompanyId(req)
     if (!companyId) return res.status(404).json(createErrorResponse('Empresa nao encontrada', 404))
 
-    const result = await repairMetaWhatsappWebhook(companyId)
+    const requestedMode: WhatsAppOfficialMode | undefined = req.body?.mode === 'coexistence'
+      ? 'coexistence'
+      : undefined
+    const result = await repairMetaWhatsappWebhook(companyId, requestedMode)
     return res.json(createSuccessResponse(result))
   } catch (error: any) {
     console.error('[WhatsApp Meta Webhook Repair] Erro:', error)
