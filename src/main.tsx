@@ -4,7 +4,7 @@ import "./index.css";
 import { FormsProvider } from './contexts/FormsContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || window.__SELLCLIN_CONFIG__?.googleClientId || '';
 
 createRoot(document.getElementById("root")!).render(
   <GoogleOAuthProvider clientId={googleClientId}>

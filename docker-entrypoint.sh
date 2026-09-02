@@ -10,6 +10,13 @@ mkdir -p /app/uploads/media
 chown -R node:node /app/uploads
 chmod 750 /app/uploads
 
+GOOGLE_CLIENT_ID_JSON=$(node -e "process.stdout.write(JSON.stringify(process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || ''))")
+cat > /app/dist/env.js <<EOF
+window.__SELLCLIN_CONFIG__ = {
+  googleClientId: ${GOOGLE_CLIENT_ID_JSON}
+};
+EOF
+
 # Sync Prisma schema before the backend bootstrap runs.
 # The VPS deployment uses db push, so new tables must exist before startup seeds.
 if [ "${RUN_PRISMA_DB_PUSH:-false}" = "true" ]; then
