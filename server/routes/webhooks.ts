@@ -870,7 +870,7 @@ async function handleMetaVerification(req: any, res: any, webhookToken?: string)
 
   if (mode === 'subscribe' && token === expectedToken && challenge) {
     console.log('[Webhook/Meta] Challenge verificado com sucesso.');
-    return res.status(200).send(challenge);
+    return res.status(200).type('text/plain').send(challenge);
   }
 
   return res.sendStatus(403);

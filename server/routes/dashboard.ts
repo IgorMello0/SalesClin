@@ -91,7 +91,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
     if (companyId) baseWhere.companyId = companyId;
 
     const appointmentWhere: any = {
-      startTime: { gte: startDate, lte: endDate },
+      createdAt: { gte: startDate, lte: endDate },
       professionalId: { in: professionalIds },
       status: { in: ['agendado', 'confirmado', 'concluido'] }
     };

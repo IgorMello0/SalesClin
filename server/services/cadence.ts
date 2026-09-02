@@ -16,7 +16,7 @@ export async function triggerCadenceForLead(
       where: {
         leadId,
         cadenceStageCode: { not: null },
-        status: 'pending'
+        status: { notIn: ['completed', 'cancelled'] }
       },
       data: {
         status: 'cancelled'

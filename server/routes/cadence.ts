@@ -77,6 +77,23 @@ router.put('/:stageCode', auth(), async (req, res) => {
       }
     })
 
+    if (isActive) {
+      // Retrigger cadence for all leads currently in this stage so they get the new config
+      const leads = await prisma.lead.findMany({
+        where: { status: stageCode, companyId }
+      });
+      const { triggerCadenceForLead } = await import('../services/cadence.js');
+      for (const lead of leads) {
+        await triggerCadenceForLead(lead.id, companyId, stageCode, lead.sdrId || lead.closerId, lead.professionalId).catch(console.error);
+      }
+    } else if (isActive === false) {
+      // Cancel pending tasks if cadence was deactivated
+      await prisma.task.updateMany({
+        where: { companyId, cadenceStageCode: stageCode, status: { notIn: ['completed', 'cancelled'] } },
+        data: { status: 'cancelled' }
+      });
+    }
+
     res.json(createSuccessResponse(config))
   } catch (error: any) {
     console.error('[Cadence] Erro ao salvar configuração:', error)

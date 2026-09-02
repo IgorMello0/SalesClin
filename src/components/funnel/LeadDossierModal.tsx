@@ -694,9 +694,9 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                             >
                               <CheckSquare className="w-4 h-4" />
                               Tarefas
-                              {leadTasks.filter(t => t.status !== 'completed').length > 0 && (
+                              {leadTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length > 0 && (
                                 <span className="bg-secondary text-white text-[9px] px-1.5 py-0.5 rounded-full">
-                                  {leadTasks.filter(t => t.status !== 'completed').length}
+                                  {leadTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length}
                                 </span>
                               )}
                             </TabsTrigger>
@@ -986,13 +986,13 @@ export const LeadDossierModal = ({ lead: initialLead, open, onOpenChange, onUpda
                           <div className="space-y-3">
                             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Tarefas do Lead</h4>
                             
-                            {leadTasks.length === 0 ? (
+                            {leadTasks.filter(task => task.status !== 'cancelled').length === 0 ? (
                               <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 border-dashed">
                                 <p className="text-sm text-slate-400 italic">Nenhuma tarefa registrada.</p>
                               </div>
                             ) : (
                               <div className="grid grid-cols-1 gap-3">
-                                {leadTasks.map(task => (
+                                {leadTasks.filter(task => task.status !== 'cancelled').map(task => (
                                   <div key={task.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-start gap-3 shadow-sm hover:border-secondary/20 transition-colors">
                                     <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${task.status === 'completed' ? 'bg-secondary border-secondary text-white' : 'border-slate-300'}`}>
                                       {task.status === 'completed' && <Check className="w-3 h-3" />}

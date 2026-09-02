@@ -340,7 +340,7 @@ router.post('/', auth(), async (req, res) => {
     }
     
     // Disparar cadência ao criar o lead (se a etapa atual tiver uma configurada)
-    triggerCadenceForLead(created.id, created.companyId!, created.status, created.sdrId || created.closerId, created.professionalId).catch(console.error);
+    await triggerCadenceForLead(created.id, created.companyId!, created.status, created.sdrId || created.closerId, created.professionalId).catch(console.error);
 
     logAudit(req.user, 'CRIAR_LEAD', 'Lead', created.id)
     
@@ -770,7 +770,7 @@ router.put('/:id', auth(), async (req, res) => {
       
       // Trigger Cadence if status changed
       if (prismaData.status && prismaData.status !== currentLead.status) {
-        triggerCadenceForLead(id, currentLead.companyId!, prismaData.status, currentLead.sdrId || currentLead.closerId, currentLead.professionalId).catch(console.error);
+        await triggerCadenceForLead(id, currentLead.companyId!, prismaData.status, currentLead.sdrId || currentLead.closerId, currentLead.professionalId).catch(console.error);
       }
       
       if (req.user?.type === 'profissional') {
@@ -791,7 +791,7 @@ router.put('/:id', auth(), async (req, res) => {
     
     // Trigger Cadence if status changed
     if (prismaData.status && prismaData.status !== currentLead.status) {
-      triggerCadenceForLead(id, currentLead.companyId!, prismaData.status, currentLead.sdrId || currentLead.closerId, currentLead.professionalId).catch(console.error);
+      await triggerCadenceForLead(id, currentLead.companyId!, prismaData.status, currentLead.sdrId || currentLead.closerId, currentLead.professionalId).catch(console.error);
     }
     
     if (req.user?.type === 'profissional') {
