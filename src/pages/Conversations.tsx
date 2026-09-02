@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Bot, Check, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Mic,
+  Bot, Check, ChevronDown, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Mic,
   Maximize2, Paperclip, Phone, Plus, RefreshCcw, Search, Send, Smile, Square,
   StickyNote, Tag, User, X,
 } from 'lucide-react';
@@ -164,6 +164,7 @@ const Conversations = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<ConversationWorkspace>({ labels: [], professionals: [], users: [] });
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [notes, setNotes] = useState<ConversationNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [newNote, setNewNote] = useState('');
@@ -257,12 +258,21 @@ const Conversations = () => {
   }, [selectedId, selected?.unreadCount]);
 
   useEffect(() => {
-    if (!detailsOpen || !selectedId) return;
+    if (!notesOpen || !selectedId) return;
+    let cancelled = false;
     setNotesLoading(true);
     void conversationsApi.listNotes(selectedId).then((response) => {
-      if (response.success) setNotes(response.data || []);
-    }).finally(() => setNotesLoading(false));
-  }, [detailsOpen, selectedId]);
+      if (!cancelled && response.success) setNotes(response.data || []);
+    }).finally(() => {
+      if (!cancelled) setNotesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [notesOpen, selectedId]);
+
+  useEffect(() => {
+    setNotes([]);
+    setNewNote('');
+  }, [selectedId]);
 
   const filtered = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -653,9 +663,44 @@ const Conversations = () => {
                     </div>
                   </SelectTrigger>
                   <SelectContent><SelectItem value="manual">Atendimento manual</SelectItem>{agents.map((agent) => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}<SelectItem value="new"><span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" />Novo agente</span></SelectItem></SelectContent></Select>
-                <Button variant="outline" size="icon" onClick={() => setDetailsOpen(true)} aria-label="Abrir notas e organizacao" title="Notas e organizacao"><StickyNote className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setDetailsOpen(true)} aria-label="Abrir organizacao da conversa" title="Responsavel e etiquetas"><Tag className="h-4 w-4" /></Button>
+                <Button variant={notesOpen ? 'secondary' : 'outline'} size="icon" onClick={() => setNotesOpen((open) => !open)} aria-label={notesOpen ? 'Fechar notas internas' : 'Abrir notas internas'} title={notesOpen ? 'Fechar notas' : 'Notas internas'}><StickyNote className="h-4 w-4" /></Button>
               </div>
             </div>
+
+            {notesOpen && (
+              <section className="flex-shrink-0 border-b border-slate-200 bg-slate-50 px-5 py-3" aria-labelledby="conversation-notes-title">
+                <div className="mx-auto max-w-5xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <StickyNote className="h-4 w-4 flex-shrink-0 text-orange-500" />
+                      <div className="min-w-0">
+                        <h2 id="conversation-notes-title" className="text-sm font-bold text-slate-900">Notas internas</h2>
+                        <p className="text-xs text-slate-500">Visiveis apenas para a equipe.</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setNotesOpen(false)} aria-label="Fechar notas internas" title="Fechar notas"><ChevronDown className="h-4 w-4 rotate-180" /></Button>
+                  </div>
+                  <div className="mt-3 flex items-end gap-2">
+                    <Textarea value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Adicionar uma nota para a equipe..." rows={2} maxLength={2000} className="min-h-0 resize-none bg-white text-sm" />
+                    <Button size="sm" onClick={() => void addConversationNote()} disabled={!newNote.trim() || savingDetails}>
+                      {savingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Salvar
+                    </Button>
+                  </div>
+                  <div className="mt-3 max-h-40 space-y-3 overflow-y-auto border-t border-slate-200 pt-3 pr-1">
+                    {notesLoading ? <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div> : notes.length === 0 ? <p className="py-1 text-xs text-slate-500">Nenhuma nota nesta conversa.</p> : notes.map((note) => (
+                      <article key={note.id} className="border-l-2 border-orange-300 pl-3">
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{note.content}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                          {note.authorProfessional?.name || note.authorUser?.name || 'Equipe'} · {format(new Date(note.createdAt), "dd/MM 'as' HH:mm", { locale: ptBR })}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
 
             <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-8">
               {selected.mensagens.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><MessageCircle className="h-12 w-12 text-slate-300" /><p className="mt-3 font-bold text-slate-600">Conversa sem mensagens</p></div> : selected.mensagens.map((message, index) => {
@@ -729,7 +774,6 @@ const Conversations = () => {
               <div className="relative mx-auto flex max-w-5xl items-center gap-2">
                 <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={(event) => { selectMedia(event.target.files?.[0]); event.currentTarget.value = ''; }} />
                 <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={sending || officialWindowClosed} aria-label="Anexar midia"><Paperclip className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => setDetailsOpen(true)} aria-label="Abrir notas da conversa" title="Notas e organizacao"><StickyNote className="h-4 w-4" /></Button>
                 {isRecording ? (
                   <div className="flex h-11 flex-1 items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3">
                     <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
@@ -757,9 +801,9 @@ const Conversations = () => {
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-md">
           <SheetHeader className="border-b border-slate-200 px-6 py-5 text-left">
-            <SheetTitle>Notas e organizacao</SheetTitle>
+            <SheetTitle>Organizacao da conversa</SheetTitle>
             <SheetDescription>
-              {selected ? `${contactName(selected)} · ${contactPhone(selected)}` : 'Organize etiquetas, responsavel e notas internas.'}
+              {selected ? `${contactName(selected)} · ${contactPhone(selected)}` : 'Organize etiquetas e responsavel da conversa.'}
             </SheetDescription>
           </SheetHeader>
 
@@ -823,29 +867,6 @@ const Conversations = () => {
                 </div>
               </section>
 
-              <section aria-labelledby="conversation-notes-title">
-                <div className="mb-3 flex items-center gap-2">
-                  <StickyNote className="h-4 w-4 text-orange-500" />
-                  <div>
-                    <h3 id="conversation-notes-title" className="text-sm font-bold text-slate-900">Notas internas</h3>
-                    <p className="text-xs text-slate-500">Visiveis apenas para a equipe.</p>
-                  </div>
-                </div>
-                <Textarea value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Ex.: lead desqualificado, pediu retorno em setembro..." rows={4} maxLength={2000} />
-                <div className="mt-2 flex justify-end">
-                  <Button size="sm" onClick={() => void addConversationNote()} disabled={!newNote.trim() || savingDetails}>{savingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Adicionar nota</Button>
-                </div>
-                <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
-                  {notesLoading ? <div className="flex justify-center py-5"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : notes.length === 0 ? <p className="py-4 text-center text-xs text-slate-500">Nenhuma nota nesta conversa.</p> : notes.map((note) => (
-                    <article key={note.id} className="border-l-2 border-orange-400 pl-3">
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{note.content}</p>
-                      <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
-                        {note.authorProfessional?.name || note.authorUser?.name || 'Equipe'} · {format(new Date(note.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              </section>
             </div>
           )}
         </SheetContent>
