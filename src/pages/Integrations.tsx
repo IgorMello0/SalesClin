@@ -55,6 +55,7 @@ type MetaStatus = {
   coexistenceWebhookFieldsRequested?: boolean;
   coexistenceWebhookFieldsRequestedAt?: string | null;
   missingCoexistenceWebhookFields?: string[];
+  phoneNumberWebhookOverrideConfigured?: boolean;
   lastWebhookEvent?: {
     eventType?: string | null;
     status?: string;
@@ -791,7 +792,7 @@ const Integrations = () => {
                     <Button variant="outline" onClick={() => loadMetaStatus()} disabled={!!workingKey} className="w-full font-bold">
                       <RefreshCcw size={16} className="mr-2" /> Atualizar status
                     </Button>
-                    {metaStatus?.connected && (!metaStatus?.webhookConfigured || !metaStatus?.coexistenceWebhookFieldsRequested || !metaStatus?.lastPhoneEchoEvent) && (
+                    {metaStatus?.connected && (!metaStatus?.webhookConfigured || !metaStatus?.coexistenceWebhookFieldsRequested || !metaStatus?.phoneNumberWebhookOverrideConfigured || !metaStatus?.lastPhoneEchoEvent) && (
                       <Button
                         onClick={() => void repairMetaWebhook()}
                         disabled={workingKey === 'meta-webhook-repair'}
@@ -812,7 +813,7 @@ const Integrations = () => {
                       <div className={`rounded-lg border p-3 text-xs font-semibold ${metaStatus?.lastPhoneEchoEvent ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                         {metaStatus.lastPhoneEchoEvent ? (
                           `Ultimo envio pelo celular recebido em ${new Date(metaStatus.lastPhoneEchoEvent.createdAt || '').toLocaleString('pt-BR')}.`
-                        ) : metaStatus.coexistenceWebhookFieldsRequested ? (
+                        ) : metaStatus.coexistenceWebhookFieldsRequested && metaStatus.phoneNumberWebhookOverrideConfigured ? (
                           <div className="space-y-1">
                             <p className="font-black">Aguardando uma mensagem de teste do celular</p>
                             <p className="leading-relaxed">Envie uma mensagem pelo WhatsApp Business. Quando ela chegar ao SellClin, este aviso confirmara a sincronizacao.</p>

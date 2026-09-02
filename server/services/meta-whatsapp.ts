@@ -172,6 +172,7 @@ type MetaWebhookSubscription = {
   subscribedAppId: string | null
   reportedCallbackUrl: string | null
   requestedFields: string[]
+  phoneNumberOverrideConfigured: boolean
 }
 
 type MetaSubscribedApp = {
@@ -198,6 +199,10 @@ export function getMetaWebhookFields(officialMode: WhatsAppOfficialMode = 'cloud
     : [...META_STANDARD_WEBHOOK_FIELDS]
 }
 
+export function requiresPhoneNumberWebhookOverride(requestedFields: string[]) {
+  return requestedFields.includes('smb_message_echoes')
+}
+
 export function inspectMetaWebhookSubscriptions(
   subscriptions: MetaSubscribedApp[],
   expectedAppId: string,
@@ -218,6 +223,7 @@ export function inspectMetaWebhookSubscriptions(
     reportedCallbackUrl,
     overrideVerified: Boolean(app && reportedCallbackUrl === expectedCallback),
     requestedFields,
+    phoneNumberOverrideConfigured: false,
   }
 }
 
@@ -230,6 +236,7 @@ async function subscribeWhatsappApp(
   accessToken: string,
   webhook?: { callbackUrl: string; verifyToken: string },
   requestedFields: string[] = META_STANDARD_WEBHOOK_FIELDS,
+  phoneNumberId?: string | null,
 ): Promise<MetaWebhookSubscription | null> {
   try {
     const { appId } = requireMetaCredentials()
@@ -267,6 +274,24 @@ async function subscribeWhatsappApp(
     }
     if (!verification.overrideVerified) {
       throw new Error('A Meta manteve outro callback configurado para esta conta do WhatsApp.')
+    }
+
+    if (requiresPhoneNumberWebhookOverride(requestedFields)) {
+      const targetPhoneNumberId = cleanRequired(phoneNumberId, 'Phone Number ID da coexistencia')
+      console.info('[Meta WhatsApp] Configurando webhook no numero da coexistencia', {
+        phoneNumberId: targetPhoneNumberId,
+        requestedFields,
+      })
+      await graphPost(`/${targetPhoneNumberId}`, accessToken, {
+        webhook_configuration: {
+          override_callback_uri: webhook.callbackUrl,
+          verify_token: webhook.verifyToken,
+        },
+      })
+      console.info('[Meta WhatsApp] Webhook do numero da coexistencia confirmado', {
+        phoneNumberId: targetPhoneNumberId,
+      })
+      verification.phoneNumberOverrideConfigured = true
     }
 
     return verification
@@ -475,6 +500,7 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
       verifyToken: webhookVerifyToken,
     },
     requestedWebhookFields,
+    account.phoneNumberId,
   )
 
   const updated = await prisma.empresa.update({
@@ -520,6 +546,7 @@ export async function connectMetaWhatsappFromCode(code: string, state: string) {
       webhookOverrideVerified: webhookSubscription?.overrideVerified === true,
       webhookSubscribedFields: webhookSubscription?.requestedFields || [],
       webhookFieldsRequestedAt: new Date().toISOString(),
+      phoneNumberWebhookOverrideConfigured: webhookSubscription?.phoneNumberOverrideConfigured === true,
     },
   })
 
@@ -568,6 +595,7 @@ export async function getMetaWhatsappStatus(companyId: number) {
   const coexistenceWebhookFieldsRequestedAt = typeof connectionMetadata.webhookFieldsRequestedAt === 'string'
     ? connectionMetadata.webhookFieldsRequestedAt
     : null
+  const phoneNumberWebhookOverrideConfigured = connectionMetadata.phoneNumberWebhookOverrideConfigured === true
   const expectedWebhookUrl = buildMetaWebhookUrl(company.webhookToken)
   let webhookConfigured = false
   let webhookDiagnostic: string | null = null
@@ -602,6 +630,8 @@ export async function getMetaWhatsappStatus(companyId: number) {
   }
   if (officialMode === 'coexistence' && webhookConfigured && !coexistenceWebhookFieldsRequested) {
     webhookDiagnostic = 'A URL do webhook esta correta, mas a sincronizacao de mensagens enviadas pelo celular ainda nao foi solicitada com sucesso.'
+  } else if (officialMode === 'coexistence' && webhookConfigured && !phoneNumberWebhookOverrideConfigured) {
+    webhookDiagnostic = 'O webhook da conta esta correto, mas falta configurar o webhook exclusivo deste numero para receber os envios do celular.'
   }
   const lastWebhookEvent = await prisma.whatsAppWebhookEvent.findFirst({
     where: { companyId, provider: 'meta' },
@@ -652,6 +682,7 @@ export async function getMetaWhatsappStatus(companyId: number) {
     coexistenceWebhookFieldsRequested,
     coexistenceWebhookFieldsRequestedAt,
     missingCoexistenceWebhookFields,
+    phoneNumberWebhookOverrideConfigured,
     coexistenceEnabled: isCoexistenceEnabled(),
     coexistenceConfigured: Boolean(process.env.META_WHATSAPP_COEXISTENCE_CONFIG_ID),
     graphVersion: GRAPH_VERSION,
@@ -750,6 +781,7 @@ export async function saveManualMetaWhatsappConfig(companyId: number, input: Man
       webhookOverrideVerified: webhookSubscription?.overrideVerified === true,
       webhookSubscribedFields: webhookSubscription?.requestedFields || [],
       webhookFieldsRequestedAt: new Date().toISOString(),
+      phoneNumberWebhookOverrideConfigured: webhookSubscription?.phoneNumberOverrideConfigured === true,
     },
   })
 
@@ -804,6 +836,7 @@ export async function repairMetaWhatsappWebhook(
       verifyToken: webhookVerifyToken,
     },
     requestedWebhookFields,
+    company.metaPhoneNumberId,
   )
   const currentMetadata = connection?.metadata && typeof connection.metadata === 'object'
     ? connection.metadata as Record<string, unknown>
@@ -828,6 +861,7 @@ export async function repairMetaWhatsappWebhook(
       webhookRepairMode: officialMode,
       webhookSubscribedFields: subscription?.requestedFields || [],
       webhookFieldsRequestedAt: new Date().toISOString(),
+      phoneNumberWebhookOverrideConfigured: subscription?.phoneNumberOverrideConfigured === true,
     },
   })
 
@@ -836,6 +870,7 @@ export async function repairMetaWhatsappWebhook(
     webhookConfigured: subscription?.overrideVerified === true,
     requestedWebhookFields: subscription?.requestedFields || [],
     awaitingPhoneEcho: officialMode === 'coexistence',
+    phoneNumberWebhookOverrideConfigured: subscription?.phoneNumberOverrideConfigured === true,
   }
 }
 

@@ -4,6 +4,7 @@ import {
   getMetaWebhookFields,
   inspectMetaWebhookSubscriptions,
   META_COEXISTENCE_WEBHOOK_FIELDS,
+  requiresPhoneNumberWebhookOverride,
 } from './meta-whatsapp.js'
 
 const APP_ID = '893193497129440'
@@ -44,4 +45,6 @@ test('rejeita callback diferente mesmo quando o app esta assinado', () => {
 test('coexistencia solicita todos os campos necessarios para ecos do celular', () => {
   assert.deepEqual(getMetaWebhookFields('coexistence'), META_COEXISTENCE_WEBHOOK_FIELDS)
   assert.deepEqual(getMetaWebhookFields('cloud_api'), ['messages'])
+  assert.equal(requiresPhoneNumberWebhookOverride(META_COEXISTENCE_WEBHOOK_FIELDS), true)
+  assert.equal(requiresPhoneNumberWebhookOverride(['messages']), false)
 })
