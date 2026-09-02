@@ -777,7 +777,7 @@ const Integrations = () => {
                     <Button variant="outline" onClick={() => loadMetaStatus()} disabled={!!workingKey} className="w-full font-bold">
                       <RefreshCcw size={16} className="mr-2" /> Atualizar status
                     </Button>
-                    {isIntegrationConnected('whatsappCoexistence') && !metaStatus?.webhookConfigured && (
+                    {isIntegrationConnected('whatsappCoexistence') && (!metaStatus?.webhookConfigured || !metaStatus?.lastPhoneEchoEvent) && (
                       <Button
                         onClick={() => void repairMetaWebhook()}
                         disabled={workingKey === 'meta-webhook-repair'}
