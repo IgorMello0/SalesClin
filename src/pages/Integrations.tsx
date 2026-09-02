@@ -589,15 +589,17 @@ const Integrations = () => {
                         </p>
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={() => void connectMeta('cloud_api')}
-                      disabled={workingKey === 'whatsappOfficial' || !metaStatus?.serverSecretConfigured}
-                      className="shrink-0 bg-slate-950 font-bold hover:bg-slate-800"
-                    >
-                      {workingKey === 'whatsappOfficial' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
-                      Conectar com a Meta
-                    </Button>
+                    {!metaStatus?.connected && (
+                      <Button
+                        type="button"
+                        onClick={() => void connectMeta('cloud_api')}
+                        disabled={workingKey === 'whatsappOfficial' || !metaStatus?.serverSecretConfigured}
+                        className="shrink-0 bg-slate-950 font-bold hover:bg-slate-800"
+                      >
+                        {workingKey === 'whatsappOfficial' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
+                        Conectar com a Meta
+                      </Button>
+                    )}
                   </div>
 
                   <details className="group rounded-lg border border-slate-200 bg-white">
@@ -738,14 +740,16 @@ const Integrations = () => {
                             </p>
                           </div>
                         </div>
-                        <Button
-                          onClick={() => void connectMeta('coexistence')}
-                          disabled={workingKey === 'whatsappCoexistence' || !metaStatus?.coexistenceEnabled || !metaStatus?.coexistenceConfigured}
-                          className="shrink-0 bg-emerald-600 font-bold hover:bg-emerald-700"
-                        >
-                          {workingKey === 'whatsappCoexistence' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
-                          Conectar com a Meta
-                        </Button>
+                        {!metaStatus?.connected && (
+                          <Button
+                            onClick={() => void connectMeta('coexistence')}
+                            disabled={workingKey === 'whatsappCoexistence' || !metaStatus?.coexistenceEnabled || !metaStatus?.coexistenceConfigured}
+                            className="shrink-0 bg-emerald-600 font-bold hover:bg-emerald-700"
+                          >
+                            {workingKey === 'whatsappCoexistence' ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ArrowRight size={16} className="mr-2" />}
+                            Conectar com a Meta
+                          </Button>
+                        )}
                       </div>
                     </div>
 
