@@ -215,6 +215,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
   const editStages = funnels?.find(f => String(f.code || f.id) === selectedFunnelForEdit)?.stages || [];
 
   const pendingCadenceTask = leadTasks?.find((t: any) => t.status === 'pending' && t.cadenceStageCode);
+  const manualTasks = leadTasks?.filter((t: any) => !t.cadenceStageCode) || [];
 
   const handleUpdate = (field, value) => {
     setSelectedLead(prev => ({ ...prev, [field]: value }));
@@ -763,43 +764,7 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                         <p className="text-sm font-bold text-secondary">{selectedLead.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                       </div>
 
-                      {contactCadence > 0 && (
-                        <div className="space-y-2 mt-4 p-4 rounded-xl bg-slate-50 border border-slate-100 relative overflow-hidden group/cadence">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-full -mr-10 -mt-10" />
-                          
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10 flex items-center gap-1.5">
-                            <Phone className="w-3 h-3 text-primary" />
-                            Cadência de Contatos
-                          </p>
-                          
-                          <div className="flex items-center gap-3 relative z-10">
-                            <button
-                              onClick={() => handleContactChange(localContactCount - 1)}
-                              disabled={localContactCount <= 0}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                            >
-                              -
-                            </button>
-                            
-                            <div className="flex-1 flex justify-center">
-                              <span className={cn(
-                                "text-lg font-extrabold tracking-tight",
-                                localContactCount >= contactCadence ? "text-emerald-500" : "text-slate-700"
-                              )}>
-                                {localContactCount}/{contactCadence}
-                              </span>
-                            </div>
-                            
-                            <button
-                              onClick={() => handleContactChange(localContactCount + 1)}
-                              disabled={localContactCount >= contactCadence}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-emerald-500 hover:border-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      )}
+
 
                       <hr className="border-slate-100 my-2 w-full" />
                       <div className="space-y-3 w-full">
@@ -1002,9 +967,9 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                             >
                               <CheckSquare className="w-4 h-4" />
                               Tarefas
-                              {leadTasks.filter(t => t.status !== 'completed').length > 0 && (
+                              {manualTasks.filter(t => t.status !== 'completed').length > 0 && (
                                 <span className="bg-secondary text-white text-[9px] px-1.5 py-0.5 rounded-full">
-                                  {leadTasks.filter(t => t.status !== 'completed').length}
+                                  {manualTasks.filter(t => t.status !== 'completed').length}
                                 </span>
                               )}
                             </TabsTrigger>
@@ -1281,13 +1246,13 @@ export function LeadDetailsModal({ lead, isOpen, onClose, onUpdate, funnels, all
                           <div className="space-y-3">
                             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Tarefas do Lead</h4>
                             
-                            {leadTasks.length === 0 ? (
+                            {manualTasks.length === 0 ? (
                               <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 border-dashed">
                                 <p className="text-sm text-slate-400 italic">Nenhuma tarefa registrada.</p>
                               </div>
                             ) : (
                               <div className="grid grid-cols-1 gap-3">
-                                {leadTasks.map(task => (
+                                {manualTasks.map(task => (
                                   <div key={task.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col gap-3 shadow-sm hover:border-secondary/20 transition-colors group">
                                     {editingTaskId === task.id ? (
                                       <div className="space-y-3 w-full">

@@ -115,7 +115,7 @@ export function ExportModal({ isOpen, onClose, onExport, selectedCount }: Export
               </div>
               <div className="flex-1">
                 <h4 className="font-bold text-slate-800 mb-1">Planilhas Google</h4>
-                <p className="text-sm text-slate-500 mb-3">Exportando clientes do Google Sheets</p>
+                <p className="text-sm text-slate-500 mb-3">Formato CSV (Otimizado para o Planilhas Google)</p>
                 {selectedFormat === 'sheets' && (
                   <div className="space-y-3">
                     <Select value={exportScope} onValueChange={(val: any) => setExportScope(val)}>

@@ -290,7 +290,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
         where: { 
           professionalId: { in: professionalIds }, 
           ...(companyId && { companyId }),
-          date: { gte: startDate, lte: endDate },
+          createdAt: { gte: startDate, lte: endDate },
           ...paymentExtraFilters
         }
       }),
@@ -393,7 +393,7 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
           method: 'transferencia',
           professionalId: { in: professionalIds },
           ...(companyId && { companyId }),
-          date: { gte: startDate, lte: endDate },
+          createdAt: { gte: startDate, lte: endDate },
           ...paymentExtraFilters
         },
         _count: { id: true }
@@ -438,10 +438,21 @@ router.get('/metrics', auth(), requireModule('dashboard'), async (req, res) => {
       fechados: funilStatus.filter(s => closedStages.includes(s.status)).reduce((acc, curr) => acc + curr._count.id, 0),
     };
 
-    const origem = origemData.map(o => ({
-      origin: o.origin || 'Desconhecido',
-      count: o._count.id
-    })).sort((a, b) => b.count - a.count);
+    const origemMap = new Map<string, { origin: string, count: number }>();
+    
+    origemData.forEach(o => {
+      const rawOrigin = (o.origin || '').trim();
+      const key = !rawOrigin ? 'desconhecido' : rawOrigin.toLowerCase();
+      const displayOrigin = !rawOrigin || key === 'desconhecido' ? 'Desconhecido' : rawOrigin;
+      
+      if (origemMap.has(key)) {
+        origemMap.get(key)!.count += o._count.id;
+      } else {
+        origemMap.set(key, { origin: displayOrigin, count: o._count.id });
+      }
+    });
+
+    const origem = Array.from(origemMap.values()).sort((a, b) => b.count - a.count);
     
     const data = {
       leads: leadsCount,

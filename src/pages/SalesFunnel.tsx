@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import Papa from 'papaparse';
 import {
   Dialog,
   DialogContent,
@@ -1034,12 +1035,44 @@ const SalesFunnel = () => {
     );
   };
 
-  const handleExport = (format: string, scope: string) => {
-    // Aqui vai a lógica de exportação final (ex: API ou frontend CSV gen)
-    // Usaremos os ids em `selectedLeadIds` se scope for 'selected'
-    toast({ title: "Exportação Iniciada", description: `Exportando em formato ${format.toUpperCase()} (${scope === 'all' ? 'Todos' : 'Selecionados'})` });
-    if (scope === 'selected') {
-      setSelectedLeadIds([]); // limpar após exportar (opcional)
+  const handleExport = (formatType: string, scope: string) => {
+    const leadsToExport = scope === 'selected' 
+      ? leads.filter(l => selectedLeadIds.includes(l.id))
+      : leads; // or filteredLeads if they only want currently filtered
+
+    if (leadsToExport.length === 0) {
+      toast({ title: "Nenhum lead para exportar", variant: "destructive" });
+      return;
+    }
+
+    const dataToExport = leadsToExport.map(lead => ({
+      Nome: lead.name,
+      Telefone: lead.phone,
+      Email: lead.email || '',
+      Valor: lead.value,
+      Origem: lead.origin || '',
+      Status: lead.status || '',
+      DataCriacao: safeFormatDate(lead.lastUpdate), // using lastUpdate or created_at if available
+    }));
+
+    if (formatType === 'csv' || formatType === 'excel' || formatType === 'sheets') {
+      const csv = Papa.unparse(dataToExport, {
+        delimiter: formatType === 'excel' ? ';' : ',',
+      });
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' }); // BOM for UTF-8 Excel support
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `leads_export_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({ title: "Exportação Concluída", description: `Foram exportados ${leadsToExport.length} leads.` });
+      
+      if (scope === 'selected') {
+        setSelectedLeadIds([]);
+      }
     }
   };
 
