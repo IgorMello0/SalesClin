@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Bot, Check, ChevronDown, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Mic,
+  Bot, Check, ChevronDown, Clock3, Download, Image as ImageIcon, Inbox, Loader2, MessageCircle, Mic, Pause,
   Maximize2, Paperclip, Phone, Plus, RefreshCcw, Search, Send, Smile, Square,
-  StickyNote, Tag, User, X,
+  StickyNote, Tag, User, X, Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { aiAgentsApi, campaignsApi, conversationsApi, whatsappTemplatesApi } from '@/lib/api';
 import { validateMediaUpload } from '@/lib/media-upload';
@@ -76,6 +77,7 @@ type PendingMedia = { file: File; previewUrl: string; type: 'image' | 'video' | 
 type PreviewMedia = { url: string; alt: string; type: 'image' | 'video' };
 
 const EMOJIS = ['😀', '😊', '😂', '😍', '🙏', '👍', '👏', '🎉', '❤️', '✅', '📅', '🦷', '💬', '✨', '🚀', '😉'];
+const VOICE_WAVEFORM = [10, 16, 25, 37, 22, 48, 34, 57, 42, 29, 51, 64, 38, 24, 46, 33, 55, 68, 42, 30, 49, 37, 61, 45, 27, 40, 58, 35, 23, 47, 31, 52, 39, 21, 34, 18];
 
 const CONVERSATION_FILTER_LABELS: Record<string, string> = {
   all: 'Todas as conversas',
@@ -133,8 +135,127 @@ function downloadMedia(url: string) {
   link.remove();
 }
 
+function formatVoiceTime(seconds: number) {
+  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`;
+}
+
+function VoiceMessagePlayer({
+  url,
+  incoming,
+  avatarUrl,
+  avatarName,
+}: {
+  url: string;
+  incoming: boolean;
+  avatarUrl?: string | null;
+  avatarName: string;
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const progress = duration > 0 ? Math.min(currentTime / duration, 1) : 0;
+  const completedBars = Math.round(progress * VOICE_WAVEFORM.length);
+  const lightText = incoming ? 'text-slate-500' : 'text-slate-300';
+
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      try {
+        await audio.play();
+      } catch {
+        setIsPlaying(false);
+      }
+      return;
+    }
+    audio.pause();
+  };
+
+  const seek = (value: string) => {
+    const audio = audioRef.current;
+    const nextTime = Number(value);
+    if (!audio || !Number.isFinite(nextTime)) return;
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  };
+
+  return (
+    <div className="flex w-[min(340px,calc(100vw-9rem))] items-center gap-2 p-2 sm:w-[340px]">
+      <audio
+        ref={audioRef}
+        src={url}
+        preload="metadata"
+        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+        onDurationChange={(event) => setDuration(event.currentTarget.duration)}
+        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={`h-9 w-9 flex-shrink-0 rounded-full ${incoming ? 'text-slate-800 hover:bg-slate-100 hover:text-slate-950' : 'text-white hover:bg-white/10 hover:text-white'}`}
+        onClick={() => void togglePlayback()}
+        aria-label={isPlaying ? 'Pausar audio' : 'Reproduzir audio'}
+        title={isPlaying ? 'Pausar audio' : 'Reproduzir audio'}
+      >
+        {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+      </Button>
+      <div className="min-w-0 flex-1">
+        <div className="relative flex h-8 items-center gap-px">
+          {VOICE_WAVEFORM.map((height, index) => (
+            <span
+              key={`${height}-${index}`}
+              className={`flex-1 rounded-full transition-colors ${index < completedBars ? (incoming ? 'bg-orange-500' : 'bg-sky-400') : (incoming ? 'bg-slate-300' : 'bg-white/30')}`}
+              style={{ height: `${height}%` }}
+            />
+          ))}
+          <input
+            type="range"
+            min="0"
+            max={duration || 0}
+            step="0.1"
+            value={Math.min(currentTime, duration || 0)}
+            onChange={(event) => seek(event.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            aria-label="Avancar audio"
+          />
+        </div>
+        <div className={`mt-1 flex items-center justify-between text-[10px] font-semibold ${lightText}`}>
+          <span>{formatVoiceTime(currentTime || duration)}</span>
+          <span>{isPlaying ? 'Reproduzindo' : 'Audio'}</span>
+        </div>
+      </div>
+      <div className="relative h-10 w-10 flex-shrink-0 overflow-visible rounded-full">
+        <div className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border ${incoming ? 'border-slate-200 bg-slate-100 text-slate-600' : 'border-white/20 bg-slate-700 text-white'}`}>
+          {avatarUrl ? <img src={avatarUrl} alt={avatarName} className="h-full w-full object-cover" /> : <span className="text-xs font-black">{initials(avatarName).slice(0, 1)}</span>}
+        </div>
+        <span className="absolute -bottom-0.5 -left-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-sky-500 text-white"><Mic className="h-2.5 w-2.5" /></span>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={`h-7 w-7 flex-shrink-0 ${incoming ? 'text-slate-400 hover:text-slate-700' : 'text-white/55 hover:bg-white/10 hover:text-white'}`}
+        onClick={() => downloadMedia(url)}
+        aria-label="Baixar audio"
+        title="Baixar audio"
+      >
+        <Download className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
 const Conversations = () => {
   const { toast } = useToast();
+  const { professional } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [filter, setFilter] = useState('all');
@@ -737,10 +858,12 @@ const Conversations = () => {
                         </div>
                       )}
                       {message.rawJson?.mediaUrl && message.rawJson.mediaType === 'audio' && (
-                        <div className={`flex items-center gap-1 p-2 ${incoming ? 'bg-white' : 'bg-slate-950'}`}>
-                          <audio src={message.rawJson.mediaUrl} controls className="h-10 w-[280px] max-w-[calc(100vw-9rem)]" />
-                          <Button type="button" variant="ghost" size="icon" className={incoming ? 'text-slate-600' : 'text-white hover:bg-white/10 hover:text-white'} onClick={() => downloadMedia(message.rawJson!.mediaUrl!)} title="Baixar audio" aria-label="Baixar audio"><Download className="h-4 w-4" /></Button>
-                        </div>
+                        <VoiceMessagePlayer
+                          url={message.rawJson.mediaUrl}
+                          incoming={incoming}
+                          avatarUrl={incoming ? contactAvatar(selected) : professional?.photoUrl}
+                          avatarName={incoming ? contactName(selected) : professional?.name || 'Equipe'}
+                        />
                       )}
                       {message.content && !/^\[(image|video|audio|sticker)\]$/.test(message.content) && <p className={`px-4 py-2.5 ${message.rawJson?.isSticker ? (incoming ? 'rounded-2xl bg-white text-slate-800' : 'rounded-2xl bg-slate-950 text-white') : ''}`}>{message.content}</p>}
                     </div>
